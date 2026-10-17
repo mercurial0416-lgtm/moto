@@ -1,0 +1,83 @@
+name: MOTO HUB Alpha6-AG APK + source
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+permissions:
+  contents: read
+jobs:
+  checkpoint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK 36
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -1); fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Make scripts executable
+        run: chmod +x gradlew tests/*.sh
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Fast pure-JVM tests
+        run: |
+          ./tests/run-offline-tests.sh
+          ./tests/run-server-settings-tests.sh
+          ./tests/run-quick-entry-tests.sh
+          ./tests/run-bike-visual-tests.sh
+          ./tests/run-photo-request-tests.sh
+          ./tests/run-photo-retry-tests.sh
+          ./tests/run-photo-title-tests.sh
+          ./tests/run-catalog-search-tests.sh
+          ./tests/run-catalog-year-tests.sh
+          ./tests/run-date-field-tests.sh
+          ./tests/run-draft-banner-tests.sh
+          ./tests/run-ride-readiness-tests.sh
+          ./tests/run-ride-consent-tests.sh
+          ./tests/run-home-ride-tests.sh
+          ./tests/run-ride-tests.sh
+          ./tests/run-ride-history-tests.sh
+          ./tests/run-ride-filter-tests.sh
+          ./tests/run-ride-sort-tests.sh
+          ./tests/run-ride-search-tests.sh
+          ./tests/run-track-recovery-tests.sh
+          ./tests/run-backup-tests.sh
+          ./tests/run-restore-tests.sh
+      - name: Verify motorcycle catalog data
+        run: python3 tests/test_catalog.py
+      - name: Build APK first (early checkpoint)
+        run: ./gradlew :app:assembleDebug --no-daemon
+      - name: Preserve installable APK before long-running tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-hub-alpha6-ag-apk-first
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Android lint and JVM tests
+        run: ./gradlew :app:lintDebug :app:testDebugUnitTest --no-daemon
+      - name: Save source checkpoint even if APK build or lint fails
+        if: always()
+        run: |
+          zip -q -r MOTO-HUB-4.0.0-alpha6-ag-source.zip . \
+            -x '.git/*' '.gradle/*' '*/build/*' 'app/build/*' '*.apk' 'MOTO-HUB-4.0.0-alpha6-ag-source.zip'
+          if test -f app/build/outputs/apk/debug/app-debug.apk; then
+            cp app/build/outputs/apk/debug/app-debug.apk MOTO-HUB-4.0.0-alpha6-ag-debug.apk
+          fi
+          sha256sum MOTO-HUB-4.0.0-alpha6-ag-source.zip > SHA256SUMS-alpha6-ag.txt
+          if test -f MOTO-HUB-4.0.0-alpha6-ag-debug.apk; then sha256sum MOTO-HUB-4.0.0-alpha6-ag-debug.apk >> SHA256SUMS-alpha6-ag.txt; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: moto-hub-alpha6-ag-checkpoint
+          path: |
+            MOTO-HUB-4.0.0-alpha6-ag-debug.apk
+            MOTO-HUB-4.0.0-alpha6-ag-source.zip
+            SHA256SUMS-alpha6-ag.txt
+          if-no-files-found: error
+          retention-days: 30

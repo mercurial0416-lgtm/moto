@@ -1,0 +1,40 @@
+plugins { id 'com.android.application' }
+android {
+ namespace 'com.motohub.next'
+ compileSdk 36
+ buildToolsVersion "36.0.0"
+ defaultConfig { applicationId 'com.motohub.next'; minSdk 26; targetSdk 36; versionCode 448; versionName '4.0.0-alpha6-aq-fix1'; testInstrumentationRunner 'com.motohub.next.SmokeRunner' }
+ defaultConfig { buildConfigField "String", "SUPABASE_URL", groovy.json.JsonOutput.toJson(providers.gradleProperty("supabaseUrl").getOrElse("https://paraeadvvdqyztqqhxpu.supabase.co")); buildConfigField "String", "SUPABASE_KEY", groovy.json.JsonOutput.toJson(providers.gradleProperty("supabaseKey").getOrElse("sb_publishable_fkKoDsRamzU0r1vt88opgw_GOUke5TY")) }
+ buildFeatures { buildConfig = true }
+ defaultConfig { buildConfigField "String", "UPDATE_MANIFEST_URL", groovy.json.JsonOutput.toJson(providers.gradleProperty("updateManifestUrl").getOrElse("")) }
+ compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+ testOptions { unitTests.includeAndroidResources = true; unitTests.all { maxHeapSize = "2g"; systemProperty "robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2"; ["https.proxyHost","https.proxyPort","http.proxyHost","http.proxyPort"].each { key -> if(System.getProperty(key)) systemProperty key, System.getProperty(key) } } }
+ // Never commit the signing key. All four variables are required for a signed release.
+ def signingFile = System.getenv('MOTO_SIGNING_STORE_FILE')
+ def signingStorePassword = System.getenv('MOTO_SIGNING_STORE_PASSWORD')
+ def signingKeyAlias = System.getenv('MOTO_SIGNING_KEY_ALIAS')
+ def signingKeyPassword = System.getenv('MOTO_SIGNING_KEY_PASSWORD')
+ def signingFields = [signingFile, signingStorePassword, signingKeyAlias, signingKeyPassword]
+ if (signingFields.any { it != null } && !signingFields.every { it != null && !it.isEmpty() }) {
+   throw new GradleException('Incomplete MOTO signing environment configuration')
+ }
+ if (signingFields.every { it != null && !it.isEmpty() }) {
+   signingConfigs {
+     motoRelease {
+       storeFile file(signingFile)
+       storePassword signingStorePassword
+       keyAlias signingKeyAlias
+       keyPassword signingKeyPassword
+     }
+   }
+ }
+ buildTypes {
+   release {
+     minifyEnabled false
+     if (signingFields.every { it != null && !it.isEmpty() }) signingConfig signingConfigs.motoRelease
+   }
+ }
+
+}
+
+dependencies { implementation "org.osmdroid:osmdroid-android:6.1.20"; testImplementation "junit:junit:4.13.2"; testImplementation "org.robolectric:robolectric:4.14.1" }
