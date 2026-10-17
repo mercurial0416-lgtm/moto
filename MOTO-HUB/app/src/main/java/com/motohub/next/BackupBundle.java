@@ -10,10 +10,11 @@ public final class BackupBundle {
  private BackupBundle() {}
  static final long MAX_TOTAL=250_000_000L;
  private static long writeFile(ZipOutputStream zip,File file,String name,long total)throws IOException{
-  if(!file.isFile()||file.length()>TrackFile.MAX_BYTES)return total;
+  if(!file.isFile())throw new IOException("백업 파일을 찾지 못했어요: "+file.getName());
+  if(file.length()>TrackFile.MAX_BYTES)throw new IOException("백업 항목이 25MB를 넘었어요: "+file.getName());
   if(total+file.length()>MAX_TOTAL)throw new IOException("백업 최대 크기(250MB)를 넘었어요. GPX를 개별로 내보내 주세요.");
   zip.putNextEntry(new ZipEntry(name));byte[] buffer=new byte[32768];long done=0;
-  try(InputStream in=new BufferedInputStream(new FileInputStream(file))){int n;while((n=in.read(buffer))!=-1){done+=n;if(done>TrackFile.MAX_BYTES)throw new IOException("백업 항목 크기가 너무 큽니다.");zip.write(buffer,0,n);}}
+  try(InputStream in=new BufferedInputStream(new FileInputStream(file))){int n;while((n=in.read(buffer))!=-1){done+=n;if(done>TrackFile.MAX_BYTES||total+done>MAX_TOTAL)throw new IOException("백업 항목 크기가 너무 큽니다.");zip.write(buffer,0,n);}}
   zip.closeEntry();return total+done;
  }
  public static int export(String json,File internal,OutputStream target)throws Exception{
