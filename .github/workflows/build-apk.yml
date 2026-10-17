@@ -29,6 +29,10 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Fix legacy Android view calls
+        run: |
+          sed -i 's/tile.setMinHeight(/tile.setMinimumHeight(/g' MOTO-HUB/app/src/main/java/com/motohub/next/HubScreens.java MOTO-HUB/app/src/main/java/com/motohub/next/GarageHomeUi.java
+          sed -i 's/base.requestApplyWindowInsets()/base.requestApplyInsets()/g' MOTO-HUB/app/src/main/java/com/motohub/next/RideMapActivity.java
       - name: Build debug APK
         working-directory: MOTO-HUB
         run: |
