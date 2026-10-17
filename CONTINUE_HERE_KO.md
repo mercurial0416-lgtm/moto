@@ -17,7 +17,7 @@
 6. GitHub Actions에서 순수 Java 테스트, assembleDebug, lintDebug, Robolectric 단위 테스트와 APK 서명/SHA 검사를 실행. CI에서는 Supabase URL/key를 비워 실제 서버 요청 방지.
 
 ## 검증 및 제한
-- 로컬 Java 테스트 스크립트 24개 실행. model 스크립트는 JSON_JAR 지정 후 재실행 통과. 복원 테스트는 롤백 실패 재현을 포함해 22개 검사 통과.
+- 최종 소스 기준 로컬 Java 테스트 스크립트 24개 모두 통과(JSON_JAR 명시). 복원 테스트는 롤백 실패 재현을 포함해 22개 검사 통과.
 - 로컬 Gradle: 의존성 다운로드 제한, offline 캐시 부족으로 빌드 불가. GitHub Actions 검증 결과는 최종 결과 항목에서 확인.
 - Galaxy S25 / Android 16 실기기, 설치, 키보드, 화면 꺼짐 GPS, 두 계정 위치 공유는 미실행.
 - 이번 작업에서 Supabase 스키마나 실제 데이터를 수정하지 않았다.
@@ -44,3 +44,15 @@ Actions는 APK와 lint/test 보고서를 같은 artifact로 업로드한다. 과
 
 ## 다른 채팅에 붙여넣기
 `mercurial0416-lgtm/moto` 저장소의 `fix/aq-validation-handoff-20261018` 브랜치를 열고 `CONTINUE_HERE_KO.md`부터 읽어. GitHub AQ 기반 오류 수정본이며 다른 대화의 AZ와 아직 병합하지 않았어. Actions 결과와 테스트 로그를 확인한 뒤 AZ와 비교 병합하고 실기기 미검증 항목을 이어서 처리해. 기존 데이터와 서명키 호환성을 지켜줘.
+
+## 최종 확인 결과
+- 검증한 앱 코드 커밋: `335e605a010c85dcc19f2e39643f39fa8a6987d2`.
+- CI: https://github.com/mercurial0416-lgtm/moto/actions/runs/39075772687 — success.
+- APK/보고서: https://github.com/mercurial0416-lgtm/moto/actions/runs/39075772687/artifacts/12116873298 (보관 만료 2027-01-15).
+- PR: https://github.com/mercurial0416-lgtm/moto/pull/1 — draft, main 미병합.
+- Java 테스트 스크립트 24개 통과. JUnit/Robolectric 55개, 실패/오류/건너뜀 0.
+- Lint 오류 0 / 경고 27: 문자열 리소스화/RTL/위젯 레이아웃/Gradle 버전 권고 등. Context 정적 참조 경고 2개는 코드상 Application Context만 보관하고 있음. 경고를 억제하거나 모두 해결했다고 주장하지 않음.
+- APK: 817,050 bytes. SHA-256 `2c0e2a4e0ba55d07e51e6e7031eb5bebce330646e37eaaf4c5df623ee0ffdb20`.
+- 서명: v2 검증 통과, Android Debug. 인증서 SHA-256 `e20f8b9cc054fb8273a7346e8461b8329d72e1e66adca616b46f803f09e96d83`.
+- 이 APK는 CI 명령에서 Supabase 설정을 비운 검증용 빌드. 서버 연동 검증/실기기 설치 결과물이 아님.
+- 현재 설치된 앱의 서명은 확인하지 못했으며, 기존 배포 APK와 업데이트 호환을 보장하지 않음. 테스트 실행 때마다 생성되는 debug 키는 안정적인 배포 서명이 아님.
