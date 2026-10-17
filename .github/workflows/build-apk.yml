@@ -1,46 +1,49 @@
-name: Build MOTO HUB Alpha6-AQ APK
+name: Validate and build MOTO HUB
 on:
   workflow_dispatch:
   push:
-    paths:
-      - 'MOTO-HUB-4.0.0-alpha6-aq-source.zip'
-      - '.github/workflows/build-apk.yml'
+    paths: ['MOTO-HUB/**', '.github/workflows/build-apk.yml']
+  pull_request:
+    paths: ['MOTO-HUB/**', '.github/workflows/build-apk.yml']
 permissions:
   contents: read
 jobs:
   apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Extract source checkpoint
-        run: |
-          test -f MOTO-HUB-4.0.0-alpha6-aq-source.zip
-          unzip -q MOTO-HUB-4.0.0-alpha6-aq-source.zip
-          test -f MOTO-HUB/app/build.gradle
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - name: Install SDK
         run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -1); fi
-          yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0'
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Fix legacy Android view calls
+      - name: Pure Java regression tests
+        working-directory: MOTO-HUB
         run: |
-          sed -i 's/tile.setMinHeight(/tile.setMinimumHeight(/g' MOTO-HUB/app/src/main/java/com/motohub/next/HubScreens.java MOTO-HUB/app/src/main/java/com/motohub/next/GarageHomeUi.java
-          sed -i 's/base.requestApplyWindowInsets()/base.requestApplyInsets()/g' MOTO-HUB/app/src/main/java/com/motohub/next/RideMapActivity.java
-      - name: Build debug APK
+          curl --fail --location --retry 3 -o "$RUNNER_TEMP/json.jar" https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar
+          export JSON_JAR="$RUNNER_TEMP/json.jar"
+          for test in tests/run-*.sh; do bash "$test"; done
+      - name: Build, lint and unit tests (no backend requests)
         working-directory: MOTO-HUB
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --no-daemon
-      - name: Upload APK
+          ./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest -PsupabaseUrl= -PsupabaseKey= --no-daemon
+      - name: APK signature and checksum
+        working-directory: MOTO-HUB
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/signature.txt
+          sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/SHA256.txt
+      - name: Upload APK and reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: MOTO-HUB-Alpha6-AQ-APK
-          path: MOTO-HUB/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          name: MOTO-HUB-AQ-review-${{ github.sha }}
+          path: |
+            MOTO-HUB/app/build/outputs/apk/debug/
+            MOTO-HUB/app/build/reports/
+            MOTO-HUB/app/build/test-results/
+          if-no-files-found: warn
