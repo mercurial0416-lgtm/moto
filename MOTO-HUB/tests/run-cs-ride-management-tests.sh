@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 javac -encoding UTF-8 -d "$work" \
- app/src/main/java/com/motohub/next/{TrackFile,TrackCompletion,RideTrackMerge,RideBikeBinding,RideCategory,RideMotionGate,RideInsights,BackupBundle,RestoreArchive}.java \
+ app/src/main/java/com/motohub/next/{TrackFile,TrackCompletion,RideTrackMerge,RideBikeBinding,RideCategory,RideMotionGate,RideInsights,BackupFormat,BackupBundle,RestoreArchive}.java \
  tests/RideCategoryAndUndoTest.java
 java -cp "$work" com.motohub.next.RideCategoryAndUndoTest
 python3 - <<'PY'
