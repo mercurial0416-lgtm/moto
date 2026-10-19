@@ -21,5 +21,6 @@ assert 'LocalSafetyBackup.recoveryPoints(a)' in ui
 assert 'LocalSafetyBackup.read(snapshots[i])' in ui
 assert 'Sharing.start(' not in service
 assert 'prepareForeground(true)' in service
-assert "versionCode 512" in (R/'app/build.gradle').read_text()
+from version_consistency import version_declaration_ok
+assert version_declaration_ok()
 print('PASS: 17 DC source/integration assertions')
