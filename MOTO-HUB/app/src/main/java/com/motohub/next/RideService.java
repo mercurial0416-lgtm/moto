@@ -65,7 +65,7 @@ public final class RideService extends Service implements LocationListener {
    // A rejected duplicate start must never stop an already-running foreground
    // ride: Android can deliver a second start intent while a restore is pending.
    if(!RideSessionInterlock.keepExistingSession(running,autoArmed)){
-    status="백업 복원 중에는 라이딩을 시작할 수 없습니다.";
+    status="백업 또는 복원 중에는 라이딩을 시작할 수 없습니다.";
     stopSelf();
    }
    return START_NOT_STICKY;

@@ -18,7 +18,7 @@ assert 'Sharing.start(' not in src
 assert 'ObdReadOnlyProtocol.query(' not in src or 'Obd' in src
 ui=Path('app/src/main/java/com/motohub/next/MainActivity.java').read_text()
 assert 'info.movingAverageKmh' in ui
-assert '정차 또는 GPS 신호 누락' in ui
-assert "versionCode 513" in Path('app/build.gradle').read_text()
+assert '정차·GPS 누락 구분 불가' in ui
+assert "versionCode 514" in Path('app/build.gradle').read_text()
 print('PASS DD safety/UI/version source wiring')
 PY

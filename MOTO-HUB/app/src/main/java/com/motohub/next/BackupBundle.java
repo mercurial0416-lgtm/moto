@@ -17,6 +17,23 @@ public final class BackupBundle {
   try(InputStream in=new BufferedInputStream(new FileInputStream(file))){int n;while((n=in.read(buffer))!=-1){done+=n;if(done>TrackFile.MAX_BYTES||total+done>MAX_TOTAL)throw new IOException("백업 항목 크기가 너무 큽니다.");zip.write(buffer,0,n);}}
   zip.closeEntry();return total+done;
  }
+ /** Count complete GPX bytes without holding a possibly huge route in memory. */
+ private static final class BoundedCounter extends OutputStream {
+  private long count;
+  @Override public void write(int b)throws IOException {advance(1);}
+  @Override public void write(byte[] b,int off,int len)throws IOException {
+   if(off<0||len<0||off>b.length-len)throw new IndexOutOfBoundsException();
+   advance(len);
+  }
+  private void advance(int amount)throws IOException {
+   if(amount<0||count>50_000_000L-amount)throw new IOException("GPX 용량 제한(50MB)을 초과했습니다.");
+   count+=amount;
+  }
+ }
+ /** Only committed, parseable GPS data is eligible for an optional GPX export. */
+ private static long gpxBytes(File track)throws Exception {
+  BoundedCounter counter=new BoundedCounter();TrackFile.gpx(track,counter);return counter.count;
+ }
  public static int export(String json,File internal,OutputStream target)throws Exception{
   byte[] data=json.getBytes(StandardCharsets.UTF_8);if(data.length>8_000_000)throw new IOException("JSON 데이터가 8MB를 넘었어요.");
   long total=data.length;int count=0;
@@ -34,15 +51,22 @@ public final class BackupBundle {
   File rides=new File(internal,"rides");File[] tracks=rides.listFiles((dir,name)->name.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));
   if(tracks!=null){if(tracks.length>2500)throw new IOException("주행 기록이 너무 많습니다.");
    for(File file:tracks){total=writeFile(zip,file,"rides/"+file.getName(),total);count++;
-    if(new File(file.getPath()+".done").isFile()||new File(file.getPath()+".recovered").isFile())try{
-     if(TrackFile.read(file,(x,y,z,t)->{})>=2){
-      // Add an interoperable GPX file for recovery on another device.
-      if(total+file.length()*2<MAX_TOTAL){
-       zip.putNextEntry(new ZipEntry("gpx/"+file.getName().replace(".track",".gpx")));
-       TrackFile.gpx(file,zip);zip.closeEntry();total+=file.length()*2;
-      }
+    if(new File(file.getPath()+".done").isFile()||new File(file.getPath()+".recovered").isFile()){
+     // Preflight validates both the GPS source and the exact generated size.
+     // NEVER suppress a failure after opening a ZIP entry: that would silently
+     // ship a truncated GPX and still report backup success.
+     long estimatedGpx=0;
+     try{if(TrackFile.read(file,(x,y,z,t)->{})>=2)estimatedGpx=gpxBytes(file);}
+     catch(Exception invalidTrack){
+      // The original track is always included; damaged/interrupted tracks
+      // cannot be represented as a trustworthy GPX route.
      }
-    }catch(Exception ignored){ /* Keep the original track even if its GPX conversion is corrupt. */ }
+     if(estimatedGpx>0&&total<=MAX_TOTAL-estimatedGpx){
+      zip.putNextEntry(new ZipEntry("gpx/"+file.getName().replace(".track",".gpx")));
+      TrackFile.gpx(file,zip); // Any mid-write error aborts the full export.
+      zip.closeEntry();total+=estimatedGpx;
+     }
+    }
     
     // Merged source metadata must round-trip. Without it restored monthly
     // statistics would count both originals plus the combined ride.

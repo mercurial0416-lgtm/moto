@@ -1,4 +1,4 @@
-name: MOTO HUB Alpha6-DD APK + source
+name: MOTO HUB Alpha6-DE APK + source
 on:
   workflow_dispatch:
   push:
@@ -99,13 +99,13 @@ jobs:
         run: |
           test -f gradlew && test -f settings.gradle && test -f app/build.gradle
           test -f app/src/main/AndroidManifest.xml
-          grep -q 'versionCode 513' app/build.gradle
+          grep -q 'versionCode 514' app/build.gradle
       - name: Build APK first (early checkpoint)
         run: ./gradlew :app:assembleDebug --no-daemon
       - name: Preserve installable APK before long-running tests
         uses: actions/upload-artifact@v4
         with:
-          name: moto-hub-alpha6-dd-apk-first
+          name: moto-hub-alpha6-de-apk-first
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
@@ -114,20 +114,20 @@ jobs:
       - name: Save source checkpoint even if APK build or lint fails
         if: always()
         run: |
-          zip -q -r MOTO-HUB-4.0.0-alpha6-dd-source.zip . \
-            -x '.git/*' '.gradle/*' '*/build/*' 'app/build/*' '*.apk' '*.jks' '*.keystore' 'local.properties' '.env' '.env.*' 'MOTO-HUB-4.0.0-alpha6-dd-source.zip'
+          zip -q -r MOTO-HUB-4.0.0-alpha6-de-source.zip . \
+            -x '.git/*' '.gradle/*' '*/build/*' 'app/build/*' '*.apk' '*.jks' '*.keystore' 'local.properties' '.env' '.env.*' 'MOTO-HUB-4.0.0-alpha6-de-source.zip'
           if test -f app/build/outputs/apk/debug/app-debug.apk; then
-            cp app/build/outputs/apk/debug/app-debug.apk MOTO-HUB-4.0.0-alpha6-dd-debug.apk
+            cp app/build/outputs/apk/debug/app-debug.apk MOTO-HUB-4.0.0-alpha6-de-debug.apk
           fi
-          sha256sum MOTO-HUB-4.0.0-alpha6-dd-source.zip > SHA256SUMS-alpha6-dd.txt
-          if test -f MOTO-HUB-4.0.0-alpha6-dd-debug.apk; then sha256sum MOTO-HUB-4.0.0-alpha6-dd-debug.apk >> SHA256SUMS-alpha6-dd.txt; fi
+          sha256sum MOTO-HUB-4.0.0-alpha6-de-source.zip > SHA256SUMS-alpha6-de.txt
+          if test -f MOTO-HUB-4.0.0-alpha6-de-debug.apk; then sha256sum MOTO-HUB-4.0.0-alpha6-de-debug.apk >> SHA256SUMS-alpha6-de.txt; fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: moto-hub-alpha6-dd-checkpoint
+          name: moto-hub-alpha6-de-checkpoint
           path: |
-            MOTO-HUB-4.0.0-alpha6-dd-debug.apk
-            MOTO-HUB-4.0.0-alpha6-dd-source.zip
-            SHA256SUMS-alpha6-dd.txt
+            MOTO-HUB-4.0.0-alpha6-de-debug.apk
+            MOTO-HUB-4.0.0-alpha6-de-source.zip
+            SHA256SUMS-alpha6-de.txt
           if-no-files-found: error
           retention-days: 30

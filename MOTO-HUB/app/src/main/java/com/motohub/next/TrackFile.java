@@ -15,7 +15,7 @@ final class TrackFile {
   if(bike.exists()&&!bike.delete())throw new IOException("빈 GPS 파일의 바이크 연결 정보 정리 실패");
   return true;
  }
- static List<File> tracks(File files)throws IOException{File[] a=directory(files).listFiles((d,n)->n.endsWith(".track"));List<File> list=new ArrayList<>(Arrays.asList(a==null?new File[0]:a));list.sort((x,y)->y.getName().compareTo(x.getName()));return list;}
+ static List<File> tracks(File files)throws IOException{File[] a=directory(files).listFiles((d,n)->n.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));List<File> list=new ArrayList<>(Arrays.asList(a==null?new File[0]:a));list.sort((x,y)->y.getName().compareTo(x.getName()));return list;}
  interface Consumer{void point(double lat,double lon,double accuracy,long time)throws Exception;}
  static int read(File f,Consumer consumer)throws Exception{
   if(f.length()>MAX_BYTES)throw new IOException("경로 파일 크기 초과");int count=0;long previous=0;

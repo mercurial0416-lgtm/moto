@@ -328,7 +328,8 @@ public class MainActivity extends Activity {
      LinearLayout row=col();row.setPadding(dp(15),dp(15),dp(15),dp(15));row.setBackground(shape(panel,line,16));
      label(row,String.format(Locale.KOREA,"평균 %.1f km/h · 최고 %.0f km/h",info.averageKmh,info.peakKmh),18,fg,true);
      label(row,String.format(Locale.KOREA,"이동 중 평균 %.1f km/h · GPS 추정 이동 시간 %d분",info.movingAverageKmh,info.movingMillis/60000),13,muted,false);
-     label(row,"총 경과 "+(info.durationMillis/60000)+"분 · 정차 또는 GPS 신호 누락 "+(Math.max(0,info.durationMillis-info.movingMillis)/60000)+"분 (구분 불가)",13,muted,false);
+     label(row,"GPS 관측 구간 "+(info.gpsObservedMillis/60000)+"분 · 시간 관측률 "+info.gpsCoveragePercent()+"% (정확도 40m 이하 기준)",13,muted,false);
+     label(row,"총 경과 "+(info.durationMillis/60000)+"분 · 이동 외 시간 "+(Math.max(0,info.durationMillis-info.movingMillis)/60000)+"분 (정차·GPS 누락 구분 불가)",13,muted,false);
      label(row,"평균속도는 총 경과시간 기준 · 오차 좌표 "+info.discarded+"개 제외",12,muted,false);p.addView(row);
      if(new File(track.getPath()+".imported").exists())label(p,"GPX에서 가져온 기록 · 실제 주행 여부는 직접 확인해 주세요.",13,muted,false);
      if(new File(track.getPath()+".recovered").exists())label(p,"중단 후 복구한 GPS 기록 · 마지막 좌표 일부가 누락됐을 수 있어요.",13,muted,false);
@@ -842,9 +843,11 @@ public class MainActivity extends Activity {
   },"MOTO-ZIP-restore-check").start();
  }
  void exportBundle(){
+  if(!BackupExportGate.canExport(RideService.running,RideService.autoArmed,RestoreRideGate.isRestoring())){error(BackupExportGate.MESSAGE);return;}
   new AlertDialog.Builder(this).setTitle("모든 기록 ZIP 내보내기")
    .setMessage("바이크·정비·매물·GPS 경로·직접 찍은 사진을 한 파일로 저장해요. GPS 위치가 들어 있으니 백업 파일 공유에 주의하세요.\n\n전체 ZIP도 복원할 수 있어요. 기록 복원 전에 현재 데이터를 따로 백업해 주세요.")
    .setNegativeButton("취소",null).setPositiveButton("내보내기",(d,w)->attempt(()->{
+    if(!BackupExportGate.canExport(RideService.running,RideService.autoArmed,RestoreRideGate.isRestoring()))throw new IOException(BackupExportGate.MESSAGE);
     pendingBundleJson=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);
     Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/zip");i.addCategory(Intent.CATEGORY_OPENABLE);
     i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-FULL-"+today()+".zip");startActivityForResult(i,45);
@@ -856,11 +859,24 @@ public class MainActivity extends Activity {
   if(request==45){
    final String snapshot=pendingBundleJson;pendingBundleJson="";
    if(snapshot.isEmpty()){error("백업 정보를 찾지 못했어요. 다시 시도하세요.");return;}
-   new Thread(()->{try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
-    if(out==null)throw new IOException("백업 파일을 열 수 없어요.");
-    int count=BackupBundle.export(snapshot,getFilesDir(),out);
+   new Thread(()->{
+    boolean reserved=RestoreRideGate.beginExport(RideService.running,RideService.autoArmed);
+    try{
+    if(!reserved)throw new IOException(BackupExportGate.MESSAGE);
+    int count;
+    try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
+     if(out==null)throw new IOException("백업 파일을 열 수 없어요.");
+     count=BackupBundle.export(snapshot,getFilesDir(),out);
+    }
+    // File provider receives the completed ZIP only after its stream closes.
+    // Reopen it before claiming success, so truncated/corrupt exports are visible.
+    try(InputStream check=getContentResolver().openInputStream(uri)){
+     if(check==null)throw new IOException("백업 검증을 위해 파일을 다시 열 수 없어요.");
+     BackupIntegrity.verify(check);
+    }
     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast("전체 백업 완료 · "+count+"개 기록/사진");});
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 백업 실패: "+e.getMessage());});}
+    finally{if(reserved)RestoreRideGate.endExport();}
    },"MOTO-full-backup").start();return;
   }
   if(request==44){
