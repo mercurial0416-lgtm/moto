@@ -38,8 +38,8 @@ final class LocalSafetyBackup {
    try{
     out=atomic.startWrite();out.write(bytes);atomic.finishWrite(out);out=null;
     // Verify the persisted snapshot before rotating older recovery points.
-    JSONObject verified=read(destination);
-    written=verified.similar(data);
+    read(destination); // Validate the backup through the normal parser.
+    written=java.util.Arrays.equals(bytes,java.nio.file.Files.readAllBytes(destination.toPath()));
    }catch(Exception e){if(out!=null)atomic.failWrite(out);}
    if(!written){
     // A failed or unverifiable snapshot must not trigger deletion of older backups.
