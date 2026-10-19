@@ -121,6 +121,14 @@ final class HubScreens {
     a.error("정상 확인한 안전 백업: "+snapshots[0].getName()+"\n\n앱 삭제 전 전체 ZIP을 별도로 내보내세요.");
    });
   });
+  a.action(p,"전체 ZIP 백업 사전 점검",false,()->{
+   new Thread(()->{
+    try{
+     BackupReadiness.Summary result=BackupReadiness.inspect(a.getFilesDir());
+     a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error(result.message());});
+    }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("백업 점검 실패: "+e.getMessage());});}
+   },"moto-backup-readiness").start();
+  });
   a.action(p,"최근 자동 백업 복원",false,()->{
    java.io.File[] snapshots=LocalSafetyBackup.recoveryPoints(a);
    if(snapshots.length==0){a.toast("자동 백업이 없습니다.");return;}

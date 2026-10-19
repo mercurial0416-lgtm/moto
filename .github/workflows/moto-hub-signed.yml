@@ -62,7 +62,7 @@ jobs:
       - name: Upload verified release
         uses: actions/upload-artifact@v4
         with:
-          name: moto-hub-alpha6-de-original-key-release
+          name: moto-hub-alpha6-df-original-key-release
           path: MOTO-HUB/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30

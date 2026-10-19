@@ -63,7 +63,7 @@ jobs:
       - name: Upload signed release
         uses: actions/upload-artifact@v4
         with:
-          name: moto-hub-alpha6-de-signed-release
+          name: moto-hub-alpha6-df-signed-release
           path: |
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/apk/release/SHA256SUMS.txt

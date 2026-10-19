@@ -8,7 +8,7 @@ import java.util.zip.*;
 /** Privacy-sensitive offline ZIP export. Includes database, routes, and garage photos, NOT credentials. */
 public final class BackupBundle {
  private BackupBundle() {}
- static final long MAX_TOTAL=250_000_000L;
+ static final long MAX_TOTAL=BackupFormat.MAX_TOTAL_BYTES;
  private static long writeFile(ZipOutputStream zip,File file,String name,long total)throws IOException{
   if(!file.isFile())throw new IOException("백업 파일을 찾지 못했어요: "+file.getName());
   if(file.length()>TrackFile.MAX_BYTES)throw new IOException("백업 항목이 25MB를 넘었어요: "+file.getName());
@@ -47,10 +47,23 @@ public final class BackupBundle {
    "친구 로그인 토큰/인증키는 포함되지 않습니다. 위치가 포함될 수 있으니 공유하지 마세요.\n";
   zip.putNextEntry(new ZipEntry("README-KO.txt"));zip.write(readme.getBytes(StandardCharsets.UTF_8));zip.closeEntry();
   File photos=internal;File[] files=photos.listFiles((dir,name)->name.matches("garage-photo-[a-fA-F0-9-]{36}\\.jpg"));
-  if(files!=null)for(File f:files){total=writeFile(zip,f,"photos/"+f.getName(),total);count++;}
+  if(files!=null){
+   if(files.length>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 백업 한도(1,000장)를 초과했습니다.");
+   Arrays.sort(files,Comparator.comparing(File::getName));
+   for(File f:files){total=writeFile(zip,f,"photos/"+f.getName(),total);count++;}
+  }
   File rides=new File(internal,"rides");File[] tracks=rides.listFiles((dir,name)->name.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));
-  if(tracks!=null){if(tracks.length>2500)throw new IOException("주행 기록이 너무 많습니다.");
-   for(File file:tracks){total=writeFile(zip,file,"rides/"+file.getName(),total);count++;
+  if(tracks!=null){if(tracks.length>BackupFormat.MAX_TRACKS)throw new IOException("주행 기록 10,000건 백업 한도를 초과했습니다.");
+   Arrays.sort(tracks,Comparator.comparing(File::getName));
+   for(File file:tracks){
+    // A completely empty crashed session has no location bytes worth archiving.
+    // Preserve non-empty interrupted tracks, including their unfinished final row.
+    if(file.length()==0){
+     if(new File(file.getPath()+".done").exists()||new File(file.getPath()+".imported").exists()||new File(file.getPath()+".recovered").exists())
+      throw new IOException("완료 표시가 있는 빈 GPS 기록을 백업할 수 없습니다: "+file.getName());
+     continue;
+    }
+    total=writeFile(zip,file,"rides/"+file.getName(),total);count++;
     if(new File(file.getPath()+".done").isFile()||new File(file.getPath()+".recovered").isFile()){
      // Preflight validates both the GPS source and the exact generated size.
      // NEVER suppress a failure after opening a ZIP entry: that would silently

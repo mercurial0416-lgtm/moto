@@ -9,10 +9,10 @@ import java.util.zip.*;
 /** Restore MOTO HUB's exported ZIP without following archive paths or trusting external file sizes. */
 public final class RestoreArchive {
  private RestoreArchive() {}
- private static final long MAX_TOTAL=250_000_000L, MAX_ENTRY=25_000_000L;
- private static final int MAX_ENTRIES=6000;
- private static final String PHOTO="garage-photo-[a-fA-F0-9-]{36}\\.jpg";
- private static final String RIDE="[0-9]{10,15}-[a-f0-9-]{36}\\.track";
+ private static final long MAX_TOTAL=BackupFormat.MAX_TOTAL_BYTES, MAX_ENTRY=BackupFormat.MAX_TRACK_BYTES;
+ private static final int MAX_ENTRIES=BackupFormat.MAX_ENTRIES;
+ private static final String PHOTO=BackupFormat.PHOTO;
+ private static final String RIDE=BackupFormat.TRACK;
  public interface DataWriter {void write(String json)throws Exception;}
  public static final class Prepared implements AutoCloseable {
   private final File staging; public final String json; public final int photos,rides;
@@ -22,6 +22,7 @@ public final class RestoreArchive {
    File backup=new File(internal,"moto-rollback-"+UUID.randomUUID());
    if(!backup.mkdirs())throw new IOException("복원 안전 사본 폴더 생성 실패");
    List<String> old=existingAssets(internal);
+   Set<String> existing=new HashSet<>(old);
    List<String> fresh=existingAssets(staging);
    boolean preserveRollback=false;
    try {
@@ -40,7 +41,7 @@ public final class RestoreArchive {
     // The caller's atomic JSON write is the last committing operation.
     writer.write(json);
    }catch(Exception failure){
-    for(String name:fresh)if(!old.contains(name))new File(internal,name).delete();
+    for(String name:fresh)if(!existing.contains(name))new File(internal,name).delete();
     for(String name:old)try{
      File saved=new File(backup,name);
      if(saved.isFile())copy(saved,new File(internal,name));
@@ -54,6 +55,7 @@ public final class RestoreArchive {
  public static Prepared prepare(InputStream source,File internal)throws Exception{
   File stage=new File(internal,"moto-stage-"+UUID.randomUUID());if(!stage.mkdirs())throw new IOException("임시 폴더를 생성하지 못했어요.");
   String json=null;int photos=0,rides=0,entries=0;long total=0;
+  Set<String> incomplete=new HashSet<>();
   Set<String> seen=new HashSet<>();byte[] buffer=new byte[32768];
   try(ZipInputStream zip=new ZipInputStream(new BufferedInputStream(source),StandardCharsets.UTF_8)){
    ZipEntry entry;
@@ -80,11 +82,25 @@ public final class RestoreArchive {
      int n;while((n=zip.read(buffer))!=-1){size+=n;total+=n;if(size>limit||total>MAX_TOTAL)throw new IOException("백업 ZIP 용량 제한을 초과했어요.");out.write(buffer,0,n);}
     }
     if(data){json=new String(jsonBytes.toByteArray(),StandardCharsets.UTF_8);if(json.isEmpty())throw new IOException("JSON 기록이 비어 있어요.");}
-    if(photo){if(size<4||!jpeg(destination))throw new IOException("잘못된 바이크 JPG 사진입니다.");photos++;}
-    if(track){if(TrackFile.read(destination,(a,b,c,d)->{})<1)throw new IOException("비어 있는 GPS 기록입니다.");rides++;}
+    if(photo){if(size<4||!jpeg(destination))throw new IOException("잘못된 바이크 JPG 사진입니다.");if(++photos>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 너무 많습니다.");}
+    if(track){
+     int points=TrackFile.read(destination,(a,b,c,d)->{});
+     if(points<1){
+      // An interrupted append can contain only one unfinished row. Preserve
+      // those exact bytes for manual diagnostics, not fabricated GPX points.
+      byte[] raw=Files.readAllBytes(destination.toPath());
+      String partial=new String(raw,StandardCharsets.UTF_8);
+      if(raw.length==0||raw.length>256||partial.indexOf('\n')>=0||!partial.matches("[0-9eE+.,-]+"))
+       throw new IOException("복원할 수 없는 GPS 기록입니다.");
+      incomplete.add(name);
+     }
+     if(++rides>BackupFormat.MAX_TRACKS)throw new IOException("주행 기록이 10,000건을 초과합니다.");
+    }
     zip.closeEntry();
    }
    if(json==null)throw new IOException("MOTO-HUB-data.json이 들어 있지 않아요.");
+   for(String name:incomplete)if(seen.contains(name+".done")||seen.contains(name+".imported")||seen.contains(name+".recovered")||seen.contains(name+".mergedinto"))
+    throw new IOException("완료 처리된 GPS 기록은 좌표가 있어야 합니다.");
    for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".mergedinto")){
     File link=new File(stage,name);
     String target=new String(Files.readAllBytes(link.toPath()),StandardCharsets.US_ASCII);
