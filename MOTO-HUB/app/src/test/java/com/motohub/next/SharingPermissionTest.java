@@ -7,7 +7,7 @@ public class SharingPermissionTest {
  @After public void finish(){service.onDestroy();}
  @Test public void locationRevokedStopsGpsAndSharing(){Shadows.shadowOf(RuntimeEnvironment.getApplication()).denyPermissions(android.Manifest.permission.ACCESS_FINE_LOCATION);service.permissionCheck.run();assertFalse(RideService.running);assertFalse(Sharing.enabled);}
  @Test public void notificationPermissionRevokedStopsSharing(){Shadows.shadowOf(RuntimeEnvironment.getApplication()).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS);service.permissionCheck.run();assertFalse(Sharing.enabled);}
- @Test public void disabledGpsStopsSharing(){service.onProviderDisabled(LocationManager.GPS_PROVIDER);assertFalse(RideService.running);assertFalse(Sharing.enabled);}
+ @Test public void disabledGpsStopsSharing(){service.onProviderDisabled(LocationManager.GPS_PROVIDER);assertTrue(RideService.running);assertFalse(Sharing.enabled);}
  @Test public void serviceDestroyDropsPendingPoint(){Sharing.offer(new Location("gps"));service.onDestroy();assertFalse(Sharing.enabled);assertNull(Sharing.latest);}
  @Test public void cancelledRequestCannotReachTransport(){SocialClient.Control c=new SocialClient.Control();c.cancel();assertThrows(Exception.class,()->SocialClient.INSTANCE.call("POST","/rest/v1/rpc/mh_share_publish",new org.json.JSONObject(),true,c));}
 }

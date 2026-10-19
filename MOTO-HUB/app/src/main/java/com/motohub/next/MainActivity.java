@@ -178,7 +178,7 @@ public class MainActivity extends Activity {
   toast("바이크 사진을 변경했어요.");render();
  }
  void hideKeyboard(){android.view.inputmethod.InputMethodManager imm=getSystemService(android.view.inputmethod.InputMethodManager.class);View focus=getCurrentFocus();if(focus!=null){imm.hideSoftInputFromWindow(focus.getWindowToken(),0);focus.clearFocus();}}
- void navigate(String destination){hideKeyboard();if(destination.equals("더보기"))previousTab=tab;tab=destination;render();}
+ void navigate(String destination){hideKeyboard();if(destination.equals("더보기")&&!tab.equals("더보기"))previousTab=tab;tab=destination;render();}
  void selectRideHistoryFilter(String value){
   String normalized=RideHistoryFilter.normalize(value);
   // Only a local display preference: never part of backup, GPS or cloud sharing.
