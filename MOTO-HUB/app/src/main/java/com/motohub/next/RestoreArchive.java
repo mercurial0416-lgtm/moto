@@ -17,8 +17,18 @@ public final class RestoreArchive {
  public static final class Prepared implements AutoCloseable {
   private final File staging; public final String json; public final int photos,rides;
   private Prepared(File dir,String data,int p,int r){staging=dir;json=data;photos=p;rides=r;}
+  /** Snapshot disk-space requirement before replacing any of the current assets. */
+  public long requiredSpace(File internal)throws IOException {
+   return RestoreCapacity.required(
+    RestoreCapacity.sum(internal,existingAssets(internal)),
+    RestoreCapacity.sum(staging,existingAssets(staging)),
+    json.getBytes(StandardCharsets.UTF_8).length);
+  }
   /** Replaces backed-up local assets and invokes caller's atomic JSON writer LAST. */
   public void install(File internal,DataWriter writer)throws Exception {
+   // Existing assets are copied into a rollback directory while staged assets
+   // are copied into place. Reserve space for BOTH copies before mutation.
+   RestoreCapacity.ensure(RestoreCapacity.available(internal),requiredSpace(internal));
    File backup=new File(internal,"moto-rollback-"+UUID.randomUUID());
    if(!backup.mkdirs())throw new IOException("복원 안전 사본 폴더 생성 실패");
    List<String> old=existingAssets(internal);

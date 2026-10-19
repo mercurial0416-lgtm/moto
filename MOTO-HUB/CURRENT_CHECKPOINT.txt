@@ -1,3 +1,3 @@
-MOTO HUB current source checkpoint: Alpha6-DF (515)
-Parent: Alpha6-DE (514); new build requires CI validation.
-See CHANGELOG-alpha6-df.md and DF_VERIFICATION_REPORT.md.
+MOTO HUB current source checkpoint: Alpha6-DG (516)
+Parent: Alpha6-DF (515). Build results in DG_VERIFICATION_REPORT.json.
+New features: restore free-space preflight and rollback capacity guarantee.

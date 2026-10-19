@@ -812,8 +812,14 @@ public class MainActivity extends Activity {
     try{verified=Store.parse(ready.json);}catch(Exception e){ready.close();throw e;}
     runOnUiThread(()->{
      if(isFinishing()||isDestroyed()){ready.close();return;}
+     String spaceNote;
+     try {
+      long need=ready.requiredSpace(getFilesDir()),free=RestoreCapacity.available(getFilesDir());
+      spaceNote="\n\n복원 작업 여유 공간: 약 "+RestoreCapacity.mb(need)+"MB 필요 · 현재 약 "+RestoreCapacity.mb(free)+"MB";
+      if(free<need)spaceNote+="\n공간 부족: 기존 파일 보호를 위해 실제 복원을 거부합니다.";
+     }catch(IOException e){spaceNote="\n\n저장 공간 점검 불가: 복원 시 안전 검사를 다시 진행합니다.";}
      new AlertDialog.Builder(this).setTitle("전체 백업을 복원할까요?")
-      .setMessage(RestorePreview.text(verified,db,ready.rides,ready.photos)+"\n\n현재 기록과 사진·GPS를 교체합니다. 중복 병합하지 않습니다. 기존 기록이 필요하면 먼저 전체 ZIP을 내보내세요.\n\n계정 없이 기기별 독립 저장됩니다.")
+      .setMessage(RestorePreview.text(verified,db,ready.rides,ready.photos)+spaceNote+"\n\n현재 기록과 사진·GPS를 교체합니다. 중복 병합하지 않습니다. 기존 기록이 필요하면 먼저 전체 ZIP을 내보내세요.\n\n계정 없이 기기별 독립 저장됩니다.")
       .setNegativeButton("취소",(d,w)->ready.close())
       .setOnCancelListener(d->ready.close())
       .setPositiveButton("전체 복원",(d,w)->{
@@ -824,6 +830,11 @@ public class MainActivity extends Activity {
          if(!RestoreRideGate.begin(RideService.running,RideService.autoArmed))throw new IOException(RestoreRideGate.MESSAGE);
          entered=true;
          byte[] previous=(readOnly?disk.readFully():db.toString(2).getBytes(StandardCharsets.UTF_8));
+         // Abort before overwriting even the previous JSON recovery point if
+         // there isn't room for the old JSON and both sets of GPS/photos.
+         long required=ready.requiredSpace(getFilesDir());
+         required=Math.addExact(required,(long)previous.length);
+         RestoreCapacity.ensure(RestoreCapacity.available(getFilesDir()),required);
          // Write old JSON rollback BEFORE replacing any user files.
          AtomicFile rollback=new AtomicFile(new File(getFilesDir(),"before-import.json"));atomic(rollback,previous);
          boolean oldProtected=readOnly;

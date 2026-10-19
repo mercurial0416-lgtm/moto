@@ -20,6 +20,12 @@ public final class BackupReadinessTest {
    ok(s.withinBasicLimits(),"basic limits");ok(s.message().contains("GPS 원본 2건"),"Korean readable UI");
    ok(!new BackupReadiness.Summary(10001,0,0,0,0,0).withinBasicLimits(),"limit reported");
    ok(!new BackupReadiness.Summary(0,0,0,0,1,0).withinBasicLimits(),"oversized reported");
+   ok(!new BackupReadiness.Summary(1,0,1,0,0,1,0).withinBasicLimits(),"completed empty GPS should be refused");
+   new File(rides,b+".done").createNewFile();
+   BackupReadiness.Summary broken=BackupReadiness.inspect(dir);
+   ok(broken.completedEmptyRides==1,"completed empty GPS detected");
+   ok(!broken.withinBasicLimits(),"misleading preflight success prevented");
+   ok(broken.message().contains("내용 없는 GPS 기록 1개"),"message explains repair issue");
    System.out.println("PASS DF backup preview: "+n+" checks");
   }finally{
    File[] contents=rides.listFiles();if(contents!=null)for(File f:contents)f.delete();rides.delete();
