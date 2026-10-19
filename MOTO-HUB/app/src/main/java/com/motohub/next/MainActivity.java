@@ -128,7 +128,7 @@ public class MainActivity extends Activity {
  void write(JSONObject next)throws Exception{if(readOnly)throw new Exception("원본 보호 중입니다. 백업 복원을 먼저 해 주세요.");Store.parse(next.toString());
   // The first snapshot of the day must preserve the state before the edit, not the new state.
   LocalSafetyBackup.snapshot(this,db);
-  atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));db=next;MotoWidgetProvider.refresh(this);}
+  atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));db=next;LocalSafetyBackup.checkpoint(this,next);MotoWidgetProvider.refresh(this);}
  void atomic(AtomicFile file,byte[] bytes)throws Exception{FileOutputStream out=null;try{out=file.startWrite();out.write(bytes);file.finishWrite(out);}catch(Exception e){if(out!=null)file.failWrite(out);throw e;}}
  void saveItem(String key,JSONObject item)throws Exception{JSONObject next=new JSONObject(db.toString());Store.upsert(next,key,item);write(next);}
  GradientDrawable shape(int color,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));if(stroke!=0)d.setStroke(dp(1),stroke);return d;}

@@ -14,7 +14,7 @@ checks={
  'continuous notification can stop auto mode': '"OBD 감지만 중지"' in text('RideService') and 'setAction(AUTO_DISARM)' in text('RideService') and 'AUTO_DISARM' in text('RideUi') and 'setAction(STOP)' in text('RideService'),
  'auto stops on developer disable': 'if(RideService.autoArmed)a.startService' in text('HubScreens') and 'AUTO_DISARM' in text('HubScreens'),
  'no auto group sharing or server write': 'Sharing.start(' not in text('RideService') and 'SocialClient.' not in text('ObdAutoSpeedMonitor'),
- 'auto meter uses GPS points, existing storage': 'openRideTrack();manager.requestLocationUpdates' in text('RideService') and 'TrackFile.point(' in text('RideService'),
+ 'auto meter uses GPS points, existing storage': 'openRideTrack();requestGpsUpdatesChecked()' in text('RideService') and 'manager.requestLocationUpdates' in text('RideService') and 'TrackFile.point(' in text('RideService'),
  'safe disconnect / recovery': 'onObdDisconnected' in text('RideService') and all(token in text('RideService').split('private void onObdDisconnected')[1].split('Notification notification')[0] for token in ('autoArmed=false','autoGate.reset();','obdMonitor=null;')) and 'GPS 단독 기록 유지' in text('RideService'),
  'read-only PID whitelist unchanged': 'ObdReadOnlyProtocol.query("010D")' in text('ObdAutoSpeedMonitor') and '010D' in text('ObdReadOnlyProtocol') and '0400' not in text('ObdAutoSpeedMonitor'),
  'connected-device foreground permission and type': 'android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE' in manifest and 'location|connectedDevice' in manifest,

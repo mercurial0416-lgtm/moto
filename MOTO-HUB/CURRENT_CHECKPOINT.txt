@@ -1,5 +1,4 @@
-MOTO HUB current source checkpoint: Alpha6-DB (511)
-Input: verified Alpha6-DA (510) ZIP from ChatGPT Library /MOTO-HUB/checkpoints.
-Changes: rollback-safe ZIP restore deletion before JSON commit; GPS future-time guard; monotonic elapsed ride timer; tests and CI wiring.
-Source: MOTO-HUB-4.0.0-alpha6-db-source.zip
-APK: NOT BUILT/NOT VERIFIED in this runtime. See DB_VALIDATION_REPORT.json.
+MOTO HUB current source checkpoint: Alpha6-DC (512)
+Parent: Alpha6-DB (511) verified APK source plus backup/UI build fixes.
+Change details: CHANGELOG-alpha6-dc.md
+Checks: see DC_VERIFICATION_REPORT.md in checkpoint.

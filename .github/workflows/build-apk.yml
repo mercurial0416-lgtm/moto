@@ -27,21 +27,23 @@ jobs:
           curl --fail --location --retry 3 -o "$RUNNER_TEMP/json.jar" https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar
           export JSON_JAR="$RUNNER_TEMP/json.jar"
           for test in tests/run-*.sh; do bash "$test"; done
+          python3 tests/test_alpha6_dc_integration.py
       - name: Build, lint and unit tests (no backend requests)
         working-directory: MOTO-HUB
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest -PsupabaseUrl= -PsupabaseKey= --no-daemon
+          ./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest --no-daemon
       - name: APK signature and checksum
         working-directory: MOTO-HUB
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/signature.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionCode='512'" > app/build/outputs/apk/debug/version-check.txt
           sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/SHA256.txt
       - name: Upload APK and reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: MOTO-HUB-AQ-review-${{ github.sha }}
+          name: MOTO-HUB-DC512-${{ github.sha }}
           path: |
             MOTO-HUB/app/build/outputs/apk/debug/
             MOTO-HUB/app/build/reports/

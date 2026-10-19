@@ -81,11 +81,18 @@ public final class RideService extends Service implements LocationListener {
    try{
     prepareForeground(false);
     openRideTrack();
-    manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,5000,0,this,Looper.getMainLooper());
+    requestGpsUpdatesChecked();
     handler.postDelayed(permissionCheck,5000);
    }catch(Exception e){stopWith(e.getMessage()==null?"GPS 시작 실패":e.getMessage(),false);}
    return START_NOT_STICKY;
   }finally{RestoreRideGate.endRideStart();}
+ }
+ /** Permission can be revoked after foreground-start; check immediately before registration. */
+ private void requestGpsUpdatesChecked(){
+  if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)
+   throw new SecurityException("위치 권한이 해제되어 GPS를 시작할 수 없습니다.");
+  if(manager==null)throw new IllegalStateException("GPS 서비스가 준비되지 않았습니다.");
+  manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,5000,0,this,Looper.getMainLooper());
  }
  private void prepareForeground(boolean automatic){
   if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("정확한 위치 권한이 필요합니다.");
@@ -171,7 +178,7 @@ public final class RideService extends Service implements LocationListener {
   ObdRideAutoGate.Event event=autoGate.accept(speedKmh,now);
   obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
   if(event==ObdRideAutoGate.Event.START){
-   try{openRideTrack();manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,5000,0,this,Looper.getMainLooper());
+   try{openRideTrack();requestGpsUpdatesChecked();
     status="OBD2 출발 감지 · GPS 기록 중";}
    catch(Exception e){stopWith("GPS 자동 기록 시작 실패: "+e.getMessage(),false);return;}
   }else if(event==ObdRideAutoGate.Event.FINISH){finishAutoTrack();}

@@ -113,7 +113,7 @@ final class HubScreens {
   a.action(p,"지금 안전 백업 확인",false,()->{
    if(a.readOnly){a.toast("원본 보호 중에는 새 백업을 만들 수 없어요.");return;}
    LocalSafetyBackup.snapshot(a,a.db);
-   java.io.File[] snapshots=LocalSafetyBackup.available(a);
+   java.io.File[] snapshots=LocalSafetyBackup.recoveryPoints(a);
    if(snapshots.length==0){a.toast("백업을 확인하지 못했어요. 전체 ZIP으로 내보내 주세요.");return;}
    a.attempt(()->{
     // Report verified backups only, never treat a filename as proof of valid data.
@@ -122,16 +122,20 @@ final class HubScreens {
    });
   });
   a.action(p,"최근 자동 백업 복원",false,()->{
-   java.io.File[] snapshots=LocalSafetyBackup.available(a);
+   java.io.File[] snapshots=LocalSafetyBackup.recoveryPoints(a);
    if(snapshots.length==0){a.toast("자동 백업이 없습니다.");return;}
    String[] choices=new String[snapshots.length];
-   for(int i=0;i<snapshots.length;i++)choices[i]=snapshots[i].getName().replace("motohub-","").replace(".json","");
+   for(int i=0;i<snapshots.length;i++){
+    String kind=snapshots[i].getParentFile().getName().equals("updates")?"변경 후":"편집 전";
+    String when=java.time.Instant.ofEpochMilli(snapshots[i].lastModified()).atZone(java.time.ZoneId.of("Asia/Seoul")).format(java.time.format.DateTimeFormatter.ofPattern("MM/dd HH:mm:ss"));
+    choices[i]=when+" · "+kind+" · "+(i+1);
+   }
    a.choose("복원할 백업 날짜",choices,date->a.attempt(()->{
     for(int i=0;i<choices.length;i++)if(choices[i].equals(date)){
      a.confirmImport(LocalSafetyBackup.read(snapshots[i]));return;
     }
    }));
-  });a.label(p,"자동 안전 백업은 앱 내부에 최대 7개 날짜의 사본을 보관합니다. 앱 삭제 시 함께 사라지므로 전체 ZIP을 별도로 보관하세요.",14,a.muted,false);a.action(p,"모든 기록 ZIP으로 내보내기",false,a::exportBundle);a.action(p,"JSON 백업만 내보내기",false,a::exportData);a.action(p,"JSON 백업 가져오기",false,()->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);a.startActivityForResult(i,42);});a.action(p,"이전 JSON 되돌리기 (사진·GPS 제외)",false,()->a.attempt(()->{android.util.AtomicFile f=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-import.json"));a.confirmImport(Store.parse(new String(f.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.show();});
+  });a.label(p,"편집 전 일일 백업 7개 + 변경 후 최근 복원 지점 12개를 기기에 보관합니다. 앱 삭제 시 모두 사라지므로 전체 ZIP을 별도로 내보내세요.",14,a.muted,false);a.action(p,"모든 기록 ZIP으로 내보내기",false,a::exportBundle);a.action(p,"JSON 백업만 내보내기",false,a::exportData);a.action(p,"JSON 백업 가져오기",false,()->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);a.startActivityForResult(i,42);});a.action(p,"이전 JSON 되돌리기 (사진·GPS 제외)",false,()->a.attempt(()->{android.util.AtomicFile f=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-import.json"));a.confirmImport(Store.parse(new String(f.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.show();});
   a.section("표시 및 알림");
   line("위젯 개인정보",a.getSharedPreferences("widget_privacy",0).getBoolean("hide_details",false)?"이름·주행거리·유지비 숨김":"이름·주행거리·유지비 표시","변경",()->{
    boolean hide=a.getSharedPreferences("widget_privacy",0).getBoolean("hide_details",false);

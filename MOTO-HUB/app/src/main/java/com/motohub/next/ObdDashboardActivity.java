@@ -38,7 +38,7 @@ public final class ObdDashboardActivity extends Activity {
  private LinearLayout base;
  private TextView value(String caption,int size){
   TextView label=new TextView(this);label.setText(caption);label.setTextSize(14);label.setTextColor(0xffb8c5d3);label.setGravity(Gravity.CENTER);base.addView(label);
-  TextView v=new TextView(this);v.setText("—");v.setTextSize(size);v.setTypeface(null,1);v.setTextColor(Color.WHITE);v.setGravity(Gravity.CENTER);
+  TextView v=new TextView(this);v.setText("—");v.setTextSize(size);v.setTypeface(null,android.graphics.Typeface.BOLD);v.setTextColor(Color.WHITE);v.setGravity(Gravity.CENTER);
   v.setPadding(0,7,0,24);base.addView(v);return v;
  }
  @Override public void onCreate(Bundle state){super.onCreate(state);

@@ -1,4 +1,4 @@
-name: MOTO HUB Alpha6-DB Signed Release
+name: MOTO HUB Alpha6-DC Signed Release
 on:
   workflow_dispatch:
 permissions:
@@ -63,7 +63,7 @@ jobs:
       - name: Upload signed release
         uses: actions/upload-artifact@v4
         with:
-          name: moto-hub-alpha6-db-signed-release
+          name: moto-hub-alpha6-dc-signed-release
           path: |
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/apk/release/SHA256SUMS.txt

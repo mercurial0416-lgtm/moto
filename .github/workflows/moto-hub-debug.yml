@@ -53,23 +53,23 @@ jobs:
       - name: Save debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: moto-hub-alpha6-db-debug-apk
+          name: moto-hub-alpha6-dc-debug-apk
           path: MOTO-HUB/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
       - name: Save source snapshot (no credentials)
         if: always()
         run: |
-          zip -q -r MOTO-HUB-4.0.0-alpha6-db-source.zip MOTO-HUB .github \
+          zip -q -r MOTO-HUB-4.0.0-alpha6-dc-source.zip MOTO-HUB .github \
             -x '*/build/*' '*/.gradle/*' '*.apk' '*.jks' '*.keystore' '*/local.properties' '*/.env' '*/.env.*'
-          sha256sum MOTO-HUB-4.0.0-alpha6-db-source.zip > MOTO-HUB-4.0.0-alpha6-db-SHA256.txt
+          sha256sum MOTO-HUB-4.0.0-alpha6-dc-source.zip > MOTO-HUB-4.0.0-alpha6-dc-SHA256.txt
       - name: Upload source checkpoint
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: moto-hub-alpha6-db-source
+          name: moto-hub-alpha6-dc-source
           path: |
-            MOTO-HUB-4.0.0-alpha6-db-source.zip
-            MOTO-HUB-4.0.0-alpha6-db-SHA256.txt
+            MOTO-HUB-4.0.0-alpha6-dc-source.zip
+            MOTO-HUB-4.0.0-alpha6-dc-SHA256.txt
           if-no-files-found: error
           retention-days: 30
