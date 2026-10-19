@@ -177,6 +177,15 @@ final class HubScreens {
    if(++taps[0]>=7){a.getSharedPreferences("developer_experiments",0).edit().putBoolean("enabled",true).apply();a.toast("개발자 모드가 활성화됐어요.");a.render();}
    else if(taps[0]>=4)a.toast("개발자 모드까지 "+(7-taps[0])+"번 남았어요.");
   });
+  String signer=SigningIdentity.current(a);
+  line("설치 서명 SHA-256",signer.isEmpty()?"인증서 지문을 확인하지 못했습니다":signer.substring(0,Math.min(16,signer.length()))+"… · 업데이트 전 비교",
+   "복사",()->{
+    if(signer.isEmpty()){a.toast("서명 정보 확인에 실패했어요.");return;}
+    android.content.ClipboardManager clipboard=(android.content.ClipboardManager)a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+    if(clipboard==null){a.toast("클립보드를 사용할 수 없어요.");return;}
+    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("MOTO HUB 설치 인증서 SHA-256",signer));
+    a.toast("공개 인증서 SHA-256을 복사했어요. 개인키는 포함되지 않습니다.");
+   });
   if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
    line("개발자 모드","실험 기능 · 순정 TFT 연동과 다름 · 기기 데이터 외부 전송 없음","열기",this::developerSettings);
   }a.label(a.content,"기존 앱에 덮어쓰기 설치하려면 동일한 서명키로 빌드해야 합니다. 서명이 다른 APK 설치를 위해 기존 앱을 삭제하지 마세요.",13,a.muted,false);a.label(a.content,"앱 삭제 전 전체 ZIP 백업을 저장하세요. GPS는 기기 내 기록입니다. 회원가입과 로그인 없이 이 휴대폰에 기록을 저장합니다. 다른 휴대폰으로 옮길 때는 전체 ZIP 백업을 사용하세요.",16,a.muted,false);

@@ -1,4 +1,3 @@
-MOTO HUB current source checkpoint: Alpha6-DC (512)
-Parent: Alpha6-DB (511) verified APK source plus backup/UI build fixes.
-Change details: CHANGELOG-alpha6-dc.md
-Checks: see DC_VERIFICATION_REPORT.md in checkpoint.
+MOTO HUB current source checkpoint: Alpha6-DD (513)
+Parent: Alpha6-DC (512) CI verified.
+See CHANGELOG-alpha6-dd.md and DD_VERIFICATION_REPORT.md.

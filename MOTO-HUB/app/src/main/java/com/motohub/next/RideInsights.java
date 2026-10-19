@@ -8,11 +8,13 @@ public final class RideInsights {
  private RideInsights() {}
  public static final class Result {
   public final int points, discarded;
-  public final double distanceKm, averageKmh, peakKmh;
+  public final double distanceKm, averageKmh, movingAverageKmh, peakKmh;
   public final long startedAt, endedAt, durationMillis, movingMillis;
   Result(int count,int bad,double distance,double maximum,long start,long end,long moving){
-   points=count;discarded=bad;distanceKm=distance;peakKmh=maximum;startedAt=start;endedAt=end;movingMillis=moving;
-   durationMillis=Math.max(0,end-start);averageKmh=durationMillis>0?distance/(durationMillis/3600000.0):0;
+   points=count;discarded=bad;distanceKm=distance;peakKmh=maximum;startedAt=start;endedAt=end;
+   durationMillis=Math.max(0,end-start);movingMillis=Math.max(0,Math.min(moving,durationMillis));
+   averageKmh=durationMillis>0?distance/(durationMillis/3600000.0):0;
+   movingAverageKmh=movingMillis>0?Math.min(250,distance/(movingMillis/3600000.0)):0;
   }
   public String distanceLabel(){return String.format(Locale.KOREA,"%.1f km",distanceKm);}
  }
