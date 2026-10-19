@@ -23,26 +23,31 @@ public final class RestoreArchive {
    if(!backup.mkdirs())throw new IOException("복원 안전 사본 폴더 생성 실패");
    List<String> old=existingAssets(internal);
    List<String> fresh=existingAssets(staging);
-   boolean retainBackup=false;
-   boolean installationStarted=false;
+   boolean preserveRollback=false;
    try {
     for(String name:old)copy(new File(internal,name),new File(backup,name));
-    installationStarted=true;
-    for(String name:fresh)copy(new File(staging,name),new File(internal,name));
-    writer.write(json);
-    // JSON saved successfully. Remove only recognized assets not present in the archive.
-    for(String name:old)if(!fresh.contains(name))new File(internal,name).delete();
-   }catch(Exception failure){
-    if(installationStarted){
-     for(String name:fresh)if(!old.contains(name)){
-      File added=new File(internal,name);
-      if(added.exists()&&!added.delete()){retainBackup=true;failure.addSuppressed(new IOException("새 파일 제거 실패: "+name));}
-     }
-     for(String name:old)try{copy(new File(backup,name),new File(internal,name));}catch(Exception e){retainBackup=true;failure.addSuppressed(e);}
+    for(String name:fresh){
+     File staged=new File(staging,name),installed=new File(internal,name);
+     copy(staged,installed);
+     if(!sameContent(staged,installed))throw new IOException("복원된 파일 검증 실패: "+name);
     }
-    if(retainBackup)throw new IOException("복원 및 원상복구에 실패했어요. 안전 사본을 보존했습니다: "+backup.getName(),failure);
+    // Remove obsolete recognized assets BEFORE committing JSON. A failed delete
+    // must abort the restore, not leave a mixed old/new garage after success.
+    // Rollback copies above already protect every original asset.
+    Set<String> restoredNames=new HashSet<>(fresh);
+    for(String name:old)if(!restoredNames.contains(name))
+     Files.deleteIfExists(new File(internal,name).toPath());
+    // The caller's atomic JSON write is the last committing operation.
+    writer.write(json);
+   }catch(Exception failure){
+    for(String name:fresh)if(!old.contains(name))new File(internal,name).delete();
+    for(String name:old)try{
+     File saved=new File(backup,name);
+     if(saved.isFile())copy(saved,new File(internal,name));
+     else {preserveRollback=true;failure.addSuppressed(new IOException("복구용 안전 사본 누락: "+name));}
+    }catch(Exception e){preserveRollback=true;failure.addSuppressed(e);}
     throw failure;
-   }finally{if(!retainBackup)clean(backup);}
+   }finally{if(!preserveRollback)clean(backup);}
   }
   @Override public void close(){clean(staging);}
  }
@@ -63,11 +68,11 @@ public final class RestoreArchive {
     boolean data=name.equals("MOTO-HUB-data.json"),
        photo=name.startsWith("photos/")&&name.substring(7).matches(PHOTO),
        track=name.startsWith("rides/")&&name.substring(6).matches(RIDE),
-       marker=name.startsWith("rides/")&&(name.substring(6).matches(RIDE+"\\.done")||name.substring(6).matches(RIDE+"\\.imported")||name.substring(6).matches(RIDE+"\\.recovered")),
+       marker=name.startsWith("rides/")&&(name.substring(6).matches(RIDE+"\\.done")||name.substring(6).matches(RIDE+"\\.imported")||name.substring(6).matches(RIDE+"\\.recovered")||name.substring(6).matches(RIDE+"\\.mergedinto")||name.substring(6).matches(RIDE+"\\.unmerged")||name.substring(6).matches(RIDE+"\\.category")||name.substring(6).matches(RIDE+"\\.bike")),
        gpx=name.startsWith("gpx/")&&name.substring(4).matches("[0-9]{10,15}-[a-f0-9-]{36}\\.gpx"),
        readme=name.equals("README-KO.txt");
     if(!data&&!photo&&!track&&!marker&&!gpx&&!readme)throw new IOException("지원하지 않는 ZIP 항목: "+name);
-    long limit=data?8_000_000L:(marker?0L:(gpx?50_000_000L:MAX_ENTRY));long size=0;
+    long limit=data?8_000_000L:(marker?(name.endsWith(".mergedinto")?100L:(name.endsWith(".category")||name.endsWith(".bike")?64L:0L)):(gpx?50_000_000L:MAX_ENTRY));long size=0;
     ByteArrayOutputStream jsonBytes=data?new ByteArrayOutputStream():null;
     File destination=(photo||track||marker)?new File(stage,photo?name.substring(7):name):null;
     if(destination!=null&&!destination.getParentFile().isDirectory()&&!destination.getParentFile().mkdirs())throw new IOException("임시 파일 저장 실패");
@@ -80,7 +85,23 @@ public final class RestoreArchive {
     zip.closeEntry();
    }
    if(json==null)throw new IOException("MOTO-HUB-data.json이 들어 있지 않아요.");
-   for(String name:seen)if(name.startsWith("rides/")&&(name.endsWith(".done")||name.endsWith(".imported")||name.endsWith(".recovered")) &&!seen.contains(name.substring(0,name.lastIndexOf('.'))))throw new IOException("원본 GPS가 없는 기록 표시입니다.");
+   for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".mergedinto")){
+    File link=new File(stage,name);
+    String target=new String(Files.readAllBytes(link.toPath()),StandardCharsets.US_ASCII);
+    if(!target.matches(RIDE)||!seen.contains("rides/"+target)||!seen.contains("rides/"+target+".done"))
+     throw new IOException("통합 라이딩 대상이 누락되거나 손상됐어요.");
+   }
+   for(String name:seen)if(name.startsWith("rides/")&&(name.endsWith(".done")||name.endsWith(".imported")||name.endsWith(".recovered")||name.endsWith(".mergedinto")||name.endsWith(".unmerged")||name.endsWith(".category")||name.endsWith(".bike")) &&!seen.contains(name.substring(0,name.lastIndexOf('.'))))throw new IOException("원본 GPS가 없는 기록 표시입니다.");
+   for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".bike")){
+    String id=new String(Files.readAllBytes(new File(stage,name).toPath()),StandardCharsets.US_ASCII);
+    if(!id.matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))throw new IOException("잘못된 바이크 연결 정보입니다.");
+   }
+   for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".category")){
+    File label=new File(stage,name);
+    if(!java.util.Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(new String(Files.readAllBytes(label.toPath()),StandardCharsets.UTF_8)))throw new IOException("지원하지 않는 라이딩 분류입니다.");
+   }
+   for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".unmerged")&&!seen.contains(name.substring(0,name.length()-9)+".done"))
+    throw new IOException("완료되지 않은 통합 기록입니다.");
    return new Prepared(stage,json,photos,rides);
   }catch(Exception e){clean(stage);throw e;}
  }
@@ -89,7 +110,17 @@ public final class RestoreArchive {
  }
  private static List<String> existingAssets(File root){
   List<String> out=new ArrayList<>();File[] photos=root.listFiles((d,n)->n.matches(PHOTO));if(photos!=null)for(File f:photos)if(f.isFile())out.add(f.getName());
-  File rides=new File(root,"rides");File[] files=rides.listFiles();if(files!=null)for(File f:files){String n=f.getName();if(f.isFile()&&(n.matches(RIDE)||n.matches(RIDE+"\\.done")||n.matches(RIDE+"\\.imported")||n.matches(RIDE+"\\.recovered")))out.add("rides/"+n);}return out;
+  File rides=new File(root,"rides");File[] files=rides.listFiles();if(files!=null)for(File f:files){String n=f.getName();if(f.isFile()&&(n.matches(RIDE)||n.matches(RIDE+"\\.done")||n.matches(RIDE+"\\.imported")||n.matches(RIDE+"\\.recovered")||n.matches(RIDE+"\\.mergedinto")||n.matches(RIDE+"\\.unmerged")||n.matches(RIDE+"\\.category")||n.matches(RIDE+"\\.bike")))out.add("rides/"+n);}return out;
+ }
+ private static boolean sameContent(File a,File b)throws IOException{
+  if(a.length()!=b.length())return false;
+  try(InputStream x=new BufferedInputStream(new FileInputStream(a));InputStream y=new BufferedInputStream(new FileInputStream(b))){
+   byte[] left=new byte[16384],right=new byte[16384];int n;
+   while((n=x.read(left))!=-1){int done=0;while(done<n){int read=y.read(right,done,n-done);if(read<0)return false;done+=read;}
+    for(int i=0;i<n;i++)if(left[i]!=right[i])return false;
+   }
+   return y.read()==-1;
+  }
  }
  private static void copy(File source,File dest)throws IOException{
   if(!dest.getParentFile().isDirectory()&&!dest.getParentFile().mkdirs())throw new IOException("복원 폴더를 만들지 못했어요.");

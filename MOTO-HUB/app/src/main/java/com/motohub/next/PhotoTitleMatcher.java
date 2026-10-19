@@ -53,9 +53,18 @@ final class PhotoTitleMatcher {
   return containsModel(filename, tokens(model));
  }
 
+ /** Avoid assigning a photo titled with multiple model years to one exact year. */
+ private static boolean hasConflictingYear(String title,int year) {
+  for(String token:tokens(title)) {
+   if(token.length()!=4)continue;
+   try {int value=Integer.parseInt(token);if(value>=1900&&value<=2200&&value!=year)return true;}
+   catch(NumberFormatException ignored){}
+  }
+  return false;
+ }
  static boolean matches(String title, String brand, String model, int year) {
   if(year < 1900 || year > 2200) return false;
   // Year must be a standalone token, not part of a serial number or 20240.
-  return tokens(title).contains(Integer.toString(year)) && matchesModel(title, brand, model);
+  return tokens(title).contains(Integer.toString(year)) && matchesModel(title, brand, model) && !hasConflictingYear(title, year);
  }
 }

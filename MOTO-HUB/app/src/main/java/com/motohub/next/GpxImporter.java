@@ -61,10 +61,29 @@ public final class GpxImporter {
    if(count[0]<2)throw new IOException("GPX에 시간이 기록된 좌표가 2개 이상 필요합니다");
    String name=System.currentTimeMillis()+"-"+UUID.randomUUID()+".track";
    File dest=new File(rides,name);
-   if(!temp.renameTo(dest))throw new IOException("가져온 GPX를 저장하지 못했어요");
-   try{new File(dest.getPath()+".done").createNewFile();new File(dest.getPath()+".imported").createNewFile();}catch(IOException ignored){}
+   commitImport(temp,dest);
    return new Imported(name,count[0]);
   }finally{temp.delete();}
+ }
+ /** Package-private so collision/rollback behavior can be tested without guessing UUIDs. */
+ static void commitImport(File temp,File dest)throws IOException{
+   // Never replace an existing ride, even in the unlikely event of a UUID collision.
+   Files.move(temp.toPath(),dest.toPath());
+   File done=new File(dest.getPath()+".done"),imported=new File(dest.getPath()+".imported");
+   boolean createdDone=false,createdImported=false;
+   try{
+    // These sidecars are part of the import transaction: without .imported,
+    // historical GPX is incorrectly attributed to today's ride statistics.
+    createdDone=done.createNewFile();
+    if(!createdDone)throw new IOException("GPX 완료 상태 파일이 이미 존재합니다");
+    createdImported=imported.createNewFile();
+    if(!createdImported)throw new IOException("GPX 가져오기 상태 파일이 이미 존재합니다");
+   }catch(IOException failure){
+    if(createdImported)try{Files.deleteIfExists(imported.toPath());}catch(IOException cleanup){failure.addSuppressed(cleanup);}
+    if(createdDone)try{Files.deleteIfExists(done.toPath());}catch(IOException cleanup){failure.addSuppressed(cleanup);}
+    try{Files.deleteIfExists(dest.toPath());}catch(IOException cleanup){failure.addSuppressed(cleanup);}
+    throw new IOException("GPX 가져오기 상태 저장 실패 · 원본 파일은 유지됩니다",failure);
+   }
  }
  private static final class BoundedInputStream extends FilterInputStream {
   long count=0;final long max;

@@ -31,6 +31,17 @@ public final class RideHistorySearchTest {
   check(RideHistorySearch.normalize(null).equals(""),"null normalization");
   check(RideHistorySearch.normalize("2026년 10월 17일").equals("20261017"),"Korean date normalization");
   check(RideHistorySearch.matches("2026.10.17 (토) 21:40","완료","  10/17  "),"trimmed query");
+  check(RideHistorySearch.matches(date,"GPX","10/17 GPX"),"combined date and GPX query");
+  check(RideHistorySearch.matches(date,"완료","완료 10/17"),"terms may appear in either order");
+  check(!RideHistorySearch.matches(date,"완료","10/17 GPX"),"all terms required");
+  check(RideHistorySearch.matches(date,"완료","10/17   완료"),"multiple spaces");
+  check(RideHistorySearch.matches(date,"완료","/ /"),"punctuation-only query");
+  String indexed=RideHistorySearch.index(date,"GPX");
+  check(RideHistorySearch.matchesIndex(indexed,RideHistorySearch.terms("10/17 GPX")),"pre-indexed search");
+  check(!RideHistorySearch.matchesIndex(indexed,RideHistorySearch.terms("10/17 복구")),"pre-indexed mismatch");
+  check(RideHistorySearch.normalize("일상").equals("일상"),"preserve Korean words containing date suffix letters");
+  check(!RideHistorySearch.matches("2026.10.17","완료","일상"),"category must not match arbitrary text");
+  check(RideHistorySearch.matches("2026.10.17 · 일상","완료","일상"),"category search exact");
   System.out.println("PASS: "+count+" ride-history search assertions");
  }
 }

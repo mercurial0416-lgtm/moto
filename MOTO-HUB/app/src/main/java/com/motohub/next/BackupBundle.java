@@ -44,8 +44,33 @@ public final class BackupBundle {
      }
     }catch(Exception ignored){ /* Keep the original track even if its GPX conversion is corrupt. */ }
     
-    for(String suffix:new String[]{".done",".imported",".recovered"}){
+    // Merged source metadata must round-trip. Without it restored monthly
+    // statistics would count both originals plus the combined ride.
+    File merged=new File(file.getPath()+".mergedinto");
+    if(merged.isFile()){
+     byte[] markerBytes=java.nio.file.Files.readAllBytes(merged.toPath());
+     String destination=new String(markerBytes,StandardCharsets.US_ASCII);
+     if(markerBytes.length>100||!destination.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track")||
+       !new File(rides,destination+".done").isFile())
+      throw new IOException("통합 라이딩 연결 정보가 손상됐습니다: "+file.getName());
+     total=writeFile(zip,merged,"rides/"+merged.getName(),total);
+    }
+    File rideBike=new File(file.getPath()+".bike");
+    if(rideBike.isFile()){
+     if(rideBike.length()>64||!new String(java.nio.file.Files.readAllBytes(rideBike.toPath()),StandardCharsets.US_ASCII)
+       .matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))
+      throw new IOException("라이딩 바이크 연결 정보가 손상됐습니다: "+file.getName());
+     total=writeFile(zip,rideBike,"rides/"+rideBike.getName(),total);
+    }
+    File category=new File(file.getPath()+".category");
+    if(category.isFile()){
+     if(category.length()>64||!java.util.Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(new String(java.nio.file.Files.readAllBytes(category.toPath()),StandardCharsets.UTF_8)))
+      throw new IOException("라이딩 분류가 손상됐습니다: "+file.getName());
+     total=writeFile(zip,category,"rides/"+category.getName(),total);
+    }
+    for(String suffix:new String[]{".done",".imported",".recovered",".unmerged"}){
      File marker=new File(file.getPath()+suffix);if(marker.isFile()){
+      if(marker.length()!=0)throw new IOException("라이딩 상태 표시가 손상됐습니다: "+marker.getName());
       zip.putNextEntry(new ZipEntry("rides/"+marker.getName()));zip.closeEntry();
      }
     }

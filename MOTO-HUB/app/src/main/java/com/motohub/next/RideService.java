@@ -1,42 +1,288 @@
 package com.motohub.next;
-import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.content.pm.ServiceInfo;import android.location.*;import android.os.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.UUID;
+import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.content.pm.ServiceInfo;import android.location.*;import android.os.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.UUID;import android.bluetooth.*;
 /** User-started location FGS. Local recording with explicit group sharing. No boot restart, network or mock positions. */
 public final class RideService extends Service implements LocationListener {
- static final String STOP="com.motohub.next.STOP_RIDE";static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0;static volatile double liveDistanceKm=0,liveSpeedKmh=0;
+ static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;
+ // Volatile display data only: neither ECU samples nor Bluetooth address are uploaded/stored.
+ static volatile int obdSpeedKmh=-1,obdReconnects=0;
+ static volatile long obdSpeedSamples=0; // only current, explicitly enabled connection session
+ static volatile double obdRpm=Double.NaN,obdCoolantC=Double.NaN,obdVoltage=Double.NaN;
+ static volatile String obdLink="연결 안 됨";
+ static volatile long obdLastSampleElapsed=0;
+ static volatile long obdRpmAt=0,obdCoolantAt=0,obdVoltageAt=0;
+ static volatile String obdLastError="없음";
+ static volatile String obdPidSupport="지원 PID 확인 전 · ODO는 미검증";
+ static volatile String obdAuxDiagnostics="센서 수신 기록 없음";
+ static volatile long obdStationaryRemainingMs=-1;
+ static String engineEstimate(){return ObdEngineState.label(obdRpm,obdRpmAt,SystemClock.elapsedRealtime());}
+ static volatile boolean gpsOnlyAfterObd=false;
  static volatile RideService instance;
  @Override public void onCreate(){super.onCreate();instance=this;}
  static boolean shareAllowed(){RideService s=instance;return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||s.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&s.getSystemService(NotificationManager.class).areNotificationsEnabled();}
- static void refreshNotification(){RideService s=instance;if(s!=null)s.handler.post(()->{if(running)s.getSystemService(NotificationManager.class).notify(404,s.notification(count+"개 좌표 · "+(Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐")));});}
- LocationManager manager;FileOutputStream output;File track;long lastTime;Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
- final Runnable permissionCheck=new Runnable(){public void run(){if(!running)return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}if(Sharing.enabled&&((Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)||!getSystemService(NotificationManager.class).areNotificationsEnabled()))Sharing.stop();handler.postDelayed(this,5000);}};
+ static void refreshNotification(){RideService s=instance;if(s!=null)s.handler.post(()->{if(running)s.getSystemService(NotificationManager.class).notify(404,s.notification(String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+(Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐")));});}
+ final RideNotificationRate notificationRate=new RideNotificationRate();
+ final RideNotificationRate autoNotificationRate=new RideNotificationRate();
+ String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();LocationManager manager;FileOutputStream output;File track;long lastTime,lastFixElapsed;Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
+ final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
+    // Turning off developer experiments revokes OBD permission, not consent to a
+    // separately running GPS ride. The GPS track must stay recoverable/active.
+    ObdAutoSpeedMonitor monitor=obdMonitor;
+    if(monitor!=null)monitor.stop();
+    onObdDisconnected("개발자 모드가 종료되어 자동 감지를 중지했습니다.");
+    if(!running)return;
+   }if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}if(autoArmed&&(manager==null||!manager.isProviderEnabled(LocationManager.GPS_PROVIDER))){stopWith("GPS가 꺼져 자동 기록을 중지했습니다.",false);return;}long now=SystemClock.elapsedRealtime();
+   if(autoArmed){
+    if(!ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now))obdSpeedKmh=-1;
+    if(!ObdTelemetryFreshness.fresh(obdRpmAt,now))obdRpm=Double.NaN;
+    if(!ObdTelemetryFreshness.fresh(obdCoolantAt,now))obdCoolantC=Double.NaN;
+    if(!ObdTelemetryFreshness.fresh(obdVoltageAt,now))obdVoltage=Double.NaN;
+   }
+   if(lastFixElapsed>0&&now-lastFixElapsed>35_000){
+    liveSpeedKmh=0;lastGood=null;
+    if(Sharing.enabled)Sharing.stop();
+    status="GPS 신호 대기 · 기록 유지 · 위치 공유 중지";
+    getSystemService(NotificationManager.class).notify(404,notification(status));
+    lastFixElapsed=0; // Notify only once per outage, resume after the next valid fix.
+   }
+   if(Sharing.enabled&&((Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)||!getSystemService(NotificationManager.class).areNotificationsEnabled()))Sharing.stop();handler.postDelayed(this,5000);}};
  @Override public IBinder onBind(Intent i){return null;}
  @Override public int onStartCommand(Intent intent,int flags,int id){
-  if(intent==null){stopWith("GPS 서비스가 중단됐습니다.",false);return START_NOT_STICKY;}if(STOP.equals(intent.getAction())){stopWith("기록 종료",true);return START_NOT_STICKY;}if(running)return START_NOT_STICKY;
+  if(intent==null){stopWith("GPS 서비스가 중단됐습니다.",false);return START_NOT_STICKY;}
+  String action=intent.getAction();
+  if(STOP.equals(action)){
+   stopWith("사용자가 라이딩 기록을 종료했습니다.",running);return START_NOT_STICKY;
+  }
+  if(AUTO_DISARM.equals(action)){
+   // Disarming the experimental reader must NOT silently discard an active GPS ride.
+   if(autoArmed){
+    ObdAutoSpeedMonitor monitor=obdMonitor;
+    if(monitor!=null)monitor.stop();
+    onObdDisconnected("사용자가 자동 감지를 중지했습니다.");
+   }else if(!RideSessionInterlock.keepExistingSession(running,autoArmed))stopSelf();
+   return START_NOT_STICKY;
+  }
+  if(!RestoreRideGate.beginRideStart()){
+   // A rejected duplicate start must never stop an already-running foreground
+   // ride: Android can deliver a second start intent while a restore is pending.
+   if(!RideSessionInterlock.keepExistingSession(running,autoArmed)){
+    status="백업 복원 중에는 라이딩을 시작할 수 없습니다.";
+    stopSelf();
+   }
+   return START_NOT_STICKY;
+  }
   try{
-   if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("정확한 위치 권한이 필요합니다.");
-   manager=getSystemService(LocationManager.class);if(manager==null||!manager.isProviderEnabled(LocationManager.GPS_PROVIDER))throw new IllegalStateException("기기의 GPS를 켜 주세요.");
-   NotificationManager nm=getSystemService(NotificationManager.class);nm.createNotificationChannel(new NotificationChannel("ride","라이딩 GPS 기록",NotificationManager.IMPORTANCE_LOW));
-   Notification n=notification("GPS 신호 대기 · 위치 공유 꺼짐");if(Build.VERSION.SDK_INT>=29)startForeground(404,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);else startForeground(404,n);
-   track=new File(TrackFile.directory(getFilesDir()),System.currentTimeMillis()+"-"+UUID.randomUUID()+".track");output=new FileOutputStream(track);count=0;lastTime=0;lastGood=null;startedAt=System.currentTimeMillis();liveDistanceKm=0;liveSpeedKmh=0;active=track.getName();running=true;status="GPS 신호 대기";
-   manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,5000,0,this,Looper.getMainLooper());handler.postDelayed(permissionCheck,5000);
-  }catch(Exception e){stopWith(e.getMessage()==null?"GPS 시작 실패":e.getMessage(),false);}return START_NOT_STICKY;
+   if(AUTO_ARM.equals(action)){
+    if(running||autoArmed)return START_NOT_STICKY;
+    pendingBikeId=intent.getStringExtra(EXTRA_BIKE_ID);
+    armAutomaticRide(intent.getStringExtra(EXTRA_DEVICE));return START_NOT_STICKY;
+   }
+   if(running||autoArmed)return START_NOT_STICKY;
+   pendingBikeId=intent.getStringExtra(EXTRA_BIKE_ID);
+   try{
+    prepareForeground(false);
+    openRideTrack();
+    manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,5000,0,this,Looper.getMainLooper());
+    handler.postDelayed(permissionCheck,5000);
+   }catch(Exception e){stopWith(e.getMessage()==null?"GPS 시작 실패":e.getMessage(),false);}
+   return START_NOT_STICKY;
+  }finally{RestoreRideGate.endRideStart();}
  }
- Notification notification(String text){PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,RideService.class).setAction(STOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);return new Notification.Builder(this,"ride").setSmallIcon(R.drawable.ic_launcher).setContentTitle("MOTO HUB · GPS 기록 중").setContentText(text).setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true).addAction(new Notification.Action.Builder(null,"기록 종료",stop).build()).build();}
+ private void prepareForeground(boolean automatic){
+  if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("정확한 위치 권한이 필요합니다.");
+  if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("알림 권한이 필요합니다.");
+  manager=getSystemService(LocationManager.class);
+  if(manager==null||!manager.isProviderEnabled(LocationManager.GPS_PROVIDER))throw new IllegalStateException("기기의 GPS를 켜 주세요.");
+  NotificationManager nm=getSystemService(NotificationManager.class);
+  if(!nm.areNotificationsEnabled())throw new IllegalStateException("앱 알림을 허용해 주세요.");
+  nm.createNotificationChannel(new NotificationChannel("ride","라이딩 GPS 기록",NotificationManager.IMPORTANCE_LOW));
+  Notification n=notification(automatic?"OBD2 자동 기록 대기 · GPS 아직 저장 안 함":"GPS 신호 대기 · 위치 공유 꺼짐");
+  if(Build.VERSION.SDK_INT>=34&&automatic)startForeground(404,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION|ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+  else if(Build.VERSION.SDK_INT>=29)startForeground(404,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+  else startForeground(404,n);
+ }
+ private void openRideTrack()throws Exception{
+  track=new File(TrackFile.directory(getFilesDir()),System.currentTimeMillis()+"-"+UUID.randomUUID()+".track");
+  output=new FileOutputStream(track);
+  try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
+  catch(IOException error){output.close();output=null;track.delete();throw error;}
+  count=0;lastTime=0;lastFixElapsed=0;lastGood=null;
+  startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;gpsOnlyAfterObd=false;
+  active=track.getName();running=true;notificationRate.reset();status="GPS 신호 대기";
+ }
+ private void armAutomaticRide(String address){
+  try{
+   if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))throw new SecurityException("개발자 모드를 활성화해 주세요.");
+   if(address==null||!BluetoothAdapter.checkBluetoothAddress(address))throw new IllegalArgumentException("OBD2 어댑터를 다시 선택해 주세요.");
+   if(Build.VERSION.SDK_INT>=31&&checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("Bluetooth 연결 권한이 필요합니다.");
+   BluetoothManager bluetooth=getSystemService(BluetoothManager.class);
+   BluetoothAdapter adapter=bluetooth==null?null:bluetooth.getAdapter();
+   if(adapter==null||!adapter.isEnabled())throw new IllegalStateException("Bluetooth를 켜 주세요.");
+   BluetoothDevice paired=null;
+   for(BluetoothDevice d:adapter.getBondedDevices())if(address.equals(d.getAddress())){paired=d;break;}
+   if(paired==null)throw new SecurityException("이미 페어링된 OBD2 장치만 사용할 수 있습니다.");
+   Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
+   prepareForeground(true);autoGate.reset();autoNotificationRate.reset();
+   autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.STOP_AFTER_MS));
+   autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
+   obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
+   obdReconnects=0;obdSpeedSamples=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
+   obdPidSupport="표준 지원 PID 확인 중 · ODO 미검증";
+   obdAuxDiagnostics="센서 수신 기록 없음";obdStationaryRemainingMs=-1;
+   obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdLastError="없음";
+   final ObdAutoSpeedMonitor[] ref=new ObdAutoSpeedMonitor[1];
+   ObdAutoSpeedMonitor reader=new ObdAutoSpeedMonitor(paired,new ObdAutoSpeedMonitor.Listener(){
+    @Override public void speed(int kmh){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
+     obdSpeedKmh=kmh;obdSpeedSamples++;obdLastSampleElapsed=SystemClock.elapsedRealtime();handleAutoSpeed(kmh);
+    }});}
+    @Override public void telemetry(String pid,double value){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
+     long now=SystemClock.elapsedRealtime();
+     if("010C".equals(pid)){obdRpm=value;obdRpmAt=now;}
+     else if("0105".equals(pid)){obdCoolantC=value;obdCoolantAt=now;}
+     else if("0142".equals(pid)){obdVoltage=value;obdVoltageAt=now;}
+    }});}
+    @Override public void capabilities(ObdPidCapabilities capability){handler.post(()->{
+     if(autoArmed&&obdMonitor==ref[0])obdPidSupport=capability.summary();
+    });}
+    @Override public void auxiliaryDiagnostics(String summary){handler.post(()->{
+     if(autoArmed&&obdMonitor==ref[0])obdAuxDiagnostics=summary;
+    });}
+    @Override public void connected(){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
+     obdLink="연결됨 · 차량 데이터 읽기 전용";
+     if(!running)status="OBD2 연결됨 · 출발 대기";
+    }});}
+    @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
+     obdLink="연결 재시도 "+attempt+"/"+max;
+     obdReconnects=attempt;obdSpeedKmh=-1;obdLastSampleElapsed=0;
+     obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
+     obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
+     autoGate.connectionLost();obdStationaryRemainingMs=-1;liveSpeedKmh=0;
+     status="OBD2 신호 손실 · "+obdLink+(running?" · GPS 기록 유지":"");
+     getSystemService(NotificationManager.class).notify(404,notification(status));
+    }});}
+    @Override public void disconnected(String reason){handler.post(()->{if(autoArmed&&obdMonitor==ref[0])onObdDisconnected(reason);});}
+   });
+   ref[0]=reader;obdMonitor=reader;
+   reader.start();handler.postDelayed(permissionCheck,5000);
+  }catch(Exception e){stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);}
+ }
+ private void handleAutoSpeed(int speedKmh){
+  if(!autoArmed)return;
+  long now=SystemClock.elapsedRealtime();
+  ObdRideAutoGate.Event event=autoGate.accept(speedKmh,now);
+  obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
+  if(event==ObdRideAutoGate.Event.START){
+   try{openRideTrack();manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,5000,0,this,Looper.getMainLooper());
+    status="OBD2 출발 감지 · GPS 기록 중";}
+   catch(Exception e){stopWith("GPS 자동 기록 시작 실패: "+e.getMessage(),false);return;}
+  }else if(event==ObdRideAutoGate.Event.FINISH){finishAutoTrack();}
+  // Speed samples arrive faster than the user needs notification updates. Avoid
+  // rebuilding the notification every second while KakaoNavi is in foreground.
+  // START and FINISH remain immediate; GPS samples and files are never throttled.
+  boolean notificationDue=autoNotificationRate.shouldNotify(SystemClock.elapsedRealtime());
+  if(autoArmed&&(notificationDue||event!=ObdRideAutoGate.Event.NONE)){
+   String text=running?(obdStationaryRemainingMs>=0
+    ?ObdRestStatus.label(true,true,obdStationaryRemainingMs)+" · GPS 기록 유지"
+    :"자동 기록 중 · OBD2 "+speedKmh+" km/h · GPS "+String.format(java.util.Locale.KOREA,"%.2f km",liveDistanceKm))
+    :"OBD2 연결됨 · 출발 대기 · 위치 공유 꺼짐";
+   getSystemService(NotificationManager.class).notify(404,notification(text));
+  }
+ }
+ private void finishAutoTrack(){
+  if(!running)return;
+  Sharing.stop();if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
+  final File savedTrack=track;
+  boolean verified=closeTrack(true);running=false;
+  status=verified?"자동 라이딩 저장 완료 · 다음 출발 감지 대기":"자동 라이딩 저장 검증 실패 · 기록을 복구 화면에서 확인해 주세요";
+  if(verified&&savedTrack!=null&&savedTrack.isFile()&&count>=2){
+   new Thread(()->{try{RideInsights.Result summary=RideInsights.analyze(savedTrack);
+    handler.post(()->{if(autoArmed&&!running){status=String.format(java.util.Locale.KOREA,
+     "라이딩 저장 · %.1f km · %.0f km/h 최고 · 다시 출발 대기",summary.distanceKm,summary.peakKmh);
+     getSystemService(NotificationManager.class).notify(404,notification(status));}});
+   }catch(Exception ignored){}},"moto-auto-ride-summary").start();
+  }
+  if(verified)DailyMaintenanceJob.checkSoon(this);
+ }
+ private void onObdDisconnected(String reason){
+  // No guessing: do not finish or split a moving ride when Bluetooth fails.
+  // Keep an already-running GPS session in the same foreground service until its
+  // user explicitly ends it. Never auto-arm again or enable group sharing.
+  obdLastError="OBD2 · "+reason;
+  obdLink="연결 종료 · "+reason;obdSpeedKmh=-1;obdLastSampleElapsed=0;
+  obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
+  obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
+  autoArmed=false;autoGate.reset();obdStationaryRemainingMs=-1;obdMonitor=null;
+  Sharing.stop();
+  if(running){
+   gpsOnlyAfterObd=true;
+   status="OBD2 연결 종료 · GPS 단독 기록 유지 · 알림에서 종료 가능";
+   getSystemService(NotificationManager.class).notify(404,notification(status));
+  }else stopWith("OBD2 자동 감지 종료 · "+reason,false);
+ }
+ Notification notification(String text){
+  PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+  PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,RideService.class).setAction(STOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+  Notification.Builder builder=new Notification.Builder(this,"ride").setSmallIcon(R.drawable.ic_launcher)
+    .setContentTitle(autoArmed?"MOTO HUB · OBD2 자동 라이딩":"MOTO HUB · GPS 기록 중")
+    .setContentText(text).setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PRIVATE)
+    .addAction(new Notification.Action.Builder(null,"기록 종료",stop).build());
+  if(autoArmed){
+   PendingIntent disarm=PendingIntent.getService(this,3,new Intent(this,RideService.class).setAction(AUTO_DISARM),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+   builder.addAction(new Notification.Action.Builder(null,"OBD 감지만 중지",disarm).build());
+  }
+  Intent navi=getPackageManager().getLaunchIntentForPackage(KakaoNaviLaunch.PACKAGE);
+  if(navi!=null){
+   PendingIntent nav=PendingIntent.getActivity(this,2,navi,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+   builder.addAction(new Notification.Action.Builder(null,"카카오내비",nav).build());
+  }
+  return builder.build();
+ }
  @Override public void onLocationChanged(Location location){
   if(!running||output==null)return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
-  if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||location.getTime()<=lastTime)return;
-  try{if(track.length()>TrackFile.MAX_BYTES-512)throw new IOException("경로 최대 크기에 도달했습니다.");output.write(TrackFile.point(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime()).getBytes(StandardCharsets.UTF_8));output.flush();output.getFD().sync();lastTime=location.getTime();count++;
+  if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
+  if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
+  try{if(track.length()>TrackFile.MAX_BYTES-512)throw new IOException("경로 최대 크기에 도달했습니다.");output.write(TrackFile.point(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime()).getBytes(StandardCharsets.UTF_8));output.flush();output.getFD().sync();lastTime=location.getTime();lastFixElapsed=SystemClock.elapsedRealtime();count++;
    if(lastGood!=null){long dt=location.getTime()-lastGood.getTime();float metres=location.distanceTo(lastGood);
-    if(dt>0&&dt<=600000){double measuredKmh=metres*3600.0/dt;
-     if(measuredKmh<=250){liveDistanceKm+=metres/1000.0;liveSpeedKmh=measuredKmh;}
-     else liveSpeedKmh=0;
-    }else liveSpeedKmh=0;
+    if(RideMotionGate.countDistance(dt,metres,lastGood.getAccuracy(),location.getAccuracy())){
+     double measuredKmh=metres*3600.0/dt;
+     liveDistanceKm+=metres/1000.0;liveSpeedKmh=measuredKmh;
+     if(autoArmed&&location.getAccuracy()<=20){autoGate.gpsMovement(measuredKmh,SystemClock.elapsedRealtime());obdStationaryRemainingMs=autoGate.stationaryRemainingMs(SystemClock.elapsedRealtime());}
+     livePeakKmh=Math.max(livePeakKmh,measuredKmh);
+    }else liveSpeedKmh=0; // A long GPS gap must never be treated as travelled distance.
    }
-   lastGood=new Location(location);Sharing.offer(location);status=count+"개 좌표 · 마지막 "+java.time.Instant.ofEpochMilli(lastTime);getSystemService(NotificationManager.class).notify(404,notification(count+"개 좌표 저장 · "+(Sharing.enabled?"그룹 위치 공유 켜짐":"위치 공유 꺼짐")));}catch(Exception e){stopWith("저장 오류로 기록 중지: "+e.getMessage(),false);}
+   lastGood=new Location(location);if(!autoArmed&&location.getAccuracy()<=40)Sharing.offer(location);status=count+"개 좌표 · 마지막 "+java.time.Instant.ofEpochMilli(lastTime)+(location.getAccuracy()>40?" · 정확도 낮음":"");if(notificationRate.shouldNotify(SystemClock.elapsedRealtime()))getSystemService(NotificationManager.class).notify(404,notification(String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+(Sharing.enabled?"그룹 위치 공유 켜짐":(gpsOnlyAfterObd?"OBD2 종료 · GPS 단독 기록":"위치 공유 꺼짐"))));}catch(Exception e){stopWith("저장 오류로 기록 중지: "+e.getMessage(),false);}
  }
- @Override public void onProviderDisabled(String provider){if(LocationManager.GPS_PROVIDER.equals(provider))stopWith("GPS가 꺼져 기록을 중지했습니다.",false);}
- @Override public void onProviderEnabled(String p){} @Override public void onStatusChanged(String p,int s,Bundle b){}
+ @Override public void onProviderDisabled(String provider){if(LocationManager.GPS_PROVIDER.equals(provider)&&running){liveSpeedKmh=0;lastGood=null;lastFixElapsed=0;Sharing.stop();status="GPS 일시 중단 · 켜면 기록 재개 (그룹 공유 중지)";getSystemService(NotificationManager.class).notify(404,notification(status));}}
+ @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p)&&running){status="GPS 복귀 · 좌표 대기";getSystemService(NotificationManager.class).notify(404,notification(status));}} @Override public void onStatusChanged(String p,int s,Bundle b){}
  void stopWith(String message,boolean completed){status=message;cleanup(completed);stopSelf();}
- void cleanup(boolean completed){Sharing.stop();running=false;handler.removeCallbacksAndMessages(null);if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}if(output!=null){try{output.close();if(completed&&track!=null)new File(track.getPath()+".done").createNewFile();}catch(IOException ignored){}output=null;}active="";stopForeground(STOP_FOREGROUND_REMOVE);}
- @Override public void onDestroy(){if(running)status="GPS 서비스가 중단됐습니다. 저장된 좌표는 복구할 수 있어요.";cleanup(false);instance=null;super.onDestroy();}
+ private boolean closeTrack(boolean completed){
+  boolean verified=false;
+  if(output!=null){
+   try{
+    // A successful close alone does not imply a valid, complete GPS track.
+    output.getFD().sync();output.close();output=null;
+    if(completed&&count>0&&track!=null){TrackCompletion.mark(track,count);verified=true;}
+    else if(count==0&&track!=null)TrackFile.discardEmptySession(track);
+   }catch(Exception e){
+    // Keep any nonempty original .track without a .done marker for recovery.
+    status="GPS 저장 검증 실패 · 원본 기록을 복구 화면에서 확인해 주세요";
+    try{output.close();}catch(Exception ignored){}
+   }finally{output=null;}
+  }
+  active="";lastGood=null;lastFixElapsed=0;gpsOnlyAfterObd=false;
+  return verified;
+ }
+ void cleanup(boolean completed){
+  Sharing.stop();autoArmed=false;obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
+  obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
+  obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
+  obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
+  if(obdMonitor!=null){obdMonitor.stop();obdMonitor=null;}
+  autoGate.reset();running=false;handler.removeCallbacksAndMessages(null);
+  if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
+  boolean verified=closeTrack(completed);
+  if(completed&&!verified&&count>0)status="GPS 기록 검증 실패 · 복구 화면에서 원본 기록을 확인해 주세요";
+  stopForeground(STOP_FOREGROUND_REMOVE);
+  if(completed&&verified)DailyMaintenanceJob.checkSoon(this);
+ }
+ @Override public void onDestroy(){if(running||autoArmed)status="라이딩 서비스가 중단됐습니다. 저장된 GPS 좌표는 복구할 수 있어요.";cleanup(false);instance=null;super.onDestroy();}
 }

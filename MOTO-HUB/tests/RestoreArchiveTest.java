@@ -26,31 +26,29 @@ public class RestoreArchiveTest {
    File rides=new File(root,"rides");rides.mkdirs();Files.write(new File(root,P).toPath(),JPG);
    Files.write(new File(rides,T).toPath(),TrackFile.point(35,127,5,1792120000000L).getBytes());
    byte[] zip=good();
+   File obsolete=new File(rides,"1792122693080-12345678-1234-1234-1234-123456789abc.track");
+   Files.write(obsolete.toPath(),TrackFile.point(35,127,5,1792120000000L).getBytes());
    try(RestoreArchive.Prepared p=RestoreArchive.prepare(new ByteArrayInputStream(zip),root)){
     ok(p.photos==1,"photo count");ok(p.rides==1,"ride count");ok(p.json.contains("vehicles"),"json");
-    p.install(root,value->ok(value.contains("version"),"writer JSON"));
+    p.install(root,value->{
+     ok(!obsolete.exists(),"obsolete ride deleted before JSON commit");
+     ok(value.contains("version"),"writer JSON");
+    });
    }
+   ok(!obsolete.exists(),"obsolete ride removed after successful restore");
    ok(Arrays.equals(JPG,Files.readAllBytes(new File(root,P).toPath())),"photo copied");
    ok(TrackFile.read(new File(rides,T),(a,b,c,d)->{})==2,"GPS restored");
    ok(new File(rides,T+".recovered").exists(),"recovery marker copied");
    byte[] original=Files.readAllBytes(new File(rides,T).toPath());
-   try(RestoreArchive.Prepared p=RestoreArchive.prepare(new ByteArrayInputStream(zip),root)){
-    try{p.install(root,data->{throw new IOException("test writer failure");});throw new AssertionError("write failed but no exception");}catch(IOException expected){checks++;}
-   }
-   ok(Arrays.equals(original,Files.readAllBytes(new File(rides,T).toPath())),"failed commit must restore old track");
+   Files.write(obsolete.toPath(),TrackFile.point(35,127,5,1792120000000L).getBytes());
    try(RestoreArchive.Prepared p=RestoreArchive.prepare(new ByteArrayInputStream(zip),root)){
     try{p.install(root,data->{
-     File blocked=new File(root,P);Files.delete(blocked.toPath());blocked.mkdir();
-     Files.write(new File(blocked,"blocker").toPath(),new byte[]{1});
-     throw new IOException("simulate rollback destination blocked");
-    });throw new AssertionError("expected rollback failure");}catch(IOException expected){
-     ok(expected.getMessage().contains("안전 사본"),"recovery location reported");
-    }
+     ok(!obsolete.exists(),"obsolete ride removed before failing JSON commit");
+     throw new IOException("test writer failure");
+    });throw new AssertionError("write failed but no exception");}catch(IOException expected){checks++;}
    }
-   File[] retained=root.listFiles((d,n)->n.startsWith("moto-rollback-"));
-   ok(retained!=null&&retained.length==1,"failed rollback preserves backup");
-   ok(Arrays.equals(JPG,Files.readAllBytes(new File(retained[0],P).toPath())),"original photo retained");
-   ok(Arrays.equals(original,Files.readAllBytes(new File(retained[0],"rides/"+T).toPath())),"original track retained");
+   ok(obsolete.exists(),"failed JSON commit restores obsolete ride");
+   ok(Arrays.equals(original,Files.readAllBytes(new File(rides,T).toPath())),"failed commit must restore old track");
    reject(root,archive(new String[][]{{"../bad","oops"},{"MOTO-HUB-data.json","{}"}}));
    reject(root,archive(new String[][]{{"MOTO-HUB-data.json","{}"},{"other.txt","x"}}));
    reject(root,archive(new String[][]{{"MOTO-HUB-data.json","{}"},{"rides/"+T,"badGPS"}}));

@@ -9,4 +9,8 @@
   <TextView android:id="@+id/widget_garage" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center" android:text="▣  차고" android:contentDescription="내 바이크 차고 열기" android:padding="8dp" android:textColor="#FFFFFF" android:background="#263844"/>
   <TextView android:id="@+id/widget_ride" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center" android:text="➤  라이딩" android:contentDescription="라이딩 화면 열기" android:padding="8dp" android:textColor="#FFFFFF" android:background="#30414F"/>
  </LinearLayout>
+ <LinearLayout android:id="@+id/widget_quick_row" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="40dp" android:paddingTop="4dp" android:visibility="gone">
+  <TextView android:id="@+id/widget_fuel" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center" android:text="⛽  주유" android:textColor="#FFFFFF" android:contentDescription="주유 기록 입력 열기" android:background="#30414F"/>
+  <TextView android:id="@+id/widget_service" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center" android:text="⚒  정비" android:textColor="#FFFFFF" android:contentDescription="정비 기록 입력 열기" android:background="#263844"/>
+ </LinearLayout>
 </LinearLayout>

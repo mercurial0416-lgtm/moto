@@ -1,0 +1,75 @@
+name: MOTO HUB DB (nested project) debug checkpoint
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'MOTO-HUB/**'
+      - '.github/workflows/moto-hub-debug.yml'
+permissions:
+  contents: read
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Android SDK 36
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Java-only ODO and boot recovery tests
+        run: |
+          cd MOTO-HUB
+          bash tests/run-cm-ride-odo-tests.sh
+          bash tests/run-cn-ride-reliability-tests.sh
+          bash tests/run-co-riding-safety-tests.sh
+          bash tests/run-cp-obd-aux-tests.sh
+          bash tests/run-cq-obd-diagnostics-tests.sh
+          bash tests/run-cr-improvements-tests.sh
+          bash tests/run-cs-ride-management-tests.sh
+          bash tests/run-ct-ride-bike-binding-tests.sh
+          bash tests/run-cu-ride-report-tests.sh
+          bash tests/run-cv-history-page-tests.sh
+          bash tests/run-cw-ride-history-tests.sh
+          bash tests/run-cx-ride-bike-filter-tests.sh
+          bash tests/run-cy-history-async-tests.sh
+          bash tests/run-cz-history-scale-tests.sh
+          bash tests/run-da-history-quality-tests.sh
+          bash tests/run-db-data-safety-tests.sh
+          bash tests/run-cy-java-syntax-tests.sh
+          python3 tests/test_alpha6_co_integration.py
+          bash tests/run-cl-session-safety-tests.sh
+          bash tests/run-cg-vehicle-tests.sh
+      - name: Compile and test Android app
+        run: |
+          cd MOTO-HUB
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon
+      - name: Save debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-hub-alpha6-db-debug-apk
+          path: MOTO-HUB/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save source snapshot (no credentials)
+        if: always()
+        run: |
+          zip -q -r MOTO-HUB-4.0.0-alpha6-db-source.zip MOTO-HUB .github \
+            -x '*/build/*' '*/.gradle/*' '*.apk' '*.jks' '*.keystore' '*/local.properties' '*/.env' '*/.env.*'
+          sha256sum MOTO-HUB-4.0.0-alpha6-db-source.zip > MOTO-HUB-4.0.0-alpha6-db-SHA256.txt
+      - name: Upload source checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-hub-alpha6-db-source
+          path: |
+            MOTO-HUB-4.0.0-alpha6-db-source.zip
+            MOTO-HUB-4.0.0-alpha6-db-SHA256.txt
+          if-no-files-found: error
+          retention-days: 30

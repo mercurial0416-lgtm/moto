@@ -6,6 +6,15 @@ final class TrackFile {
  static boolean valid(double lat,double lon,double accuracy,long time){return Double.isFinite(lat)&&Double.isFinite(lon)&&Double.isFinite(accuracy)&&lat>=-90&&lat<=90&&lon>=-180&&lon<=180&&accuracy>=0&&accuracy<=100&&time>0;}
  static String point(double lat,double lon,double accuracy,long time){if(!valid(lat,lon,accuracy,time))throw new IllegalArgumentException("유효하지 않은 GPS 좌표");return lat+","+lon+","+accuracy+","+time+"\n";}
  static File directory(File files)throws IOException{File dir=new File(files,"rides");if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("경로 폴더 생성 실패");return dir;}
+ /** Delete only a zero-byte uncommitted session; preserve any partial GPS data for recovery. */
+ static boolean discardEmptySession(File track)throws IOException{
+  if(track==null||!track.isFile()||track.length()!=0)return false;
+  if(new File(track.getPath()+".done").exists()||new File(track.getPath()+".recovered").exists())return false;
+  if(!track.delete())throw new IOException("빈 GPS 파일 정리 실패");
+  File bike=new File(track.getPath()+".bike");
+  if(bike.exists()&&!bike.delete())throw new IOException("빈 GPS 파일의 바이크 연결 정보 정리 실패");
+  return true;
+ }
  static List<File> tracks(File files)throws IOException{File[] a=directory(files).listFiles((d,n)->n.endsWith(".track"));List<File> list=new ArrayList<>(Arrays.asList(a==null?new File[0]:a));list.sort((x,y)->y.getName().compareTo(x.getName()));return list;}
  interface Consumer{void point(double lat,double lon,double accuracy,long time)throws Exception;}
  static int read(File f,Consumer consumer)throws Exception{

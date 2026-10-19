@@ -17,6 +17,7 @@ public final class PhotoTitleMatcherTest {
   verify(PhotoTitleMatcher.matches("File:2024 Kawasaki Ninja 400R.jpg", "Kawasaki", "Ninja 400", 2024), false, "400 must not match 400R");
   verify(PhotoTitleMatcher.matches("File:20240 KTM Duke 390.jpg", "KTM", "Duke 390", 2024), false, "year boundary");
   verify(PhotoTitleMatcher.matches("File:2023 KTM Duke 390.jpg", "KTM", "Duke 390", 2024), false, "wrong year");
+  verify(PhotoTitleMatcher.matches("File:2023 2024 KTM Duke 390.jpg", "KTM", "Duke 390", 2024), false, "ambiguous years");
   verify(PhotoTitleMatcher.matches("File:2024 Indianapolis Scout.jpg", "Indian", "Scout", 2024), false, "brand boundary");
   verify(PhotoTitleMatcher.matches("File:2024 Honda Super Cub C125.jpg", "Honda", "Super Cub 110", 2024), false, "110 must not match C125");
   verify(PhotoTitleMatcher.matches("File:2024 Honda Super Cub 110.jpg", "Honda", "Super Cub 110", 2024), true, "correct cub");

@@ -9,9 +9,9 @@ public final class RideInsights {
  public static final class Result {
   public final int points, discarded;
   public final double distanceKm, averageKmh, peakKmh;
-  public final long startedAt, endedAt, durationMillis;
-  Result(int count,int bad,double distance,double maximum,long start,long end){
-   points=count;discarded=bad;distanceKm=distance;peakKmh=maximum;startedAt=start;endedAt=end;
+  public final long startedAt, endedAt, durationMillis, movingMillis;
+  Result(int count,int bad,double distance,double maximum,long start,long end,long moving){
+   points=count;discarded=bad;distanceKm=distance;peakKmh=maximum;startedAt=start;endedAt=end;movingMillis=moving;
    durationMillis=Math.max(0,end-start);averageKmh=durationMillis>0?distance/(durationMillis/3600000.0):0;
   }
   public String distanceLabel(){return String.format(Locale.KOREA,"%.1f km",distanceKm);}
@@ -24,22 +24,29 @@ public final class RideInsights {
  }
  public static Result analyze(File track)throws Exception{
   final int[] count={0},bad={0};final long[] start={0},end={0},last={0};
-  final double[] lat={0},lon={0},km={0},max={0};final boolean[] have={false};
+  final double[] lat={0},lon={0},previousAccuracy={0},km={0},max={0};final long[] moving={0};final boolean[] have={false};
   TrackFile.read(track,(x,y,accuracy,t)->{
    count[0]++;if(start[0]==0)start[0]=t;end[0]=t;
-   if(accuracy>70){bad[0]++;return;}
+   if(accuracy>40){bad[0]++;have[0]=false;return;}
    if(have[0]){
     long delta=t-last[0];double metres=meters(lat[0],lon[0],x,y);
-    double speed=delta>0?metres*3600.0/delta:Double.POSITIVE_INFINITY; // km/h: metres / millis * 3600
-    if(delta>600000 || speed>250 || (metres<Math.max(accuracy,5)&&delta<30000)){
-     if(speed>250)bad[0]++;
-     if(delta>600000){lat[0]=x;lon[0]=y;last[0]=t;}
+    if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS &&
+       metres<Math.max(Math.max(previousAccuracy[0],accuracy),5)){
+     // Ignore GPS jitter without adding distance; retain prior point for a stable reference.
      return;
     }
-    km[0]+=metres/1000.0;max[0]=Math.max(max[0],speed);
+    if(RideMotionGate.countDistance(delta,metres,previousAccuracy[0],accuracy)){
+     double speed=metres*3600.0/delta;
+     km[0]+=metres/1000.0;max[0]=Math.max(max[0],speed);
+     if(speed>=3)moving[0]+=delta;
+    }else if(delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS){
+     bad[0]++; // Discard impossible spikes without poisoning the last reliable location.
+     return;
+    }
+    // On a long GPS outage, restart measurement here; never bridge the missing segment.
    }
-   lat[0]=x;lon[0]=y;last[0]=t;have[0]=true;
+   lat[0]=x;lon[0]=y;last[0]=t;previousAccuracy[0]=accuracy;have[0]=true;
   });
-  return new Result(count[0],bad[0],km[0],max[0],start[0],end[0]);
+  return new Result(count[0],bad[0],km[0],max[0],start[0],end[0],moving[0]);
  }
 }

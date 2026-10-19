@@ -10,6 +10,7 @@ final class PhotoRetry {
   if(candidates==null||candidates.isEmpty()||maxAttempts<=0)return null;
   int attempted=0;
   for(T candidate:candidates) {
+   if(candidate==null)continue;
    if(attempted++>=maxAttempts)break;
    try { R result=attempt.load(candidate);if(result!=null)return result; }
    catch(Exception ignored) { /* One broken image must not prevent trying another. */ }

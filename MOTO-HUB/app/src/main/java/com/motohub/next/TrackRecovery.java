@@ -40,7 +40,13 @@ final class TrackRecovery {
     Files.move(temp,track.toPath(),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
    }finally{Files.deleteIfExists(temp);}
   }
-  if(!new File(track.getPath()+".recovered").createNewFile())throw new IOException("복구 완료 표시를 저장하지 못했습니다.");
+  File marker=new File(track.getPath()+".recovered");
+  if(!marker.createNewFile())throw new IOException("복구 완료 표시를 저장하지 못했습니다.");
+  // Do not report success until the marker itself has been flushed. On failure
+  // leave the validated track available for another explicit recovery attempt.
+  try(FileOutputStream markerOut=new FileOutputStream(marker,true)){
+   markerOut.getFD().sync();
+  }catch(IOException e){marker.delete();throw e;}
   return new Result(points,dropped);
  }
 }

@@ -10,7 +10,7 @@ from pathlib import Path
 ui=Path('app/src/main/java/com/motohub/next/RideUi.java').read_text()
 activity=Path('app/src/main/java/com/motohub/next/MainActivity.java').read_text()
 assert 'HorizontalScrollView strip=new HorizontalScrollView(a);' in ui
-assert 'RideHistoryFilter.select(rides,selected,activeName,recording)' in ui
+assert 'RideHistoryFilter.select(bikeRides,selected,activeName,recording)' in ui
 assert 'RideHistoryFilter.status(file,activeName,recording)' in ui
 assert 'a.selectRideHistoryFilter(option);' in ui
 assert 'void selectRideHistoryFilter(String value)' in activity

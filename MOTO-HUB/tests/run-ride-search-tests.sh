@@ -13,7 +13,7 @@ hub=Path('app/src/main/java/com/motohub/next/HubScreens.java').read_text()
 assert 'search.addTextChangedListener(' in ui
 assert 'showHistoryResults(results,entries,rides.size(),selected,summary)' in ui
 assert 'new HubScreens(a).line(results,date,detail,' in ui
-assert 'RideHistorySearch.matches(entry.date,entry.status,query)' in ui
+assert 'RideHistorySearch.matchesIndex(entry.searchKey,terms)' in ui
 assert 'RideHistorySearch.MAX_LENGTH' in ui
 assert 'setContentDescription("라이딩 기록 검색")' in ui
 assert 'setContentDescription("라이딩 검색어 지우기")' in ui
