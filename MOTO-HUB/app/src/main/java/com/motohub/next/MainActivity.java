@@ -154,8 +154,9 @@ public class MainActivity extends Activity {
   garagePhotoTarget=b.optString("id");if(garagePhotoFile(garagePhotoTarget)==null){toast("사진을 등록할 수 없는 바이크 ID입니다.");return;}
   Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.setType("image/*");intent.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(intent,52);
  }
- void saveGaragePhoto(Uri uri)throws Exception{
-  File file=garagePhotoFile(garagePhotoTarget);garagePhotoTarget="";if(file==null)throw new IOException("바이크 사진 저장 경로 오류");
+ void saveGaragePhoto(Uri uri,String bikeId)throws Exception{
+  // Bind the photo to the bike selected when the document picker returned, not a mutable UI field.
+  File file=garagePhotoFile(bikeId);if(file==null)throw new IOException("바이크 사진 저장 경로 오류");
   // Decode through the content resolver, bound pixels to avoid loading full camera images into memory.
   android.graphics.BitmapFactory.Options opts=new android.graphics.BitmapFactory.Options();opts.inJustDecodeBounds=true;
   try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("선택한 사진을 열 수 없습니다.");android.graphics.BitmapFactory.decodeStream(in,null,opts);}
@@ -164,6 +165,8 @@ public class MainActivity extends Activity {
   android.graphics.Bitmap bitmap;
   try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("사진을 열 수 없습니다.");bitmap=android.graphics.BitmapFactory.decodeStream(in,null,opts);}
   if(bitmap==null)throw new IOException("지원하지 않는 사진입니다.");
+  // The picker can return portrait JPEG pixels with EXIF rotation; preserve their appearance.
+  bitmap=ReceiptImageOrientation.rotate(bitmap,ReceiptImageOrientation.readDegrees(this,uri));
   // Keep the previous photo intact if encoding, disk writes or the final commit fail.
   // AtomicFile writes to a staging file and only replaces the old image after success.
   AtomicFile photoDisk=new AtomicFile(file);
@@ -177,7 +180,9 @@ public class MainActivity extends Activity {
    if(photoOut!=null)photoDisk.failWrite(photoOut);
    throw failure;
   }finally{bitmap.recycle();}
-  toast("바이크 사진을 변경했어요.");render();
+  runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){
+   toast("바이크 사진을 변경했어요.");render();
+  }});
  }
  /** Every receipt stays in app-private storage and is included in full ZIP backups. */
  File receiptPhotoFile(String id){return receiptPhotoFile(id,1);}
@@ -1390,7 +1395,8 @@ public class MainActivity extends Activity {
     toast("입력칸에만 적용했어요. 확인 후 저장해 주세요.");
    }).show();
  }
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치가 취소되었거나 완료되지 않았습니다. 기존 기록은 삭제하지 않았습니다.");return;}if(request==55||request==56){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==52){attempt(()->saveGaragePhoto(uri));return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치가 취소되었거나 완료되지 않았습니다. 기존 기록은 삭제하지 않았습니다.");return;}if(request==55||request==56){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
+   new Thread(()->{try{saveGaragePhoto(uri,bikeId);}catch(Exception error){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())this.error("바이크 사진 저장 실패: "+error.getMessage());});}},"moto-garage-photo-save").start();return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
   if(request==54){scanReceiptOcr(uri,null);return;}
   if(request==46){prepareBundleRestore(uri);return;}
   if(request==48){char[] password=pendingSecurePassword;pendingSecurePassword=null;
