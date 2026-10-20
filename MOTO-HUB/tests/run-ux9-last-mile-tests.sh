@@ -21,7 +21,7 @@ assert 'finishPending=true;\n  Sharing.stop();' in service
 assert 'new Handler(worker.getLooper()).post(()->{' in service
 assert service.count('boolean verified=closeTrack(true);')==2, 'Both user and OBD completion verify on the worker'
 assert 'private synchronized boolean closeTrack(boolean completed)' in service
-assert 'finishPending=false;\n   stopWith' in service
+assert 'if(!finishPending)return;finishPending=false;' in service and 'stopWith(verified?' in service
 assert 'autoFinishPending=false;running=false;' in service
 assert 'if(!autoArmed||autoFinishPending||finishPending)return;' in service
 assert 'gpsIoThread.quitSafely()' in service and 'TrackCompletion.mark(track,count)' in service
