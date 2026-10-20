@@ -3,10 +3,10 @@ android {
  namespace 'com.motohub.next'
  compileSdk 36
  buildToolsVersion "36.0.0"
- defaultConfig { applicationId 'com.motohub.next'; minSdk 26; targetSdk 36; versionCode 517; versionName '4.0.0-alpha6-dh'; testInstrumentationRunner 'com.motohub.next.SmokeRunner' }
+ defaultConfig { applicationId 'com.motohub.next'; minSdk 26; targetSdk 36; versionCode 518; versionName '4.0.0-alpha6-di'; testInstrumentationRunner 'com.motohub.next.SmokeRunner' }
  defaultConfig { buildConfigField "String", "SUPABASE_URL", groovy.json.JsonOutput.toJson(providers.gradleProperty("supabaseUrl").getOrElse("https://paraeadvvdqyztqqhxpu.supabase.co")); buildConfigField "String", "SUPABASE_KEY", groovy.json.JsonOutput.toJson(providers.gradleProperty("supabaseKey").getOrElse("sb_publishable_fkKoDsRamzU0r1vt88opgw_GOUke5TY")) }
  buildFeatures { buildConfig = true }
- defaultConfig { buildConfigField "String", "UPDATE_MANIFEST_URL", groovy.json.JsonOutput.toJson(providers.gradleProperty("updateManifestUrl").getOrElse("")) }
+ defaultConfig { buildConfigField "String", "UPDATE_MANIFEST_URL", groovy.json.JsonOutput.toJson(providers.gradleProperty("updateManifestUrl").getOrElse("https://raw.githubusercontent.com/mercurial0416-lgtm/moto/main/updates/manifest.json")) }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
  testOptions { unitTests.includeAndroidResources = true; unitTests.all { maxHeapSize = "2g"; systemProperty "robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2"; ["https.proxyHost","https.proxyPort","http.proxyHost","http.proxyPort"].each { key -> if(System.getProperty(key)) systemProperty key, System.getProperty(key) } } }
  // Never commit the signing key. All four variables are required for a signed release.

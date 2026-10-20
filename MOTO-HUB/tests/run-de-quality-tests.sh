@@ -18,7 +18,7 @@ assert 'if(reserved)RestoreRideGate.endExport();' in ui and "Arrays.fill(passwor
 assert 'BackupIntegrity.verify(check)' in ui
 assert 'UpdateSafety.canInstall' in (root/'AppUpdater.java').read_text()
 assert 'GPS 관측 구간' in ui
-assert "versionCode 517" in Path('app/build.gradle').read_text()
+assert "versionCode 518" in Path('app/build.gradle').read_text()
 assert 'Sharing.start(' not in (root/'RideService.java').read_text()
 assert 'ObdReadOnlyProtocol.query("010D")' in (root/'ObdAutoSpeedMonitor.java').read_text()
 print('PASS DE UI/privacy/version integration (8 checks)')

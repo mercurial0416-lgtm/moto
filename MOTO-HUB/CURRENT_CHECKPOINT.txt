@@ -1,1 +1,3 @@
-MOTO HUB Alpha6-DH (517). Parent DG516. Encrypted backup .mhub (AES-256-GCM streaming), existing ZIP support retained. Android CI pending verification. See CHANGELOG-alpha6-dh.md. Existing debug signatures differ across previous versions; back up externally before changing installs.
+MOTO HUB Alpha6-DI(518) PREBUILD source checkpoint. Android APK NOT built, assembled or signed.
+Based on DH(517) fixed signing branch; preserve certificate SHA256 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b.
+Run tests/run-di-prebuild-tests.sh before the next dedicated Android build.

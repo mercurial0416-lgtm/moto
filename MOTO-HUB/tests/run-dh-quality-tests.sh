@@ -19,7 +19,7 @@ assert '암호화 백업 복원' in screen
 assert 'BackupCrypto.decryptToPrivateFile' in main
 assert 'BackupIntegrity.verify(in)' in main
 assert 'Arrays.fill(password' in main
-assert 'versionCode 517' in Path('app/build.gradle').read_text()
+assert 'versionCode 518' in Path('app/build.gradle').read_text()
 assert 'AES/GCM/NoPadding' in crypto and 'PBKDF2WithHmacSHA256' in crypto
 assert 'Sharing.start(' not in (root/'RideService.java').read_text()
 print('PASS DH encrypted backup UI, no password persistence, privacy checks')

@@ -2,6 +2,7 @@ name: Validate and build MOTO HUB
 on:
   workflow_dispatch:
   push:
+    branches-ignore: ['build/di518-prebuild-20261020']
     paths: ['MOTO-HUB/**', '.github/workflows/build-apk.yml']
   pull_request:
     paths: ['MOTO-HUB/**', '.github/workflows/build-apk.yml']
@@ -37,13 +38,13 @@ jobs:
         working-directory: MOTO-HUB
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/signature.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionCode='517'" > app/build/outputs/apk/debug/version-check.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionCode='518'" > app/build/outputs/apk/debug/version-check.txt
           sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/SHA256.txt
       - name: Upload APK and reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: MOTO-HUB-TEST-ONLY-EPHEMERAL-DEBUG-${{ github.sha }}
+          name: MOTO-HUB-DI518-${{ github.sha }}
           path: |
             MOTO-HUB/app/build/outputs/apk/debug/
             MOTO-HUB/app/build/reports/

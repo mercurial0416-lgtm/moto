@@ -96,6 +96,18 @@ final class MotorcyclePhoto {
    }
   }finally{c.disconnect();}
  }
+ /** Decode local user or model photos at display size, never full camera resolution. */
+ static Bitmap decodeLocalSampled(File photo,int maxDimension){
+  if(photo==null||!photo.isFile()||maxDimension<1)return null;
+  try{
+   BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;
+   BitmapFactory.decodeFile(photo.getAbsolutePath(),bounds);
+   if(bounds.outWidth<1||bounds.outHeight<1||bounds.outWidth>20000||bounds.outHeight>20000)return null;
+   BitmapFactory.Options scaled=new BitmapFactory.Options();
+   scaled.inSampleSize=PhotoDecodeScale.sampleSize(bounds.outWidth,bounds.outHeight,maxDimension);
+   return BitmapFactory.decodeFile(photo.getAbsolutePath(),scaled);
+  }catch(Exception invalid){return null;}
+ }
  /** Main thread only. Each lookup owns a generation token, so stale responses cannot overwrite newer selections. */
  static void show(MainActivity a,ImageView target,TextView credit,String brand,String model,int year,String garageBikeId){
   // Only a garage card is allowed to load or change its owner's manually chosen photo.
@@ -108,14 +120,14 @@ final class MotorcyclePhoto {
   target.setImageResource(BikeVisual.superCub(model)?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
   if(brand.isEmpty()||model.isEmpty()) {credit.setText(garageMode?"모델 정보 확인 필요 · 탭해서 사진 직접 등록":"모델 정보를 선택하면 사진을 검색해요");if(garageMode)credit.setOnClickListener(v->a.chooseGaragePhoto());return;}
   if(garageMode){File manual=a.garagePhotoFile(garageBikeId);
-   if(manual!=null&&manual.isFile())try{Bitmap user=BitmapFactory.decodeFile(manual.getAbsolutePath());
+   if(manual!=null&&manual.isFile())try{Bitmap user=decodeLocalSampled(manual,1200);
     if(user!=null){target.setImageBitmap(user);credit.setText("내가 선택한 사진 · 탭해서 변경");credit.setOnClickListener(v->a.chooseGaragePhoto());return;}}
    catch(Exception ignored){}
   }
   File file=photoFile(a,brand,model,year);File attribution=new File(file.getAbsolutePath()+".json");
   if(file.isFile()){
    Bitmap cached=null;
-   try{cached=BitmapFactory.decodeFile(file.getAbsolutePath());}catch(Exception ignored){}
+   try{cached=decodeLocalSampled(file,1200);}catch(Exception ignored){}
    if(cached!=null){
     // Attribution is optional metadata: missing, truncated or invalid JSON must not hide a valid offline image.
     JSONObject meta=new JSONObject();

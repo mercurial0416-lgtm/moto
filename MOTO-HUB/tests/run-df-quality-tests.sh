@@ -18,7 +18,7 @@ assert 'BackupFormat.MAX_TRACKS' in backup and 'BackupFormat.MAX_TRACKS' in rest
 assert 'BackupFormat.MAX_ENTRIES' in restore and 'BackupFormat.MAX_ENTRIES' in (root/'BackupIntegrity.java').read_text()
 assert '전체 ZIP 백업 사전 점검' in (root/'HubScreens.java').read_text()
 assert 'Arrays.sort(tracks' in backup and 'Arrays.sort(files' in backup
-assert 'versionCode 517' in Path('app/build.gradle').read_text()
+assert 'versionCode 518' in Path('app/build.gradle').read_text()
 assert 'Sharing.start(' not in (root/'RideService.java').read_text()
 assert 'ObdReadOnlyProtocol.query("010D")' in (root/'ObdAutoSpeedMonitor.java').read_text()
 print('PASS DF archive, version and privacy wiring (7 checks)')

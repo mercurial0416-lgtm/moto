@@ -1,10 +1,17 @@
 name: Fixed-signature MOTO HUB update APK
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish verified APK as a GitHub Release and update the public manifest'
+        type: boolean
+        required: true
+        default: false
 permissions:
-  contents: read
+  contents: write
 jobs:
   verified-fixed-release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -50,10 +57,35 @@ jobs:
       - name: Publish verified release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MOTO-HUB-FIXED-SIGNED-${{ github.sha }}
+          name: MOTO-HUB-FIXED-ONLY-${{ github.sha }}
           path: MOTO-HUB/app/build/outputs/apk/release/
           if-no-files-found: error
           retention-days: 90
+      - name: Publish verified release and update manifest
+        if: ${{ inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          APK=MOTO-HUB/app/build/outputs/apk/release/app-release.apk
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          CODE=$($AAPT dump badging "$APK" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -1)
+          test -n "$CODE" && test "$CODE" -ge 518
+          TAG="moto-hub-v${CODE}"
+          if gh release view "$TAG" >/dev/null 2>&1; then echo "Release already exists; refusing overwrite"; exit 1; fi
+          cp "$APK" "$RUNNER_TEMP/MOTO-HUB.apk"
+          gh release create "$TAG" "$RUNNER_TEMP/MOTO-HUB.apk" --title "MOTO HUB $CODE (fixed-signed)" --notes "Same fixed signing certificate; existing data remains installed on compatible devices."
+          ASSET="https://github.com/$REPO/releases/download/$TAG/MOTO-HUB.apk"
+          python3 MOTO-HUB/tools/make_update_manifest.py \
+            --apk "$APK" --apk-url "$ASSET" --aapt "$AAPT" --apksigner "$SIGNER" \
+            --output updates/manifest.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add updates/manifest.json
+          git commit -m "Publish verified fixed-signature MOTO HUB $CODE update manifest [skip ci]"
+          git push origin HEAD:main
       - name: Scrub private material
         if: always()
         run: rm -f "$RUNNER_TEMP/moto-fixed.p12"

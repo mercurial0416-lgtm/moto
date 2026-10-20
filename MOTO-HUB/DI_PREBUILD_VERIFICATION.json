@@ -1,0 +1,32 @@
+{
+  "checkpoint": "MOTO HUB Alpha6-DI (518) SOURCE-ONLY PREBUILD",
+  "status": "source tests passed; Android APK NOT built or signed",
+  "based_on": "DH517 fixed-signing source checkpoint",
+  "versionCode": 518,
+  "versionName": "4.0.0-alpha6-di",
+  "android_compilation": "NOT RUN per user request",
+  "android_lint": "NOT RUN per user request",
+  "apk_assemble": "NOT RUN per user request",
+  "apk_signing": "NOT RUN per user request",
+  "personal_data_uploaded": false,
+  "public_update_manifest": "https://raw.githubusercontent.com/mercurial0416-lgtm/moto/main/updates/manifest.json",
+  "published_manifest_version": 517,
+  "fixed_signer_certificate_sha256": "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b",
+  "checks": [
+    "DI private cache cleanup 16 assertions",
+    "DI paging 720 assertions including 10000 records reachable",
+    "DI restricted HTTPS redirect 11 assertions",
+    "DI signed update manifest generator 7 tests",
+    "Java syntax checks: 120 Android Java source files, syntax-only",
+    "14 existing existing regression shell suites passed",
+    "Old source tests updated for photo bitmap downsampling and source version 518"
+  ],
+  "previous_validation_run": "https://github.com/mercurial0416-lgtm/moto/actions/runs/39384037697",
+  "pending": [
+    "Android SDK compile/lint/unit tests for new 518",
+    "real device GPS/OBD",
+    "Supabase real server/auth/permission checks",
+    "GitHub signing secrets",
+    "merge of DI source to main and release publication"
+  ]
+}
