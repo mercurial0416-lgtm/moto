@@ -19,13 +19,18 @@
     "existing_ocr_parser_assertions": 9,
     "new_source_wiring_checks": 22,
     "java_source_syntax_parsed": 141,
-    "selected_regression_scripts": 13
+    "selected_regression_scripts": 13,
+    "compile_debug_java_only": "PASS",
+    "no_apk_output": "PASS",
+    "initial_compile_error_fixed": "Store.find JSONException checked exception"
   },
   "limitations": [
     "No new APK created",
-    "Android compile-only status pending",
     "Camera and Korean OCR not tested on physical phone",
     "Official manufacturer maintenance intervals and actual OBD odometer not verified",
     "Existing fixed signing private key remains outside source archive"
-  ]
+  ],
+  "android_compiled": true,
+  "compile_only_run_url": "https://github.com/mercurial0416-lgtm/moto/actions/runs/39411964902",
+  "compile_only_run_conclusion": "success"
 }
