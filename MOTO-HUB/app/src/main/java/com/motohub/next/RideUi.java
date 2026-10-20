@@ -38,10 +38,11 @@ final class RideUi {
  }
  final MainActivity a;RideUi(MainActivity a){this.a=a;}
  void render(){
+  final boolean saving=RideService.finishPending||RideService.autoFinishPending;
   LinearLayout hero=a.col();hero.setPadding(a.dp(18),a.dp(18),a.dp(18),a.dp(18));hero.setBackground(a.shape(a.panel,a.line,19));
-  TextView eyebrow=a.text(RideService.running?"●  GPS 기록 중":RideService.autoArmed?"●  OBD2 자동 출발 대기":"●  라이딩 준비 완료",13,RideService.running?0xff48d99a:a.accent,true);hero.addView(eyebrow);
-  TextView title=a.text(RideService.running?RideService.count+"개 좌표 저장":RideService.autoArmed?"AUTO RIDE ARMED":"READY TO RIDE",25,a.fg,true);LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
-  TextView sub=a.text(RideService.running?"화면을 꺼도 기기에 GPS 경로를 기록해요":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"출발 버튼 한 번으로 기록을 시작해요",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
+  TextView eyebrow=a.text(saving?"●  GPS 저장 검증 중":RideService.running?"●  GPS 기록 중":RideService.autoArmed?"●  OBD2 자동 출발 대기":"●  라이딩 준비 완료",13,RideService.running?0xff48d99a:a.accent,true);hero.addView(eyebrow);
+  TextView title=a.text(saving?"SAVING RIDE":RideService.running?RideService.count+"개 좌표 저장":RideService.autoArmed?"AUTO RIDE ARMED":"READY TO RIDE",25,a.fg,true);LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
+  TextView sub=a.text(saving?"마지막 좌표까지 기기에 저장하고 검증 중이에요. 앱을 종료하지 마세요.":RideService.running?"화면을 꺼도 기기에 GPS 경로를 기록해요":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"출발 버튼 한 번으로 기록을 시작해요",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
   RideReadiness.State readiness=readiness();
   if(!RideService.running){
    if(readiness!=RideReadiness.State.READY){
@@ -71,7 +72,8 @@ final class RideUi {
    TextView peak=a.text("최고속도 계산 중",13,a.muted,false);peak.setPadding(a.dp(6),0,0,a.dp(9));hero.addView(peak);
    a.gap(hero,12);
    Runnable refresh=new Runnable(){@Override public void run(){
-    if(!RideService.running||!hero.isAttachedToWindow()||a.isFinishing()||a.isDestroyed())return;
+    if(!hero.isAttachedToWindow()||a.isFinishing()||a.isDestroyed())return;
+    if(!RideService.running){a.render();return;}
     long seconds=Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.startedElapsed)/1000);
     values[0].setText(String.format(Locale.KOREA,"%.1f km",RideService.liveDistanceKm));
     values[1].setText(String.format(Locale.KOREA,"%02d:%02d",seconds/3600,seconds/60%60));
@@ -87,7 +89,7 @@ final class RideUi {
    if(RideService.running){new AlertDialog.Builder(a).setTitle("라이딩 기록 종료").setMessage("기록을 끝내고 주행 분석에서 이동거리와 경로를 확인할 수 있어요.").setNegativeButton("취소",null).setPositiveButton("종료",(d,w)->{
     a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
    }).show();}else requestStart();
-  });start.setTextColor(Color.WHITE);start.setBackground(a.shape(RideService.running?0xffda443c:0xffff6b1b,0,14));start.setMinHeight(a.dp(58));hero.addView(start);
+  });start.setTextColor(Color.WHITE);start.setBackground(a.shape(RideService.running?0xffda443c:0xffff6b1b,0,14));start.setMinHeight(a.dp(58));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);hero.addView(start);
   // Auto detection and GPS recording are independent. When both are active,
   // expose a direct way to finish the ride instead of hiding it behind a
   // developer-mode disarm button or relying exclusively on a notification.
@@ -102,7 +104,7 @@ final class RideUi {
       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
      }).show();
    });
-   finishRide.setMinHeight(a.dp(48));
+   finishRide.setMinHeight(a.dp(48));finishRide.setEnabled(!saving);
    hero.addView(finishRide);
   }
   a.content.addView(hero);a.gap(a.content,12);
