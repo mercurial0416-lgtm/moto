@@ -1199,7 +1199,8 @@ public class MainActivity extends Activity {
  }
  void offerReceiptForSavedRecord(String key,JSONObject item){
   if(!"services".equals(key)&&!"expenses".equals(key))return;
-  if(Store.find(db,key,item.optString("id"))==null)return;
+  try{if(Store.find(db,key,item.optString("id"))==null)return;}
+  catch(Exception e){return;} // Saved record was removed or data is unavailable.
   new AlertDialog.Builder(this).setTitle("영수증·작업 사진 추가")
    .setMessage("기록은 이미 저장했어요. 영수증 사진을 추가할까요? (최대 4장)")
    .setItems(new String[]{"카메라로 촬영","갤러리에서 선택"},(d,which)->{
