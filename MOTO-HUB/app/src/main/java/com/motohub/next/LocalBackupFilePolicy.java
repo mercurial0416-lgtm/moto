@@ -18,6 +18,15 @@ final class LocalBackupFilePolicy {
    && !Files.isSymbolicLink(file.toPath())
    && file.length()>0 && file.length()<=MAX_BYTES;
  }
+ /** Only truly usable local files may count toward the retention quota.
+  *  Never let a linked, empty or oversized fake checkpoint evict real backups.
+  */
+ static File[] eligible(File folder,String namePattern){
+  if(!safeFolder(folder)||namePattern==null)return new File[0];
+  File[] files=folder.listFiles((parent,name)->name.matches(namePattern)
+    &&readable(new File(parent,name)));
+  return files==null?new File[0]:files;
+ }
  static void requireReadable(File file)throws IOException{
   if(!readable(file))throw new IOException("안전하지 않거나 손상된 로컬 복원 파일입니다.");
  }
