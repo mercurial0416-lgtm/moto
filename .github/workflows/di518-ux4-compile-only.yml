@@ -1,7 +1,7 @@
 name: MOTO HUB DI518 UX4 compile-only verification (NO APK)
 on:
   push:
-    branches: ['build/di518-ux4-prebuild-20261020', 'fix/di518-ux5-record-stability-20261020']
+    branches: ['build/di518-ux4-prebuild-20261020', 'fix/di518-ux5-record-stability-20261020', 'fix/di518-ux6-reliability-20261020']
     paths:
       - 'MOTO-HUB/**'
       - '.github/workflows/di518-ux4-compile-only.yml'
@@ -25,6 +25,7 @@ jobs:
       - name: Pure-Java UX and privacy regressions
         working-directory: MOTO-HUB
         run: |
+          bash tests/run-ux6-quality-tests.sh
           bash tests/run-ux5-record-tests.sh
           bash tests/run-dm-ux4-tests.sh
           bash tests/run-dl-ux3-tests.sh
@@ -35,7 +36,7 @@ jobs:
         working-directory: MOTO-HUB
         run: |
           chmod +x ./gradlew
-          ./gradlew :app:compileDebugJavaWithJavac --no-daemon
+          ./gradlew :app:compileDebugJavaWithJavac :app:lintDebug :app:testDebugUnitTest --no-daemon
       - name: Verify no APK outputs were created
         run: |
           test ! -d MOTO-HUB/app/build/outputs/apk || { echo 'Unexpected APK output!'; exit 1; }
