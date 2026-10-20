@@ -22,12 +22,15 @@ public final class RideService extends Service implements LocationListener {
   gpsIoThread=new HandlerThread("moto-gps-disk",android.os.Process.THREAD_PRIORITY_BACKGROUND);
   gpsIoThread.start();
  }
+ /** Read current service-owned finalization state without leaking it across service instances. */
+ static boolean saving(){RideService s=instance;return s!=null&&(s.finishPending||s.autoFinishPending);}
  static boolean shareAllowed(){RideService s=instance;return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||s.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&s.getSystemService(NotificationManager.class).areNotificationsEnabled();}
  static void refreshNotification(){RideService s=instance;if(s!=null)s.handler.post(()->{if(running)s.getSystemService(NotificationManager.class).notify(404,s.notification(String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+(Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐")));});}
  final RideNotificationRate notificationRate=new RideNotificationRate();
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();LocationManager manager;FileOutputStream output;File track;long lastTime;volatile long lastFixElapsed;volatile Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
  HandlerThread gpsIoThread;
+ volatile boolean finishPending=false,autoFinishPending=false;
  final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
     // Turning off developer experiments revokes OBD permission, not consent to a
     // separately running GPS ride. The GPS track must stay recoverable/active.
@@ -60,7 +63,7 @@ public final class RideService extends Service implements LocationListener {
   if(intent==null){stopWith("GPS 서비스가 중단됐습니다.",false);return START_NOT_STICKY;}
   String action=intent.getAction();
   if(STOP.equals(action)){
-   stopWith("사용자가 라이딩 기록을 종료했습니다.",running);return START_NOT_STICKY;
+   finishUserRideAsync();return START_NOT_STICKY;
   }
   if(AUTO_DISARM.equals(action)){
    // Disarming the experimental reader must NOT silently discard an active GPS ride.
@@ -184,7 +187,7 @@ public final class RideService extends Service implements LocationListener {
   }catch(Exception e){stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);}
  }
  private void handleAutoSpeed(int speedKmh){
-  if(!autoArmed)return;
+  if(!autoArmed||autoFinishPending||finishPending)return;
   long now=SystemClock.elapsedRealtime();
   ObdRideAutoGate.Event event=autoGate.accept(speedKmh,now);
   obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
@@ -205,11 +208,60 @@ public final class RideService extends Service implements LocationListener {
    getSystemService(NotificationManager.class).notify(404,notification(text));
   }
  }
- private synchronized void finishAutoTrack(){
-  if(!running)return;
-  Sharing.stop();if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
+ /** A full-track readback can scan 25MB: keep STOP responsive on Android main.
+  *  Location callbacks and this close operation run FIFO on the same GPS worker.
+  *  Never stop the service until the verified marker or recoverable original is settled.
+  */
+ private void finishUserRideAsync(){
+  if(finishPending)return;
+  if(autoFinishPending){
+   // A user STOP during automatic file verification means stop the OBD session too.
+   finishPending=true;Sharing.stop();return;
+  }
+  if(!running){stopWith("라이딩 기록이 종료됐습니다.",false);return;}
+  finishPending=true;
+  Sharing.stop();
+  if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
+  status="GPS 기록 저장·검증 중…";
+  HandlerThread worker=gpsIoThread;
+  if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
+   boolean verified=closeTrack(true);
+   handler.post(()->{
+    if(!finishPending)return;finishPending=false;
+    stopWith(verified?"사용자가 라이딩 기록을 저장하고 종료했습니다.":"GPS 기록 검증 실패 · 복구 화면에서 원본을 확인하세요.",false);
+    if(verified)DailyMaintenanceJob.checkSoon(this);
+   });
+  })){
+   finishPending=false;
+   stopWith("사용자가 라이딩 기록을 종료했습니다.",true);
+  }
+ }
+ /** Auto rides use the same ordered GPS worker for full-file verification.
+  *  Keep OBD autoGate on the main thread but do not allow a new start mid-finalize.
+  */
+ private void finishAutoTrack(){
+  if(!running||autoFinishPending)return;
+  autoFinishPending=true;
+  Sharing.stop();
+  if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
   final File savedTrack=track;
-  boolean verified=closeTrack(true);running=false;
+  status="자동 라이딩 GPS 기록 저장·검증 중…";
+  HandlerThread worker=gpsIoThread;
+  if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
+   boolean verified=closeTrack(true);
+   handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,verified);});
+  })){
+   completeAutoTrack(savedTrack,closeTrack(true));
+  }
+ }
+ private void completeAutoTrack(File savedTrack,boolean verified){
+  autoFinishPending=false;running=false;
+  if(finishPending){
+   finishPending=false;
+   stopWith(verified?"자동 라이딩을 저장하고 종료했습니다.":"GPS 저장 검증 실패 · 원본 복구가 필요합니다.",false);
+   if(verified)DailyMaintenanceJob.checkSoon(this);
+   return;
+  }
   status=verified?"자동 라이딩 저장 완료 · 다음 출발 감지 대기":"자동 라이딩 저장 검증 실패 · 기록을 복구 화면에서 확인해 주세요";
   if(verified&&savedTrack!=null&&savedTrack.isFile()&&count>=2){
    new Thread(()->{try{RideInsights.Result summary=RideInsights.analyze(savedTrack);
@@ -300,6 +352,8 @@ public final class RideService extends Service implements LocationListener {
   return verified;
  }
  synchronized void cleanup(boolean completed){
+  // Invalidate queued main-thread finalization callbacks after failures or process teardown.
+  finishPending=false;autoFinishPending=false;
   Sharing.stop();autoArmed=false;obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;

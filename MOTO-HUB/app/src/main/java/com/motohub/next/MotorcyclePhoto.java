@@ -126,13 +126,16 @@ final class MotorcyclePhoto {
    catch(Exception ignored){}
   }
   File file=photoFile(a,brand,model,year);File attribution=new File(file.getAbsolutePath()+".json");
-  if(file.isFile()){
+  // An earlier cached automatic image may explicitly describe another model/year.
+  // Keep the file recoverable but do not display it as the selected motorcycle.
+  JSONObject meta=new JSONObject();
+  if(attribution.isFile())try{meta=new JSONObject(readSmall(attribution));}catch(Exception ignored){}
+  boolean cacheAllowed=PhotoCacheYearPolicy.canShow(meta.optString("label"),brand,model,year,meta.optBoolean("userSelected"));
+  if(file.isFile()&&cacheAllowed){
    Bitmap cached=null;
    try{cached=decodeLocalSampled(file,1200);}catch(Exception ignored){}
    if(cached!=null){
-    // Attribution is optional metadata: missing, truncated or invalid JSON must not hide a valid offline image.
-    JSONObject meta=new JSONObject();
-    if(attribution.isFile())try{meta=new JSONObject(readSmall(attribution));}catch(Exception ignored){}
+    // Missing/truncated legacy attribution remains available for offline use.
     String source=meta.optString("pageUrl");
     credit.setText(source.isEmpty()?(garageMode?"저장된 바이크 사진 · 사진 변경 버튼 사용":"저장된 모델 사진"):(meta.optBoolean("userSelected")?"내가 고른 모델 사진 · ":"저장된 모델 사진 · ")+meta.optString("license","Wikimedia Commons")+" · 출처 보기");
     target.setImageBitmap(cached);
