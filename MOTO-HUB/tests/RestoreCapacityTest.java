@@ -36,6 +36,18 @@ public final class RestoreCapacityTest {
    try {RestoreCapacity.sum(root,Collections.singletonList("missing.dat"));throw new AssertionError("missing asset");}
    catch(IOException expected){checks++;}
   }finally{clean(root);}
+  check(RestoreCapacity.mb(Long.MAX_VALUE)>0,"large free-space size formats without overflow");
+  File linkedRoot=Files.createTempDirectory("moto-restore-safe-root").toFile();
+  File outside=Files.createTempFile("moto-restore-external", ".jpg").toFile();
+  try {
+   try {
+    Path link=new File(linkedRoot,"photo.jpg").toPath();
+    Files.createSymbolicLink(link,outside.toPath());
+    try{RestoreCapacity.sum(linkedRoot,Collections.singletonList("photo.jpg"));throw new AssertionError("symlinked restore target accepted");}
+    catch(IOException expected){checks++;}
+    Files.deleteIfExists(link);
+   }catch(UnsupportedOperationException|SecurityException ignored){}
+  }finally{Files.deleteIfExists(outside.toPath());clean(linkedRoot);}
   System.out.println("PASS DG restore free-space safety: "+checks+" assertions");
  }
 }
