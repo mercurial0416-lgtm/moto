@@ -7,6 +7,10 @@ javac -encoding UTF-8 -d "$out" \
  app/src/main/java/com/motohub/next/{PhotoTitleMatcher,PhotoCacheYearPolicy}.java \
  tests/PhotoCacheYearPolicyTest.java
 java -cp "$out" com.motohub.next.PhotoCacheYearPolicyTest
+javac -encoding UTF-8 -d "$out" \
+ app/src/main/java/com/motohub/next/{TrackFile,TrackCompletion}.java \
+ tests/Ux9TrackCompletionTest.java
+java -cp "$out" com.motohub.next.Ux9TrackCompletionTest
 python3 - <<'PY'
 from pathlib import Path
 base=Path('app/src/main/java/com/motohub/next')
