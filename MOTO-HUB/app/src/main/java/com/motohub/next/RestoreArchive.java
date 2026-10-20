@@ -135,10 +135,34 @@ public final class RestoreArchive {
  private static boolean jpeg(File f)throws IOException{
   try(RandomAccessFile in=new RandomAccessFile(f,"r")){if(in.readUnsignedByte()!=0xff||in.readUnsignedByte()!=0xd8)return false;in.seek(in.length()-2);return in.readUnsignedByte()==0xff&&in.readUnsignedByte()==0xd9;}
  }
- private static List<String> existingAssets(File root){
-  List<String> out=new ArrayList<>();File[] photos=root.listFiles((d,n)->n.matches(PHOTO));if(photos!=null)for(File f:photos)if(f.isFile())out.add(f.getName());
-  File[] receipts=root.listFiles((d,n)->n.matches(RECEIPT));if(receipts!=null)for(File f:receipts)if(f.isFile())out.add(f.getName());
-  File rides=new File(root,"rides");File[] files=rides.listFiles();if(files!=null)for(File f:files){String n=f.getName();if(f.isFile()&&(n.matches(RIDE)||n.matches(RIDE+"\\.done")||n.matches(RIDE+"\\.imported")||n.matches(RIDE+"\\.recovered")||n.matches(RIDE+"\\.mergedinto")||n.matches(RIDE+"\\.unmerged")||n.matches(RIDE+"\\.category")||n.matches(RIDE+"\\.bike")))out.add("rides/"+n);}return out;
+ private static void addSafeAsset(List<String> out,File root,File file,String path)throws IOException{
+  if(Files.isSymbolicLink(file.toPath())||
+    !Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS))
+   throw new IOException("복원 대상에 안전하지 않은 파일이 있습니다: "+path);
+  if(!file.getParentFile().equals(path.startsWith("rides/")?new File(root,"rides"):root))
+   throw new IOException("복원 파일 경로가 앱 저장소 밖입니다.");
+  out.add(path);
+ }
+ private static List<String> existingAssets(File root)throws IOException{
+  if(root==null||!Files.isDirectory(root.toPath(),LinkOption.NOFOLLOW_LINKS))
+   throw new IOException("복원할 저장 공간이 안전하지 않습니다.");
+  List<String> out=new ArrayList<>();
+  File[] photos=root.listFiles((d,n)->n.matches(PHOTO));if(photos!=null)
+   for(File f:photos)addSafeAsset(out,root,f,f.getName());
+  File[] receipts=root.listFiles((d,n)->n.matches(RECEIPT));if(receipts!=null)
+   for(File f:receipts)addSafeAsset(out,root,f,f.getName());
+  File rides=new File(root,"rides");
+  if(Files.isSymbolicLink(rides.toPath())||
+    (rides.exists()&&!Files.isDirectory(rides.toPath(),LinkOption.NOFOLLOW_LINKS)))
+   throw new IOException("복원 대상 GPS 폴더가 안전하지 않습니다.");
+  File[] files=rides.listFiles();if(files!=null)for(File f:files){
+   String n=f.getName();
+   if(n.matches(RIDE)||n.matches(RIDE+"\\.done")||n.matches(RIDE+"\\.imported")||
+      n.matches(RIDE+"\\.recovered")||n.matches(RIDE+"\\.mergedinto")||
+      n.matches(RIDE+"\\.unmerged")||n.matches(RIDE+"\\.category")||n.matches(RIDE+"\\.bike"))
+    addSafeAsset(out,root,f,"rides/"+n);
+  }
+  return out;
  }
  private static boolean sameContent(File a,File b)throws IOException{
   if(a.length()!=b.length())return false;
