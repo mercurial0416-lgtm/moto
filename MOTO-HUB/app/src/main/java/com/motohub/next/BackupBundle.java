@@ -54,7 +54,7 @@ public final class BackupBundle {
   }
   File[] receipts=internal.listFiles((dir,name)->name.matches(BackupFormat.RECEIPT));
   if(receipts!=null){
-   if(receipts.length>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증 사진이 1,000장을 초과했습니다.");
+   if(receipts.length>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증 사진이 4,000장을 초과했습니다.");
    Arrays.sort(receipts,Comparator.comparing(File::getName));
    for(File file:receipts){total=writeFile(zip,file,"receipts/"+file.getName(),total);count++;}
   }

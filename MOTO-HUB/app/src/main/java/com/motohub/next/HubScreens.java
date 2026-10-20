@@ -69,7 +69,7 @@ final class HubScreens {
   for(int i=ListPageLimit.start(list.size(),a.recordPageOffset);i<ListPageLimit.end(list.size(),a.recordPageOffset);i++){
    JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";
    if(!month.equals(last)){a.section(month);last=month;}
-   boolean receipt=a.receiptPhotoFile(x.optString("id"))!=null&&a.receiptPhotoFile(x.optString("id")).isFile();
+   boolean receipt=ReceiptSlots.count(a.getFilesDir(),x.optString("id"))>0;
    line((receipt?"▣ ":"")+x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km",
     a.won(x.optDouble(x.has("amount")?"amount":"cost")),()->a.edit(x.has("amount")?"expenses":"services",x));
   }
@@ -81,6 +81,8 @@ final class HubScreens {
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
   a.action(p,"바이크 정보 수정",true,()->a.edit("vehicles",b));
+  a.action(p,"정비 주기 직접 설정 · 제조사 매뉴얼 기준",false,()->a.serviceIntervalTemplates(b.optString("id")));
+
   a.action(p,sold?"판매 처리 취소 (기록 유지)":"판매 처리 (기록 보존)",false,()->new AlertDialog.Builder(a)
    .setTitle(sold?"판매 처리를 취소할까요?":"판매한 바이크로 보관할까요?")
    .setMessage("바이크와 연결된 주유·정비 기록을 삭제하지 않습니다. 언제든 정보를 다시 수정할 수 있어요.")
@@ -141,6 +143,10 @@ final class HubScreens {
    RecordMonthlySummary totals=RecordMonthlySummary.forBike(allExpenses,allServices,id,now);
    double allFuel=totals.sumFuelAndOther(),allService=totals.sumService();
    a.label(page,"계기판 기록 "+a.num(bike.optDouble("odo"))+" km · 실제 계기판과 대조 필요",14,a.muted,false);
+   FuelTrend.Summary fuelTrend=FuelTrend.forBike(allExpenses,id);
+   a.label(page,"기록된 주유 "+fuelTrend.entries+"건 · 평균 결제 단가 "+(fuelTrend.unitPrice>0?a.won(Math.round(fuelTrend.unitPrice))+"/L":"계산 불가"),14,a.muted,false);
+   a.label(page,fuelTrend.fullTankSegments>0?"가득 주유 구간 "+fuelTrend.fullTankSegments+"개 · 추정 연비 "+String.format(java.util.Locale.KOREA,"%.1f km/L",fuelTrend.fullTankKmPerLiter):"추정 연비: 가득 주유를 최소 두 번 기록해 주세요.",14,a.muted,false);
+   a.label(page,"연비는 같은 바이크의 계기판·가득 주유 기록만 사용한 추정치입니다.",12,a.muted,false);
    int dueCount=0,upcoming=0;
    for(JSONObject service:allServices)if(id.equals(service.optString("vehicleId"))){
     if(Store.due(service,bike,java.time.LocalDate.now().toString()))dueCount++;

@@ -1,0 +1,32 @@
+{
+  "product": "MOTO HUB 4.0 Alpha6-DI UX3",
+  "versionCode": 518,
+  "versionName": "4.0.0-alpha6-di",
+  "phase": "SOURCE_ONLY_PREBUILD",
+  "apk_built": false,
+  "android_compilation_performed": false,
+  "device_verified": false,
+  "features": [
+    "on-device Korean receipt OCR with explicit user confirmation before applying detected fields",
+    "up to four local receipt photos per saved maintenance/fuel entry with ZIP and encrypted ZIP roundtrip",
+    "batch maintenance draft saved per bike and recovered after closing the form",
+    "explicit per-bike manual service interval templates stored inside backed-up JSON",
+    "average cost per liter and full-tank-only estimated fuel efficiency per bike",
+    "one-step save-then-attach photo for new records",
+    "legacy receipts and existing data retained",
+    "existing developer OBD2 odometer read/check flow preserved: no unsupported automatic ECU write"
+  ],
+  "tests": {
+    "new_policy_assertions": 54,
+    "source_integration_check": "pass",
+    "legacy_regression_scripts_passed": 15,
+    "java_source_syntax_checked": 138
+  },
+  "limitations": [
+    "No Android Gradle compile/Lint/APK build or physical device test requested or performed.",
+    "ML Kit OCR runtime accuracy/model packaging unverified on device.",
+    "No manufacturer-specific OEM intervals added without confirmed manuals.",
+    "No ECU mileage changes without explicit user confirmation and device compatibility."
+  ],
+  "previous_checkpoint": "build/di518-ux2-prebuild-20261020"
+}
