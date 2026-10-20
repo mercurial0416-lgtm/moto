@@ -2,9 +2,10 @@ name: Validate and build MOTO HUB
 on:
   workflow_dispatch:
   push:
-    branches-ignore: ['build/di518-prebuild-20261020', 'build/di518-ux4-prebuild-20261020']
+    branches-ignore: ['build/di518-prebuild-20261020', 'build/di518-ux4-prebuild-20261020', 'fix/di518-ux5-record-stability-20261020']
     paths: ['MOTO-HUB/**', '.github/workflows/build-apk.yml']
   pull_request:
+    branches: ['main']
     paths: ['MOTO-HUB/**', '.github/workflows/build-apk.yml']
 permissions:
   contents: read
