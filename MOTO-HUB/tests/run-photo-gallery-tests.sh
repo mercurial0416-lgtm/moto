@@ -21,7 +21,7 @@ checks={
  'gallery candidates use conservative Commons search': 'MotorcyclePhoto.searchCommons(' in s,
  'gallery displays image previews': 'image.setImageBitmap(ready)' in s,
  'gallery previews are downsampled': 'MotorcyclePhoto.downloadPreview(' in s and 'PhotoDecodeScale.sampleSize(' in p,
- 'gallery selection saves full-size download': 'Bitmap bitmap=MotorcyclePhoto.downloadImage(' in s,
+ 'gallery selection saves full-size download': 'bitmap=MotorcyclePhoto.downloadImage(' in s and 'save(a,brand,model,year,choice,bitmap)' in s and 'bitmap.recycle()' in s,
  'preview loading failure is visible': '미리보기 실패 · 선택하면 다시 시도' in s,
  'gallery selection is explicit': 'row.setOnClickListener' in s and 'save(a,brand,model,year,choice,bitmap)' in s,
  'gallery saves JPEG atomically': 'AtomicFile photoFile=new AtomicFile(photo)' in s and 'photoFile.failWrite(photoOut)' in s,
