@@ -23,6 +23,8 @@ assert 'output.getFD().sync()' in ride, "committed samples remain durable"
 assert 'gpsIoThread.quitSafely()' in ride
 assert 'handler.post(()->{if(autoArmed&&running){autoGate.gpsMovement(' in ride, "OBD gate stays on main"
 assert 'PhotoTitleMatcher.matchesFallback(title,brand,model,year)' in photo
+provider=ride.split('@Override public void onProviderDisabled')[1].split('@Override public void onProviderEnabled')[0]
+assert provider.index('Sharing.stop();')<provider.index('handler.post('), 'privacy: stop location sharing immediately'
 signed=Path("../.github/workflows/moto-fixed-signed.yml").read_text()
 assert 'test "$CODE" -gt "$CURRENT"' in signed
 assert "if: github.ref == 'refs/heads/main'" in signed
