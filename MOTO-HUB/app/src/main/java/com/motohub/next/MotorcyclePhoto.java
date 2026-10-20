@@ -70,7 +70,7 @@ final class MotorcyclePhoto {
    try(InputStream in=c.getInputStream()){ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))!=-1){if(out.size()+n>250000)throw new IOException("image result too big");out.write(buf,0,n);}
     JSONObject pages=new JSONObject(out.toString("UTF-8")).optJSONObject("query");if(pages==null)return candidates;pages=pages.optJSONObject("pages");if(pages==null)return candidates;
     for(Iterator<String> keys=pages.keys();keys.hasNext();){JSONObject page=pages.optJSONObject(keys.next());if(page==null)continue;
-      String title=page.optString("title");if(exactYear?!matches(title,brand,model,year):!matchesModel(title,brand,model))continue;
+      String title=page.optString("title");if(exactYear?!matches(title,brand,model,year):!PhotoTitleMatcher.matchesFallback(title,brand,model,year))continue;
       JSONArray images=page.optJSONArray("imageinfo");JSONObject im=images==null?null:images.optJSONObject(0);if(im==null||!PhotoMimeFilter.supported(im.optString("mime")))continue;
       String imageUrl=im.optString("thumburl",im.optString("url"));String pageUrl=im.optString("descriptionurl");
       if(!imageUrl.startsWith("https://upload.wikimedia.org/")||!seenImageUrls.add(imageUrl))continue;

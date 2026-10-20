@@ -17,12 +17,17 @@ public final class RideService extends Service implements LocationListener {
  static String engineEstimate(){return ObdEngineState.label(obdRpm,obdRpmAt,SystemClock.elapsedRealtime());}
  static volatile boolean gpsOnlyAfterObd=false;
  static volatile RideService instance;
- @Override public void onCreate(){super.onCreate();instance=this;}
+ @Override public void onCreate(){super.onCreate();instance=this;
+  // GPS disk sync and callbacks live off the UI looper, preserving location callback order.
+  gpsIoThread=new HandlerThread("moto-gps-disk",android.os.Process.THREAD_PRIORITY_BACKGROUND);
+  gpsIoThread.start();
+ }
  static boolean shareAllowed(){RideService s=instance;return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||s.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&s.getSystemService(NotificationManager.class).areNotificationsEnabled();}
  static void refreshNotification(){RideService s=instance;if(s!=null)s.handler.post(()->{if(running)s.getSystemService(NotificationManager.class).notify(404,s.notification(String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+(Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐")));});}
  final RideNotificationRate notificationRate=new RideNotificationRate();
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
- String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();LocationManager manager;FileOutputStream output;File track;long lastTime,lastFixElapsed;Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
+ String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();LocationManager manager;FileOutputStream output;File track;long lastTime;volatile long lastFixElapsed;volatile Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
+ HandlerThread gpsIoThread;
  final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
     // Turning off developer experiments revokes OBD permission, not consent to a
     // separately running GPS ride. The GPS track must stay recoverable/active.
@@ -37,12 +42,17 @@ public final class RideService extends Service implements LocationListener {
     if(!ObdTelemetryFreshness.fresh(obdCoolantAt,now))obdCoolantC=Double.NaN;
     if(!ObdTelemetryFreshness.fresh(obdVoltageAt,now))obdVoltage=Double.NaN;
    }
-   if(lastFixElapsed>0&&now-lastFixElapsed>35_000){
-    liveSpeedKmh=0;lastGood=null;
+   // The watchdog and GPS I/O worker must not race when resetting the last valid fix.
+   boolean gpsLost=false;
+   synchronized(RideService.this){
+    if(lastFixElapsed>0&&now-lastFixElapsed>35_000){
+     liveSpeedKmh=0;lastGood=null;lastFixElapsed=0;gpsLost=true;
+    }
+   }
+   if(gpsLost){
     if(Sharing.enabled)Sharing.stop();
     status="GPS 신호 대기 · 기록 유지 · 위치 공유 중지";
     getSystemService(NotificationManager.class).notify(404,notification(status));
-    lastFixElapsed=0; // Notify only once per outage, resume after the next valid fix.
    }
    if(Sharing.enabled&&((Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)||!getSystemService(NotificationManager.class).areNotificationsEnabled()))Sharing.stop();handler.postDelayed(this,5000);}};
  @Override public IBinder onBind(Intent i){return null;}
@@ -92,7 +102,8 @@ public final class RideService extends Service implements LocationListener {
   if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)
    throw new SecurityException("위치 권한이 해제되어 GPS를 시작할 수 없습니다.");
   if(manager==null)throw new IllegalStateException("GPS 서비스가 준비되지 않았습니다.");
-  manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,5000,0,this,Looper.getMainLooper());
+  if(gpsIoThread==null||!gpsIoThread.isAlive())throw new IllegalStateException("GPS 기록 스레드를 시작할 수 없습니다.");
+  manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,5000,0,this,gpsIoThread.getLooper());
  }
  private void prepareForeground(boolean automatic){
   if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("정확한 위치 권한이 필요합니다.");
@@ -107,7 +118,7 @@ public final class RideService extends Service implements LocationListener {
   else if(Build.VERSION.SDK_INT>=29)startForeground(404,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
   else startForeground(404,n);
  }
- private void openRideTrack()throws Exception{
+ private synchronized void openRideTrack()throws Exception{
   track=new File(TrackFile.directory(getFilesDir()),System.currentTimeMillis()+"-"+UUID.randomUUID()+".track");
   output=new FileOutputStream(track);
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
@@ -194,7 +205,7 @@ public final class RideService extends Service implements LocationListener {
    getSystemService(NotificationManager.class).notify(404,notification(text));
   }
  }
- private void finishAutoTrack(){
+ private synchronized void finishAutoTrack(){
   if(!running)return;
   Sharing.stop();if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
   final File savedTrack=track;
@@ -243,7 +254,7 @@ public final class RideService extends Service implements LocationListener {
   }
   return builder.build();
  }
- @Override public void onLocationChanged(Location location){
+ @Override public synchronized void onLocationChanged(Location location){
   if(!running||output==null)return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
   if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
@@ -252,16 +263,26 @@ public final class RideService extends Service implements LocationListener {
     if(RideMotionGate.countDistance(dt,metres,lastGood.getAccuracy(),location.getAccuracy())){
      double measuredKmh=metres*3600.0/dt;
      liveDistanceKm+=metres/1000.0;liveSpeedKmh=measuredKmh;
-     if(autoArmed&&location.getAccuracy()<=20){autoGate.gpsMovement(measuredKmh,SystemClock.elapsedRealtime());obdStationaryRemainingMs=autoGate.stationaryRemainingMs(SystemClock.elapsedRealtime());}
+     if(autoArmed&&location.getAccuracy()<=20){final double speedForGate=measuredKmh;
+      // OBD connection callbacks own the autoGate on the main looper. Serialize GPS hints there.
+      handler.post(()->{if(autoArmed&&running){autoGate.gpsMovement(speedForGate,SystemClock.elapsedRealtime());obdStationaryRemainingMs=autoGate.stationaryRemainingMs(SystemClock.elapsedRealtime());}});
+     }
      livePeakKmh=Math.max(livePeakKmh,measuredKmh);
     }else liveSpeedKmh=0; // A long GPS gap must never be treated as travelled distance.
    }
    lastGood=new Location(location);if(!autoArmed&&location.getAccuracy()<=40)Sharing.offer(location);status=count+"개 좌표 · 마지막 "+java.time.Instant.ofEpochMilli(lastTime)+(location.getAccuracy()>40?" · 정확도 낮음":"");if(notificationRate.shouldNotify(SystemClock.elapsedRealtime()))getSystemService(NotificationManager.class).notify(404,notification(String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+(Sharing.enabled?"그룹 위치 공유 켜짐":(gpsOnlyAfterObd?"OBD2 종료 · GPS 단독 기록":"위치 공유 꺼짐"))));}catch(Exception e){stopWith("저장 오류로 기록 중지: "+e.getMessage(),false);}
  }
- @Override public void onProviderDisabled(String provider){if(LocationManager.GPS_PROVIDER.equals(provider)&&running){liveSpeedKmh=0;lastGood=null;lastFixElapsed=0;Sharing.stop();status="GPS 일시 중단 · 켜면 기록 재개 (그룹 공유 중지)";getSystemService(NotificationManager.class).notify(404,notification(status));}}
- @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p)&&running){status="GPS 복귀 · 좌표 대기";getSystemService(NotificationManager.class).notify(404,notification(status));}} @Override public void onStatusChanged(String p,int s,Bundle b){}
+ @Override public void onProviderDisabled(String provider){if(LocationManager.GPS_PROVIDER.equals(provider)){
+  // Security-critical: disable remote sharing synchronously, before any UI message is queued.
+  Sharing.stop();
+  handler.post(()->{if(!running)return;
+   synchronized(RideService.this){liveSpeedKmh=0;lastGood=null;lastFixElapsed=0;}
+   status="GPS 일시 중단 · 켜면 기록 재개 (그룹 공유 중지)";getSystemService(NotificationManager.class).notify(404,notification(status));
+  });
+ }}
+ @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p))handler.post(()->{if(!running)return;status="GPS 복귀 · 좌표 대기";getSystemService(NotificationManager.class).notify(404,notification(status));});} @Override public void onStatusChanged(String p,int s,Bundle b){}
  void stopWith(String message,boolean completed){status=message;cleanup(completed);stopSelf();}
- private boolean closeTrack(boolean completed){
+ private synchronized boolean closeTrack(boolean completed){
   boolean verified=false;
   if(output!=null){
    try{
@@ -278,7 +299,7 @@ public final class RideService extends Service implements LocationListener {
   active="";lastGood=null;lastFixElapsed=0;gpsOnlyAfterObd=false;
   return verified;
  }
- void cleanup(boolean completed){
+ synchronized void cleanup(boolean completed){
   Sharing.stop();autoArmed=false;obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
@@ -291,5 +312,8 @@ public final class RideService extends Service implements LocationListener {
   stopForeground(STOP_FOREGROUND_REMOVE);
   if(completed&&verified)DailyMaintenanceJob.checkSoon(this);
  }
- @Override public void onDestroy(){if(running||autoArmed)status="라이딩 서비스가 중단됐습니다. 저장된 GPS 좌표는 복구할 수 있어요.";cleanup(false);instance=null;super.onDestroy();}
+ @Override public void onDestroy(){if(running||autoArmed)status="라이딩 서비스가 중단됐습니다. 저장된 GPS 좌표는 복구할 수 있어요.";
+  cleanup(false);
+  if(gpsIoThread!=null){gpsIoThread.quitSafely();gpsIoThread=null;}
+  instance=null;super.onDestroy();}
 }

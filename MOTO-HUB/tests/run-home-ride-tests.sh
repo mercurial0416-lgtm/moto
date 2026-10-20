@@ -17,7 +17,7 @@ checks={
  'no direct stopService for ride anywhere': all(not re.search(r'\.stopService\(\s*new Intent\([^;]*RideService\.class',p.read_text()) for p in Path('app/src/main/java').rglob('*.java')),
  'STOP is completed not interrupted': 'if(STOP.equals(action))' in service and 'stopWith("사용자가 라이딩 기록을 종료했습니다.",running)' in service and 'if(AUTO_DISARM.equals(action))' in service,
  'verified completed ride creates done marker': 'TrackCompletion.mark(track,count)' in service and 'TrackCompletion.java' in {p.name for p in Path('app/src/main/java/com/motohub/next').iterdir()},
- 'unexpected destruction remains interrupted': 'cleanup(false);instance=null;super.onDestroy();' in service,
+ 'unexpected destruction remains interrupted': 'cleanup(false);' in service and 'gpsIoThread.quitSafely()' in service and 'instance=null;super.onDestroy();' in service,
  'permission callback requires ride tab': 'rideStartConsent.mayContinue("라이딩".equals(tab),granted)' in activity,
  'GPS shared location not enabled by home': 'Sharing.start(' not in home and 'Sharing.enabled=true' not in home,
 }

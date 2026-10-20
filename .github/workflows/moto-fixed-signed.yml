@@ -73,6 +73,9 @@ jobs:
           SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
           CODE=$($AAPT dump badging "$APK" | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p" | head -1)
           test -n "$CODE" && test "$CODE" -ge 518
+          # Never publish a signed build whose version cannot upgrade the current public release.
+          CURRENT=$(python3 -c 'import json; print(int(json.load(open("updates/manifest.json",encoding="utf-8"))["versionCode"]))')
+          test "$CODE" -gt "$CURRENT" || { echo "Refusing downgrade or same-version overwrite: candidate $CODE, published $CURRENT"; exit 1; }
           TAG="moto-hub-v${CODE}"
           if gh release view "$TAG" >/dev/null 2>&1; then echo "Release already exists; refusing overwrite"; exit 1; fi
           cp "$APK" "$RUNNER_TEMP/MOTO-HUB.apk"
