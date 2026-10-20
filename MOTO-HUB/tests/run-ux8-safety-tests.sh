@@ -23,5 +23,9 @@ assert 'output.getFD().sync()' in ride, "committed samples remain durable"
 assert 'gpsIoThread.quitSafely()' in ride
 assert 'handler.post(()->{if(autoArmed&&running){autoGate.gpsMovement(' in ride, "OBD gate stays on main"
 assert 'PhotoTitleMatcher.matchesFallback(title,brand,model,year)' in photo
+signed=Path("../.github/workflows/moto-fixed-signed.yml").read_text()
+assert 'test "$CODE" -gt "$CURRENT"' in signed
+assert "if: github.ref == 'refs/heads/main'" in signed
+assert 'WRONG SIGNING CERTIFICATE. Refusing APK.' in signed
 print("PASS UX8 GPS off-main ordering, final fsync and year-aware photo selection")
 PY
