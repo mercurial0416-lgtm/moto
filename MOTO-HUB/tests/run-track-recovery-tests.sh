@@ -13,7 +13,7 @@ backup=Path('app/src/main/java/com/motohub/next/BackupBundle.java').read_text()
 restore=Path('app/src/main/java/com/motohub/next/RestoreArchive.java').read_text()
 main=Path('app/src/main/java/com/motohub/next/MainActivity.java').read_text()
 assert 'stopWith("사용자가 라이딩 기록을 종료했습니다.",running)' in service and 'if(AUTO_DISARM.equals(action))' in service
-assert 'cleanup(false);instance=null' in service
+assert 'cleanup(false);' in service and 'gpsIoThread.quitSafely()' in service and 'instance=null;super.onDestroy();' in service
 assert 'status="GPS 일시 중단 · 켜면 기록 재개 (그룹 공유 중지)"' in service and 'Sharing.stop();status=' in service
 assert 'stopWith("저장 오류로 기록 중지: "+e.getMessage(),false)' in service
 assert 'startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in ui
