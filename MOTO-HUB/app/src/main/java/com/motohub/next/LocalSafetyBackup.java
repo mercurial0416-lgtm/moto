@@ -40,7 +40,7 @@ final class LocalSafetyBackup {
    atomic=new AtomicFile(file);out=atomic.startWrite();out.write(bytes);atomic.finishWrite(out);out=null;
    read(file);
    if(!java.util.Arrays.equals(bytes,java.nio.file.Files.readAllBytes(file.toPath())))throw new java.io.IOException("검증되지 않은 복원 지점");
-   File[] points=folder.listFiles((dir,name)->name.matches("motohub-[0-9]{13}-[a-f0-9]{8}\\.json"));
+   File[] points=LocalBackupFilePolicy.eligible(folder,"motohub-[0-9]{13}-[a-f0-9]{8}\\.json");
    if(points!=null&&points.length>12){
     java.util.Arrays.sort(points,(a,b)->{int date=Long.compare(a.lastModified(),b.lastModified());return date!=0?date:a.getName().compareTo(b.getName());});
     for(int i=0;i<points.length-12;i++)points[i].delete();
@@ -79,7 +79,7 @@ final class LocalSafetyBackup {
     destination.delete();
     return;
    }
-   File[] snapshots=folder.listFiles((dir,name)->name.matches("motohub-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.json"));
+   File[] snapshots=LocalBackupFilePolicy.eligible(folder,"motohub-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.json");
    if(snapshots!=null&&snapshots.length>7){
     java.util.Arrays.sort(snapshots,(a,b)->a.getName().compareTo(b.getName()));
     for(int i=0;i<snapshots.length-7;i++)snapshots[i].delete();
