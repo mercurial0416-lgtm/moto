@@ -212,6 +212,10 @@ public final class RideService extends Service implements LocationListener {
   */
  private void finishUserRideAsync(){
   if(finishPending)return;
+  if(autoFinishPending){
+   // A user STOP during automatic file verification means stop the OBD session too.
+   finishPending=true;Sharing.stop();return;
+  }
   if(!running){stopWith("라이딩 기록이 종료됐습니다.",false);return;}
   finishPending=true;
   Sharing.stop();
@@ -250,6 +254,12 @@ public final class RideService extends Service implements LocationListener {
  }
  private void completeAutoTrack(File savedTrack,boolean verified){
   autoFinishPending=false;running=false;
+  if(finishPending){
+   finishPending=false;
+   stopWith(verified?"자동 라이딩을 저장하고 종료했습니다.":"GPS 저장 검증 실패 · 원본 복구가 필요합니다.",false);
+   if(verified)DailyMaintenanceJob.checkSoon(this);
+   return;
+  }
   status=verified?"자동 라이딩 저장 완료 · 다음 출발 감지 대기":"자동 라이딩 저장 검증 실패 · 기록을 복구 화면에서 확인해 주세요";
   if(verified&&savedTrack!=null&&savedTrack.isFile()&&count>=2){
    new Thread(()->{try{RideInsights.Result summary=RideInsights.analyze(savedTrack);
