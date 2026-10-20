@@ -262,6 +262,14 @@ public final class RideService extends Service implements LocationListener {
    if(verified)DailyMaintenanceJob.checkSoon(this);
    return;
   }
+  // OBD can disconnect or developer access can be revoked while the GPS worker
+  // verifies the final track. A disarmed session must not leave a foreground
+  // service running forever with neither GPS recording nor an OBD reader.
+  if(!autoArmed){
+   stopWith(verified?"OBD2 연결 종료 · GPS 기록 저장 완료":"OBD2 연결 종료 · GPS 기록 원본 복구 필요",false);
+   if(verified)DailyMaintenanceJob.checkSoon(this);
+   return;
+  }
   status=verified?"자동 라이딩 저장 완료 · 다음 출발 감지 대기":"자동 라이딩 저장 검증 실패 · 기록을 복구 화면에서 확인해 주세요";
   if(verified&&savedTrack!=null&&savedTrack.isFile()&&count>=2){
    new Thread(()->{try{RideInsights.Result summary=RideInsights.analyze(savedTrack);
@@ -282,6 +290,12 @@ public final class RideService extends Service implements LocationListener {
   obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
   autoArmed=false;autoGate.reset();obdStationaryRemainingMs=-1;obdMonitor=null;
   Sharing.stop();
+  if(autoFinishPending){
+   // Completion owns the same GPS worker. Let its callback stop the service
+   // after the existing .track is verified, rather than closing it mid-write.
+   status="OBD2 연결 종료 · GPS 저장 검증 중…";
+   return;
+  }
   if(running){
    gpsOnlyAfterObd=true;
    status="OBD2 연결 종료 · GPS 단독 기록 유지 · 알림에서 종료 가능";
