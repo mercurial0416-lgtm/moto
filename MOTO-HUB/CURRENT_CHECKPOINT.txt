@@ -1,3 +1,1 @@
-MOTO HUB Alpha6-DI(518) PREBUILD source checkpoint. Android APK NOT built, assembled or signed.
-Based on DH(517) fixed signing branch; preserve certificate SHA256 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b.
-Run tests/run-di-prebuild-tests.sh before the next dedicated Android build.
+MOTO HUB Alpha6-DI(518) QUALITY PREBUILD. No Android assemble, no APK generation or signing. Same versionCode 518 as original DI source. Source regression passed; Android compilation pending. Preserve fixed signing SHA256 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b.

@@ -179,6 +179,8 @@ final class HubScreens {
     }).show();
   });
   a.section("개인정보 및 라이딩");
+  line("라이딩·OBD2 사전 점검","GPS·알림·배터리 제한·Bluetooth 상태 확인","열기",this::ridePreflight);
+  line("친구·그룹 서버 연결",SocialClient.configured()?"서버 주소 설정됨 · 실제 로그인/접속 별도 확인":"서버 미설정 · 로컬 기록 사용 가능","진단",this::serverPreflight);
   line("위치 공유 상태",Sharing.enabled?"그룹 위치 공유 중":"공유 꺼짐 · 명시적 동의 필요",Sharing.enabled?"중지":"확인",()->{
    if(Sharing.enabled)new AlertDialog.Builder(a).setTitle("위치 공유를 중지할까요?")
     .setNegativeButton("취소",null).setPositiveButton("즉시 중지",(d,w)->{Sharing.stop();a.render();}).show();
@@ -209,6 +211,40 @@ final class HubScreens {
   if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
    line("개발자 모드","실험 기능 · 순정 TFT 연동과 다름 · 기기 데이터 외부 전송 없음","열기",this::developerSettings);
   }a.label(a.content,"기존 앱에 덮어쓰기 설치하려면 동일한 서명키로 빌드해야 합니다. 서명이 다른 APK 설치를 위해 기존 앱을 삭제하지 마세요.",13,a.muted,false);a.label(a.content,"앱 삭제 전 전체 ZIP 백업을 저장하세요. GPS는 기기 내 기록입니다. 회원가입과 로그인 없이 이 휴대폰에 기록을 저장합니다. 다른 휴대폰으로 옮길 때는 전체 ZIP 백업을 사용하세요.",16,a.muted,false);
+ }
+ void ridePreflight(){
+  LinearLayout p=a.page("라이딩 사전 점검");
+  android.location.LocationManager gps=(android.location.LocationManager)a.getSystemService(android.content.Context.LOCATION_SERVICE);
+  android.app.NotificationManager nm=(android.app.NotificationManager)a.getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+  android.os.PowerManager pm=(android.os.PowerManager)a.getSystemService(android.content.Context.POWER_SERVICE);
+  android.bluetooth.BluetoothManager bt=(android.bluetooth.BluetoothManager)a.getSystemService(android.content.Context.BLUETOOTH_SERVICE);
+  boolean fine=a.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED;
+  boolean enabled=false;try{enabled=gps!=null&&gps.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);}catch(Exception ignored){}
+  boolean notify=nm!=null&&nm.areNotificationsEnabled()&&(android.os.Build.VERSION.SDK_INT<33||a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED);
+  boolean battery=pm!=null&&pm.isIgnoringBatteryOptimizations(a.getPackageName());
+  boolean bluetooth=bt!=null&&bt.getAdapter()!=null&&bt.getAdapter().isEnabled();
+  for(String detail:RideReadinessReport.summary(fine,enabled,notify,battery,bluetooth))a.label(p,detail,15,a.muted,false);
+  if(RideService.running){
+   RideService service=RideService.instance;
+   long age=service==null||service.lastFixElapsed<=0?-1:android.os.SystemClock.elapsedRealtime()-service.lastFixElapsed;
+   a.label(p,"라이딩 기록: 실행 중 · 마지막 GPS 수신 "+(age<0?"대기 중":(age/1000)+"초 전")+" · 좌표 "+RideService.count+"개",15,a.fg,false);
+  }else if(RideService.autoArmed)a.label(p,"OBD2 연결 대기 중 · GPS 기록은 출발 조건 후 시작됩니다.",15,a.muted,false);
+  else a.label(p,"라이딩 기록: 중지됨 · 마지막 주행 내용은 기록 탭에서 확인하세요.",15,a.muted,false);
+
+  a.action(p,"위치 권한 확인",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+a.getPackageName()))));
+  a.action(p,"GPS 켜기 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)));
+  a.action(p,"배터리 최적화 설정 확인",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
+  a.label(p,"이 점검은 설정 상태만 표시하며 위치를 기록하거나 외부에 전송하지 않습니다. OBD2 실제 차량 지원 여부는 별도로 확인해야 합니다.",13,a.muted,false);
+  a.show();
+ }
+ void serverPreflight(){
+  LinearLayout p=a.page("친구·그룹 서버 진단");
+  a.label(p,SocialClient.configured()?"Supabase 앱 설정: 등록됨":"Supabase 앱 설정: 없음 · 친구·그룹 기능만 제한",17,a.fg,true);
+  a.label(p,SocialClient.INSTANCE.uid.isEmpty()?"계정 세션: 로그인 안 됨 또는 만료 가능":"계정 세션: 기기에 보관됨 · 실제 서버 권한은 호출 시 확인",15,a.muted,false);
+  a.label(p,"위치 공유: "+Sharing.status,15,a.fg,false);
+  a.label(p,"진단은 서버로 좌표를 보내지 않습니다. 실제 그룹 공유는 로그인, 그룹 참가, GPS 기록 시작, 명시적 공유 동의가 모두 필요합니다.",14,a.muted,false);
+  if(Sharing.enabled)a.action(p,"위치 공유 즉시 중지",false,()->{Sharing.stop();a.toast("이 기기에서 위치 전송을 중단했어요.");});
+  a.show();
  }
  void developerSettings(){
   if(!a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))return;
