@@ -6,6 +6,7 @@ Base: build/di518-ux4-prebuild-20261020; versionCode remains 518. **No APK compi
 - MY GARAGE maintenance reminders choose the newest record by date then odometer per vehicle and service type; an old due date no longer overrides a more recent completed job.
 - Duplicate detection treats two blank record IDs as potentially duplicate while excluding edits to the same nonblank ID; null/incomplete/nonfinite input cannot generate false warnings.
 - Offline receipt OCR recognizes Korean **승인금액**, **결제합계**, **주유수량** and **2026년 10월 20일** date format, prioritizing final paid amount over subtotal; OCR suggestions remain explicitly confirmed by the user.
+- Kotlin runtime dependency alignment through the 1.8.22 BOM resolves transitive ML Kit duplicate-class collisions in the full Android build.
 - Regression tests cover unsorted service histories, vehicle isolation, zero-cost DIY jobs, blank IDs, malformed numbers and Korean receipt text.
 
 ## Verify
