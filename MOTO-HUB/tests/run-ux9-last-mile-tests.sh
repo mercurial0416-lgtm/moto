@@ -29,7 +29,7 @@ assert 'if(!finishPending)return;finishPending=false;' in service and 'stopWith(
 assert 'autoFinishPending=false;running=false;' in service
 assert 'if(!autoArmed||autoFinishPending||finishPending)return;' in service
 assert 'gpsIoThread.quitSafely()' in service and 'TrackCompletion.mark(track,count)' in service
-assert 'final boolean saving=RideService.finishPending||RideService.autoFinishPending;' in ride
+assert 'final boolean saving=RideService.saving();' in ride and 's.finishPending||s.autoFinishPending' in service
 assert 'start.setEnabled(!saving);' in ride
 assert 'finishRide.setEnabled(!saving);' in ride
 assert 'if(!RideService.running){a.render();return;}' in ride
