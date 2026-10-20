@@ -28,7 +28,7 @@ public final class RideService extends Service implements LocationListener {
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();LocationManager manager;FileOutputStream output;File track;long lastTime;volatile long lastFixElapsed;volatile Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
  HandlerThread gpsIoThread;
- volatile boolean finishPending=false;
+ volatile boolean finishPending=false,autoFinishPending=false;
  final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
     // Turning off developer experiments revokes OBD permission, not consent to a
     // separately running GPS ride. The GPS track must stay recoverable/active.
@@ -185,7 +185,7 @@ public final class RideService extends Service implements LocationListener {
   }catch(Exception e){stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);}
  }
  private void handleAutoSpeed(int speedKmh){
-  if(!autoArmed)return;
+  if(!autoArmed||autoFinishPending||finishPending)return;
   long now=SystemClock.elapsedRealtime();
   ObdRideAutoGate.Event event=autoGate.accept(speedKmh,now);
   obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
@@ -230,11 +230,26 @@ public final class RideService extends Service implements LocationListener {
    stopWith("사용자가 라이딩 기록을 종료했습니다.",true);
   }
  }
- private synchronized void finishAutoTrack(){
-  if(!running)return;
-  Sharing.stop();if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
+ /** Auto rides use the same ordered GPS worker for full-file verification.
+  *  Keep OBD autoGate on the main thread but do not allow a new start mid-finalize.
+  */
+ private void finishAutoTrack(){
+  if(!running||autoFinishPending)return;
+  autoFinishPending=true;
+  Sharing.stop();
+  if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
   final File savedTrack=track;
-  boolean verified=closeTrack(true);running=false;
+  status="자동 라이딩 GPS 기록 저장·검증 중…";
+  HandlerThread worker=gpsIoThread;
+  if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
+   boolean verified=closeTrack(true);
+   handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,verified);});
+  })){
+   completeAutoTrack(savedTrack,closeTrack(true));
+  }
+ }
+ private void completeAutoTrack(File savedTrack,boolean verified){
+  autoFinishPending=false;running=false;
   status=verified?"자동 라이딩 저장 완료 · 다음 출발 감지 대기":"자동 라이딩 저장 검증 실패 · 기록을 복구 화면에서 확인해 주세요";
   if(verified&&savedTrack!=null&&savedTrack.isFile()&&count>=2){
    new Thread(()->{try{RideInsights.Result summary=RideInsights.analyze(savedTrack);
