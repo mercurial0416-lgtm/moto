@@ -42,12 +42,17 @@ public final class RideService extends Service implements LocationListener {
     if(!ObdTelemetryFreshness.fresh(obdCoolantAt,now))obdCoolantC=Double.NaN;
     if(!ObdTelemetryFreshness.fresh(obdVoltageAt,now))obdVoltage=Double.NaN;
    }
-   if(lastFixElapsed>0&&now-lastFixElapsed>35_000){
-    liveSpeedKmh=0;lastGood=null;
+   // The watchdog and GPS I/O worker must not race when resetting the last valid fix.
+   boolean gpsLost=false;
+   synchronized(RideService.this){
+    if(lastFixElapsed>0&&now-lastFixElapsed>35_000){
+     liveSpeedKmh=0;lastGood=null;lastFixElapsed=0;gpsLost=true;
+    }
+   }
+   if(gpsLost){
     if(Sharing.enabled)Sharing.stop();
     status="GPS 신호 대기 · 기록 유지 · 위치 공유 중지";
     getSystemService(NotificationManager.class).notify(404,notification(status));
-    lastFixElapsed=0; // Notify only once per outage, resume after the next valid fix.
    }
    if(Sharing.enabled&&((Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)||!getSystemService(NotificationManager.class).areNotificationsEnabled()))Sharing.stop();handler.postDelayed(this,5000);}};
  @Override public IBinder onBind(Intent i){return null;}
