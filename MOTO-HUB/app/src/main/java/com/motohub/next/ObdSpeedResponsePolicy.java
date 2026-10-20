@@ -10,7 +10,7 @@ final class ObdSpeedResponsePolicy {
  }
  static long pollDelayMs(int speed){
   // A slower stationary poll saves radio/CPU work; moving samples stay responsive.
-  return speed==0?4_000L:1_100L;
+  return speed<=0||speed>255?4_000L:1_100L;
  }
  private ObdSpeedResponsePolicy(){}
 }
