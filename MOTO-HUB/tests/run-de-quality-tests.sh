@@ -14,7 +14,7 @@ from pathlib import Path
 root=Path('app/src/main/java/com/motohub/next')
 ui=(root/'MainActivity.java').read_text()
 assert 'RestoreRideGate.beginExport(RideService.running,RideService.autoArmed)' in ui
-assert 'finally{if(reserved)RestoreRideGate.endExport();}' in ui
+assert 'if(reserved)RestoreRideGate.endExport();' in ui and "Arrays.fill(password,'\\0')" in ui
 assert 'BackupIntegrity.verify(check)' in ui
 assert 'UpdateSafety.canInstall' in (root/'AppUpdater.java').read_text()
 assert 'GPS 관측 구간' in ui
