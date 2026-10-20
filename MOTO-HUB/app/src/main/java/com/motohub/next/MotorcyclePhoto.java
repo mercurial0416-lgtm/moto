@@ -164,7 +164,10 @@ final class MotorcyclePhoto {
     }
    }catch(Exception ignored){} // A cache write failure must not hide a downloaded photo.
    final JSONObject data=found;final Bitmap image=b;
-   a.runOnUiThread(()->{if(a.isFinishing()||target.getParent()==null||!PhotoRequestGuard.isCurrent(target,requestToken))return;
+   a.runOnUiThread(()->{if(a.isFinishing()||a.isDestroyed()||target.getParent()==null||!PhotoRequestGuard.isCurrent(target,requestToken)){
+    // Downloaded preview is not attached to any ImageView; return bitmap memory immediately.
+    if(image!=null&&!image.isRecycled())image.recycle();return;
+   }
     if(data!=null&&image!=null){target.setImageBitmap(image);credit.setText((data.optBoolean("exactYearCandidate")?"연식 검색 후보":"동일 모델 참고 · 연식 미확인")+" · "+data.optString("license")+" · 출처 보기");credit.setOnClickListener(v->a.open(data.optString("pageUrl")));}
     else {
      String reason=PhotoSearchStatus.message(lookup.failure);
