@@ -61,6 +61,16 @@ final class HubScreens {
    if(Double.isFinite(price))a.label(summary,"리터당 약 "+a.won(Math.round(price))+" · 실제 영수증 기준",12,a.muted,false);
    a.content.addView(summary);a.gap(a.content,10);
   }
+  FuelStats fuelStats=FuelStats.forBike(a.items("expenses"),bikeId);
+  if(fuelStats.fills>0){
+   LinearLayout insight=a.col();insight.setPadding(a.dp(15),a.dp(12),a.dp(15),a.dp(12));insight.setBackground(a.shape(a.panel,a.line,15));
+   a.label(insight,"주유 기록 "+fuelStats.fills+"회 · 평균 리터당 "+a.won(Math.round(fuelStats.averageWonPerLiter)),14,a.fg,true);
+   if(fuelStats.fullIntervals>0&&Double.isFinite(fuelStats.kmPerLiter))
+    a.label(insight,"만땅 간격 추정 연비 약 "+String.format(java.util.Locale.KOREA,"%.1f",fuelStats.kmPerLiter)+" km/L · "+fuelStats.fullIntervals+"구간",13,a.muted,false);
+   else a.label(insight,"만땅 기록 두 번 이상이면 구간별 예상 연비를 표시해요.",12,a.muted,false);
+   a.label(insight,"직접 입력한 주유값만 계산 · 계기판과 실제 주유량을 확인하세요.",12,a.muted,false);
+   a.content.addView(insight);a.gap(a.content,10);
+  }
   tabs(new String[]{"전체","주유","정비","기타"},a.garageMode,v->{a.garageMode=v;a.recordPageOffset=0;a.render();});
   List<JSONObject> list=records(a.garageMode,a.bike());
   a.label(a.content,"기록 "+list.size()+"건"+(a.garageMode.equals("전체")?"":" · "+a.garageMode),13,a.muted,false);
@@ -69,7 +79,7 @@ final class HubScreens {
   for(int i=ListPageLimit.start(list.size(),a.recordPageOffset);i<ListPageLimit.end(list.size(),a.recordPageOffset);i++){
    JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";
    if(!month.equals(last)){a.section(month);last=month;}
-   boolean receipt=a.receiptPhotoFile(x.optString("id"))!=null&&a.receiptPhotoFile(x.optString("id")).isFile();
+   boolean receipt=a.receiptCount(x.optString("id"))>0;
    line((receipt?"▣ ":"")+x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km",
     a.won(x.optDouble(x.has("amount")?"amount":"cost")),()->a.edit(x.has("amount")?"expenses":"services",x));
   }

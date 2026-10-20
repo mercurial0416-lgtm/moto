@@ -9,9 +9,9 @@ final class BackupFormat {
  static final long MAX_GPX_BYTES=50_000_000L;
  static final int MAX_TRACKS=10_000;
  static final int MAX_PHOTOS=1_000;
- static final int MAX_RECEIPTS=1_000;
+ static final int MAX_RECEIPTS=4_000;
  static final int MAX_ENTRIES=100_000;
- static final String RECEIPT="record-receipt-[a-fA-F0-9-]{36}\\.jpg";
+ static final String RECEIPT=ReceiptSlots.PATTERN;
  static final String PHOTO="garage-photo-[a-fA-F0-9-]{36}\\.jpg";
  static final String TRACK="[0-9]{10,15}-[a-f0-9-]{36}\\.track";
  static String sidecarSuffix(String name){

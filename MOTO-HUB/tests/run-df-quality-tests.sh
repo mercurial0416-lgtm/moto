@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 BIN=$(mktemp -d)
 trap 'rm -rf "$BIN"' EXIT
 javac -encoding UTF-8 -d "$BIN" \
- app/src/main/java/com/motohub/next/{BackupFormat,TrackFile,BackupBundle,BackupIntegrity,BackupReadiness,RestoreArchive,RestoreCapacity}.java \
+ app/src/main/java/com/motohub/next/{ReceiptSlots,BackupFormat,TrackFile,BackupBundle,BackupIntegrity,BackupReadiness,RestoreArchive,RestoreCapacity}.java \
  tests/{BackupTenThousandTest,BackupReadinessTest}.java
 java -Xmx768m -cp "$BIN" com.motohub.next.BackupTenThousandTest
 java -cp "$BIN" com.motohub.next.BackupReadinessTest

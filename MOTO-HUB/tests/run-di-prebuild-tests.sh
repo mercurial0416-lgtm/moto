@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 B=$(mktemp -d)
 trap 'rm -rf "$B"' EXIT
 javac -encoding UTF-8 -d "$B" \
-  app/src/main/java/com/motohub/next/{BackupFormat,PrivateCacheCleanup,ListPageLimit,UpdateDownloadPolicy}.java \
+  app/src/main/java/com/motohub/next/{ReceiptSlots,BackupFormat,PrivateCacheCleanup,ListPageLimit,UpdateDownloadPolicy}.java \
   tests/{PrivateCacheCleanupTest,ListPageLimitTest,UpdateDownloadPolicyTest}.java
 java -cp "$B" com.motohub.next.PrivateCacheCleanupTest
 java -cp "$B" com.motohub.next.ListPageLimitTest

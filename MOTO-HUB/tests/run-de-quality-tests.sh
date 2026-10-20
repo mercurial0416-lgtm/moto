@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 javac -encoding UTF-8 -d "$OUT" \
- app/src/main/java/com/motohub/next/{BackupFormat,TrackFile,RideMotionGate,RideInsights,BackupBundle,BackupIntegrity,BackupExportGate,RestoreRideGate,UpdateSafety}.java \
+ app/src/main/java/com/motohub/next/{ReceiptSlots,BackupFormat,TrackFile,RideMotionGate,RideInsights,BackupBundle,BackupIntegrity,BackupExportGate,RestoreRideGate,UpdateSafety}.java \
  tests/{BackupIntegrityTest,BackupExportInterlockTest,RideGpsCoverageTest}.java
 for CLASS in BackupIntegrityTest BackupExportInterlockTest RideGpsCoverageTest; do
  java -cp "$OUT" "com.motohub.next.$CLASS"

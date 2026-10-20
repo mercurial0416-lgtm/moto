@@ -8,7 +8,7 @@ javac -encoding UTF-8 -d "$out" tests/support/org/json/JSONObject.java \
  tests/ServiceBatchTest.java
 java -cp "$out" com.motohub.next.ServiceBatchTest
 javac -encoding UTF-8 -d "$out" \
- app/src/main/java/com/motohub/next/{BackupFormat,TrackFile,BackupBundle,BackupIntegrity,BackupReadiness,RestoreArchive,RestoreCapacity,BackupCrypto}.java \
+ app/src/main/java/com/motohub/next/{ReceiptSlots,BackupFormat,TrackFile,BackupBundle,BackupIntegrity,BackupReadiness,RestoreArchive,RestoreCapacity,BackupCrypto}.java \
  tests/ReceiptArchiveRoundtripTest.java
 java -cp "$out" com.motohub.next.ReceiptArchiveRoundtripTest
 python3 tests/test_dk_ui_wiring.py
