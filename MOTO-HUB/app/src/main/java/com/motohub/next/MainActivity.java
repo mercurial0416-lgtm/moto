@@ -27,7 +27,7 @@ public class MainActivity extends Activity {
  String draftKey="",draftId="",draftVehicle="";Map<String,EditText> draftFields;Map<String,Spinner> draftSelectors;CheckBox fullTankBox;boolean formDirty=false;
  LinearLayout formOptionalSection;Button formOptionalToggle;Set<String> formOptionalKeys=new HashSet<>();
  String activeForm="";JSONObject activeOld=new JSONObject();
- String garagePhotoTarget="",receiptPhotoTarget="",receiptPhotoKey="";
+ String garagePhotoTarget="",receiptPhotoTarget="",receiptPhotoKey="";int receiptPhotoSlot=1;
  String catalogBrand="", catalogModel="";
  boolean dark,readOnly;int bg,fg,muted,line,accent,panel,highlight;
  final Set<String> compare=new LinkedHashSet<>();
@@ -45,7 +45,7 @@ public class MainActivity extends Activity {
   rideHistoryPeriod=RideHistoryPeriod.restore(getSharedPreferences("ride_history_ui",MODE_PRIVATE).getString("period",RideHistoryPeriod.ALL),state==null?null:state.getString("rideHistoryPeriod"));
   rideHistoryBike=RideHistoryBikeFilter.restore(getSharedPreferences("ride_history_ui",MODE_PRIVATE).getString("bike",RideHistoryBikeFilter.ALL),state==null?null:state.getString("rideHistoryBike"));
   if(state==null)selected=getSharedPreferences("garage_ui",MODE_PRIVATE).getString("selected_bike","");
-  if(state!=null){rideHistoryQuery=RideHistorySearch.limit(state.getString("rideHistoryQuery",""));pendingTrack=state.getString("pendingTrack","");tab=state.getString("tab","홈");selected=state.getString("selected","");garagePhotoTarget=state.getString("garagePhotoTarget","");receiptPhotoTarget=state.getString("receiptPhotoTarget","");receiptPhotoKey=state.getString("receiptPhotoKey","");if(state.getBoolean("rideStartConsent",false))rideStartConsent.approve();}
+  if(state!=null){rideHistoryQuery=RideHistorySearch.limit(state.getString("rideHistoryQuery",""));pendingTrack=state.getString("pendingTrack","");tab=state.getString("tab","홈");selected=state.getString("selected","");garagePhotoTarget=state.getString("garagePhotoTarget","");receiptPhotoTarget=state.getString("receiptPhotoTarget","");receiptPhotoKey=state.getString("receiptPhotoKey","");receiptPhotoSlot=state.getInt("receiptPhotoSlot",1);if(state.getBoolean("rideStartConsent",false))rideStartConsent.approve();}
   if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::back);
   applyWidgetTab(getIntent());
   render();
@@ -112,7 +112,7 @@ public class MainActivity extends Activity {
   }
   toast("공유한 매물 링크를 가져왔어요.");
  }
- @Override public void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("pendingTrack",pendingTrack);out.putString("tab",tab);out.putString("selected",selected);out.putString("garagePhotoTarget",garagePhotoTarget);out.putString("receiptPhotoTarget",receiptPhotoTarget);out.putString("receiptPhotoKey",receiptPhotoKey);out.putString("rideHistoryFilter",rideHistoryFilter);out.putString("rideHistorySort",rideHistorySort);out.putString("rideHistoryPeriod",rideHistoryPeriod);out.putString("rideHistoryBike",rideHistoryBike);out.putString("rideHistoryQuery",rideHistoryQuery);out.putBoolean("rideStartConsent",rideStartConsent.pending());}
+ @Override public void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("pendingTrack",pendingTrack);out.putString("tab",tab);out.putString("selected",selected);out.putString("garagePhotoTarget",garagePhotoTarget);out.putString("receiptPhotoTarget",receiptPhotoTarget);out.putString("receiptPhotoKey",receiptPhotoKey);out.putInt("receiptPhotoSlot",receiptPhotoSlot);out.putString("rideHistoryFilter",rideHistoryFilter);out.putString("rideHistorySort",rideHistorySort);out.putString("rideHistoryPeriod",rideHistoryPeriod);out.putString("rideHistoryBike",rideHistoryBike);out.putString("rideHistoryQuery",rideHistoryQuery);out.putBoolean("rideStartConsent",rideStartConsent.pending());}
  void attempt(Work w){try{w.run();}catch(Exception e){error(e instanceof NumberFormatException?"숫자를 확인해 주세요.":e instanceof java.time.format.DateTimeParseException?"날짜는 YYYY-MM-DD 형식으로 입력해 주세요.":e.getMessage()==null?"작업을 완료하지 못했습니다.":e.getMessage());}}
  void error(String s){new AlertDialog.Builder(this).setTitle("확인해 주세요").setMessage(s).setPositiveButton("확인",null).show();}
  void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
@@ -178,22 +178,28 @@ public class MainActivity extends Activity {
   }finally{bitmap.recycle();}
   toast("바이크 사진을 변경했어요.");render();
  }
- /** Every receipt stays in app-private storage and is included in full ZIP backups. */
- File receiptPhotoFile(String id){
-  if(id==null||!id.matches("[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}"))return null;
-  return new File(getFilesDir(),"record-receipt-"+id+".jpg");
- }
+ /** All receipt attachments are local and follow the strict backup filename allowlist. */
+ File receiptPhotoFile(String id){return ReceiptFiles.validId(id)?ReceiptFiles.file(getFilesDir(),id,1):null;}
+ java.util.List<File> receiptPhotos(String id){return ReceiptFiles.existing(getFilesDir(),id);}
  void chooseReceiptPhoto(String key,JSONObject record){
   if(readOnly){error("원본 보호 상태에서는 사진을 변경할 수 없습니다.");return;}
-  if(!key.equals("services")&&!key.equals("expenses"))return;
-  File f=receiptPhotoFile(record.optString("id"));if(f==null){error("영수증을 연결할 기록 ID가 올바르지 않습니다.");return;}
-  receiptPhotoTarget=record.optString("id");receiptPhotoKey=key;
+  if(!"services".equals(key)&&!"expenses".equals(key))return;
+  String id=record.optString("id");int slot=ReceiptFiles.nextSlot(getFilesDir(),id);
+  if(slot<1){error("한 기록에는 영수증과 작업 사진을 최대 5장까지 첨부할 수 있어요.");return;}
+  receiptPhotoTarget=id;receiptPhotoKey=key;receiptPhotoSlot=slot;
+  Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.setType("image/*");intent.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(intent,53);
+ }
+ void replaceReceiptPhoto(String key,JSONObject record,int slot){
+  if(readOnly||slot<1||slot>ReceiptFiles.MAX_PER_RECORD)return;
+  receiptPhotoTarget=record.optString("id");receiptPhotoKey=key;receiptPhotoSlot=slot;
   Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.setType("image/*");intent.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(intent,53);
  }
  void saveReceiptPhoto(Uri uri)throws Exception{
-  String id=receiptPhotoTarget,key=receiptPhotoKey;receiptPhotoTarget="";receiptPhotoKey="";
-  if(readOnly||!"services".equals(key)&&!"expenses".equals(key))throw new IOException("영수증 연결 상태가 올바르지 않습니다.");
-  File output=receiptPhotoFile(id);if(output==null||Store.find(db,key,id)==null)throw new IOException("삭제된 기록에는 영수증을 첨부할 수 없습니다.");
+  String id=receiptPhotoTarget,key=receiptPhotoKey;int slot=receiptPhotoSlot;
+  receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;
+  if(readOnly||!("services".equals(key)||"expenses".equals(key)))throw new IOException("영수증 연결 상태 오류");
+  File output=ReceiptFiles.validId(id)&&slot>=1&&slot<=ReceiptFiles.MAX_PER_RECORD?ReceiptFiles.file(getFilesDir(),id,slot):null;
+  if(output==null||Store.find(db,key,id)==null)throw new IOException("삭제된 기록에는 영수증을 첨부할 수 없습니다.");
   android.graphics.BitmapFactory.Options opts=new android.graphics.BitmapFactory.Options();opts.inJustDecodeBounds=true;
   try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("사진을 열 수 없습니다.");android.graphics.BitmapFactory.decodeStream(in,null,opts);}
   if(opts.outWidth<1||opts.outHeight<1||opts.outWidth>25000||opts.outHeight>25000)throw new IOException("지원하지 않는 이미지 크기입니다.");
@@ -205,22 +211,67 @@ public class MainActivity extends Activity {
   AtomicFile atomic=new AtomicFile(output);FileOutputStream stream=null;
   try{stream=atomic.startWrite();if(!image.compress(android.graphics.Bitmap.CompressFormat.JPEG,82,stream))throw new IOException("사진 저장에 실패했습니다.");atomic.finishWrite(stream);stream=null;}
   catch(Exception e){if(stream!=null)atomic.failWrite(stream);throw e;}finally{image.recycle();}
-  runOnUiThread(()->toast("영수증을 저장했어요. 전체 ZIP 백업에도 포함됩니다."));
+  runOnUiThread(()->toast("사진 "+slot+"번을 저장했어요. ZIP 백업에도 포함됩니다."));
  }
  void receiptOptions(String key,JSONObject item){
-  File photo=receiptPhotoFile(item.optString("id"));if(photo==null)return;
-  if(!photo.isFile()){chooseReceiptPhoto(key,item);return;}
-  new AlertDialog.Builder(this).setTitle("영수증 사진")
-   .setItems(new String[]{"사진 보기","사진 교체","영수증만 삭제"},(d,which)->{
-    if(which==0){android.graphics.BitmapFactory.Options opts=new android.graphics.BitmapFactory.Options();opts.inSampleSize=2;
-     android.graphics.Bitmap bmp=android.graphics.BitmapFactory.decodeFile(photo.getAbsolutePath(),opts);
-     if(bmp==null){error("사진을 읽을 수 없어요.");return;}
-     ImageView preview=new ImageView(this);preview.setImageBitmap(bmp);preview.setAdjustViewBounds(true);
-     new AlertDialog.Builder(this).setTitle("영수증 · 기기 내부 보관").setView(preview).setPositiveButton("닫기",null).show();
-    }else if(which==1)chooseReceiptPhoto(key,item);
-    else if(!readOnly)new AlertDialog.Builder(this).setTitle("영수증을 삭제할까요?")
-     .setMessage("정비·주유 기록은 유지하고 영수증 사진만 삭제합니다.")
-     .setNegativeButton("취소",null).setPositiveButton("영수증 삭제",(yes,w)->{if(photo.delete())toast("영수증을 삭제했어요.");else error("영수증 삭제에 실패했습니다.");}).show();
+  String id=item.optString("id");if(!ReceiptFiles.validId(id))return;
+  java.util.List<File> saved=receiptPhotos(id);
+  String[] options=new String[saved.size()+1];for(int i=0;i<saved.size();i++){
+   int slotNumber=1;for(int n=1;n<=ReceiptFiles.MAX_PER_RECORD;n++)if(saved.get(i).getName().equals(ReceiptFiles.name(id,n)))slotNumber=n;
+   options[i]="사진 "+slotNumber+" 보기 · 교체 · 삭제";
+  }
+  options[saved.size()]="＋ 사진 추가 (최대 5장)";
+  new AlertDialog.Builder(this).setTitle("첨부 사진 · "+saved.size()+"/5장").setItems(options,(d,choice)->{
+   if(choice==saved.size()){chooseReceiptPhoto(key,item);return;}
+   File f=saved.get(choice);int slot=1;
+   for(int i=1;i<=ReceiptFiles.MAX_PER_RECORD;i++)if(f.getName().equals(ReceiptFiles.name(id,i))){slot=i;break;}
+   final int selectedSlot=slot;
+   new AlertDialog.Builder(this).setTitle("사진 "+slot)
+    .setItems(new String[]{"보기","교체","이 사진만 삭제"},(dd,action)->{
+     if(action==0){
+      android.graphics.BitmapFactory.Options opts=new android.graphics.BitmapFactory.Options();opts.inJustDecodeBounds=true;
+      android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(),opts);
+      opts.inSampleSize=1;while(Math.max(opts.outWidth,opts.outHeight)/opts.inSampleSize>1200)opts.inSampleSize*=2;opts.inJustDecodeBounds=false;
+      android.graphics.Bitmap image=android.graphics.BitmapFactory.decodeFile(f.getAbsolutePath(),opts);
+      if(image==null){error("사진을 열 수 없습니다.");return;}
+      ImageView preview=new ImageView(this);preview.setImageBitmap(image);preview.setAdjustViewBounds(true);
+      new AlertDialog.Builder(this).setTitle("사진 · 기기 안에 보관").setView(preview).setPositiveButton("닫기",null).setOnDismissListener(x->image.recycle()).show();
+     }else if(action==1)replaceReceiptPhoto(key,item,selectedSlot);
+     else if(!readOnly)new AlertDialog.Builder(this).setTitle("사진을 삭제할까요?")
+      .setMessage("정비·주유 기록은 유지하고 이 사진만 지웁니다.").setNegativeButton("취소",null)
+      .setPositiveButton("삭제",(dd2,w)->{if(f.delete())toast("사진을 삭제했어요.");else error("사진 삭제 실패");}).show();
+    }).show();
+  }).show();
+ }
+ void removeReceiptsFor(String id){
+  for(File f:receiptPhotos(id))if(!f.delete())toast("사진 정리에 실패했어요. 백업 전 확인해 주세요.");
+ }
+ void startReceiptOcr(){
+  if(!"services".equals(activeForm)&&!"expenses".equals(activeForm)){toast("정비 또는 주유 입력 화면에서 실행해 주세요.");return;}
+  Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("image/*");startActivityForResult(intent,54);
+ }
+ void receiptOcrSuggestion(ReceiptTextParser.Guess guess){
+  if(isFinishing()||isDestroyed()||draftFields==null||!guess.useful()){toast("사진에서 확실한 금액·날짜·주유량을 찾지 못했어요. 직접 입력해 주세요.");return;}
+  Map<String,EditText> inputs=draftFields;String form=activeForm;
+  StringBuilder found=new StringBuilder();
+  if(!guess.date.isEmpty())found.append("날짜: ").append(guess.date).append("\n");
+  if(!guess.amount.isEmpty())found.append("금액: ").append(guess.amount).append("원\n");
+  if(!guess.liters.isEmpty())found.append("주유량: ").append(guess.liters).append("L\n");
+  if(!guess.unitPrice.isEmpty())found.append("리터당 단가: ").append(guess.unitPrice).append("원\n");
+  new AlertDialog.Builder(this).setTitle("사진에서 읽은 값 · 확인 필수")
+   .setMessage(found+"\nOCR은 오인식할 수 있어요. 적용 후 영수증과 대조하고 저장하세요. 자동 저장하지 않습니다.")
+   .setNegativeButton("적용 안 함",null).setPositiveButton("입력칸에 적용",(d,w)->{
+    if(!form.equals(activeForm)||draftFields!=inputs){toast("화면이 바뀌어 값을 적용하지 않았어요.");return;}
+    if(!guess.date.isEmpty()&&inputs.containsKey("date"))inputs.get("date").setText(guess.date);
+    String moneyKey="expenses".equals(form)?"amount":"cost";
+    if(!guess.amount.isEmpty()&&inputs.containsKey(moneyKey))inputs.get(moneyKey).setText(guess.amount);
+    if("expenses".equals(form)&&!guess.liters.isEmpty()&&inputs.containsKey("liters"))inputs.get("liters").setText(guess.liters);
+    if("expenses".equals(form)&&inputs.containsKey("amount")&&inputs.get("amount").getText().length()==0
+       &&!guess.unitPrice.isEmpty()&&!guess.liters.isEmpty()){
+     String derived=QuickLogMath.amountFromLiters(guess.liters,guess.unitPrice);
+     if(!derived.isEmpty())inputs.get("amount").setText(derived);
+    }
+    toast("추천값을 입력했어요. 확인 후 저장하세요.");
    }).show();
  }
  void hideKeyboard(){android.view.inputmethod.InputMethodManager imm=getSystemService(android.view.inputmethod.InputMethodManager.class);View focus=getCurrentFocus();if(focus!=null){imm.hideSoftInputFromWindow(focus.getWindowToken(),0);focus.clearFocus();}}
@@ -715,6 +766,33 @@ public class MainActivity extends Activity {
     if(formOptionalSection!=null){formOptionalSection.setVisibility(View.VISIBLE);updateOptionalButton();}
     toast("이전 비용·메모만 복사했어요. 날짜·계기판은 현재값이고 정비 거리는 재계산했습니다.");
    });copy.setContentDescription("선택한 정비 항목의 이전 기록을 이 바이크에서만 찾기");target.addView(copy);
+   Button intervalTemplate=button("내 정비 간격 설정 · 다음 거리 자동 계산",false,()->{
+    String service=type.getText().toString().trim();if(service.isEmpty()){toast("정비 항목부터 선택해 주세요.");return;}
+    JSONObject settings=db.optJSONObject("settings");
+    JSONObject allIntervals=settings==null?null:settings.optJSONObject("serviceIntervals");
+    JSONObject perBike=allIntervals==null?null:allIntervals.optJSONObject(bikeId);
+    int previous=perBike==null?0:perBike.optInt(service,0);
+    int example=ServiceIntervals.starter().getOrDefault(service,0);
+    EditText interval=new EditText(this);interval.setSingleLine(true);
+    interval.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);interval.setText(String.valueOf(previous>0?previous:example>0?example:1000));
+    interval.setSelectAllOnFocus(true);interval.setHint("직접 입력한 교체 간격 (km)");
+    LinearLayout wrap=col();wrap.setPadding(dp(20),dp(4),dp(20),dp(4));wrap.addView(interval);
+    new AlertDialog.Builder(this).setTitle("내 "+service+" 정비 주기")
+     .setMessage("차종·연식별 공식 정비 간격이 아닙니다. 차량 설명서의 권장 주기를 확인하고 직접 입력하세요.")
+     .setView(wrap).setNegativeButton("취소",null).setPositiveButton("저장하고 적용",(d,w)->attempt(()->{
+      int value=Integer.parseInt(interval.getText().toString().trim());
+      if(ServiceIntervals.validated(service,value)==0)throw new IOException("정비 간격은 100~100,000 km 사이로 입력해 주세요.");
+      double km=Double.parseDouble(inputs.get("mileage").getText().toString().trim());
+      if(!Double.isFinite(km)||km<0||km>10_000_000)throw new IOException("계기판을 확인해 주세요.");
+      JSONObject next=new JSONObject(db.toString());JSONObject updatedSettings=next.getJSONObject("settings");
+      JSONObject storedIntervals=updatedSettings.optJSONObject("serviceIntervals");if(storedIntervals==null){storedIntervals=new JSONObject();updatedSettings.put("serviceIntervals",storedIntervals);}
+      JSONObject bikeIntervals=storedIntervals.optJSONObject(bikeId);if(bikeIntervals==null){bikeIntervals=new JSONObject();storedIntervals.put(bikeId,bikeIntervals);}
+      bikeIntervals.put(service,value);write(next);
+      if(nextKm!=null)nextKm.setText(String.valueOf((long)(km+value)));
+      if(formOptionalSection!=null){formOptionalSection.setVisibility(View.VISIBLE);updateOptionalButton();}
+      toast("다음 정비 예정 거리를 입력했어요. 확인 후 저장하세요.");
+     })).show();
+   });target.addView(intervalTemplate);
    Button diy=button("직접 작업 · 비용 0원",false,()->{cost.setText("0");toast("직접 정비 비용을 0원으로 입력했어요.");});target.addView(diy);
    label(target,"비용과 다음 정비 거리는 확인 후 저장하세요. 차량별 제조사 주기를 자동 가정하지 않습니다.",12,muted,false);
   }
@@ -850,6 +928,35 @@ public class MainActivity extends Activity {
   }
   CheckBox intervals=new CheckBox(this);intervals.setText("이전 동일 항목의 정비 간격 재사용 (선택)");intervals.setTextColor(fg);intervals.setTextSize(14);intervals.setMinHeight(dp(52));p.addView(intervals);
   label(p,"정비 간격은 같은 바이크·같은 항목의 기록으로만 계산하며 제조사 공식 주기가 아닙니다.",12,muted,false);
+  // Autosave uncommitted batch form only on-device, scoped to the selected motorcycle.
+  final android.content.SharedPreferences batchPreferences=getSharedPreferences("batch_draft",MODE_PRIVATE);
+  BatchDraft savedBatch=BatchDraft.decode(batchPreferences.getString(bikeId,""),bikeId);
+  if(savedBatch!=null){
+   date.setText(savedBatch.date);mileage.setText(savedBatch.mileage);
+   for(int i=0;i<choices.size();i++){
+    choices.get(i).setChecked(savedBatch.selected[i]);costs.get(i).setText(savedBatch.costs[i]);
+   }
+   intervals.setChecked(savedBatch.intervals);
+   label(p,"이전에 작성하던 정비 묶음을 복구했어요. 확인 후 저장하세요.",13,accent,true);
+  }
+  final Runnable saveBatchDraft=()->{
+   boolean[] selectedItems=new boolean[choices.size()];String[] amounts=new String[costs.size()];
+   for(int i=0;i<choices.size();i++){selectedItems[i]=choices.get(i).isChecked();amounts[i]=costs.get(i).getText().toString();}
+   try{batchPreferences.edit().putString(bikeId,BatchDraft.encode(bikeId,date.getText().toString(),mileage.getText().toString(),intervals.isChecked(),selectedItems,amounts)).apply();}
+   catch(Exception ignored){toast("임시저장 중 문제가 발생했어요. 저장 전에 입력값을 확인해 주세요.");}
+  };
+  android.text.TextWatcher autosave=new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence x,int start,int count,int after){}
+   public void onTextChanged(CharSequence x,int start,int before,int count){saveBatchDraft.run();}
+   public void afterTextChanged(android.text.Editable x){}
+  };
+  date.addTextChangedListener(autosave);mileage.addTextChangedListener(autosave);
+  for(int i=0;i<choices.size();i++){choices.get(i).setOnClickListener(v->saveBatchDraft.run());costs.get(i).addTextChangedListener(autosave);}
+  intervals.setOnCheckedChangeListener((v,on)->saveBatchDraft.run());
+  action(p,"작성 중인 묶음 초안 삭제",false,()->new AlertDialog.Builder(this)
+   .setTitle("임시저장만 삭제할까요?")
+   .setMessage("이 화면에서 입력한 항목은 지워지지 않고, 다음에 이어서 작성할 초안만 삭제합니다.")
+   .setNegativeButton("취소",null).setPositiveButton("초안 삭제",(d,w)->{batchPreferences.edit().remove(bikeId).apply();toast("임시저장을 삭제했어요.");}).show());
   action(p,"선택 항목 한 번에 저장",true,()->attempt(()->{
    List<ServiceBatch.Item> rows=new ArrayList<>();
    for(int i=0;i<choices.size();i++)if(choices.get(i).isChecked())rows.add(new ServiceBatch.Item(ServiceBatch.COMMON[i],costs.get(i).getText().toString(),""));
@@ -871,7 +978,7 @@ public class MainActivity extends Activity {
      JSONObject updated=Store.find(next,"vehicles",bikeId);
      double km=Double.parseDouble(mileage.getText().toString().trim());
      if(km>updated.optDouble("odo",0))updated.put("odo",km);
-     write(next);DailyMaintenanceJob.checkSoon(this);close();render();toast("정비 "+result.records.size()+"건을 저장했어요.");
+     write(next);batchPreferences.edit().remove(bikeId).apply();DailyMaintenanceJob.checkSoon(this);close();render();toast("정비 "+result.records.size()+"건을 저장했어요.");
     })).show();
   }));
   show();
@@ -895,7 +1002,11 @@ public class MainActivity extends Activity {
    Button catalog=button("⌕  브랜드 / 모델 / 연식 선택",true,()->showBikeCatalog(f,preview,status));
    LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(54));bp.topMargin=dp(10);bp.bottomMargin=dp(18);p.addView(catalog,bp);
   }
-  if(key.equals("expenses")||key.equals("services"))label(p,"차량: "+bikeName(old.optString("vehicleId",b.optString("id"))),16,fg,true);
+  if(key.equals("expenses")||key.equals("services")){
+   label(p,"차량: "+bikeName(old.optString("vehicleId",b.optString("id"))),16,fg,true);
+   action(p,"📷 영수증 사진에서 금액·날짜 자동 입력 제안",false,this::startReceiptOcr);
+   label(p,"기기 내 한국어 OCR. 읽힌 값은 확인 후 입력칸에만 적용하고, 자동으로 기록을 저장하지 않아요.",12,muted,false);
+  }
   // Put the one-tap shortcut above the long form, not below the optional fields.
   LinearLayout recentShortcut=col();
   boolean fastEntry=existing==null&&(key.equals("expenses")||key.equals("services"));
@@ -940,8 +1051,8 @@ public class MainActivity extends Activity {
    formOptionalToggle=expand;p.addView(expand);p.addView(optional);gap(p,14);
   }
   if(existing!=null&&(key.equals("services")||key.equals("expenses"))){
-   File attached=receiptPhotoFile(old.optString("id"));
-   action(p,attached!=null&&attached.isFile()?"영수증 사진 보기 · 교체":"＋ 영수증 사진 첨부",false,()->receiptOptions(key,old));
+   int receiptCount=receiptPhotos(old.optString("id")).size();
+   action(p,receiptCount>0?"첨부 사진 "+receiptCount+"장 · 관리":"＋ 영수증·작업 사진 첨부",false,()->receiptOptions(key,old));
    label(p,"사진은 기기 내부에 보관되고 전체 ZIP/암호화 백업에 포함돼요. 새 기록은 저장한 뒤 첨부할 수 있습니다.",12,muted,false);
   }
   if(key.equals("listings")){selector(p,sel,"status","판매 상태",new String[]{"확인필요","판매중","예약중","판매완료"},old.optString("status","확인필요"));selector(p,sel,"quick","퀵시프터",new String[]{"미확인","있음","없음"},old.optString("quick","미확인"));}
@@ -1004,7 +1115,8 @@ public class MainActivity extends Activity {
  }
  void remove(String key,JSONObject item){new AlertDialog.Builder(this).setTitle("기록을 삭제할까요?").setMessage(key.equals("vehicles")?"이 바이크의 정비·비용 기록도 함께 삭제됩니다. 필요한 기록은 먼저 백업해 주세요.":"삭제 후 되돌릴 수 없습니다.").setNegativeButton("취소",null).setPositiveButton("삭제",(d,w)->attempt(()->{JSONObject next=new JSONObject(db.toString());String id=item.getString("id");List<String> childReceipts=new ArrayList<>();
   if(key.equals("vehicles"))for(String collection:new String[]{"services","expenses"})for(JSONObject oldEntry:items(collection))if(id.equals(oldEntry.optString("vehicleId")))childReceipts.add(oldEntry.optString("id"));
-  Store.remove(next,key,id);if(key.equals("vehicles")){for(String k:new String[]{"services","expenses"}){JSONArray a=next.getJSONArray(k);for(int i=a.length()-1;i>=0;i--)if(a.getJSONObject(i).optString("vehicleId").equals(id))a.remove(i);}if(next.getJSONObject("settings").optString("primary").equals(id))next.getJSONObject("settings").remove("primary");selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();}write(next);if(key.equals("vehicles"))for(String childId:childReceipts){File child=receiptPhotoFile(childId);if(child!=null&&child.isFile()&&!child.delete())toast("영수증 정리에 실패했어요. 백업 전에 확인하세요.");}if(key.equals("services")||key.equals("expenses")){File receipt=receiptPhotoFile(id);if(receipt!=null&&receipt.isFile()&&!receipt.delete())toast("영수증 사진 삭제는 실패했어요. 다음 백업 전 확인해 주세요.");}render();})).show();}
+  Store.remove(next,key,id);if(key.equals("vehicles")){for(String k:new String[]{"services","expenses"}){JSONArray a=next.getJSONArray(k);for(int i=a.length()-1;i>=0;i--)if(a.getJSONObject(i).optString("vehicleId").equals(id))a.remove(i);}if(next.getJSONObject("settings").optString("primary").equals(id))next.getJSONObject("settings").remove("primary");
+   JSONObject stored=next.getJSONObject("settings").optJSONObject("serviceIntervals");if(stored!=null)stored.remove(id);selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();}write(next);if(key.equals("vehicles"))for(String childId:childReceipts)removeReceiptsFor(childId);if(key.equals("services")||key.equals("expenses"))removeReceiptsFor(id);render();})).show();}
  boolean restoreIsBlocked(){return RestoreRideGate.blocked(RideService.running,RideService.autoArmed);}
  void explainRestoreBlocked(){error(RestoreRideGate.MESSAGE);}
  void importBundle(){
@@ -1134,7 +1246,12 @@ public class MainActivity extends Activity {
   });
  }
  void exportData(){attempt(()->{pendingExport=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-"+today()+".json");startActivityForResult(i,41);});}
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치가 취소되었거나 완료되지 않았습니다. 기존 기록은 삭제하지 않았습니다.");return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";}return;}Uri uri=data.getData();if(request==52){attempt(()->saveGaragePhoto(uri));return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치가 취소되었거나 완료되지 않았습니다. 기존 기록은 삭제하지 않았습니다.");return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}return;}Uri uri=data.getData();if(request==52){attempt(()->saveGaragePhoto(uri));return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("사진 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
+  if(request==54){
+   toast("사진에서 글자를 확인하고 있어요. 자동으로 저장하지는 않습니다.");
+   ReceiptOcr.read(this,uri,guess->runOnUiThread(()->receiptOcrSuggestion(guess)),
+    message->runOnUiThread(()->error("OCR 실패: "+message)));return;
+  }
   if(request==46){prepareBundleRestore(uri);return;}
   if(request==48){char[] password=pendingSecurePassword;pendingSecurePassword=null;
    if(password==null){error("암호를 다시 입력해 주세요.");return;}

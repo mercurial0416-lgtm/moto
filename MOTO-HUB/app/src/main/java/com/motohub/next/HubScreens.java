@@ -41,6 +41,11 @@ final class HubScreens {
   title("정비와 주유","내 바이크 기록 · 빠른 입력 · 비용 한눈에");
   if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}
   bikePicker();
+  String currentId=a.bike().optString("id");
+  if(BatchDraft.decode(a.getSharedPreferences("batch_draft",android.content.Context.MODE_PRIVATE).getString(currentId,""),currentId)!=null){
+   a.action(a.content,"작성 중인 정비 묶음 이어서 작성 →",false,a::batchServiceEntry);
+   a.gap(a.content,8);
+  }
   LinearLayout actions=a.col();actions.setPadding(a.dp(14),a.dp(15),a.dp(14),a.dp(8));actions.setBackground(a.shape(a.panel,0,18));
   a.label(actions,"＋ 바로 기록",17,a.fg,true);
   a.pair(actions,"⛽ 주유",()->a.edit("expenses",null),"🔧 정비",()->a.edit("services",null));
@@ -69,7 +74,7 @@ final class HubScreens {
   for(int i=ListPageLimit.start(list.size(),a.recordPageOffset);i<ListPageLimit.end(list.size(),a.recordPageOffset);i++){
    JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";
    if(!month.equals(last)){a.section(month);last=month;}
-   boolean receipt=a.receiptPhotoFile(x.optString("id"))!=null&&a.receiptPhotoFile(x.optString("id")).isFile();
+   boolean receipt=!a.receiptPhotos(x.optString("id")).isEmpty();
    line((receipt?"▣ ":"")+x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km",
     a.won(x.optDouble(x.has("amount")?"amount":"cost")),()->a.edit(x.has("amount")?"expenses":"services",x));
   }
@@ -141,6 +146,13 @@ final class HubScreens {
    RecordMonthlySummary totals=RecordMonthlySummary.forBike(allExpenses,allServices,id,now);
    double allFuel=totals.sumFuelAndOther(),allService=totals.sumService();
    a.label(page,"계기판 기록 "+a.num(bike.optDouble("odo"))+" km · 실제 계기판과 대조 필요",14,a.muted,false);
+   FuelEfficiency.Result measured=FuelEfficiency.forBike(allExpenses,id);
+   if(measured!=null){
+    a.label(page,"실연비 "+String.format(java.util.Locale.KOREA,"%.1f",measured.kmPerLiter)+" km/L  ·  "+
+     String.format(java.util.Locale.KOREA,"%.0f",measured.costPerKm)+" 원/km",16,a.accent,true);
+    a.label(page,"가득→가득 주유 "+measured.trips+"구간 · 계기판과 주유량 수동 기록으로 계산",12,a.muted,false);
+   }else a.label(page,"실연비: 가득 주유를 2회 이상 정확히 기록하면 표시됩니다.",12,a.muted,false);
+
    int dueCount=0,upcoming=0;
    for(JSONObject service:allServices)if(id.equals(service.optString("vehicleId"))){
     if(Store.due(service,bike,java.time.LocalDate.now().toString()))dueCount++;

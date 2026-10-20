@@ -1,0 +1,29 @@
+{
+  "versionCode": 518,
+  "checkpoint": "DI518-UX3-PREBUILD",
+  "apkBuilt": false,
+  "androidCompiled": false,
+  "onDeviceTested": false,
+  "tests": {
+    "ux3PureJavaAssertions": 37,
+    "multiReceiptZipAssertions": 14,
+    "sourceWiring": 21,
+    "syntaxCheckedJavaSources": 138,
+    "regressionScripts": [
+      "run-quick-log-tests.sh",
+      "run-backup-tests.sh",
+      "run-restore-tests.sh",
+      "run-dh-quality-tests.sh",
+      "run-df-quality-tests.sh",
+      "run-dg-quality-tests.sh",
+      "run-dj-quality-tests.sh",
+      "run-di-quality-policy-tests.sh"
+    ]
+  },
+  "caveats": [
+    "Android and ML Kit dependency type resolution unverified",
+    "OBD2 actual odometer capability is unverified",
+    "Fixed-signature Android update untested",
+    "Manual confirmation required for every OCR suggestion"
+  ]
+}
