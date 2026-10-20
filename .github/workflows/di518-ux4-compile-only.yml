@@ -25,13 +25,9 @@ jobs:
       - name: Pure-Java UX and privacy regressions
         working-directory: MOTO-HUB
         run: |
-          bash tests/run-ux6-quality-tests.sh
-          bash tests/run-ux5-record-tests.sh
-          bash tests/run-dm-ux4-tests.sh
-          bash tests/run-dl-ux3-tests.sh
-          bash tests/run-dk-quality-tests.sh
-          bash tests/run-dh-quality-tests.sh
-          bash tests/run-backup-tests.sh
+          curl --fail --location --retry 3 -o "$RUNNER_TEMP/json.jar" https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar
+          export JSON_JAR="$RUNNER_TEMP/json.jar"
+          for test in tests/run-*.sh; do bash "$test"; done
       - name: Android Java compile ONLY (no APK, no signing)
         working-directory: MOTO-HUB
         run: |
