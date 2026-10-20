@@ -350,6 +350,8 @@ public final class RideService extends Service implements LocationListener {
   return verified;
  }
  synchronized void cleanup(boolean completed){
+  // Invalidate queued main-thread finalization callbacks after failures or process teardown.
+  finishPending=false;autoFinishPending=false;
   Sharing.stop();autoArmed=false;obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
