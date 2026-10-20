@@ -17,7 +17,8 @@ checks={
  'old photo is never replaced by a raw rename': 'renameTo(file)' not in method,
  'photo remains associated with requested bike': 'garagePhotoFile(bikeId)' in method and 'garagePhotoTarget=' not in method,
  'portrait EXIF preserved': 'ReceiptImageOrientation.rotate(bitmap,ReceiptImageOrientation.readDegrees(this,uri))' in method,
- 'photo work remains off the UI thread': 'new Thread(()->{try{saveGaragePhoto(uri,bikeId);}' in s and 'runOnUiThread(' in method,
+ 'photo work remains off the UI thread': 'GARAGE_PHOTO_SAVER.execute(()->{try{saveGaragePhoto(uri,bikeId);}' in s and 'runOnUiThread(' in method,
+ 'photo saves are serialized': 'Executors.newSingleThreadExecutor' in s,
  'release version incremented': bool((match:=re.search(r"versionCode\s+(\d+);\s*versionName\s+'4\.0\.0-alpha6-[a-z]+'", Path('app/build.gradle').read_text())) and int(match.group(1))>=459),
 }
 for name,ok in checks.items():print(('PASS' if ok else 'FAIL')+': '+name)
