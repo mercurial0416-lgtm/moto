@@ -1,1 +1,1 @@
-MOTO HUB Alpha6-DI(518) QUALITY PREBUILD. No Android assemble, no APK generation or signing. Same versionCode 518 as original DI source. Source regression passed; Android compilation pending. Preserve fixed signing SHA256 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b.
+MOTO HUB Alpha6-DI(518) PRIVACY/OFFLINE QUALITY PREBUILD. versionCode 518 unchanged. NO APK BUILT, NO ANDROID COMPILATION, NO SIGNING. Preserve fixed signing certificate 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b. Review CHANGELOG-alpha6-di-privacy.md.

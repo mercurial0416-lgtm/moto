@@ -19,6 +19,7 @@ public final class RideMapActivity extends Activity {
  private final ArrayList<Polyline> speedLines=new ArrayList<>();
  private boolean speedVisible=false;private Polyline baseLine;
  private Button speedButton;
+ private Button tileButton;private boolean onlineTiles=false;
  @Override public void onCreate(Bundle b){super.onCreate(b);
   String filename=getIntent().getStringExtra("track");
   if(filename==null||!filename.matches("[0-9]{10,15}-[0-9a-f-]{36}\\.track")){finish();return;}
@@ -37,11 +38,21 @@ public final class RideMapActivity extends Activity {
    if(baseLine!=null)baseLine.getOutlinePaint().setColor(speedVisible?0xff596572:0xffff6b1b);
    speedButton.setText(speedVisible?"단색 경로 보기":"속도별 경로 보기");map.invalidate();
   });base.addView(speedButton);
+  tileButton=new Button(this);tileButton.setText("온라인 배경지도 켜기 (선택)");
+  tileButton.setOnClickListener(v->{
+   if(onlineTiles){setOnlineTiles(false);return;}
+   new AlertDialog.Builder(this).setTitle("온라인 배경지도")
+    .setMessage("OpenStreetMap 타일 서버에 지도 위치 주변의 영역 요청이 전달됩니다. 저장된 GPS 원본은 전송하지 않습니다. Wi-Fi/모바일 데이터가 사용될 수 있습니다. 배경지도 없이도 경로를 볼 수 있습니다.")
+    .setNegativeButton("오프라인 유지",null)
+    .setPositiveButton("배경지도 켜기",(d,w)->setOnlineTiles(true)).show();
+  });base.addView(tileButton);
   caption=new TextView(this);caption.setText("저장된 경로를 불러오는 중…");caption.setPadding(18,12,14,14);caption.setTextColor(0xff9caebd);caption.setTextSize(14);base.addView(caption);
   map=new MapView(this);map.setTileSource(TileSourceFactory.MAPNIK);map.setMultiTouchControls(true);
+  // Saved routes stay available without automatically contacting any map tile server.
+  map.setUseDataConnection(false);
   map.getOverlayManager().getTilesOverlay().setColorFilter(org.osmdroid.views.overlay.TilesOverlay.INVERT_COLORS);
   map.getController().setZoom(10.0);base.addView(map,new LinearLayout.LayoutParams(-1,0,1));
-  TextView attribution=new TextView(this);attribution.setText("© OpenStreetMap contributors · GPX는 기기에만 저장됨");attribution.setTextColor(0xff9caebd);attribution.setPadding(12,8,12,14);base.addView(attribution);
+  TextView attribution=new TextView(this);attribution.setText("오프라인 경로 표시 · 배경지도는 캐시에 있을 때만 표시 · © OpenStreetMap contributors");attribution.setTextColor(0xff9caebd);attribution.setPadding(12,8,12,14);base.addView(attribution);
   new Thread(()->{
    try{File track=new File(TrackFile.directory(getFilesDir()),filename);
     final int[] n={0};final ArrayList<GeoPoint> route=new ArrayList<>();
@@ -84,6 +95,11 @@ public final class RideMapActivity extends Activity {
     });
    }catch(Exception e){runOnUiThread(()->{if(alive&&caption!=null)caption.setText("경로를 열지 못했어요: "+e.getMessage());});}
   },"MOTO-route-load").start();
+ }
+ private void setOnlineTiles(boolean allowed){
+  onlineTiles=allowed;
+  if(map!=null){map.setUseDataConnection(allowed);map.invalidate();}
+  if(tileButton!=null)tileButton.setText(allowed?"온라인 배경지도 끄기":"온라인 배경지도 켜기 (선택)");
  }
  @Override protected void onResume(){super.onResume();if(map!=null)map.onResume();}
  @Override protected void onPause(){if(map!=null)map.onPause();super.onPause();}

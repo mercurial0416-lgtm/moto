@@ -1,0 +1,119 @@
+{
+  "project": "MOTO HUB",
+  "checkpoint": "DI518_PRIVACY_OFFLINE_PREBUILD",
+  "version_code": 518,
+  "version_name": "4.0.0-alpha6-di",
+  "source_changes": [
+    "offline map tile opt-in",
+    "offline network validated",
+    "allowlisted manual diagnostic clipboard",
+    "safe stale downloaded APK pruning"
+  ],
+  "tests": [
+    {
+      "script": "run-dj-quality-tests.sh",
+      "ok": true,
+      "tail": "PASS offline map privacy + diagnostics + validated network checks",
+      "error": ""
+    },
+    {
+      "script": "run-di-prebuild-tests.sh",
+      "ok": true,
+      "tail": "PASS DI future signed-update manifest generation: 7 checks",
+      "error": ""
+    },
+    {
+      "script": "run-di-quality-policy-tests.sh",
+      "ok": true,
+      "tail": "PASS DI quality source integration assertions: 9",
+      "error": ""
+    },
+    {
+      "script": "run-cy-java-syntax-tests.sh",
+      "ok": true,
+      "tail": "PASS: parsed 127 Android Java source files (syntax only, no SDK or type resolution)",
+      "error": ""
+    },
+    {
+      "script": "run-offline-tests.sh",
+      "ok": true,
+      "tail": "TOTAL 20 passed",
+      "error": ""
+    },
+    {
+      "script": "run-ride-readiness-tests.sh",
+      "ok": true,
+      "tail": "PASS: GPS readiness card, settings links, explicit consent and error status wired",
+      "error": ""
+    },
+    {
+      "script": "run-photo-cache-ui-tests.sh",
+      "ok": true,
+      "tail": "Photo cache UI source checks PASS (8 checks)",
+      "error": ""
+    },
+    {
+      "script": "run-restore-tests.sh",
+      "ok": true,
+      "tail": "PASS ZIP restore safety and rollback checks: 22",
+      "error": ""
+    },
+    {
+      "script": "run-ride-search-tests.sh",
+      "ok": true,
+      "tail": "PASS: live search, clear button, list container, rotation and sharing guard wiring",
+      "error": ""
+    },
+    {
+      "script": "run-ride-history-tests.sh",
+      "ok": true,
+      "tail": "PASS: ride history UI wiring and unchanged explicit sharing",
+      "error": ""
+    },
+    {
+      "script": "run-garage-photo-atomic-tests.sh",
+      "ok": true,
+      "tail": "Garage photo atomic save static regression checks PASS (8 checks)",
+      "error": ""
+    },
+    {
+      "script": "run-server-settings-tests.sh",
+      "ok": true,
+      "tail": "PASS ServerSettingsTest: 16 checks",
+      "error": ""
+    },
+    {
+      "script": "run-ce-telemetry-tests.sh",
+      "ok": true,
+      "tail": "CE OBD2/reconnect/map checks: 209",
+      "error": ""
+    },
+    {
+      "script": "run-ch-restore-gate-tests.sh",
+      "ok": true,
+      "tail": "15 restore integration source assertions passed (not Android runtime)",
+      "error": ""
+    },
+    {
+      "script": "run-ride-consent-tests.sh",
+      "ok": true,
+      "tail": "PASS: explicit consent, chained permission callbacks, saved-state wiring",
+      "error": ""
+    }
+  ],
+  "new_java_assertions": 25,
+  "android_compiled": false,
+  "android_lint_run": false,
+  "apk_built": false,
+  "apk_signed": false,
+  "real_device_tests": false,
+  "fixed_signing_certificate_sha256": "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b",
+  "remaining": [
+    "full regression suite not run",
+    "Android SDK compile/lint",
+    "real phone GPS and OBD2",
+    "authenticated Supabase group/location",
+    "fixed signing GitHub Actions secrets",
+    "real Android installer upgrade test"
+  ]
+}

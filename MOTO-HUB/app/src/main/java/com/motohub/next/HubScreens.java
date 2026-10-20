@@ -180,6 +180,7 @@ final class HubScreens {
   });
   a.section("개인정보 및 라이딩");
   line("라이딩·OBD2 사전 점검","GPS·알림·배터리 제한·Bluetooth 상태 확인","열기",this::ridePreflight);
+  line("개인정보 없는 진단 보고서","권한·서명·GPS·연결 상태만 요약 · 좌표와 계정 정보 제외","열기",this::localDiagnostics);
   line("친구·그룹 서버 연결",SocialClient.configured()?"서버 주소 설정됨 · 실제 로그인/접속 별도 확인":"서버 미설정 · 로컬 기록 사용 가능","진단",this::serverPreflight);
   line("위치 공유 상태",Sharing.enabled?"그룹 위치 공유 중":"공유 꺼짐 · 명시적 동의 필요",Sharing.enabled?"중지":"확인",()->{
    if(Sharing.enabled)new AlertDialog.Builder(a).setTitle("위치 공유를 중지할까요?")
@@ -211,6 +212,28 @@ final class HubScreens {
   if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
    line("개발자 모드","실험 기능 · 순정 TFT 연동과 다름 · 기기 데이터 외부 전송 없음","열기",this::developerSettings);
   }a.label(a.content,"기존 앱에 덮어쓰기 설치하려면 동일한 서명키로 빌드해야 합니다. 서명이 다른 APK 설치를 위해 기존 앱을 삭제하지 마세요.",13,a.muted,false);a.label(a.content,"앱 삭제 전 전체 ZIP 백업을 저장하세요. GPS는 기기 내 기록입니다. 회원가입과 로그인 없이 이 휴대폰에 기록을 저장합니다. 다른 휴대폰으로 옮길 때는 전체 ZIP 백업을 사용하세요.",16,a.muted,false);
+ }
+ void localDiagnostics(){
+  boolean fine=a.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED;
+  android.location.LocationManager lm=(android.location.LocationManager)a.getSystemService(android.content.Context.LOCATION_SERVICE);
+  boolean gps=false;try{gps=lm!=null&&lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);}catch(Exception ignored){}
+  android.app.NotificationManager nm=(android.app.NotificationManager)a.getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+  boolean notify=nm!=null&&nm.areNotificationsEnabled();
+  android.bluetooth.BluetoothManager bm=(android.bluetooth.BluetoothManager)a.getSystemService(android.content.Context.BLUETOOTH_SERVICE);
+  boolean bluetooth=false;try{bluetooth=bm!=null&&bm.getAdapter()!=null&&bm.getAdapter().isEnabled();}catch(SecurityException ignored){}
+  String report=LocalDiagnosticReport.create(BuildConfig.VERSION_NAME,
+   UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256),
+   fine,gps,notify,bluetooth,RideService.running,Sharing.enabled,
+   SocialClient.configured(),!SocialClient.INSTANCE.uid.isEmpty(),RideService.count);
+  LinearLayout p=a.page("로컬 진단 보고서");
+  a.label(p,"개인정보가 제외된 상태 요약입니다. 앱에서 직접 복사하지 않는 한 전송하지 않습니다. 오류 로그·실차 기능 테스트를 대체하지 않습니다.",14,a.muted,false);
+  a.label(p,report,14,a.fg,false);
+  a.action(p,"진단 보고서 복사",true,()->{
+   android.content.ClipboardManager cb=(android.content.ClipboardManager)a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+   if(cb==null){a.toast("클립보드를 사용할 수 없습니다.");return;}
+   cb.setPrimaryClip(android.content.ClipData.newPlainText("MOTO HUB 로컬 진단",report));
+   a.toast("좌표·계정 정보 없는 진단 보고서를 복사했어요.");
+  });a.show();
  }
  void ridePreflight(){
   LinearLayout p=a.page("라이딩 사전 점검");
