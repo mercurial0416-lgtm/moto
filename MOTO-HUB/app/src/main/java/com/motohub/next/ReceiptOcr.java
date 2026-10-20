@@ -34,7 +34,8 @@ final class ReceiptOcr {
     }
     if(bitmap==null)throw new IOException("사진을 읽을 수 없습니다.");
     final Bitmap pixels=bitmap;
-    InputImage input=InputImage.fromBitmap(pixels,0);
+    int rotation=ReceiptImageOrientation.readDegrees(activity,uri);
+    InputImage input=InputImage.fromBitmap(pixels,rotation);
     activity.runOnUiThread(()->{
      if(activity.isFinishing()||activity.isDestroyed()){pixels.recycle();return;}
      TextRecognizer recognizer=TextRecognition.getClient(new KoreanTextRecognizerOptions.Builder().build());

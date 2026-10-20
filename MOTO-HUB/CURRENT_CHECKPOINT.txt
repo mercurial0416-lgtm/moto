@@ -1,2 +1,2 @@
-MOTO HUB Alpha6 DI(518) UX3 PREBUILD — source only, no APK
-Branch: build/di518-ux3-prebuild-20261020
+MOTO HUB Alpha6 DI(518) UX4 PREBUILD — SOURCE + compile-only workflow, NO APK
+Branch: build/di518-ux4-prebuild-20261020

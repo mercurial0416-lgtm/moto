@@ -1,0 +1,40 @@
+name: MOTO HUB DI518 UX4 compile-only verification (NO APK)
+on:
+  push:
+    branches: ['build/di518-ux4-prebuild-20261020']
+    paths:
+      - 'MOTO-HUB/**'
+      - '.github/workflows/di518-ux4-compile-only.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Pure-Java UX and privacy regressions
+        working-directory: MOTO-HUB
+        run: |
+          bash tests/run-dm-ux4-tests.sh
+          bash tests/run-dl-ux3-tests.sh
+          bash tests/run-dk-quality-tests.sh
+          bash tests/run-dh-quality-tests.sh
+          bash tests/run-backup-tests.sh
+      - name: Android Java compile ONLY (no APK, no signing)
+        working-directory: MOTO-HUB
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:compileDebugJavaWithJavac --no-daemon
+      - name: Verify no APK outputs were created
+        run: |
+          test ! -d MOTO-HUB/app/build/outputs/apk || { echo 'Unexpected APK output!'; exit 1; }

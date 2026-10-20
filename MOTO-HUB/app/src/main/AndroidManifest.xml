@@ -15,6 +15,10 @@
  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
  <queries><package android:name="com.locnall.KimGiSa"/></queries>
  <application android:theme="@style/AppTheme" android:label="MOTO HUB" android:icon="@drawable/ic_launcher" android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true" android:usesCleartextTraffic="false">
+  <provider android:name=".MotoCameraFileProvider" android:authorities="${applicationId}.receiptcamera"
+   android:exported="false" android:grantUriPermissions="true">
+   <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/receipt_camera_paths"/>
+  </provider>
   <provider android:name=".UpdateApkProvider" android:authorities="${applicationId}.updates" android:exported="false" android:grantUriPermissions="true"><grant-uri-permission android:pathPrefix="/apk/"/></provider>
   <receiver android:name=".MotoWidgetProvider" android:exported="true"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/moto_widget_info"/></receiver>
   <receiver android:name=".BootRideReminder" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter></receiver>
