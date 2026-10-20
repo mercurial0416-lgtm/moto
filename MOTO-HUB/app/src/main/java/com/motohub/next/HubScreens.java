@@ -26,7 +26,7 @@ final class HubScreens {
   tile.setClickable(true);tile.setFocusable(true);tile.setContentDescription(name+" "+detail);tile.setOnClickListener(v->click.run());return tile;
  }
  List<JSONObject> records(String mode,JSONObject bike){List<JSONObject> result=new ArrayList<>();for(String key:new String[]{"services","expenses"}){if(mode.equals("정비")&&!key.equals("services")||mode.equals("주유·비용")&&!key.equals("expenses"))continue;for(JSONObject x:a.items(key))if(x.optString("vehicleId").equals(bike.optString("id")))result.add(x);}result.sort((x,y)->y.optString("date").compareTo(x.optString("date")));return result;}
- void records(){title("정비와 주유","날짜별 기록 · 바이크별 관리");if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}bikePicker();tabs(new String[]{"전체","정비","주유·비용"},a.garageMode,v->{a.garageMode=v;a.recordPageOffset=0;a.render();});List<JSONObject> list=records(a.garageMode,a.bike());if(list.isEmpty())a.note("아직 기록이 없어요. 아래 기록 추가 버튼을 이용해 주세요.");String last="";for(int i=ListPageLimit.start(list.size(),a.recordPageOffset);i<ListPageLimit.end(list.size(),a.recordPageOffset);i++){JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";if(!month.equals(last)){a.section(month);last=month;}line(x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km",a.won(x.optDouble(x.has("amount")?"amount":"cost")),()->a.edit(x.has("amount")?"expenses":"services",x));}if(ListPageLimit.canPrevious(list.size(),a.recordPageOffset))a.action(a.content,"◀ 최근 기록",false,()->{a.recordPageOffset=ListPageLimit.previous(list.size(),a.recordPageOffset);a.render();});
+ void records(){title("정비와 주유","날짜별 기록 · 바이크별 관리");if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}bikePicker();a.pair(a.content,"＋ 주유 빠른 기록",()->a.edit("expenses",null),"＋ 정비 빠른 기록",()->a.edit("services",null));tabs(new String[]{"전체","정비","주유·비용"},a.garageMode,v->{a.garageMode=v;a.recordPageOffset=0;a.render();});List<JSONObject> list=records(a.garageMode,a.bike());if(list.isEmpty())a.note("아직 기록이 없어요. 아래 기록 추가 버튼을 이용해 주세요.");String last="";for(int i=ListPageLimit.start(list.size(),a.recordPageOffset);i<ListPageLimit.end(list.size(),a.recordPageOffset);i++){JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";if(!month.equals(last)){a.section(month);last=month;}line(x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km",a.won(x.optDouble(x.has("amount")?"amount":"cost")),()->a.edit(x.has("amount")?"expenses":"services",x));}if(ListPageLimit.canPrevious(list.size(),a.recordPageOffset))a.action(a.content,"◀ 최근 기록",false,()->{a.recordPageOffset=ListPageLimit.previous(list.size(),a.recordPageOffset);a.render();});
   if(ListPageLimit.canNext(list.size(),a.recordPageOffset))a.action(a.content,"이전 기록 ▶ · "+ListPageLimit.end(list.size(),a.recordPageOffset)+"/"+list.size(),false,()->{a.recordPageOffset=ListPageLimit.next(list.size(),a.recordPageOffset);a.render();});}
  void tabs(String[] values,String current,MainActivity.Choice select){HorizontalScrollView sc=new HorizontalScrollView(a);sc.setHorizontalScrollBarEnabled(false);LinearLayout group=new LinearLayout(a);for(String value:values){Button b=a.button(value,current.equals(value),()->select.pick(value));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.rightMargin=a.dp(8);group.addView(b,lp);}sc.addView(group);a.content.addView(sc);a.gap(a.content,12);}
  void manageBike(){JSONObject b=a.bike();if(b==null){a.edit("vehicles",null);return;}LinearLayout p=a.page("내 바이크 관리");a.label(p,b.optString("name"),25,a.fg,true);a.label(p,b.optInt("year")+"년식 · "+a.num(b.optDouble("odo"))+" km",17,a.muted,false);a.label(p,"구매가 "+a.won(b.optDouble("purchase")),17,a.fg,false);
@@ -85,40 +85,33 @@ final class HubScreens {
   java.util.List<JSONObject> bikes=a.items("vehicles");
   if(bikes.isEmpty()){a.label(page,"먼저 바이크를 등록해 주세요.",16,a.muted,false);a.show();return;}
   java.time.YearMonth now=java.time.YearMonth.now(java.time.ZoneId.of("Asia/Seoul"));
+  // Snapshot each collection once, instead of decoding it repeatedly for every month and bike.
+  java.util.List<JSONObject> allExpenses=a.items("expenses"),allServices=a.items("services");
   for(JSONObject bike:bikes){
    a.label(page,bike.optString("name","내 바이크"),21,a.fg,true);
-   String id=bike.optString("id");double allFuel=0,allService=0;
+   String id=bike.optString("id");
+   RecordMonthlySummary totals=RecordMonthlySummary.forBike(allExpenses,allServices,id,now);
+   double allFuel=totals.sumFuelAndOther(),allService=totals.sumService();
    a.label(page,"계기판 기록 "+a.num(bike.optDouble("odo"))+" km · 실제 계기판과 대조 필요",14,a.muted,false);
    int dueCount=0,upcoming=0;
-   for(JSONObject service:a.items("services"))if(id.equals(service.optString("vehicleId"))){
+   for(JSONObject service:allServices)if(id.equals(service.optString("vehicleId"))){
     if(Store.due(service,bike,java.time.LocalDate.now().toString()))dueCount++;
     else if(service.optDouble("nextKm",0)>bike.optDouble("odo",0)&&service.optDouble("nextKm",0)-bike.optDouble("odo",0)<=1000)upcoming++;
    }
    a.label(page,"정비 초과/도래 "+dueCount+"건 · 1,000km 이내 예정 "+upcoming+"건",14,dueCount>0?a.accent:a.muted,true);
    for(int m=0;m<6;m++){
-    String month=now.minusMonths(m).toString();double fuel=0,service=0;
-    for(JSONObject x:a.items("expenses"))if(id.equals(x.optString("vehicleId"))&&x.optString("date").startsWith(month))fuel=CostDashboard.add(fuel,x.optDouble("amount"));
-    for(JSONObject x:a.items("services"))if(id.equals(x.optString("vehicleId"))&&x.optString("date").startsWith(month))service=CostDashboard.add(service,x.optDouble("cost"));
-    allFuel+=fuel;allService+=service;
-    a.label(page,month+"  ·  주유/기타 "+a.won(fuel)+"  ·  정비 "+a.won(service),13,a.muted,false);
+    String month=now.minusMonths(m).toString();
+    double fuel=totals.fuel[m]+totals.other[m],service=totals.service[m];
+    a.label(page,month+"  ·  주유 "+a.won(totals.fuel[m])+"  ·  기타 "+a.won(totals.other[m])+"  ·  정비 "+a.won(service),13,a.muted,false);
     LinearLayout bars=new LinearLayout(a);bars.setMinimumHeight(a.dp(8));
     int fuelWidth=CostDashboard.proportion(fuel,fuel+service),serviceWidth=100-fuelWidth;
     if(fuel+service>0){View orange=new View(a);orange.setBackgroundColor(a.accent);bars.addView(orange,new LinearLayout.LayoutParams(0,a.dp(8),fuelWidth));View grey=new View(a);grey.setBackgroundColor(a.line);bars.addView(grey,new LinearLayout.LayoutParams(0,a.dp(8),serviceWidth));page.addView(bars);a.gap(page,10);}
    }
-   double currentMonth=0,previousMonth=0;
-   String currentKey=now.toString(),previousKey=now.minusMonths(1).toString();
-   for(String collection:new String[]{"expenses","services"})for(JSONObject x:a.items(collection))
-    if(id.equals(x.optString("vehicleId"))){
-     double value=x.optDouble(collection.equals("services")?"cost":"amount",Double.NaN);
-     if(!Double.isFinite(value)||value<0||value>1_000_000_000)continue;
-     String date=x.optString("date");
-     if(date.startsWith(currentKey))currentMonth=CostDashboard.add(currentMonth,value);
-     else if(date.startsWith(previousKey))previousMonth=CostDashboard.add(previousMonth,value);
-    }
+   double currentMonth=totals.monthTotal(0),previousMonth=totals.monthTotal(1);
    a.label(page,"이번 달 "+a.won(currentMonth)+" · "+CostTrend.caption(currentMonth,previousMonth),14,a.accent,true);
    a.label(page,"최근 6개월 합계  "+a.won(allFuel+allService),16,a.fg,true);a.divider(page);
   }
-  a.label(page,"금액은 기기에 저장한 입력값입니다. 주유/기타에는 보험·부품 등 비용 기록도 포함됩니다.",12,a.muted,false);
+  a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
  void settings(){title("설정과 도구","내 기록은 로그인 없이 기기에 보관됩니다");a.section("데이터 및 복구");line("백업 · 복원","JSON 내보내기와 기존 데이터 이전","열기",()->{LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·정비·주유·GPS 원본·사진을 백업하고 복원할 수 있어요. 복원은 현재 기록을 교체하므로 기존 기록이 필요하다면 먼저 내보내세요.",16,a.muted,false);a.action(p,"전체 ZIP 백업 복원",true,a::importBundle);a.action(p,"암호화 백업 복원 (.mhub)",false,a::importEncryptedBundle);

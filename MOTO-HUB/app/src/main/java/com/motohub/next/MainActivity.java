@@ -602,11 +602,78 @@ public class MainActivity extends Activity {
     EditText dueDate=f.get("nextDate");if(dueDate!=null)dueDate.setText("");
    }
    if(fullTankBox!=null&&key.equals("expenses"))fullTankBox.setChecked("주유".equals(last.optString("type"))&&last.optBoolean("fullTank"));
+   if(formOptionalSection!=null&&(key.equals("services")||hasPopulatedOptionalFields(f))){
+    formOptionalSection.setVisibility(View.VISIBLE);updateOptionalButton();
+   }
    toast(key.equals("services")?"날짜·주행거리 유지 · 다음 정비 거리는 이전 간격으로 재계산했어요.":"날짜·주행거리는 오늘 기준으로 유지했어요.");
   });
   reuse.setContentDescription("최근 "+(key.equals("expenses")?"비용":"정비")+" 기록 "+lastDate+"의 입력값 재사용");
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(12);p.addView(reuse,lp);
   label(p,"최근 기록: "+lastDate+" · "+num(last.optDouble("mileage"))+" km"+(key.equals("services")?"  |  다음 정비 간격 자동 계산":""),12,muted,false);
+ }
+
+ /** Small, explicit buttons rather than storing guesses or reusing another motorcycle's values. */
+ void quickRecordTools(LinearLayout target,String key,Map<String,EditText> inputs,Map<String,Spinner> selectors,JSONObject currentBike){
+  if(currentBike==null||!key.equals("expenses")&&!key.equals("services"))return;
+  String bikeId=currentBike.optString("id");
+  if(key.equals("expenses")){
+   EditText money=inputs.get("amount"),liters=inputs.get("liters");
+   if(money==null||liters==null)return;
+   JSONObject lastFuel=null;
+   for(JSONObject entry:items("expenses")){
+    if(!bikeId.equals(entry.optString("vehicleId"))||!"주유".equals(entry.optString("type")))continue;
+    try{FuelRecordValidation.requireFuel(entry.optDouble("amount",Double.NaN),entry.optDouble("liters",Double.NaN));}
+    catch(Exception ignored){continue;}
+    if(lastFuel==null||RecentRecordReuse.isNewer(entry.optString("date"),entry.optDouble("mileage"),lastFuel.optString("date"),lastFuel.optDouble("mileage")))lastFuel=entry;
+   }
+   long lastUnit=lastFuel==null?0:QuickLogMath.unitPrice(lastFuel.optDouble("amount"),lastFuel.optDouble("liters"));
+   label(target,"주유 빠른 계산 (선택)",15,fg,true);
+   label(target,"총금액 또는 주유량과 L당 가격을 입력하고 계산하세요. 추정값이므로 영수증과 대조 후 저장하세요.",12,muted,false);
+   EditText price=new EditText(this);price.setSingleLine(true);price.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+   price.setText(lastUnit>0?String.valueOf(lastUnit):"");price.setHint("L당 가격 (원) · 직접 수정 가능");price.setContentDescription("리터당 가격, 영수증 기준으로 수정");
+   price.setTextColor(fg);price.setHintTextColor(muted);price.setBackground(shape(panel,line,13));price.setPadding(dp(12),dp(10),dp(12),dp(10));
+   target.addView(price,new LinearLayout.LayoutParams(-1,dp(53)));
+   pair(target,"금액 → 주유량",()->{
+    String result=QuickLogMath.litersFromAmount(money.getText().toString(),price.getText().toString());
+    if(result.isEmpty()){toast("총금액과 리터당 가격을 확인해 주세요.");return;}
+    Spinner type=selectors.get("type");if(type!=null)type.setSelection(0);
+    liters.setText(result);toast("약 "+result+" L · 실제 주유량과 확인해 주세요.");
+   },"주유량 → 금액",()->{
+    String result=QuickLogMath.amountFromLiters(liters.getText().toString(),price.getText().toString());
+    if(result.isEmpty()){toast("주유량과 리터당 가격을 확인해 주세요.");return;}
+    Spinner type=selectors.get("type");if(type!=null)type.setSelection(0);
+    money.setText(result);toast("약 "+result+"원 · 실제 결제액을 확인해 주세요.");
+   });
+   label(target,lastUnit>0?"최근 이 바이크의 L당 가격 약 "+lastUnit+"원 · 자동 적용하지 않습니다.":"이 바이크의 최근 정상 주유 내역이 없어요. L당 가격을 직접 입력하세요.",12,muted,false);
+   Button fullQuick=button("가득 주유로 표시",false,()->{
+    Spinner type=selectors.get("type");if(type!=null)type.setSelection(0);
+    if(fullTankBox!=null){fullTankBox.setChecked(true);toast("가득 주유를 선택했어요. 주유량을 확인해 주세요.");}
+   });target.addView(fullQuick);
+
+  }else{
+   EditText type=inputs.get("type"),cost=inputs.get("cost"),nextKm=inputs.get("nextKm");
+   if(type==null||cost==null)return;
+   label(target,"정비 항목 빠른 선택",15,fg,true);
+   String[] types={"엔진오일","오일필터","체인","브레이크 패드","타이어","냉각수"};
+   chips(target,types,types,type);
+   Button copy=button("↻ 같은 바이크 · 같은 항목의 최근 기록 불러오기",false,()->{
+    JSONObject previous=QuickServiceHistory.latest(items("services"),bikeId,type.getText().toString().trim());
+    if(previous==null){toast("이 바이크의 해당 정비 기록이 없습니다.");return;}
+    cost.setText(previous.optString("cost"));EditText note=inputs.get("note");
+    if(note!=null)note.setText(previous.optString("note"));
+    if(nextKm!=null){double km=currentBike.optDouble("odo");
+     try{km=Double.parseDouble(inputs.get("mileage").getText().toString().trim());}catch(Exception ignored){}
+     nextKm.setText(String.valueOf(RecentRecordReuse.nextServiceKm(previous.optDouble("mileage",Double.NaN),previous.optDouble("nextKm",Double.NaN),km)));
+    }
+    EditText nextDate=inputs.get("nextDate");if(nextDate!=null)nextDate.setText("");
+    // A copied maintenance target is never hidden: show all optional fields for review.
+    if(formOptionalSection!=null){formOptionalSection.setVisibility(View.VISIBLE);updateOptionalButton();}
+    toast("이전 비용·메모만 복사했어요. 날짜·계기판은 현재값이고 정비 거리는 재계산했습니다.");
+   });copy.setContentDescription("선택한 정비 항목의 이전 기록을 이 바이크에서만 찾기");target.addView(copy);
+   Button diy=button("직접 작업 · 비용 0원",false,()->{cost.setText("0");toast("직접 정비 비용을 0원으로 입력했어요.");});target.addView(diy);
+   label(target,"비용과 다음 정비 거리는 확인 후 저장하세요. 차량별 제조사 주기를 자동 가정하지 않습니다.",12,muted,false);
+  }
+  gap(target,12);
  }
  void field(LinearLayout p,Map<String,EditText> f,JSONObject old,String key,String label,String def){label(p,label,14,muted,true);EditText e=new EditText(this);e.setContentDescription(label);e.setTextSize(16);e.setTextColor(fg);e.setHintTextColor(muted);e.setPadding(dp(12),dp(10),dp(12),dp(10));e.setMinHeight(dp(52));e.setInputType(numbers.contains(key)?android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL:android.text.InputType.TYPE_CLASS_TEXT|(key.equals("url")?android.text.InputType.TYPE_TEXT_VARIATION_URI:android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE));e.setText(old.has(key)?old.optString(key):def);e.setBackground(shape(panel,line,13));e.setHint(key.equals("date")?"날짜를 선택하세요":key.equals("model")?"모델명 직접 입력":key.equals("type")?"항목 직접 입력":"직접 입력");f.put(key,e);e.setSelectAllOnFocus(numbers.contains(key));helpers(p,activeForm,key,e,activeOld,bike());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(20);p.addView(e,lp);}
  void selector(LinearLayout p,Map<String,Spinner> f,String key,String title,String[] values,String value){label(p,title,14,muted,true);Spinner s=new Spinner(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,values){@Override public View getView(int position,View convert,ViewGroup parent){TextView t=(TextView)super.getView(position,convert,parent);t.setTextColor(fg);t.setTextSize(16);return t;}};s.setAdapter(adapter);for(int i=0;i<values.length;i++)if(values[i].equals(value))s.setSelection(i);p.addView(s,new LinearLayout.LayoutParams(-1,dp(56)));gap(p,12);f.put(key,s);if(key.equals("type")&&activeForm.equals("expenses")){
@@ -728,13 +795,26 @@ public class MainActivity extends Activity {
   if(key.equals("expenses")||key.equals("services"))label(p,"차량: "+bikeName(old.optString("vehicleId",b.optString("id"))),16,fg,true);
   // Put the one-tap shortcut above the long form, not below the optional fields.
   LinearLayout recentShortcut=col();
-  if(existing==null&&(key.equals("expenses")||key.equals("services")))p.addView(recentShortcut);
+  boolean fastEntry=existing==null&&(key.equals("expenses")||key.equals("services"));
+  LinearLayout dateMileageFields=col();
+  TextView quickMetaSummary=null;Button metaToggle=null;
+  if(fastEntry){
+   p.addView(recentShortcut);
+   label(p,"기본 기록값 · 필요할 때만 변경",14,fg,true);
+   TextView summary=text("오늘 "+today()+" · 계기판 "+num(b.optDouble("odo"))+" km",13,muted,false);
+   quickMetaSummary=summary;p.addView(summary);
+   Button expand=button("날짜·계기판 수정  ▾",false,()->{
+    boolean open=dateMileageFields.getVisibility()!=View.VISIBLE;
+    dateMileageFields.setVisibility(open?View.VISIBLE:View.GONE);
+   });metaToggle=expand;p.addView(expand);dateMileageFields.setVisibility(View.GONE);p.addView(dateMileageFields);
+  }
   if(key.equals("expenses"))selector(p,sel,"type","비용 종류",new String[]{"주유","보험","부품","기타"},old.optString("type","주유"));
   LinearLayout optional=col();optional.setVisibility(View.GONE);formOptionalSection=optional;formOptionalToggle=null;formOptionalKeys.clear();
   Set<String> essentials=new HashSet<>(Arrays.asList("name","model","odo","year","price","url","type","date","mileage","amount","cost","liters","start","end"));
   LinearLayout litersContainer=null;
   for(String[] x:fields){
    if(key.equals("expenses")&&x[0].equals("liters")){litersContainer=col();p.addView(litersContainer);field(litersContainer,f,old,x[0],x[1],x[2]);}
+   else if(fastEntry&&(x[0].equals("date")||x[0].equals("mileage"))){field(dateMileageFields,f,old,x[0],x[1],x[2]);}
    else {if(!essentials.contains(x[0]))formOptionalKeys.add(x[0]);field(essentials.contains(x[0])?p:optional,f,old,x[0],x[1],x[2]);}
   }
   if(catalogPreview!=null&&old.optInt("year")>0){
@@ -759,9 +839,12 @@ public class MainActivity extends Activity {
   if(key.equals("listings")){selector(p,sel,"status","판매 상태",new String[]{"확인필요","판매중","예약중","판매완료"},old.optString("status","확인필요"));selector(p,sel,"quick","퀵시프터",new String[]{"미확인","있음","없음"},old.optString("quick","미확인"));}
   CheckBox full=new CheckBox(this);LinearLayout fuelNote=col();
   if(key.equals("expenses")){full.setText("가득 주유  ·  연비 계산에 사용");full.setTextSize(16);full.setTextColor(fg);full.setMinHeight(dp(52));full.setChecked(old.optBoolean("fullTank"));fuelNote.addView(full);label(fuelNote,"가득 주유를 두 번 이상 기록하면 연비를 계산해요.",13,muted,false);p.addView(fuelNote);fuelNote.setVisibility("주유".equals(sel.get("type").getSelectedItem().toString())?View.VISIBLE:View.GONE);}
+  TextView fuelUnitPrice=null;
   if(key.equals("expenses")&&f.containsKey("amount")&&f.containsKey("liters")){
    TextView unit=text(FuelEntryMath.unitPrice(f.get("amount").getText().toString(),f.get("liters").getText().toString()),13,muted,false);
    unit.setPadding(dp(5),dp(6),0,dp(8));p.addView(unit);
+   fuelUnitPrice=unit;
+   unit.setVisibility("주유".equals(sel.get("type").getSelectedItem().toString())?View.VISIBLE:View.GONE);
    android.text.TextWatcher watcher=new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int af){}
     public void onTextChanged(CharSequence s,int st,int before,int count){unit.setText(FuelEntryMath.unitPrice(f.get("amount").getText().toString(),f.get("liters").getText().toString()));}
     public void afterTextChanged(android.text.Editable e){}
@@ -772,7 +855,20 @@ public class MainActivity extends Activity {
   for(EditText input:f.values())input.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence a,int b,int c,int d){}public void onTextChanged(CharSequence a,int b,int c,int d){formDirty=true;persistDraft();}public void afterTextChanged(android.text.Editable e){}});
   full.setOnCheckedChangeListener((v,value)->{formDirty=true;persistDraft();});
   if(existing==null)recentRecordShortcut(recentShortcut,key,f,sel,b);
-  for(Spinner spinner:sel.values())spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){boolean initial=true;public void onItemSelected(android.widget.AdapterView<?> parent,View view,int pos,long id){if(fuelInputs!=null&&spinner==sel.get("type")){boolean isFuel="주유".equals(spinner.getSelectedItem().toString());fuelInputs.setVisibility(isFuel?View.VISIBLE:View.GONE);fuelNote.setVisibility(isFuel?View.VISIBLE:View.GONE);}if(initial){initial=false;return;}formDirty=true;persistDraft();}public void onNothingSelected(android.widget.AdapterView<?> p){}});
+  if(fastEntry){
+   quickRecordTools(recentShortcut,key,f,sel,b);
+   final TextView summary=quickMetaSummary;
+   android.text.TextWatcher updateSummary=new android.text.TextWatcher(){
+    public void beforeTextChanged(CharSequence t,int start,int count,int after){}
+    public void onTextChanged(CharSequence t,int start,int before,int count){
+     summary.setText("날짜 "+f.get("date").getText().toString()+" · 계기판 "+f.get("mileage").getText().toString()+" km");
+    }
+    public void afterTextChanged(android.text.Editable e){}
+   };
+   f.get("date").addTextChangedListener(updateSummary);f.get("mileage").addTextChangedListener(updateSummary);
+  }
+  final TextView fuelUnitLabel=fuelUnitPrice;
+  for(Spinner spinner:sel.values())spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){boolean initial=true;public void onItemSelected(android.widget.AdapterView<?> parent,View view,int pos,long id){if(fuelInputs!=null&&spinner==sel.get("type")){boolean isFuel="주유".equals(spinner.getSelectedItem().toString());fuelInputs.setVisibility(isFuel?View.VISIBLE:View.GONE);fuelNote.setVisibility(isFuel?View.VISIBLE:View.GONE);if(fuelUnitLabel!=null)fuelUnitLabel.setVisibility(isFuel?View.VISIBLE:View.GONE);}if(initial){initial=false;return;}formDirty=true;persistDraft();}public void onNothingSelected(android.widget.AdapterView<?> p){}});
   action(p,"저장",true,()->attempt(()->{JSONObject item=new JSONObject(old.toString());item.put("id",old.optString("id",Store.id()));for(Map.Entry<String,EditText> entry:f.entrySet()){String k=entry.getKey(),s=entry.getValue().getText().toString().trim();if(numbers.contains(k)){if((k.equals("odo")||k.equals("price")||k.equals("cost")||k.equals("amount"))&&s.isEmpty())throw new Exception("필수 숫자 항목을 입력해 주세요.");double n=s.isEmpty()?0:Double.parseDouble(s);if(!Double.isFinite(n)||n<0||n>1e13)throw new Exception("숫자 범위를 확인해 주세요.");if(k.equals("year")&&(n<1900||n>LocalDate.now().getYear()+2||n%1!=0))throw new Exception("연식을 확인해 주세요.");item.put(k,n);}else item.put(k,s);}for(String k:sel.keySet())item.put(k,sel.get(k).getSelectedItem().toString());
    String required=switch(key){case"vehicles","routes","gear"->"name";case"listings"->"model";default->"type";};if(item.optString(required).isEmpty())throw new Exception("이름 또는 항목을 입력해 주세요.");for(String d:new String[]{"date","purchaseDate","soldDate","insuranceDate","nextDate"})Store.validateDate(item.optString(d));if((key.equals("expenses")||key.equals("services"))&&item.optString("date").isEmpty())throw new Exception("날짜를 입력해 주세요.");if(key.equals("vehicles"))item.put("isDemo",false);
    if(key.equals("vehicles")||key.equals("listings")){
@@ -790,7 +886,13 @@ public class MainActivity extends Activity {
    if(key.equals("expenses")){if(!"주유".equals(item.optString("type")))item.put("liters",0);
     else FuelRecordValidation.requireFuel(item.optDouble("amount"),item.optDouble("liters"));
     boolean isFull=full.isChecked()&&"주유".equals(item.optString("type"));if(isFull&&item.optDouble("liters")<=0)throw new Exception("가득 주유의 주유량을 입력해 주세요.");item.put("fullTank",isFull);}
-   if(key.equals("services")||key.equals("expenses"))item.put("vehicleId",old.optString("vehicleId",b.optString("id")));JSONObject next=new JSONObject(db.toString());Store.upsert(next,key,item);if(key.equals("services")||key.equals("expenses")){JSONObject v=Store.find(next,"vehicles",item.getString("vehicleId"));if(v!=null&&item.optDouble("mileage")>v.optDouble("odo"))v.put("odo",item.optDouble("mileage"));}write(next);clearDraft();close();render();toast("저장했어요.");}));if(existing!=null&&!key.equals("vehicles"))action(p,"기록 삭제",false,()->{close();remove(key,old);});show();
+   if(key.equals("services")||key.equals("expenses"))item.put("vehicleId",old.optString("vehicleId",b.optString("id")));JSONObject next=new JSONObject(db.toString());Store.upsert(next,key,item);if(key.equals("services")||key.equals("expenses")){JSONObject v=Store.find(next,"vehicles",item.getString("vehicleId"));if(v!=null&&item.optDouble("mileage")>v.optDouble("odo"))v.put("odo",item.optDouble("mileage"));}if(existing==null&&QuickLogDuplicate.exists(items(key),item,key)){
+    new AlertDialog.Builder(this).setTitle("중복으로 보이는 기록")
+     .setMessage("이 바이크에 같은 날짜·거리·항목·금액의 기록이 이미 있어요. 두 번 저장할까요?")
+     .setNegativeButton("취소",null).setPositiveButton("그래도 저장",(d,which)->attempt(()->{
+      write(next);clearDraft();close();render();toast("중복 확인 후 저장했어요.");
+     })).show();return;
+   }write(next);clearDraft();close();render();toast("저장했어요.");}));if(existing!=null&&!key.equals("vehicles"))action(p,"기록 삭제",false,()->{close();remove(key,old);});show();
  }
  void remove(String key,JSONObject item){new AlertDialog.Builder(this).setTitle("기록을 삭제할까요?").setMessage(key.equals("vehicles")?"이 바이크의 정비·비용 기록도 함께 삭제됩니다. 필요한 기록은 먼저 백업해 주세요.":"삭제 후 되돌릴 수 없습니다.").setNegativeButton("취소",null).setPositiveButton("삭제",(d,w)->attempt(()->{JSONObject next=new JSONObject(db.toString());String id=item.getString("id");Store.remove(next,key,id);if(key.equals("vehicles")){for(String k:new String[]{"services","expenses"}){JSONArray a=next.getJSONArray(k);for(int i=a.length()-1;i>=0;i--)if(a.getJSONObject(i).optString("vehicleId").equals(id))a.remove(i);}if(next.getJSONObject("settings").optString("primary").equals(id))next.getJSONObject("settings").remove("primary");selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();}write(next);render();})).show();}
  boolean restoreIsBlocked(){return RestoreRideGate.blocked(RideService.running,RideService.autoArmed);}

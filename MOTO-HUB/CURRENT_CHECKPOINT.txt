@@ -1,1 +1,2 @@
-MOTO HUB Alpha6-DI(518) PRIVACY/OFFLINE QUALITY PREBUILD. versionCode 518 unchanged. NO APK BUILT, NO ANDROID COMPILATION, NO SIGNING. Preserve fixed signing certificate 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b. Review CHANGELOG-alpha6-di-privacy.md.
+MOTO HUB Alpha6-DI(518) EASY-ENTRY PREBUILD SOURCE — YYYYMMDD 20261020.
+Original base: Alpha6-DI(518) PRIVACY-PREBUILD. This checkpoint includes quick fuel/service forms, explicit math, per-bike reuse and duplicate-confirmation UI. APK NOT BUILT. Android compile/Lint NOT RUN. Signing credentials and APK are deliberately excluded. Fixed signing certificate remains 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b.
