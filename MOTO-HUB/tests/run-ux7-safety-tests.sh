@@ -16,5 +16,8 @@ assert 'GARAGE_PHOTO_SAVER.execute(()->{try{saveGaragePhoto(uri,bikeId);}' in ma
 assert 'ReceiptImageOrientation.rotate(bitmap,ReceiptImageOrientation.readDegrees(this,uri))' in main
 assert 'callback.failure("화면이 닫혀 영수증 인식이 취소됐습니다.")' in ocr
 assert 'if(cleanup!=null)cleanup.run()' in main
-print("PASS UX7 photo cancellation, EXIF, serialized save and OCR temp cleanup wiring")
+photo=Path("app/src/main/java/com/motohub/next/MotorcyclePhoto.java").read_text()
+assert 'if(image!=null&&!image.isRecycled())image.recycle()' in photo
+assert '!PhotoRequestGuard.isCurrent(target,requestToken)' in photo
+print("PASS UX7 photo cancellation, EXIF, serialized save, stale-bitmap disposal and OCR temp cleanup wiring")
 PY
