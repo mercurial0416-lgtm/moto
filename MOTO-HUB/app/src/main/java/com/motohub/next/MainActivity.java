@@ -391,8 +391,7 @@ public class MainActivity extends Activity {
  }
  String dueText(JSONObject s){return(s.optDouble("nextKm")>0?num(s.optDouble("nextKm"))+" km":"")+(!s.optString("nextDate").isEmpty()?" · "+s.optString("nextDate"):"");}
  void renderMaintenance(JSONObject b){
-  Map<String,JSONObject> latest=new LinkedHashMap<>();
-  for(JSONObject service:items("services"))if(b.optString("id").equals(service.optString("vehicleId")))latest.putIfAbsent(service.optString("type"),service);
+  Map<String,JSONObject> latest=LatestServiceByType.latest(items("services"),b.optString("id"));
   List<JSONObject> reminders=new ArrayList<>();
   for(JSONObject service:latest.values())if(service.optDouble("nextKm")>0||!service.optString("nextDate").isEmpty())reminders.add(service);
   reminders.sort((x,y)->{
