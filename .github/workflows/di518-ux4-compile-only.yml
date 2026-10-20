@@ -8,6 +8,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: moto-di518-source-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   compile-only:
     runs-on: ubuntu-latest
