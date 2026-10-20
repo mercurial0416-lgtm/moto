@@ -51,6 +51,15 @@ public final class QuickLogEntryTest {
   JSONObject sSame=service("s5","cub","2026-04-11",2800,"엔진오일",25000,7000);
   ok(QuickLogDuplicate.same(s2,sSame,"services"),"service duplicate ignores future interval");
   ok(!QuickLogDuplicate.same(s2,service("s6","cub","2026-04-11",2800,"엔진오일",28000,4800),"services"),"different service cost");
+  ok(QuickLogDuplicate.same(fuel("","cub","2026-10-20",500,"주유",10000,5),
+   fuel("","cub","2026-10-20",500,"주유",10000,5),"expenses"),"two blank IDs still warn");
+  ok(!QuickLogDuplicate.same(fuel("","cub","2026-10-20",500,"주유",Double.NaN,5),b,"expenses"),"NaN amount never matches");
+  ok(!QuickLogDuplicate.same(fuel("","cub","2026-10-20",Double.POSITIVE_INFINITY,"주유",10000,5),b,"expenses"),"infinite odometer never matches");
+  ok(!QuickLogDuplicate.same(new JSONObject().put("vehicleId","cub").put("type","주유").put("date","2026-10-20"),b,"expenses"),"incomplete record cannot warn");
+  ok(!QuickLogDuplicate.same(a,b,null),"null collection safe");
+  ok(!QuickLogDuplicate.same(null,b,"expenses"),"null row safe");
+  ok(QuickLogDuplicate.same(service("","cub","2026-10-20",500,"엔진오일",0,1000),
+   service("","cub","2026-10-20",500,"엔진오일",0,2000),"services"),"zero-cost DIY service can duplicate");
   ok(!QuickLogDuplicate.same(a,b,"vehicles"),"unsupported collections ignored");
   System.out.println("PASS quick-log safety/math/history: "+checks+" assertions");
  }
