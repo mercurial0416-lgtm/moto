@@ -272,10 +272,14 @@ public final class RideService extends Service implements LocationListener {
    }
    lastGood=new Location(location);if(!autoArmed&&location.getAccuracy()<=40)Sharing.offer(location);status=count+"개 좌표 · 마지막 "+java.time.Instant.ofEpochMilli(lastTime)+(location.getAccuracy()>40?" · 정확도 낮음":"");if(notificationRate.shouldNotify(SystemClock.elapsedRealtime()))getSystemService(NotificationManager.class).notify(404,notification(String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+(Sharing.enabled?"그룹 위치 공유 켜짐":(gpsOnlyAfterObd?"OBD2 종료 · GPS 단독 기록":"위치 공유 꺼짐"))));}catch(Exception e){stopWith("저장 오류로 기록 중지: "+e.getMessage(),false);}
  }
- @Override public void onProviderDisabled(String provider){if(LocationManager.GPS_PROVIDER.equals(provider))handler.post(()->{if(!running)return;
+ @Override public void onProviderDisabled(String provider){if(LocationManager.GPS_PROVIDER.equals(provider)){
+  // Security-critical: disable remote sharing synchronously, before any UI message is queued.
+  Sharing.stop();
+  handler.post(()->{if(!running)return;
    synchronized(RideService.this){liveSpeedKmh=0;lastGood=null;lastFixElapsed=0;}
-   Sharing.stop();status="GPS 일시 중단 · 켜면 기록 재개 (그룹 공유 중지)";getSystemService(NotificationManager.class).notify(404,notification(status));
-  });}
+   status="GPS 일시 중단 · 켜면 기록 재개 (그룹 공유 중지)";getSystemService(NotificationManager.class).notify(404,notification(status));
+  });
+ }}
  @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p))handler.post(()->{if(!running)return;status="GPS 복귀 · 좌표 대기";getSystemService(NotificationManager.class).notify(404,notification(status));});} @Override public void onStatusChanged(String p,int s,Bundle b){}
  void stopWith(String message,boolean completed){status=message;cleanup(completed);stopSelf();}
  private synchronized boolean closeTrack(boolean completed){
