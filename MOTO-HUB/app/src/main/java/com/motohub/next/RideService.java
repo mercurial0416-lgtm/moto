@@ -22,6 +22,8 @@ public final class RideService extends Service implements LocationListener {
   gpsIoThread=new HandlerThread("moto-gps-disk",android.os.Process.THREAD_PRIORITY_BACKGROUND);
   gpsIoThread.start();
  }
+ /** Read current service-owned finalization state without leaking it across service instances. */
+ static boolean saving(){RideService s=instance;return s!=null&&(s.finishPending||s.autoFinishPending);}
  static boolean shareAllowed(){RideService s=instance;return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||s.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&s.getSystemService(NotificationManager.class).areNotificationsEnabled();}
  static void refreshNotification(){RideService s=instance;if(s!=null)s.handler.post(()->{if(running)s.getSystemService(NotificationManager.class).notify(404,s.notification(String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+(Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐")));});}
  final RideNotificationRate notificationRate=new RideNotificationRate();
