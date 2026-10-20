@@ -13,7 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Android SDK 36
-        run: "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0'
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0'
       - name: Verify fixed-key signature, package name, and version
         run: |
           APK=MOTO-HUB/releases/MOTO-HUB-Alpha6-DH517-FIXED-SIGNED.apk
