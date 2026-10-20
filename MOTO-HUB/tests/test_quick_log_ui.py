@@ -14,7 +14,7 @@ checks={
  'same saved backup mechanism': 'write(next);clearDraft();close();render();toast("저장했어요.")' in s,
  'draft recovery unaffected': 'void resumeDraft(){' in s,
  'fuel full tank opt-in': 'full.setChecked(old.optBoolean("fullTank"))' in s,
- 'top-level shortcuts': '＋ 주유 빠른 기록' in h and '＋ 정비 빠른 기록' in h,
+ 'top-level shortcuts': '⛽ 주유' in h and '🔧 정비' in h and 'a::batchServiceEntry' in h,
  'full-tank quick button': '가득 주유로 표시' in s and 'fullTankBox.setChecked(true)' in s,
  'DIY maintenance zero-cost button': '직접 작업 · 비용 0원' in s,
  'nonfuel hides unit price label': 'if(fuelUnitLabel!=null)fuelUnitLabel.setVisibility(isFuel?View.VISIBLE:View.GONE)' in s,

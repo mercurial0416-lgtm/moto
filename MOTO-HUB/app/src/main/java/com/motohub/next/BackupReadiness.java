@@ -6,18 +6,21 @@ import java.util.*;
 final class BackupReadiness {
  private BackupReadiness(){}
  static final class Summary {
-  final int rides,photos,emptyRides,unfinishedRides,oversizedFiles,completedEmptyRides;
+  final int rides,photos,receipts,emptyRides,unfinishedRides,oversizedFiles,completedEmptyRides;
   final long rawBytes;
   Summary(int rides,int photos,int empty,int unfinished,int oversized,long size){
-   this(rides,photos,empty,unfinished,oversized,0,size);
+   this(rides,photos,0,empty,unfinished,oversized,0,size);
   }
   Summary(int rides,int photos,int empty,int unfinished,int oversized,int completedEmpty,long size){
-   this.rides=rides;this.photos=photos;emptyRides=empty;unfinishedRides=unfinished;oversizedFiles=oversized;completedEmptyRides=completedEmpty;rawBytes=size;
+   this(rides,photos,0,empty,unfinished,oversized,completedEmpty,size);
   }
-  boolean withinBasicLimits(){return rides<=BackupFormat.MAX_TRACKS&&photos<=BackupFormat.MAX_PHOTOS&&oversizedFiles==0&&completedEmptyRides==0&&rawBytes<=BackupFormat.MAX_TOTAL_BYTES;}
+  Summary(int rides,int photos,int receipts,int empty,int unfinished,int oversized,int completedEmpty,long size){
+   this.rides=rides;this.photos=photos;this.receipts=receipts;emptyRides=empty;unfinishedRides=unfinished;oversizedFiles=oversized;completedEmptyRides=completedEmpty;rawBytes=size;
+  }
+  boolean withinBasicLimits(){return rides<=BackupFormat.MAX_TRACKS&&photos<=BackupFormat.MAX_PHOTOS&&receipts<=BackupFormat.MAX_RECEIPTS&&oversizedFiles==0&&completedEmptyRides==0&&rawBytes<=BackupFormat.MAX_TOTAL_BYTES;}
   String message(){
    String status=withinBasicLimits()?"기본 용량 점검 통과":"백업 전에 용량·파일 수를 확인하세요";
-   return status+"\nGPS 원본 "+rides+"건 · 바이크 사진 "+photos+"장"
+   return status+"\nGPS 원본 "+rides+"건 · 바이크 사진 "+photos+"장 · 영수증 "+receipts+"장"
     +"\n원본 크기 합계 약 "+(rawBytes/1_000_000)+"MB (ZIP의 GPX 추가 용량 제외)"
     +"\n완전히 빈 GPS 기록 "+emptyRides+"개 · 미완료 기록 "+unfinishedRides+"개"
     +"\n완료 표시가 있지만 내용 없는 GPS 기록 "+completedEmptyRides+"개"
@@ -29,7 +32,8 @@ final class BackupReadiness {
   if(internal==null||!internal.isDirectory())throw new IOException("앱 저장 폴더를 찾을 수 없어요.");
   File[] rides=new File(internal,"rides").listFiles((d,name)->name.matches(BackupFormat.TRACK));
   File[] photos=internal.listFiles((d,name)->name.matches(BackupFormat.PHOTO));
-  int count=0,photoCount=0,empty=0,unfinished=0,oversized=0,completedEmpty=0;long bytes=0;
+  File[] receipts=internal.listFiles((d,name)->name.matches(BackupFormat.RECEIPT));
+  int count=0,photoCount=0,receiptCount=0,empty=0,unfinished=0,oversized=0,completedEmpty=0;long bytes=0;
   if(rides!=null)for(File f:rides)if(f.isFile()){
    count++;long length=f.length();bytes+=length;
    if(length==0)empty++;
@@ -45,6 +49,7 @@ final class BackupReadiness {
    photoCount++;long length=f.length();bytes+=length;
    if(length>BackupFormat.MAX_TRACK_BYTES)oversized++;
   }
-  return new Summary(count,photoCount,empty,unfinished,oversized,completedEmpty,bytes);
+  if(receipts!=null)for(File f:receipts)if(f.isFile()){receiptCount++;long length=f.length();bytes+=length;if(length>BackupFormat.MAX_TRACK_BYTES)oversized++;}
+  return new Summary(count,photoCount,receiptCount,empty,unfinished,oversized,completedEmpty,bytes);
  }
 }

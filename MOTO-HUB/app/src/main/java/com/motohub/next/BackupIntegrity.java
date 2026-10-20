@@ -15,7 +15,7 @@ final class BackupIntegrity {
  static Result verify(InputStream source)throws IOException {
   if(source==null)throw new IOException("백업 파일을 열 수 없어요.");
   Set<String> names=new HashSet<>();Map<String,String> small=new HashMap<>();byte[] buffer=new byte[32768];
-  int entries=0,tracks=0,photos=0;long total=0;boolean hasData=false;
+  int entries=0,tracks=0,photos=0,receipts=0;long total=0;boolean hasData=false;
   try(ZipInputStream zip=new ZipInputStream(new BufferedInputStream(source),StandardCharsets.UTF_8)){
    ZipEntry entry;
    while((entry=zip.getNextEntry())!=null){
@@ -25,15 +25,20 @@ final class BackupIntegrity {
      throw new IOException("백업 ZIP 항목이 유효하지 않습니다.");
     if(BackupFormat.isTrack(name)&&++tracks>BackupFormat.MAX_TRACKS)throw new IOException("GPS 기록이 너무 많습니다.");
     if(BackupFormat.isPhoto(name)&&++photos>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 너무 많습니다.");
+    if(BackupFormat.isReceipt(name)&&++receipts>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증 사진이 너무 많습니다.");
     if("MOTO-HUB-data.json".equals(name))hasData=true;
     long size=0,limit=BackupFormat.entryLimit(name);
     ByteArrayOutputStream value=BackupFormat.isSidecar(name)&&limit>0?new ByteArrayOutputStream():null;
-    int n;
+    int n;byte[] header=new byte[2],trailer=new byte[2];
     while((n=zip.read(buffer))!=-1){
+     if(BackupFormat.isReceipt(name)||BackupFormat.isPhoto(name)){
+      for(int ix=0;ix<n;ix++){long pos=size+ix;if(pos<2)header[(int)pos]=buffer[ix];trailer[0]=trailer[1];trailer[1]=buffer[ix];}
+     }
      size+=n;total+=n;
      if(size>limit||total>BackupFormat.MAX_TOTAL_BYTES)throw new IOException("백업 크기 제한을 초과했습니다.");
      if(value!=null)value.write(buffer,0,n);
     }
+    if((BackupFormat.isReceipt(name)||BackupFormat.isPhoto(name))&&(size<4||(header[0]&255)!=255||(header[1]&255)!=216||(trailer[0]&255)!=255||(trailer[1]&255)!=217))throw new IOException("손상된 사진 파일입니다.");
     if(name.equals("MOTO-HUB-data.json")&&size==0)throw new IOException("백업 기록이 비어 있습니다.");
     if(value!=null)small.put(name,value.toString("UTF-8"));
     zip.closeEntry(); // Checks the entry CRC before a success message is shown.

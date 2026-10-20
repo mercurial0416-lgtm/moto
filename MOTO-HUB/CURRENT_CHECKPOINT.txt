@@ -1,2 +1,8 @@
-MOTO HUB Alpha6-DI(518) EASY-ENTRY PREBUILD SOURCE — YYYYMMDD 20261020.
-Original base: Alpha6-DI(518) PRIVACY-PREBUILD. This checkpoint includes quick fuel/service forms, explicit math, per-bike reuse and duplicate-confirmation UI. APK NOT BUILT. Android compile/Lint NOT RUN. Signing credentials and APK are deliberately excluded. Fixed signing certificate remains 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b.
+MOTO HUB Alpha6 DI(518) UX2 PREBUILD SOURCE — 2026-10-20
+
+Baseline: Alpha6-DI(518) EASY-ENTRY-PREBUILD, branch build/di518-easy-entry-prebuild-20261020.
+Key changes: atomic 1-8 item maintenance entry, per-bike last-cost suggestions and optional interval reuse, local JPEG receipt attachment for existing services/fuel/expenses, receipt preservation through normal and encrypted full ZIP backup/restore, expense/service/fuel UI cards and per-category filters.
+QA: selected 9 regression scripts pass; DK new Java and source tests pass; Android JVM app compile/Lint/physical device and APK signing NOT RUN as requested.
+APK NOT BUILT. Keep versionCode 518, applicationId com.motohub.next, and original fixed signer fingerprint. No keys/passwords/APKs embedded.
+The new receipts/ ZIP entries may not be supported by older installed app versions. Save the previous-format ZIP before converting.
+Not implemented or validated: receipt OCR, device-based photo picker/backup test, real OBD2 odometer, server-shared attachments, native Android compilation.

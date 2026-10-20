@@ -1,0 +1,46 @@
+{
+  "app": "MOTO HUB 4.0 Alpha6 DI",
+  "phase": "UX2 source-only PREBUILD",
+  "versionCode": 518,
+  "applicationId": "com.motohub.next",
+  "date": "2026-10-20",
+  "new_tests": {
+    "ServiceBatchTest.java": "19 assertions passed",
+    "ReceiptArchiveRoundtripTest.java": "12 assertions passed",
+    "test_dk_ui_wiring.py": "19 assertions passed"
+  },
+  "regression_scripts_passed": [
+    "run-quick-log-tests.sh",
+    "run-dk-quality-tests.sh",
+    "run-dh-quality-tests.sh",
+    "run-dg-quality-tests.sh",
+    "run-df-quality-tests.sh",
+    "run-de-quality-tests.sh",
+    "run-dd-quality-tests.sh",
+    "run-dj-quality-tests.sh",
+    "run-cy-java-syntax-tests.sh"
+  ],
+  "source_syntax_files_checked": 132,
+  "not_run": [
+    "Android compile",
+    "Android Lint",
+    "Android unit tests",
+    "Android emulator",
+    "physical smartphone",
+    "live OBD2",
+    "APK build",
+    "APK signing"
+  ],
+  "pending_features": [
+    "offline receipt OCR",
+    "on-device receipt photo verification",
+    "OBD2 mileage read from bike",
+    "draft recovery for batch editor",
+    "older version restores with receipts folder"
+  ],
+  "privacy": {
+    "backup_receipts": "private full ZIP + encrypted full ZIP",
+    "auto_network_upload": false,
+    "signing_material_in_zip": false
+  }
+}

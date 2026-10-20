@@ -25,9 +25,57 @@ final class HubScreens {
   TextView t=a.text(name,17,a.fg,true);tile.addView(t);TextView d=a.text(detail,12,a.accent,true);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(9);tile.addView(d,dp);
   tile.setClickable(true);tile.setFocusable(true);tile.setContentDescription(name+" "+detail);tile.setOnClickListener(v->click.run());return tile;
  }
- List<JSONObject> records(String mode,JSONObject bike){List<JSONObject> result=new ArrayList<>();for(String key:new String[]{"services","expenses"}){if(mode.equals("정비")&&!key.equals("services")||mode.equals("주유·비용")&&!key.equals("expenses"))continue;for(JSONObject x:a.items(key))if(x.optString("vehicleId").equals(bike.optString("id")))result.add(x);}result.sort((x,y)->y.optString("date").compareTo(x.optString("date")));return result;}
- void records(){title("정비와 주유","날짜별 기록 · 바이크별 관리");if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}bikePicker();a.pair(a.content,"＋ 주유 빠른 기록",()->a.edit("expenses",null),"＋ 정비 빠른 기록",()->a.edit("services",null));tabs(new String[]{"전체","정비","주유·비용"},a.garageMode,v->{a.garageMode=v;a.recordPageOffset=0;a.render();});List<JSONObject> list=records(a.garageMode,a.bike());if(list.isEmpty())a.note("아직 기록이 없어요. 아래 기록 추가 버튼을 이용해 주세요.");String last="";for(int i=ListPageLimit.start(list.size(),a.recordPageOffset);i<ListPageLimit.end(list.size(),a.recordPageOffset);i++){JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";if(!month.equals(last)){a.section(month);last=month;}line(x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km",a.won(x.optDouble(x.has("amount")?"amount":"cost")),()->a.edit(x.has("amount")?"expenses":"services",x));}if(ListPageLimit.canPrevious(list.size(),a.recordPageOffset))a.action(a.content,"◀ 최근 기록",false,()->{a.recordPageOffset=ListPageLimit.previous(list.size(),a.recordPageOffset);a.render();});
-  if(ListPageLimit.canNext(list.size(),a.recordPageOffset))a.action(a.content,"이전 기록 ▶ · "+ListPageLimit.end(list.size(),a.recordPageOffset)+"/"+list.size(),false,()->{a.recordPageOffset=ListPageLimit.next(list.size(),a.recordPageOffset);a.render();});}
+ List<JSONObject> records(String mode,JSONObject bike){
+  List<JSONObject> result=new ArrayList<>();String bikeId=bike.optString("id");
+  for(String key:new String[]{"services","expenses"})for(JSONObject record:a.items(key)){
+   if(!bikeId.equals(record.optString("vehicleId")))continue;
+   boolean service=key.equals("services"),fuel="주유".equals(record.optString("type"));
+   if(mode.equals("정비")&&!service||mode.equals("주유")&&!fuel||mode.equals("기타")&&(service||fuel))continue;
+   result.add(record);
+  }
+  result.sort((x,y)->{int date=y.optString("date").compareTo(x.optString("date"));
+   return date!=0?date:Double.compare(y.optDouble("mileage"),x.optDouble("mileage"));});
+  return result;
+ }
+ void records(){
+  title("정비와 주유","내 바이크 기록 · 빠른 입력 · 비용 한눈에");
+  if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}
+  bikePicker();
+  LinearLayout actions=a.col();actions.setPadding(a.dp(14),a.dp(15),a.dp(14),a.dp(8));actions.setBackground(a.shape(a.panel,0,18));
+  a.label(actions,"＋ 바로 기록",17,a.fg,true);
+  a.pair(actions,"⛽ 주유",()->a.edit("expenses",null),"🔧 정비",()->a.edit("services",null));
+  a.action(actions,"정비 여러 항목 한번에 등록 →",false,a::batchServiceEntry);
+  a.content.addView(actions);a.gap(a.content,14);
+  String bikeId=a.bike().optString("id");
+  JSONObject lastFuel=null;
+  for(JSONObject record:a.items("expenses"))if(bikeId.equals(record.optString("vehicleId"))&&"주유".equals(record.optString("type"))){
+   try{FuelRecordValidation.requireFuel(record.optDouble("amount",Double.NaN),record.optDouble("liters",Double.NaN));}
+   catch(Exception ignored){continue;}
+   if(lastFuel==null||RecentRecordReuse.isNewer(record.optString("date"),record.optDouble("mileage"),lastFuel.optString("date"),lastFuel.optDouble("mileage")))lastFuel=record;
+  }
+  if(lastFuel!=null){
+   LinearLayout summary=a.col();summary.setPadding(a.dp(15),a.dp(15),a.dp(15),a.dp(13));summary.setBackground(a.shape(a.panel,a.line,15));
+   a.label(summary,"최근 주유  ·  "+lastFuel.optString("date"),13,a.muted,false);
+   a.label(summary,a.won(lastFuel.optDouble("amount"))+"  /  "+a.num(lastFuel.optDouble("liters"))+"L",19,a.fg,true);
+   double price=lastFuel.optDouble("amount")/lastFuel.optDouble("liters");
+   if(Double.isFinite(price))a.label(summary,"리터당 약 "+a.won(Math.round(price))+" · 실제 영수증 기준",12,a.muted,false);
+   a.content.addView(summary);a.gap(a.content,10);
+  }
+  tabs(new String[]{"전체","주유","정비","기타"},a.garageMode,v->{a.garageMode=v;a.recordPageOffset=0;a.render();});
+  List<JSONObject> list=records(a.garageMode,a.bike());
+  a.label(a.content,"기록 "+list.size()+"건"+(a.garageMode.equals("전체")?"":" · "+a.garageMode),13,a.muted,false);
+  if(list.isEmpty())a.note("표시할 기록이 없어요. 위의 빠른 기록을 눌러 추가하세요.");
+  String last="";
+  for(int i=ListPageLimit.start(list.size(),a.recordPageOffset);i<ListPageLimit.end(list.size(),a.recordPageOffset);i++){
+   JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";
+   if(!month.equals(last)){a.section(month);last=month;}
+   boolean receipt=a.receiptPhotoFile(x.optString("id"))!=null&&a.receiptPhotoFile(x.optString("id")).isFile();
+   line((receipt?"▣ ":"")+x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km",
+    a.won(x.optDouble(x.has("amount")?"amount":"cost")),()->a.edit(x.has("amount")?"expenses":"services",x));
+  }
+  if(ListPageLimit.canPrevious(list.size(),a.recordPageOffset))a.action(a.content,"◀ 최근 기록",false,()->{a.recordPageOffset=ListPageLimit.previous(list.size(),a.recordPageOffset);a.render();});
+  if(ListPageLimit.canNext(list.size(),a.recordPageOffset))a.action(a.content,"이전 기록 ▶ · "+ListPageLimit.end(list.size(),a.recordPageOffset)+"/"+list.size(),false,()->{a.recordPageOffset=ListPageLimit.next(list.size(),a.recordPageOffset);a.render();});
+ }
  void tabs(String[] values,String current,MainActivity.Choice select){HorizontalScrollView sc=new HorizontalScrollView(a);sc.setHorizontalScrollBarEnabled(false);LinearLayout group=new LinearLayout(a);for(String value:values){Button b=a.button(value,current.equals(value),()->select.pick(value));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.rightMargin=a.dp(8);group.addView(b,lp);}sc.addView(group);a.content.addView(sc);a.gap(a.content,12);}
  void manageBike(){JSONObject b=a.bike();if(b==null){a.edit("vehicles",null);return;}LinearLayout p=a.page("내 바이크 관리");a.label(p,b.optString("name"),25,a.fg,true);a.label(p,b.optInt("year")+"년식 · "+a.num(b.optDouble("odo"))+" km",17,a.muted,false);a.label(p,"구매가 "+a.won(b.optDouble("purchase")),17,a.fg,false);
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));

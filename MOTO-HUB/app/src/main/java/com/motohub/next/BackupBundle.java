@@ -42,7 +42,7 @@ public final class BackupBundle {
   String readme="MOTO HUB 전체 백업 - 개인 위치정보 포함 가능\n"+
    "MOTO-HUB-data.json은 앱 설정 > JSON 백업 가져오기로 복원합니다.\n"+
    "rides 폴더는 원본 기록, gpx 폴더는 가져오기로 복원 가능한 GPX 경로입니다.\n"+
-   "photos에는 등록한 바이크 사진이 들어 있습니다.\n"+
+   "photos에는 바이크 사진, receipts에는 정비·주유 영수증 사진이 있습니다.\n"+
    "현재 버전에서는 설정 > 백업·복원 > 전체 ZIP 백업 복원으로 사진과 GPS도 한 번에 불러올 수 있습니다.\n"+
    "친구 로그인 토큰/인증키는 포함되지 않습니다. 위치가 포함될 수 있으니 공유하지 마세요.\n";
   zip.putNextEntry(new ZipEntry("README-KO.txt"));zip.write(readme.getBytes(StandardCharsets.UTF_8));zip.closeEntry();
@@ -51,6 +51,12 @@ public final class BackupBundle {
    if(files.length>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 백업 한도(1,000장)를 초과했습니다.");
    Arrays.sort(files,Comparator.comparing(File::getName));
    for(File f:files){total=writeFile(zip,f,"photos/"+f.getName(),total);count++;}
+  }
+  File[] receipts=internal.listFiles((dir,name)->name.matches(BackupFormat.RECEIPT));
+  if(receipts!=null){
+   if(receipts.length>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증 사진이 1,000장을 초과했습니다.");
+   Arrays.sort(receipts,Comparator.comparing(File::getName));
+   for(File file:receipts){total=writeFile(zip,file,"receipts/"+file.getName(),total);count++;}
   }
   File rides=new File(internal,"rides");File[] tracks=rides.listFiles((dir,name)->name.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));
   if(tracks!=null){if(tracks.length>BackupFormat.MAX_TRACKS)throw new IOException("주행 기록 10,000건 백업 한도를 초과했습니다.");
