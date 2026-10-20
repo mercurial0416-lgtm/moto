@@ -132,12 +132,14 @@ final class MotorcyclePhotoGallery {
    row.setEnabled(false);caption.setText("사진 적용 중…");
    PHOTO_IO.execute(()->{
     String problem=null;
+    Bitmap bitmap=null;
     try{
      // A low-resolution thumbnail must never become the saved full-size model image.
-     Bitmap bitmap=MotorcyclePhoto.downloadImage(choice.optString("imageUrl"));
+     bitmap=MotorcyclePhoto.downloadImage(choice.optString("imageUrl"));
      if(bitmap==null)throw new java.io.IOException("사진을 내려받지 못했어요.");
      if(!canceled.get())save(a,brand,model,year,choice,bitmap);
     }catch(Exception ex){problem="사진 저장 실패: "+(ex.getMessage()==null?"다시 시도해 주세요.":ex.getMessage());}
+    finally{if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();}
     final String failure=problem;
     a.runOnUiThread(()->{
      if(canceled.get()||a.isFinishing()||a.isDestroyed())return;
@@ -150,7 +152,10 @@ final class MotorcyclePhotoGallery {
    Bitmap bitmap=null;
    try{bitmap=MotorcyclePhoto.downloadPreview(choice.optString("imageUrl"));}catch(Exception ignored){}
    final Bitmap ready=bitmap;
-   a.runOnUiThread(()->{if(canceled.get()||a.isFinishing()||a.isDestroyed())return;
+   a.runOnUiThread(()->{if(canceled.get()||a.isFinishing()||a.isDestroyed()){
+    if(ready!=null&&!ready.isRecycled())ready.recycle();
+    return;
+   }
     if(ready!=null){image.setImageBitmap(ready);previewStatus.setText("미리보기 준비됨");}
     else{previewStatus.setText("미리보기 실패 · 선택하면 다시 시도");image.setContentDescription("사진 미리보기 불러오기 실패");}
    });
