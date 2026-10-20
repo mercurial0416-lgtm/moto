@@ -6,7 +6,7 @@ checks={
 'home sold label': '판매 완료 · 기록 보관 중' in java('GarageHomeUi'),
 'quick entry service chips': '"오일필터","체인","브레이크 패드"' in java('MainActivity'),
 'GPS signal stale resets estimated speed': 'now-lastFixElapsed>35_000' in java('RideService') and 'SystemClock.elapsedRealtime()' in java('RideService') and 'liveSpeedKmh=0;lastGood=null' in java('RideService'),
-'backup user review without overwriting': '지금 안전 백업 확인' in java('HubScreens') and 'if(destination.isFile())return;' in java('LocalSafetyBackup'),
+'backup user review without overwriting': '지금 안전 백업 확인' in java('HubScreens') and 'if(destination.exists()||java.nio.file.Files.isSymbolicLink(destination.toPath()))return;' in java('LocalSafetyBackup'),
 'photo decode bounded': 'options.outWidth/options.inSampleSize>1024' in java('GarageHomeUi'),
 'widget IO off main': 'WIDGET_IO.execute(()->updateWidgets(' in java('MotoWidgetProvider') and 'goAsync()' in java('MotoWidgetProvider'),
 'maintenance presets explicit': '정비 간격 선택 · 확인 후 적용' in java('MainActivity'),
