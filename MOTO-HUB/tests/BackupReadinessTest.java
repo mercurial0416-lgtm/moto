@@ -26,6 +26,40 @@ public final class BackupReadinessTest {
    ok(broken.completedEmptyRides==1,"completed empty GPS detected");
    ok(!broken.withinBasicLimits(),"misleading preflight success prevented");
    ok(broken.message().contains("내용 없는 GPS 기록 1개"),"message explains repair issue");
+   // Symlinked external photo/track data must never silently pass a backup preflight.
+   Path outside=Files.createTempFile("moto-user-outside-", ".jpg");
+   try{
+    Path linked=new File(dir,"garage-photo-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg").toPath();
+    try{
+     Files.createSymbolicLink(linked,outside);
+     BackupReadiness.Summary unsafe=BackupReadiness.inspect(dir);
+     ok(!unsafe.withinBasicLimits(),"external symlink photo cannot pass");
+     ok(unsafe.oversizedFiles>0,"unsafe file surfaced in warning");
+     Files.delete(linked);
+    }catch(UnsupportedOperationException|SecurityException e){ /* Filesystem may not permit symlinks */ }
+    Path trackLink=new File(rides,"1792122693081-12345678-1234-1234-1234-123456789abc.track").toPath();
+    try{
+     Files.createSymbolicLink(trackLink,outside);
+     ok(!BackupReadiness.inspect(dir).withinBasicLimits(),"symlinked GPS track refused");
+     Files.delete(trackLink);
+    }catch(UnsupportedOperationException|SecurityException e){ /* Environment limitation */ }
+    Path linkedDir=new File(dir,"rides-other").toPath();
+    // A symlink at the exact rides folder would make user GPS escape app storage;
+    // emulate by inspecting a separate app root with linked rides folder.
+    File fake=Files.createTempDirectory("moto-linked-rides-").toFile();
+    try{
+     Path linkedRides=new File(fake,"rides").toPath();
+     try{
+      Files.createSymbolicLink(linkedRides,rides.toPath());
+      try{BackupReadiness.inspect(fake);throw new AssertionError("linked GPS directory accepted");}
+      catch(IOException expected){n++;}
+     }catch(UnsupportedOperationException|SecurityException e){ /* Environment limitation */ }
+    }finally{
+     Path child=new File(fake,"rides").toPath();
+     Files.deleteIfExists(child);fake.delete();
+    }
+   }finally{Files.deleteIfExists(outside);}
+   ok(!new BackupReadiness.Summary(1,0,0,0,0,-1).withinBasicLimits(),"negative byte totals invalid");
    System.out.println("PASS DF backup preview: "+n+" checks");
   }finally{
    File[] contents=rides.listFiles();if(contents!=null)for(File f:contents)f.delete();rides.delete();
