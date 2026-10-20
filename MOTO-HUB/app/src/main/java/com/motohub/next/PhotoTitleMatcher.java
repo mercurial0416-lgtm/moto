@@ -62,6 +62,13 @@ final class PhotoTitleMatcher {
   }
   return false;
  }
+ /** Automatic fallback is allowed for undated photos, but never knowingly picks another model year.
+  *  Manual gallery browsing still uses matchesModel so a person can inspect and choose.
+  */
+ static boolean matchesFallback(String title,String brand,String model,int requestedYear){
+  return matchesModel(title,brand,model)
+   && (requestedYear<1900||requestedYear>2200||!hasConflictingYear(title,requestedYear));
+ }
  static boolean matches(String title, String brand, String model, int year) {
   if(year < 1900 || year > 2200) return false;
   // Year must be a standalone token, not part of a serial number or 20240.
