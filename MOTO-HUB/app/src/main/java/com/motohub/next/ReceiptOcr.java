@@ -37,7 +37,9 @@ final class ReceiptOcr {
     int rotation=ReceiptImageOrientation.readDegrees(activity,uri);
     InputImage input=InputImage.fromBitmap(pixels,rotation);
     activity.runOnUiThread(()->{
-     if(activity.isFinishing()||activity.isDestroyed()){pixels.recycle();return;}
+     if(activity.isFinishing()||activity.isDestroyed()){
+      pixels.recycle();callback.failure("화면이 닫혀 영수증 인식이 취소됐습니다.");return;
+     }
      TextRecognizer recognizer=TextRecognition.getClient(new KoreanTextRecognizerOptions.Builder().build());
      try{
       recognizer.process(input)
