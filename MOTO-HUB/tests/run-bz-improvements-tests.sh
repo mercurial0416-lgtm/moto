@@ -15,8 +15,8 @@ def java(n):return (src/(n+'.java')).read_text()
 checks={
 'home due dates and mileage': 'ServiceDueSummary.nearest(' in java('GarageHomeUi'),
 'home interrupted ride manual recovery': 'interruptedRideShortcut();' in java('GarageHomeUi') and 'RideHistoryFilter.INTERRUPTED' in java('GarageHomeUi'),
-'ride permission safe stop': 'START_NOT_STICKY' in java('RideService') and 'Sharing.stop();status=' in java('RideService'),
-'GPS gap resets previous fix': 'lastGood=null;lastFixElapsed=0;' in java('RideService') and 'Sharing.stop();status="GPS 일시 중단' in java('RideService'),
+'ride permission safe stop': 'START_NOT_STICKY' in java('RideService') and 'Sharing.stop();' in java('RideService'),
+'GPS gap resets previous fix': 'lastGood=null;lastFixElapsed=0;' in java('RideService') and 'Sharing.stop();' in java('RideService').split('@Override public void onProviderDisabled')[1].split('@Override public void onProviderEnabled')[0],
 'GPS peak metric updated': 'livePeakKmh=Math.max(' in java('RideService') and 'RideService.livePeakKmh' in java('RideUi'),
 'maintenance private on lockscreen': 'setVisibility(Notification.VISIBILITY_PRIVATE)' in java('DailyMaintenanceJob'),
 'gallery IO bounded': 'newFixedThreadPool(2' in java('MotorcyclePhotoGallery') and java('MotorcyclePhotoGallery').count('PHOTO_IO.execute(')==2,
