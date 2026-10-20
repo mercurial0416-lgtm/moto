@@ -1,4 +1,4 @@
 MOTO HUB 4.0 Alpha6 DI(518) UX3 SOURCE ONLY PREBUILD
-GitHub branch: build/di518-ux3-prebuild-20261020
+GitHub branch: build/di518-ux3-complete-prebuild-20261020
 NO APK BUILD / NO NEW SIGNING
 See CHANGELOG-alpha6-di-ux3.md and UX3_PREBUILD_VERIFICATION.json
