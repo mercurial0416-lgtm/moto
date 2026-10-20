@@ -7,7 +7,7 @@ ride=(src/'RideService.java').read_text()
 checks={
  'shared_restore_guard_helper': 'boolean restoreIsBlocked()' in main and 'RestoreRideGate.blocked(RideService.running,RideService.autoArmed)' in main,
  'zip_picker_blocked': 'void importBundle(){\n  if(restoreIsBlocked())' in main,
- 'zip_staging_blocked': 'void prepareBundleRestore(Uri uri){\n  if(restoreIsBlocked())' in main,
+ 'zip_staging_blocked': ('void prepareBundleRestore(Uri uri){prepareBundleRestore(uri,null);}' in main and 'void prepareBundleRestore(Uri uri,char[] password){\n  if(restoreIsBlocked())' in main),
  'zip_confirmation_rechecks': 'if(restoreIsBlocked()){ready.close();explainRestoreBlocked();return;}' in main,
  'zip_apply_transaction': 'RestoreRideGate.begin(RideService.running,RideService.autoArmed)' in main,
  'zip_transaction_released': 'if(entered)RestoreRideGate.end();ready.close();' in main,
