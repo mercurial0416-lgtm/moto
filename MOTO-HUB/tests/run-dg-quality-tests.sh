@@ -17,7 +17,7 @@ assert 'RestoreCapacity.ensure' in restore
 assert 'RestoreCapacity.ensure(RestoreCapacity.available(getFilesDir()),required)' in main
 assert 'ready.requiredSpace(getFilesDir())' in main
 assert 'spaceNote+=' in main
-assert 'versionCode 516' in Path('app/build.gradle').read_text()
+assert 'versionCode 517' in Path('app/build.gradle').read_text()
 assert 'Sharing.start(' not in (root/'RideService.java').read_text()
 print('PASS DG disk-space preflight, UI and privacy wiring')
 PYS

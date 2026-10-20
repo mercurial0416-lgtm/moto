@@ -3,7 +3,7 @@ android {
  namespace 'com.motohub.next'
  compileSdk 36
  buildToolsVersion "36.0.0"
- defaultConfig { applicationId 'com.motohub.next'; minSdk 26; targetSdk 36; versionCode 516; versionName '4.0.0-alpha6-dg'; testInstrumentationRunner 'com.motohub.next.SmokeRunner' }
+ defaultConfig { applicationId 'com.motohub.next'; minSdk 26; targetSdk 36; versionCode 517; versionName '4.0.0-alpha6-dh'; testInstrumentationRunner 'com.motohub.next.SmokeRunner' }
  defaultConfig { buildConfigField "String", "SUPABASE_URL", groovy.json.JsonOutput.toJson(providers.gradleProperty("supabaseUrl").getOrElse("https://paraeadvvdqyztqqhxpu.supabase.co")); buildConfigField "String", "SUPABASE_KEY", groovy.json.JsonOutput.toJson(providers.gradleProperty("supabaseKey").getOrElse("sb_publishable_fkKoDsRamzU0r1vt88opgw_GOUke5TY")) }
  buildFeatures { buildConfig = true }
  defaultConfig { buildConfigField "String", "UPDATE_MANIFEST_URL", groovy.json.JsonOutput.toJson(providers.gradleProperty("updateManifestUrl").getOrElse("")) }

@@ -21,7 +21,7 @@ import java.util.*;
 public class MainActivity extends Activity {
  JSONObject db;AtomicFile disk;LinearLayout root,content,formFooter;Dialog dialog;LinearLayout formBody;
  String tab="홈",selected="",query="",filter="전체",sort="최신순",pendingExport="";
- String pendingTrack="";String pendingBundleJson="";
+ String pendingTrack="";String pendingBundleJson="";char[] pendingSecurePassword;
  final RideStartConsent rideStartConsent=new RideStartConsent();
  DeveloperObdScreen developerObd;
  String draftKey="",draftId="",draftVehicle="";Map<String,EditText> draftFields;Map<String,Spinner> draftSelectors;CheckBox fullTankBox;boolean formDirty=false;
@@ -800,13 +800,34 @@ public class MainActivity extends Activity {
   i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/zip","application/x-zip-compressed","application/octet-stream"});
   startActivityForResult(i,46);
  }
- void prepareBundleRestore(Uri uri){
-  if(restoreIsBlocked()){explainRestoreBlocked();return;}
+ void prepareBundleRestore(Uri uri){prepareBundleRestore(uri,null);}
+ void prepareBundleRestore(Uri uri,char[] password){
+  if(restoreIsBlocked()){if(password!=null)Arrays.fill(password,'\0');explainRestoreBlocked();return;}
   new Thread(()->{
    try {
     RestoreArchive.Prepared ready;
-    try(InputStream in=getContentResolver().openInputStream(uri)){
-     if(in==null)throw new IOException("ZIP을 열지 못했어요.");ready=RestoreArchive.prepare(in,getFilesDir());
+    File authenticated=null;
+    try{
+     if(password==null){
+      try(InputStream in=getContentResolver().openInputStream(uri)){
+       if(in==null)throw new IOException("ZIP을 열지 못했어요.");ready=RestoreArchive.prepare(in,getFilesDir());
+      }
+     }else{
+      // Verify the entire authenticated stream before parsing or offering any restore.
+      try(InputStream encrypted=getContentResolver().openInputStream(uri)){
+       if(encrypted==null)throw new IOException("암호화 백업 파일을 열지 못했어요.");
+       authenticated=BackupCrypto.decryptToPrivateFile(encrypted,password,getCacheDir());
+      }
+      try(InputStream in=new BufferedInputStream(new FileInputStream(authenticated))){
+       BackupIntegrity.verify(in);
+      }
+      try(InputStream in=new BufferedInputStream(new FileInputStream(authenticated))){
+       ready=RestoreArchive.prepare(in,getFilesDir());
+      }
+     }
+    }finally{
+     if(authenticated!=null)java.nio.file.Files.deleteIfExists(authenticated.toPath());
+     if(password!=null)Arrays.fill(password,'\0');
     }
     JSONObject verified;
     try{verified=Store.parse(ready.json);}catch(Exception e){ready.close();throw e;}
@@ -856,18 +877,58 @@ public class MainActivity extends Activity {
  void exportBundle(){
   if(!BackupExportGate.canExport(RideService.running,RideService.autoArmed,RestoreRideGate.isRestoring())){error(BackupExportGate.MESSAGE);return;}
   new AlertDialog.Builder(this).setTitle("모든 기록 ZIP 내보내기")
-   .setMessage("바이크·정비·매물·GPS 경로·직접 찍은 사진을 한 파일로 저장해요. GPS 위치가 들어 있으니 백업 파일 공유에 주의하세요.\n\n전체 ZIP도 복원할 수 있어요. 기록 복원 전에 현재 데이터를 따로 백업해 주세요.")
-   .setNegativeButton("취소",null).setPositiveButton("내보내기",(d,w)->attempt(()->{
-    if(!BackupExportGate.canExport(RideService.running,RideService.autoArmed,RestoreRideGate.isRestoring()))throw new IOException(BackupExportGate.MESSAGE);
-    pendingBundleJson=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);
-    Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/zip");i.addCategory(Intent.CATEGORY_OPENABLE);
-    i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-FULL-"+today()+".zip");startActivityForResult(i,45);
-   })).show();
+   .setMessage("바이크·정비·매물·GPS 경로·직접 찍은 사진을 한 파일로 저장해요. 이 ZIP은 암호화되지 않습니다. 공유에 주의하세요.\n\n위치정보가 민감하면 '암호화 전체 백업'을 사용하세요.")
+   .setNegativeButton("취소",null).setPositiveButton("내보내기",(d,w)->launchBackupDocument(null)).show();
+ }
+ void exportEncryptedBundle(){showBackupPassword(true,password->launchBackupDocument(password));}
+ void importEncryptedBundle(){
+  if(restoreIsBlocked()){explainRestoreBlocked();return;}
+  showBackupPassword(false,password->{
+   if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');
+   pendingSecurePassword=password;
+   Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/octet-stream");i.addCategory(Intent.CATEGORY_OPENABLE);
+   i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/octet-stream","*/*"});startActivityForResult(i,48);
+  });
+ }
+ interface PasswordChoice{void picked(char[] password);}
+ void showBackupPassword(boolean confirm,PasswordChoice next){
+  LinearLayout fields=new LinearLayout(this);fields.setOrientation(LinearLayout.VERTICAL);fields.setPadding(dp(20),dp(6),dp(20),0);
+  EditText first=new EditText(this);first.setSingleLine(true);first.setHint("암호 (12자 이상)");first.setInputType(129);fields.addView(first);
+  EditText second=null;
+  if(confirm){second=new EditText(this);second.setSingleLine(true);second.setHint("암호 다시 입력");second.setInputType(129);fields.addView(second);}
+  final EditText repeated=second;
+  AlertDialog alert=new AlertDialog.Builder(this).setTitle(confirm?"암호화 전체 백업":"암호화 백업 복원")
+   .setMessage(confirm?"AES-256-GCM으로 GPS·사진·기록을 보호합니다. 비밀번호는 저장하지 않습니다. 잊으면 복구할 수 없어요.":"백업을 만들 때 사용한 비밀번호가 필요합니다. 틀리면 기존 기록을 수정하지 않습니다.")
+   .setView(fields).setNegativeButton("취소",null).setPositiveButton("계속",null).create();
+  alert.setOnShowListener(d->alert.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+   char[] password=first.getText().toString().toCharArray();
+   char[] confirmPassword=confirm?repeated.getText().toString().toCharArray():null;
+   boolean valid=BackupCrypto.validPassword(password)&&(!confirm||Arrays.equals(password,confirmPassword));
+   if(confirmPassword!=null)Arrays.fill(confirmPassword,'\0');
+   if(!valid){Arrays.fill(password,'\0');first.setError(confirm?"12~256자이며 두 암호가 같아야 합니다.":"암호는 12~256자여야 합니다.");return;}
+   first.setText("");if(repeated!=null)repeated.setText("");alert.dismiss();next.picked(password);
+  }));alert.show();
+ }
+ void launchBackupDocument(char[] password){
+  attempt(()->{
+   if(!BackupExportGate.canExport(RideService.running,RideService.autoArmed,RestoreRideGate.isRestoring()))throw new IOException(BackupExportGate.MESSAGE);
+   if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');
+   pendingSecurePassword=password;
+   pendingBundleJson=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);
+   boolean secure=password!=null;
+   Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType(secure?"application/octet-stream":"application/zip");i.addCategory(Intent.CATEGORY_OPENABLE);
+   i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-FULL-"+today()+(secure?".mhub":".zip"));startActivityForResult(i,secure?47:45);
+  });
  }
  void exportData(){attempt(()->{pendingExport=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-"+today()+".json");startActivityForResult(i,41);});}
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치가 취소되었거나 완료되지 않았습니다. 기존 기록은 삭제하지 않았습니다.");return;}if(result!=RESULT_OK||data==null||data.getData()==null)return;Uri uri=data.getData();if(request==52){attempt(()->saveGaragePhoto(uri));return;}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치가 취소되었거나 완료되지 않았습니다. 기존 기록은 삭제하지 않았습니다.");return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";return;}Uri uri=data.getData();if(request==52){attempt(()->saveGaragePhoto(uri));return;}
   if(request==46){prepareBundleRestore(uri);return;}
-  if(request==45){
+  if(request==48){char[] password=pendingSecurePassword;pendingSecurePassword=null;
+   if(password==null){error("암호를 다시 입력해 주세요.");return;}
+   prepareBundleRestore(uri,password);return;
+  }
+  if(request==45||request==47){
+   final char[] password=(request==47?pendingSecurePassword:null);pendingSecurePassword=null;
    final String snapshot=pendingBundleJson;pendingBundleJson="";
    if(snapshot.isEmpty()){error("백업 정보를 찾지 못했어요. 다시 시도하세요.");return;}
    new Thread(()->{
@@ -877,17 +938,28 @@ public class MainActivity extends Activity {
     int count;
     try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
      if(out==null)throw new IOException("백업 파일을 열 수 없어요.");
-     count=BackupBundle.export(snapshot,getFilesDir(),out);
+     if(password==null)count=BackupBundle.export(snapshot,getFilesDir(),out);
+     else try(OutputStream secure=BackupCrypto.encrypt(out,password)){
+      count=BackupBundle.export(snapshot,getFilesDir(),secure);
+     }
     }
-    // File provider receives the completed ZIP only after its stream closes.
-    // Reopen it before claiming success, so truncated/corrupt exports are visible.
-    try(InputStream check=getContentResolver().openInputStream(uri)){
-     if(check==null)throw new IOException("백업 검증을 위해 파일을 다시 열 수 없어요.");
-     BackupIntegrity.verify(check);
-    }
-    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast("전체 백업 완료 · "+count+"개 기록/사진");});
+    // Validate every authenticated encrypted chunk BEFORE trusting the ZIP.
+    File authenticated=null;
+    try{
+     if(password!=null){
+      try(InputStream check=getContentResolver().openInputStream(uri)){
+       if(check==null)throw new IOException("암호화 백업 검증을 위해 파일을 다시 열 수 없어요.");
+       authenticated=BackupCrypto.decryptToPrivateFile(check,password,getCacheDir());
+      }
+     }
+     try(InputStream check=authenticated!=null?new FileInputStream(authenticated):getContentResolver().openInputStream(uri)){
+      if(check==null)throw new IOException("백업 검증을 위해 파일을 다시 열 수 없어요.");
+      BackupIntegrity.verify(check);
+     }
+    }finally{if(authenticated!=null)java.nio.file.Files.deleteIfExists(authenticated.toPath());}
+    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast((password==null?"전체 백업":"암호화 백업")+" 검증 완료 · "+count+"개 기록/사진");});
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 백업 실패: "+e.getMessage());});}
-    finally{if(reserved)RestoreRideGate.endExport();}
+    finally{if(password!=null)Arrays.fill(password,'\0');if(reserved)RestoreRideGate.endExport();}
    },"MOTO-full-backup").start();return;
   }
   if(request==44){

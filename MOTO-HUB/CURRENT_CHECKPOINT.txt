@@ -1,3 +1,1 @@
-MOTO HUB current source checkpoint: Alpha6-DG (516)
-Parent: Alpha6-DF (515). Build results in DG_VERIFICATION_REPORT.json.
-New features: restore free-space preflight and rollback capacity guarantee.
+MOTO HUB Alpha6-DH (517). Parent DG516. Encrypted backup .mhub (AES-256-GCM streaming), existing ZIP support retained. Android CI pending verification. See CHANGELOG-alpha6-dh.md. Existing debug signatures differ across previous versions; back up externally before changing installs.
