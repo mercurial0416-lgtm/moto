@@ -28,6 +28,7 @@ public final class RideService extends Service implements LocationListener {
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();LocationManager manager;FileOutputStream output;File track;long lastTime;volatile long lastFixElapsed;volatile Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
  HandlerThread gpsIoThread;
+ volatile boolean finishPending=false;
  final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
     // Turning off developer experiments revokes OBD permission, not consent to a
     // separately running GPS ride. The GPS track must stay recoverable/active.
@@ -60,7 +61,7 @@ public final class RideService extends Service implements LocationListener {
   if(intent==null){stopWith("GPS 서비스가 중단됐습니다.",false);return START_NOT_STICKY;}
   String action=intent.getAction();
   if(STOP.equals(action)){
-   stopWith("사용자가 라이딩 기록을 종료했습니다.",running);return START_NOT_STICKY;
+   finishUserRideAsync();return START_NOT_STICKY;
   }
   if(AUTO_DISARM.equals(action)){
    // Disarming the experimental reader must NOT silently discard an active GPS ride.
@@ -203,6 +204,30 @@ public final class RideService extends Service implements LocationListener {
     :"자동 기록 중 · OBD2 "+speedKmh+" km/h · GPS "+String.format(java.util.Locale.KOREA,"%.2f km",liveDistanceKm))
     :"OBD2 연결됨 · 출발 대기 · 위치 공유 꺼짐";
    getSystemService(NotificationManager.class).notify(404,notification(text));
+  }
+ }
+ /** A full-track readback can scan 25MB: keep STOP responsive on Android main.
+  *  Location callbacks and this close operation run FIFO on the same GPS worker.
+  *  Never stop the service until the verified marker or recoverable original is settled.
+  */
+ private void finishUserRideAsync(){
+  if(finishPending)return;
+  if(!running){stopWith("라이딩 기록이 종료됐습니다.",false);return;}
+  finishPending=true;
+  Sharing.stop();
+  if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
+  status="GPS 기록 저장·검증 중…";
+  HandlerThread worker=gpsIoThread;
+  if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
+   boolean verified=closeTrack(true);
+   handler.post(()->{
+    if(!finishPending)return;finishPending=false;
+    stopWith(verified?"사용자가 라이딩 기록을 저장하고 종료했습니다.":"GPS 기록 검증 실패 · 복구 화면에서 원본을 확인하세요.",false);
+    if(verified)DailyMaintenanceJob.checkSoon(this);
+   });
+  })){
+   finishPending=false;
+   stopWith("사용자가 라이딩 기록을 종료했습니다.",true);
   }
  }
  private synchronized void finishAutoTrack(){
