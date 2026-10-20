@@ -1,0 +1,59 @@
+name: Fixed-signature MOTO HUB update APK
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verified-fixed-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Require persistent signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.MOTO_SIGNING_STORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64" && test -n "$KEYSTORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD" || { echo 'Fixed signing secrets missing; refusing random-key APK'; exit 1; }
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/moto-fixed.p12"
+          test -s "$RUNNER_TEMP/moto-fixed.p12"
+      - name: Sign release with required fixed identity
+        env:
+          MOTO_SIGNING_STORE_FILE: ${{ runner.temp }}/moto-fixed.p12
+          MOTO_SIGNING_STORE_PASSWORD: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
+          MOTO_SIGNING_KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
+          MOTO_SIGNING_KEY_PASSWORD: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
+        working-directory: MOTO-HUB
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
+          ACTUAL=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          EXPECTED=212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b
+          test "$ACTUAL" = "$EXPECTED" || { echo "WRONG SIGNING CERTIFICATE. Refusing APK. Expected: $EXPECTED; got: $ACTUAL"; exit 1; }
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='com.motohub.next'" > app/build/outputs/apk/release/version-check.txt
+          sha256sum "$APK" > app/build/outputs/apk/release/SHA256.txt
+          echo "$ACTUAL" > app/build/outputs/apk/release/certificate-SHA256.txt
+      - name: Publish verified release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MOTO-HUB-FIXED-SIGNED-${{ github.sha }}
+          path: MOTO-HUB/app/build/outputs/apk/release/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Scrub private material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/moto-fixed.p12"
