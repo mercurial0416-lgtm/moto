@@ -26,6 +26,12 @@ public final class PhotoTitleMatcherTest {
   verify(PhotoTitleMatcher.matchesModel("File:2024 KTM 390 Adventure.jpg", "KTM", "390 Duke"), false, "fallback different model");
   verify(PhotoTitleMatcher.matchesModel("File:2024 KTM 390 Duke.jpg", "", "390 Duke"), false, "missing brand");
   verify(PhotoTitleMatcher.matchesModel("File:2024 KTM 390 Duke.jpg", "KTM", ""), false, "missing model");
+  verify(PhotoTitleMatcher.matchesFallback("File:2023 KTM 390 Duke.jpg","KTM","390 Duke",2024),false,"different year fallback rejected");
+  verify(PhotoTitleMatcher.matchesFallback("File:KTM 390 Duke studio.jpg","KTM","390 Duke",2024),true,"undated known model can be suggested");
+  verify(PhotoTitleMatcher.matchesFallback("File:2024 KTM 390 Duke.jpg","KTM","390 Duke",2024),true,"requested year fallback accepted");
+  verify(PhotoTitleMatcher.matchesFallback("File:2023 2024 KTM 390 Duke.jpg","KTM","390 Duke",2024),false,"mixed year fallback rejected");
+  verify(PhotoTitleMatcher.matchesFallback("File:2025 KTM 390 Adventure.jpg","KTM","390 Duke",2024),false,"wrong trim still rejected");
+  verify(PhotoTitleMatcher.matchesFallback("File:2023 KTM 390 Duke.jpg","KTM","390 Duke",0),true,"year unknown falls back to model only");
   System.out.println("PASS: " + checks + " conservative photo filename checks");
  }
 }
