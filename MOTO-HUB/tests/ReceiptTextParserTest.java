@@ -10,6 +10,11 @@ public class ReceiptTextParserTest{
   ok(!ReceiptTextParser.parse("바이크 용량 1000km").hasAny(),"no spurious price");
   ok(ReceiptTextParser.parse("TOTAL: 10000000000").amount.isEmpty(),"no oversized sum");
   ok(ReceiptTextParser.parse("2026-02-30").date.isEmpty(),"invalid date");
+  r=ReceiptTextParser.parse("2026년 10월 20일\n주유수량 7.25 L\n합계: 37,000원\n승인 금액 ₩ 36,500원");
+  ok(r.amount.equals("36500"),"approved payment beats subtotal");
+  ok(r.liters.equals("7.25"),"common Korean fuel quantity label");
+  ok(r.date.equals("2026-10-20"),"Korean year month day");
+  ok(ReceiptTextParser.parse("2026년 10월 320일").date.isEmpty(),"invalid Korean day not accepted");
   ok(ReceiptTextParser.parse(null).date.isEmpty(),"null safe");
   System.out.println("PASS local OCR candidate parser: "+n+" assertions");
  }

@@ -18,12 +18,12 @@ final class ReceiptTextParser {
   boolean hasAny(){return !amount.isEmpty()||!liters.isEmpty()||!date.isEmpty();}
  }
  /** Recognize the final paid total before subtotals, unit prices or VAT. */
- private static final Pattern MONEY=Pattern.compile("(총\\s*결제\\s*금액|총\\s*금액|실\\s*결제\\s*금액|카드\\s*결제|결제\\s*금액|합\\s*계|청구\\s*금액|판매\\s*금액|TOTAL|AMOUNT\\s*PAID)\\s*[:：]?\\s*₩?\\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,10})(?![0-9,])(?:\\s*원)?",Pattern.CASE_INSENSITIVE);
- private static final Pattern VOLUME=Pattern.compile("(?:주유\\s*량|공급\\s*량|리터|LITERS?)\\s*[:：]?\\s*([0-9]{1,4}(?:\\.[0-9]{1,3})?)\\s*(?:L|리터)?",Pattern.CASE_INSENSITIVE);
- private static final Pattern DATE=Pattern.compile("(20[0-9]{2})[./-]([0-9]{1,2})[./-]([0-9]{1,2})");
+ private static final Pattern MONEY=Pattern.compile("(총\\s*결제\\s*금액|실\\s*결제\\s*금액|카드\\s*결제|승인\\s*금액|결제\\s*합계|총\\s*금액|결제\\s*금액|주유\\s*금액|합\\s*계|청구\\s*금액|판매\\s*금액|TOTAL|AMOUNT\\s*PAID)\\s*[:：]?\\s*₩?\\s*([0-9]{1,3}(?:,[0-9]{3})+|[0-9]{3,10})(?![0-9,])(?:\\s*원)?",Pattern.CASE_INSENSITIVE);
+ private static final Pattern VOLUME=Pattern.compile("(?:주유\\s*(?:량|수량)|공급\\s*(?:량|수량)|리터|LITERS?)\\s*[:：]?\\s*([0-9]{1,4}(?:\\.[0-9]{1,3})?)\\s*(?:L|리터)?",Pattern.CASE_INSENSITIVE);
+ private static final Pattern DATE=Pattern.compile("(20[0-9]{2})\\s*(?:[./-]|년\\s*)([0-9]{1,2})\\s*(?:[./-]|월\\s*)([0-9]{1,2})(?![0-9])(?:\\s*일)?");
  private static int priority(String label){
   String value=label.toUpperCase(Locale.ROOT).replaceAll("\\s+","");
-  if(value.startsWith("총결제")||value.startsWith("실결제")||value.startsWith("카드결제")||value.contains("PAID"))return 100;
+  if(value.startsWith("총결제")||value.startsWith("실결제")||value.startsWith("카드결제")||value.startsWith("승인금액")||value.startsWith("결제합계")||value.contains("PAID"))return 100;
   if(value.startsWith("총금액")||value.startsWith("결제금액")||value.equals("TOTAL"))return 90;
   if(value.startsWith("합계")||value.startsWith("청구"))return 70;
   return 50;
