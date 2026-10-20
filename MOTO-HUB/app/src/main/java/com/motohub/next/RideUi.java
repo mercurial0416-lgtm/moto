@@ -38,7 +38,7 @@ final class RideUi {
  }
  final MainActivity a;RideUi(MainActivity a){this.a=a;}
  void render(){
-  final boolean saving=RideService.finishPending||RideService.autoFinishPending;
+  final boolean saving=RideService.saving();
   LinearLayout hero=a.col();hero.setPadding(a.dp(18),a.dp(18),a.dp(18),a.dp(18));hero.setBackground(a.shape(a.panel,a.line,19));
   TextView eyebrow=a.text(saving?"●  GPS 저장 검증 중":RideService.running?"●  GPS 기록 중":RideService.autoArmed?"●  OBD2 자동 출발 대기":"●  라이딩 준비 완료",13,RideService.running?0xff48d99a:a.accent,true);hero.addView(eyebrow);
   TextView title=a.text(saving?"SAVING RIDE":RideService.running?RideService.count+"개 좌표 저장":RideService.autoArmed?"AUTO RIDE ARMED":"READY TO RIDE",25,a.fg,true);LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
