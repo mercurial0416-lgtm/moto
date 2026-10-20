@@ -16,7 +16,7 @@ photo=(root/"MotorcyclePhoto.java").read_text()
 assert 'new HandlerThread("moto-gps-disk"' in ride, "GPS needs an off-UI callback looper"
 assert 'manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,5000,0,this,gpsIoThread.getLooper())' in ride
 assert '@Override public synchronized void onLocationChanged(Location location)' in ride
-assert 'private synchronized void closeTrack(boolean completed)' in ride
+assert 'private synchronized boolean closeTrack(boolean completed)' in ride
 assert 'private synchronized void openRideTrack()throws Exception' in ride
 assert 'synchronized void cleanup(boolean completed)' in ride
 assert 'output.getFD().sync()' in ride, "committed samples remain durable"
