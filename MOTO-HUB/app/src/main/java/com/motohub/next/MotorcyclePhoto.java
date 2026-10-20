@@ -62,6 +62,7 @@ final class MotorcyclePhoto {
  }
  static List<JSONObject> searchCommons(String search,String brand,String model,int year,boolean exactYear)throws Exception{
   List<JSONObject> candidates=new ArrayList<>();
+  Set<String> seenImageUrls=new HashSet<>(); // An identical broken photo needs only one network attempt.
   URL url=new URL("https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch="+URLEncoder.encode(search,"UTF-8")+"&gsrnamespace=6&gsrlimit=40&prop=imageinfo&iiprop=url%7Cmime%7Cextmetadata&iiurlwidth=1100&format=json");
   HttpURLConnection c=(HttpURLConnection)url.openConnection();try{
    c.setConnectTimeout(6000);c.setReadTimeout(8000);c.setRequestProperty("User-Agent","MotoHubAndroid/4.0 (motorcycle photo lookup; https://github.com/mercurial0416-lgtm/moto)");c.setRequestProperty("Accept","application/json");
@@ -72,7 +73,7 @@ final class MotorcyclePhoto {
       String title=page.optString("title");if(exactYear?!matches(title,brand,model,year):!matchesModel(title,brand,model))continue;
       JSONArray images=page.optJSONArray("imageinfo");JSONObject im=images==null?null:images.optJSONObject(0);if(im==null||!PhotoMimeFilter.supported(im.optString("mime")))continue;
       String imageUrl=im.optString("thumburl",im.optString("url"));String pageUrl=im.optString("descriptionurl");
-      if(!imageUrl.startsWith("https://upload.wikimedia.org/"))continue;
+      if(!imageUrl.startsWith("https://upload.wikimedia.org/")||!seenImageUrls.add(imageUrl))continue;
       if(pageUrl.isEmpty())pageUrl="https://commons.wikimedia.org/wiki/"+title.replace(' ','_');
       if(!pageUrl.startsWith("https://commons.wikimedia.org/"))continue;
       JSONObject ext=im.optJSONObject("extmetadata");String license=ext==null?"":ext.optJSONObject("LicenseShortName")==null?"":ext.optJSONObject("LicenseShortName").optString("value");
