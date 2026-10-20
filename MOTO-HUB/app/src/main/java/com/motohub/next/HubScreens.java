@@ -118,7 +118,9 @@ final class HubScreens {
   showListingResults(results);
  }
  void showListingResults(LinearLayout into){
-  into.removeAllViews();List<JSONObject> list=a.items("listings");list.removeIf(x->!x.optString("model").toLowerCase(Locale.ROOT).contains(a.query.toLowerCase(Locale.ROOT))||!a.filter.equals("전체")&&!a.filter.equals(x.optString("status","확인필요")));
+  into.removeAllViews();List<JSONObject> list=a.items("listings");
+  final String query=a.query.toLowerCase(Locale.ROOT);
+  list.removeIf(x->!x.optString("model").toLowerCase(Locale.ROOT).contains(query)||!a.filter.equals("전체")&&!a.filter.equals(x.optString("status","확인필요")));
   if(a.sort.equals("가격 낮은순"))list.sort(Comparator.comparingDouble(x->x.optDouble("price")));if(a.sort.equals("주행거리순"))list.sort(Comparator.comparingDouble(x->x.optDouble("mileage")));
   a.gap(into,12);a.label(into,list.size()+"개 매물",13,a.muted,false);
   if(list.isEmpty()){TextView none=a.text("조건에 맞는 매물이 없어.\n필터를 바꾸거나 매물을 추가해 봐.",15,a.muted,false);none.setPadding(a.dp(18),a.dp(25),a.dp(18),a.dp(25));none.setBackground(a.shape(a.panel,0,16));into.addView(none);return;}
@@ -152,8 +154,11 @@ final class HubScreens {
    double allFuel=totals.sumFuelAndOther(),allService=totals.sumService();
    a.label(page,"계기판 기록 "+a.num(bike.optDouble("odo"))+" km · 실제 계기판과 대조 필요",14,a.muted,false);
    int dueCount=0,upcoming=0;
-   for(JSONObject service:allServices)if(id.equals(service.optString("vehicleId"))){
-    if(Store.due(service,bike,java.time.LocalDate.now().toString()))dueCount++;
+   // An older oil-change record must not create a second overdue warning.
+   // Reuse the same latest-per-type policy as MY GARAGE and its reminders.
+   String localToday=java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).toString();
+   for(JSONObject service:LatestServiceByType.latest(allServices,id).values()){
+    if(Store.due(service,bike,localToday))dueCount++;
     else if(service.optDouble("nextKm",0)>bike.optDouble("odo",0)&&service.optDouble("nextKm",0)-bike.optDouble("odo",0)<=1000)upcoming++;
    }
    a.label(page,"정비 초과/도래 "+dueCount+"건 · 1,000km 이내 예정 "+upcoming+"건",14,dueCount>0?a.accent:a.muted,true);

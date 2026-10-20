@@ -200,12 +200,8 @@ final class GarageHomeUi {
   iv.setImageResource(BikeVisual.superCub(bike.optString("name"))?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);return false;
  }
  List<JSONObject> latestServices(JSONObject b){
-  Map<String,JSONObject> latest=new LinkedHashMap<>();
-  for(JSONObject s:a.items("services"))if(b.optString("id").equals(s.optString("vehicleId"))){
-   String type=s.optString("type");JSONObject previous=latest.get(type);
-   if(previous==null||MaintenanceNoticeOrder.isNewerOrSame(s.optString("date"),previous.optString("date")))latest.put(type,s);
-  }
-  return new ArrayList<>(latest.values());
+  // One consistent policy for home, notifications and the cost dashboard.
+  return new ArrayList<>(LatestServiceByType.latest(a.items("services"),b.optString("id")).values());
  }
  String condition(JSONObject b){
   List<HomeMaintenanceStatus.Schedule> schedules=new ArrayList<>();
