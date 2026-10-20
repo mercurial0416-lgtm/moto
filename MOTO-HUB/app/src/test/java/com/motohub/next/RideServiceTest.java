@@ -11,6 +11,18 @@ public class RideServiceTest {
   RideService s=Robolectric.buildService(RideService.class).create().get();LocationManager lm=s.getSystemService(LocationManager.class);Shadows.shadowOf(lm).setProviderEnabled(LocationManager.GPS_PROVIDER,true);
   s.onStartCommand(new Intent(),0,1);assertTrue(RideService.status,RideService.running);assertFalse(Shadows.shadowOf(lm).getLocationUpdateListeners().isEmpty());
   Location p=new Location("gps");p.setLatitude(37);p.setLongitude(127);p.setAccuracy(5);p.setTime(System.currentTimeMillis());p.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());s.onLocationChanged(p);assertEquals(1,RideService.count);
-  java.io.File f=s.track;assertEquals(1,TrackFile.read(f,(a,b,c,d)->{}));s.onStartCommand(new Intent().setAction(RideService.STOP),0,2);assertFalse(RideService.running);assertTrue(Shadows.shadowOf(lm).getLocationUpdateListeners().isEmpty());s.onLocationChanged(p);assertEquals(1,TrackFile.read(f,(a,b,c,d)->{}));s.onDestroy();
+  java.io.File f=s.track;assertEquals(1,TrackFile.read(f,(a,b,c,d)->{}));
+  s.onStartCommand(new Intent().setAction(RideService.STOP),0,2);
+  // Location listeners must stop immediately, but final .done verification is asynchronous.
+  assertTrue(Shadows.shadowOf(lm).getLocationUpdateListeners().isEmpty());
+  long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(6);
+  while(RideService.running&&System.nanoTime()<deadline){
+   Shadows.shadowOf(Looper.getMainLooper()).idle();
+   Thread.sleep(10);
+  }
+  Shadows.shadowOf(Looper.getMainLooper()).idle();
+  assertFalse("Completed track should finish after background validation",RideService.running);
+  assertTrue("A verified user STOP creates the completion marker",new java.io.File(f.getPath()+".done").isFile());
+  s.onLocationChanged(p);assertEquals(1,TrackFile.read(f,(a,b,c,d)->{}));s.onDestroy();
  }
 }
