@@ -18,7 +18,7 @@ assert 'if(points!=null&&points.length>12)' in back
 assert activity.index('atomic(disk,next.toString(2)') < activity.index('LocalSafetyBackup.checkpoint(this,next)')
 assert 'LocalSafetyBackup.snapshot(this,db);' in activity
 assert 'LocalSafetyBackup.recoveryPoints(a)' in ui
-assert 'LocalSafetyBackup.read(snapshots[i])' in ui
+assert 'LocalSafetyBackup.read(selected)' in ui and 'LOCAL_BACKUP_IO.execute(()->{' in ui, 'restore reads must remain off the main thread'
 assert 'Sharing.start(' not in service
 assert 'prepareForeground(true)' in service
 from version_consistency import version_declaration_ok
