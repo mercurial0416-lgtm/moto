@@ -22,5 +22,10 @@ assert "MAX_AGE_NANOS=15_000_000_000L" in cache and "MAX_ENTRIES=64" in cache
 assert "if(total>MAX_BYTES)" in policy and "requireReadable(file);" in policy
 assert "LocalSafetyBackup.read(selected)" in ui, "Restore still validates chosen snapshot"
 assert "LOCAL_BACKUP_IO.execute(()->{" in ui, "Picker validation stays off UI looper"
-print("PASS UX13 chosen restore read bypasses picker cache and remains bounded")
+ride=Path("app/src/main/java/com/motohub/next/RideUi.java").read_text()
+assert "final List<HistoryEntry> page=new ArrayList<>" in ride
+assert "if(page.size()<historyVisibleLimit)page.add(entry);" in ride
+assert "for(HistoryEntry entry:page){" in ride
+assert "for(HistoryEntry entry:entries)if(RideHistorySearch.matchesIndex(entry.searchKey,terms))count++;" not in ride
+print("PASS UX13 bounded restore, picker cache and one-pass ride-search wiring")
 PY
