@@ -18,7 +18,7 @@ assert 'if(!autoArmed){' in auto and 'stopWith(verified?' in auto, "Stop orphan 
 assert 'if(autoFinishPending){' in disconnect and 'GPS 저장 검증 중' in disconnect, "Disconnect must not close a track while saving"
 assert disconnect.index('if(autoFinishPending){')<disconnect.index('if(running){'), "Check pending close first"
 assert 'if(finishPending){' in auto and auto.index('if(finishPending){')<auto.index('if(!autoArmed){'), "User STOP takes priority"
-assert 'LocalBackupFilePolicy.requireReadable(file);' in backup
+assert 'LocalBackupFilePolicy.readBounded(file)' in backup, 'restore reads must check and limit actual bytes'
 assert backup.count('LocalBackupFilePolicy.safeFolder(folder)')>=3
 assert backup.count('verified(new File(dir,name))')>=2, 'local restore picker must verify full backup schema'
 assert 'destination.exists()||java.nio.file.Files.isSymbolicLink' in backup
