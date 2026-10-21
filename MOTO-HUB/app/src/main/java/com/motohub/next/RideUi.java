@@ -393,7 +393,13 @@ final class RideUi {
   results.removeAllViews();
   int count=0;
   final String[] terms=RideHistorySearch.terms(a.rideHistoryQuery);
-  for(HistoryEntry entry:entries)if(RideHistorySearch.matchesIndex(entry.searchKey,terms))count++;
+  // One pass counts all matches and collects only the visible page. This avoids
+  // scanning the same 10k-record history again every time the user types.
+  final List<HistoryEntry> page=new ArrayList<>(Math.min(entries.size(),Math.min(historyVisibleLimit,100)));
+  for(HistoryEntry entry:entries)if(RideHistorySearch.matchesIndex(entry.searchKey,terms)){
+   count++;
+   if(page.size()<historyVisibleLimit)page.add(entry);
+  }
   String bikeLabel=RideHistoryBikeFilter.ALL.equals(a.rideHistoryBike)?"전체":
    RideHistoryBikeFilter.UNASSIGNED.equals(a.rideHistoryBike)?"미지정":a.bikeName(a.rideHistoryBike);
   summary.setText("검색 "+count+"건 / 전체 "+total+"건 · 바이크 "+bikeLabel+" · "+a.rideHistoryPeriod+(count>historyVisibleLimit?" · 처음 "+historyVisibleLimit+"건 표시":""));
@@ -411,11 +417,8 @@ final class RideUi {
    }
    return;
   }
-  int shown=0;
-  for(HistoryEntry entry:entries){
-   if(!RideHistorySearch.matchesIndex(entry.searchKey,terms))continue;
-   if(shown>=historyVisibleLimit)break;
-   shown++;
+  final int shown=page.size();
+  for(HistoryEntry entry:page){
    File f=entry.file;String date=entry.date,status=entry.status;
    boolean live=RideHistoryFilter.ACTIVE.equals(status);
    boolean interrupted=RideHistoryFilter.INTERRUPTED.equals(status);
