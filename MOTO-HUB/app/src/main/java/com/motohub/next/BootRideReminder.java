@@ -20,6 +20,10 @@ public final class BootRideReminder extends BroadcastReceiver {
   final PendingResult result=goAsync();
   new Thread(()->{
    try {
+    // JobScheduler non-persisted jobs disappear on reboot. Restore daily local
+    // maintenance checks without starting GPS, Bluetooth or group sharing.
+    DailyMaintenanceJob.schedule(context);
+    if(DailyMaintenanceJob.remindersEnabled(context))DailyMaintenanceJob.checkSoon(context);
     if(Build.VERSION.SDK_INT>=33&&context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
     NotificationManager manager=context.getSystemService(NotificationManager.class);
     if(manager==null||!manager.areNotificationsEnabled())return;
