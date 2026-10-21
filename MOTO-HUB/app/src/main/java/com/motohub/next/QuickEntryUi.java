@@ -65,7 +65,7 @@ final class QuickEntryUi {
   a.action(extra,"전체 주유·비용 편집 열기",false,()->a.edit("expenses",null));
   Button toggle=a.button("주행거리·날짜 수정",false,()->extra.setVisibility(extra.getVisibility()==View.GONE?View.VISIBLE:View.GONE));
   body.addView(toggle);body.addView(extra);a.gap(body,12);
-  a.action(body,"주유 저장",true,()->a.attempt(()->{
+  a.action(body,"저장",true,()->a.attempt(()->{
    JSONObject record=QuickRecordDraft.fuel(bike.optString("id"),date.getText().toString().trim(),
     numeric(odo,"계기판",true),numeric(amount,"주유 금액",true),numeric(liters,"주유량",true),full.isChecked());
    Runnable persist=()->a.attempt(()->{
@@ -117,7 +117,7 @@ final class QuickEntryUi {
    ()->advanced.setVisibility(advanced.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
   body.addView(advancedToggle);body.addView(advanced);
   a.gap(body,13);a.label(body,"등록한 거리까지 500km 남거나 예정일까지 30일 남으면 알림을 보냅니다. 제조사 공식 정비주기는 직접 확인해 주세요.",13,a.muted,false);
-  a.action(body,"정비주기 저장",true,()->a.attempt(()->{
+  a.action(body,"저장",true,()->a.attempt(()->{
    int kmInterval=intervals[distanceChoice.getSelectedItemPosition()];
    int monthsInterval=months[dateChoice.getSelectedItemPosition()];
    double odo=numeric(mileage,"현재 계기판",true);
