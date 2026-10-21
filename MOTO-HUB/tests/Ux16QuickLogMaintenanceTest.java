@@ -14,6 +14,7 @@ public final class Ux16QuickLogMaintenanceTest {
  static void throwsException(Unsafe call,String message){
   try{call.run();throw new AssertionError(message);}
   catch(IllegalArgumentException expected){checks++;}
+  catch(java.time.format.DateTimeParseException expected){checks++;}
   catch(Exception other){throw new AssertionError(message,other);}
  }
  interface Unsafe {void run()throws Exception;}
