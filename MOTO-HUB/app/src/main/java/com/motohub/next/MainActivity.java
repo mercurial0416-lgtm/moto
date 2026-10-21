@@ -135,16 +135,16 @@ public class MainActivity extends Activity {
  void saveItem(String key,JSONObject item)throws Exception{JSONObject next=new JSONObject(db.toString());Store.upsert(next,key,item);write(next);}
  GradientDrawable shape(int color,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));if(stroke!=0)d.setStroke(dp(1),stroke);return d;}
  LinearLayout col(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
- TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(null,Typeface.BOLD);t.setIncludeFontPadding(false);return t;}
+ TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setTypeface(bold?MotoDesign.medium():Typeface.create("sans-serif",Typeface.NORMAL));t.setIncludeFontPadding(false);return t;}
  void label(LinearLayout p,String s,int size,int color,boolean bold){TextView t=text(s,size,color,bold);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(t,lp);}
  void gap(LinearLayout p,int n){p.addView(new Space(this),new LinearLayout.LayoutParams(1,dp(n)));}
  void divider(LinearLayout p){View v=new View(this);v.setBackgroundColor(line);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(1));lp.topMargin=dp(12);lp.bottomMargin=dp(12);p.addView(v,lp);}
- Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(15);b.setTypeface(null,Typeface.BOLD);b.setMinHeight(dp(50));b.setMinimumWidth(0);b.setTextColor(primary?(dark?Color.rgb(8,28,33):Color.WHITE):fg);b.setBackground(shape(primary?accent:panel,primary?0:line,14));b.setPadding(dp(14),dp(8),dp(14),dp(8));b.setOnClickListener(v->r.run());return b;}
+ Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(14);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(50));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?(dark?0xFF18191B:Color.WHITE):fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,12);b.setPadding(dp(14),dp(8),dp(14),dp(8));b.setOnClickListener(v->r.run());return b;}
  void action(LinearLayout p,String s,boolean primary,Runnable r){if(p==formBody&&s.equals("저장")&&formFooter!=null)p=formFooter;LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(button(s,primary,r),lp);}
  void pair(LinearLayout p,String a,Runnable ra,String b,Runnable rb){LinearLayout row=new LinearLayout(this);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(0,0,dp(4),dp(8));row.addView(button(a,true,ra),lp);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);rp.setMargins(dp(4),0,0,dp(8));row.addView(button(b,false,rb),rp);p.addView(row);}
- void heading(String t,String sub){gap(content,8);label(content,t,30,fg,true);label(content,sub,14,muted,false);gap(content,16);}
- void section(String s){gap(content,20);label(content,s,19,fg,true);}
- void note(String s){TextView t=text(s,14,muted,false);t.setLineSpacing(dp(3),1f);t.setPadding(dp(16),dp(16),dp(16),dp(16));t.setBackground(shape(panel,0,16));content.addView(t);gap(content,8);}
+ void heading(String t,String sub){gap(content,12);TextView title=text(t,26,fg,true);title.setTypeface(MotoDesign.display());content.addView(title);if(sub!=null&&!sub.isEmpty()){gap(content,6);label(content,sub,13,muted,false);}gap(content,16);}
+ void section(String s){gap(content,23);label(content,s,18,fg,true);}
+ void note(String s){TextView t=text(s,13,muted,false);t.setLineSpacing(dp(3),1f);t.setPadding(dp(15),dp(15),dp(15),dp(15));t.setBackground(shape(panel,0,12));content.addView(t);gap(content,8);}
  void row(String title,String sub,String tail,Runnable r){new HubScreens(this).line(title,sub,tail,r);}
  File garagePhotoFile(String id){
   if(id==null||!id.matches("[a-fA-F0-9-]{1,64}"))return null;
@@ -351,12 +351,11 @@ public class MainActivity extends Activity {
    break;
   }
  }
- void render(){String theme=settings().optString("theme","dark");dark=tab.equals("홈")||theme.equals("dark")||(theme.equals("system")&&(getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);
-  bg=Color.parseColor(dark?"#0C141B":"#FAFBFC");fg=Color.parseColor(dark?"#F1F6F7":"#13212C");muted=Color.parseColor(dark?"#A1B1BE":"#677886");line=Color.parseColor(dark?"#283744":"#E2E9ED");accent=Color.parseColor(dark?"#74E2C5":"#126A5A");panel=Color.parseColor(dark?"#17242E":"#EEF3F5");highlight=Color.parseColor(dark?"#213C3B":"#E4F6F0");
-  if(dark){bg=Color.rgb(9,15,20);fg=Color.rgb(237,243,248);muted=Color.rgb(142,159,174);line=Color.rgb(44,60,71);accent=Color.rgb(255,107,27);panel=Color.rgb(19,29,38);highlight=Color.rgb(49,32,25);}
-  getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+ void render(){String theme=settings().optString("theme","dark");dark=theme.equals("dark")||(theme.equals("system")&&(getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);
+  int[] palette=MotoDesign.colors(dark);bg=palette[0];fg=palette[1];muted=palette[2];line=palette[3];accent=palette[4];panel=palette[5];highlight=palette[6];
+(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
   root=col();root.setBackgroundColor(bg);setContentView(root);root.setOnApplyWindowInsetsListener((v,i)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets x=i.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());v.setPadding(x.left,x.top,x.right,x.bottom);}else v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});root.requestApplyInsets();
-  LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);top.setPadding(dp(20),dp(12),dp(12),dp(8));LinearLayout branding=col();TextView brand=text("MOTO HUB",17,fg,true);brand.setLetterSpacing(.13f);branding.addView(brand);TextView byline=text("RIDE  /  RECORD  /  LOCAL",10,muted,true);byline.setLetterSpacing(.11f);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=dp(5);branding.addView(byline,bp);top.addView(branding,new LinearLayout.LayoutParams(0,-2,1));Button settingsButton=button("설정  ⚙",false,()->navigate("더보기"));settingsButton.setTextSize(13);settingsButton.setMinHeight(dp(42));settingsButton.setBackground(shape(panel,0,12));top.addView(settingsButton);if(tab.equals("홈"))new GarageHomeUi(this).header(top);root.addView(top);
+  MotoDesign.addHeader(this,root);
   if(Sharing.enabled){
    LinearLayout sharingBar=new LinearLayout(this);sharingBar.setGravity(Gravity.CENTER_VERTICAL);sharingBar.setPadding(dp(20),dp(5),dp(20),dp(7));
    TextView live=text("●  내 위치 공유 중",14,accent,true);sharingBar.addView(live,new LinearLayout.LayoutParams(0,-2,1));
@@ -369,13 +368,11 @@ public class MainActivity extends Activity {
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);content=col();content.setPadding(dp(20),dp(10),dp(20),dp(26));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout dock=col();dock.setPadding(dp(20),dp(8),dp(20),0);
   // Home contains contextual quick actions; keep the bottom dock uncluttered.
-  if(tab.equals("매물"))pair(dock,"＋ 매물 저장",()->edit("listings",null),"선택 비교",()->new HubScreens(this).compare());
-  if(tab.equals("차고")&&bike()!=null)pair(dock,"＋ 주유·비용",()->edit("expenses",null),"＋ 정비",()->edit("services",null));
-  if(tab.equals("홈")&&bike()!=null)pair(dock,"＋ 주유",()->edit("expenses",null),"＋ 정비",()->edit("services",null));
+  if(tab.equals("매물"))pair(dock,"매물 추가",()->edit("listings",null),"비교",()->new HubScreens(this).compare());
+  if(tab.equals("차고")&&bike()!=null)pair(dock,"주유 기록",()->edit("expenses",null),"정비 기록",()->edit("services",null));
+  // Home quick actions are inside its content, not repeated above the navigation.
   root.addView(dock);
-  LinearLayout nav=new LinearLayout(this);nav.setBackgroundColor(bg);nav.setPadding(dp(8),dp(7),dp(8),dp(6));View navRule=new View(this);navRule.setBackgroundColor(line);root.addView(navRule,new LinearLayout.LayoutParams(-1,dp(1)));
-  String[] names={"홈","바이크","매물","라이딩","도구"};int index=0;
-  for(String t:tabs){final int icon=new int[]{0,2,1,3,4}[index];boolean active=tab.equals(t);LinearLayout item=col();item.setGravity(Gravity.CENTER);item.setMinimumHeight(dp(60));item.setPadding(dp(2),dp(6),dp(2),dp(6));item.addView(new NavIcon(this,icon,active?accent:muted),new LinearLayout.LayoutParams(dp(24),dp(24)));TextView title=text(names[index++],13,active?accent:muted,active);title.setGravity(Gravity.CENTER);title.setPadding(0,dp(5),0,0);item.addView(title,new LinearLayout.LayoutParams(-1,-2));item.setSelected(active);item.setFocusable(true);item.setClickable(true);item.setContentDescription(t+(active?", 선택됨":""));item.setBackground(shape(active?highlight:bg,0,14));item.setOnClickListener(v->navigate(t));nav.addView(item,new LinearLayout.LayoutParams(0,-2,1));}root.addView(nav);
+  MotoDesign.addNavigation(this,root);
   content.setAlpha(0f);content.animate().alpha(1f).setDuration(120).start();
   if(readOnly)note("저장 오류 · 원본을 보호하고 있습니다");
   // Keep abandoned drafts visible, but give users a deliberate, reversible way to dismiss the reminder.
