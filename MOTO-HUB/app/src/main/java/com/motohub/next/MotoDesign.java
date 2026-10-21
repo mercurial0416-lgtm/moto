@@ -53,9 +53,6 @@ final class MotoDesign {
   LinearLayout header=new LinearLayout(a);
   header.setGravity(Gravity.CENTER_VERTICAL);
   header.setPadding(a.dp(22),a.dp(17),a.dp(20),a.dp(17));
-  View mark=new View(a);mark.setBackground(a.shape(a.accent,0,2));
-  LinearLayout.LayoutParams markParams=new LinearLayout.LayoutParams(a.dp(4),a.dp(36));
-  markParams.rightMargin=a.dp(13);header.addView(mark,markParams);
   LinearLayout caption=a.col();
   TextView brand=a.text("MOTO HUB",11,a.muted,true);
   brand.setLetterSpacing(.10f);caption.addView(brand);
@@ -100,10 +97,8 @@ final class MotoDesign {
    LinearLayout cell=a.col();cell.setGravity(Gravity.CENTER);
    cell.setMinimumHeight(a.dp(61));
    cell.setPadding(a.dp(2),a.dp(5),a.dp(2),a.dp(4));
-   View indicator=new View(a);indicator.setBackground(a.shape(selected?a.accent:a.panel,0,2));
-   cell.addView(indicator,new LinearLayout.LayoutParams(a.dp(17),a.dp(2)));
    LinearLayout.LayoutParams iconParams=new LinearLayout.LayoutParams(a.dp(23),a.dp(23));
-   iconParams.topMargin=a.dp(7);
+   iconParams.topMargin=a.dp(5);
    cell.addView(new NavIcon(a,icons[i],selected?a.accent:a.muted),iconParams);
    TextView name=a.text(labels[i],11,selected?a.fg:a.muted,selected);
    name.setGravity(Gravity.CENTER);
@@ -111,6 +106,7 @@ final class MotoDesign {
    lp.topMargin=a.dp(5);cell.addView(name,lp);
    cell.setContentDescription(labels[i]+(selected?", 선택됨":""));
    cell.setClickable(true);cell.setFocusable(true);cell.setSelected(selected);
+   ripple(a,cell,a.panel,0,10);
    cell.setOnClickListener(v->a.navigate(destination));
    bar.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
   }
