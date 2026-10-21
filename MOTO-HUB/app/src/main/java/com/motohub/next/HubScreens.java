@@ -57,7 +57,7 @@ final class HubScreens {
   return result;
  }
  void records(){
-  title("정비와 주유","주유, 정비와 지출을 한곳에서 기록합니다.");
+  a.gap(a.content,4);a.label(a.content,"주유·정비 내역을 한곳에서 관리하세요.",12,a.muted,false);
   if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}
   bikePicker();
   LinearLayout actions=a.col();actions.setPadding(a.dp(14),a.dp(15),a.dp(14),a.dp(8));actions.setBackground(a.shape(a.panel,0,18));
@@ -119,7 +119,7 @@ final class HubScreens {
     record.put("soldDate",sold?"":a.today());a.write(next);a.close();a.render();
    })).show());a.action(p,"대표 바이크로 설정",false,()->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("primary",b.getString("id"));a.write(next);a.selected="";a.getSharedPreferences("garage_ui",0).edit().remove("selected_bike").apply();a.close();a.render();}));a.action(p,"다른 바이크 추가",false,()->a.edit("vehicles",null));a.divider(p);a.action(p,"바이크와 관련 기록 삭제",false,()->{a.close();a.remove("vehicles",b);});a.show();}
  void listings(){
-  title("관심 매물","매물을 저장하고 조건별로 비교하세요.");
+  a.gap(a.content,4);a.label(a.content,"저장한 매물을 검색하고 비교하세요.",12,a.muted,false);
   EditText search=new EditText(a);search.setSingleLine();search.setTextSize(16);search.setTextColor(a.fg);search.setHintTextColor(a.muted);search.setHint("모델명으로 빠르게 찾기");search.setText(a.query);search.setContentDescription("저장한 매물 검색");search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
   search.setPadding(a.dp(16),a.dp(12),a.dp(16),a.dp(12));search.setBackground(a.shape(a.panel,0,14));a.content.addView(search,new LinearLayout.LayoutParams(-1,a.dp(53)));
   a.gap(a.content,13);tabs(new String[]{"전체","확인필요","판매중","예약중","판매완료"},a.filter,v->{a.filter=v;a.listingPageOffset=0;a.render();});
