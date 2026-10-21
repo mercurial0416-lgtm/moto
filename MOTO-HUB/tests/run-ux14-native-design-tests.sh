@@ -26,7 +26,7 @@ assert 'void quickActions(){' in home and 'new MotoQuickIcon(a,i,soft)' in home
 assert '"⛽","⚒","▤","▣"' not in home, 'no emoji shortcut placeholders'
 assert 'void stats(JSONObject b)' in home and 'String[] names={"총 주행거리","다음 정비"};' in home
 assert 'void line(LinearLayout target' in lists and 'MotoDesign.ripple(a,block,a.bg,0,8)' in lists
-assert 'a.pair(actions,"주유 등록"' in lists and '🔧 정비' not in lists
+assert 'a.pair(actions,"간편 주유"' in lists and 'QuickEntryUi(a).maintenance()' in lists and '🔧 정비' not in lists
 assert '"라이딩 시작하기"' in ride and 'title.setTypeface(MotoDesign.display())' in ride
 assert 'finishRide.setEnabled(!saving)' in ride and 'RideService.saving()' in ride
 assert 'Sharing.start(' not in ride and 'Sharing.start(' not in home
