@@ -39,3 +39,13 @@ jobs:
       - name: Verify no APK outputs were created
         run: |
           test ! -d MOTO-HUB/app/build/outputs/apk || { echo 'Unexpected APK output!'; exit 1; }
+      - name: Share Robolectric visual previews
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-ux14-native-preview-${{ github.sha }}
+          path: |
+            MOTO-HUB/evidence/native-previews/*.png
+            MOTO-HUB/app/evidence/native-previews/*.png
+          if-no-files-found: ignore
+          retention-days: 14
