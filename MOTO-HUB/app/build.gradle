@@ -29,6 +29,11 @@ android {
    }
  }
  buildTypes {
+   // UX15 side-by-side preview: separate package and app data; never replaces 517.
+   debug {
+     applicationIdSuffix ".ux15preview"
+     versionNameSuffix "-preview"
+   }
    release {
      minifyEnabled false
      if (signingFields.every { it != null && !it.isEmpty() }) signingConfig signingConfigs.motoRelease
