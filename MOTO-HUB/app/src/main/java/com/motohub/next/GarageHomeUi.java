@@ -17,21 +17,11 @@ import java.util.*;
 /** Alpha6-H: MY GARAGE visual home. All numbers are read from local records, never demo values. */
 final class GarageHomeUi {
  final MainActivity a;
- final int orange=Color.rgb(255,107,27),light=Color.rgb(237,243,248),soft=Color.rgb(142,159,174);
- final int surface=Color.rgb(19,29,38),card=Color.rgb(23,34,44),stroke=Color.rgb(44,60,71);
- GarageHomeUi(MainActivity a){this.a=a;}
-
- void header(LinearLayout container){
-  container.removeAllViews();container.setPadding(a.dp(20),a.dp(14),a.dp(20),a.dp(7));container.setGravity(Gravity.CENTER_VERTICAL);
-  LinearLayout heading=a.col();TextView brand=a.text("MOTO HUB",13,orange,true);brand.setLetterSpacing(.13f);heading.addView(brand);
-  TextView name=a.text("MY GARAGE",29,light,true);name.setLetterSpacing(.035f);LinearLayout.LayoutParams nl=new LinearLayout.LayoutParams(-1,-2);nl.topMargin=a.dp(2);heading.addView(name,nl);
-  TextView sub=a.text("RIDE  ·  RECORD  ·  CONNECT",10,soft,true);sub.setLetterSpacing(.10f);LinearLayout.LayoutParams sl=new LinearLayout.LayoutParams(-1,-2);sl.topMargin=a.dp(5);heading.addView(sub,sl);
-  container.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
-  TextView notifications=headerIcon("🔔","정비 알림 확인",this::showNotices);
-  LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(a.dp(41),a.dp(43));cp.rightMargin=a.dp(9);container.addView(notifications,cp);
-  container.addView(headerIcon("⚙","설정 열기",()->a.navigate("더보기")),new LinearLayout.LayoutParams(a.dp(42),a.dp(43)));
+ final int orange,light,soft,surface,card,stroke;
+ GarageHomeUi(MainActivity a){this.a=a;
+  orange=a.accent;light=a.fg;soft=a.muted;surface=a.panel;card=a.panel;stroke=a.line;
  }
- TextView headerIcon(String symbol,String description,Runnable click){TextView v=a.text(symbol,23,light,true);v.setGravity(Gravity.CENTER);v.setBackground(a.shape(surface,stroke,13));v.setContentDescription(description);v.setClickable(true);v.setFocusable(true);v.setOnClickListener(w->click.run());return v;}
+
  void showNotices(){JSONObject b=a.bike();if(b==null){a.toast("바이크를 먼저 등록해 주세요.");return;}
   List<MaintenanceNoticeOrder.Notice> history=new ArrayList<>();
   for(JSONObject s:latestServices(b))history.add(new MaintenanceNoticeOrder.Notice(
@@ -64,13 +54,13 @@ final class GarageHomeUi {
   addHero(b);stats(b);a.gap(a.content,12);
   String condition=condition(b);
   if("점검 필요".equals(condition)||"곧 점검".equals(condition)){
-   TextView alert=a.text("⚠  "+condition+" · 눌러서 정비 일정 확인",14,0xFFFFD58A,true);
-   alert.setPadding(a.dp(15),a.dp(14),a.dp(15),a.dp(14));alert.setBackground(a.shape(0xFF503E20,0,13));
+   TextView alert=a.text(condition+" · 정비 일정 확인",13,a.fg,true);
+   alert.setPadding(a.dp(15),a.dp(14),a.dp(15),a.dp(14));alert.setBackground(a.shape(a.highlight,a.line,12));
    alert.setClickable(true);alert.setFocusable(true);alert.setContentDescription(condition+" 정비 알림 열기");
    alert.setOnClickListener(v->showNotices());a.content.addView(alert);a.gap(a.content,10);
   }
-  if(RideService.autoArmed&&!RideService.running){TextView arm=a.text("● OBD2 자동 라이딩 대기 · 출발하면 GPS 기록",13,orange,true);arm.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));arm.setBackground(a.shape(surface,stroke,13));a.content.addView(arm);a.gap(a.content,10);}
-  if(RideService.running){TextView live=a.text("● GPS 기록 중 · "+RideService.status,13,orange,true);live.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));live.setBackground(a.shape(surface,stroke,13));a.content.addView(live);a.gap(a.content,10);}
+  if(RideService.autoArmed&&!RideService.running){TextView arm=a.text("OBD2 자동 감지 대기 · 출발하면 기록 시작",13,orange,true);arm.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));arm.setBackground(a.shape(surface,stroke,13));a.content.addView(arm);a.gap(a.content,10);}
+  if(RideService.running){TextView live=a.text("GPS 기록 중 · "+RideService.status,13,orange,true);live.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));live.setBackground(a.shape(surface,stroke,13));a.content.addView(live);a.gap(a.content,10);}
   rideAction();a.gap(a.content,10);interruptedRideShortcut();a.gap(a.content,14);quickActions();a.gap(a.content,20);insights(b);a.gap(a.content,20);
   listings();a.gap(a.content,16);friends();a.gap(a.content,18);recent(b);
  }
@@ -90,10 +80,10 @@ final class GarageHomeUi {
  }
  void emptyGarage(){
   LinearLayout blank=a.col();blank.setGravity(Gravity.CENTER);blank.setPadding(a.dp(24),a.dp(45),a.dp(24),a.dp(44));blank.setBackground(a.shape(surface,stroke,20));
-  TextView intro=a.text("MY FIRST BIKE",12,orange,true);intro.setLetterSpacing(.16f);blank.addView(intro);
-  TextView big=a.text("첫 바이크를 등록해 봐",24,light,true);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=a.dp(15);big.setGravity(Gravity.CENTER);blank.addView(big,bp);
+  TextView intro=a.text("GARAGE",12,orange,true);intro.setLetterSpacing(.16f);blank.addView(intro);
+  TextView big=a.text("첫 바이크 등록",24,light,true);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=a.dp(15);big.setGravity(Gravity.CENTER);blank.addView(big,bp);
   TextView hint=a.text("등록하면 이곳에 내 바이크 사진과 주행거리, 정비 상태가 자동으로 표시돼.",14,soft,false);hint.setGravity(Gravity.CENTER);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=a.dp(12);blank.addView(hint,hp);
-  Button add=a.button("＋ 내 바이크 등록하기",true,()->a.edit("vehicles",null));add.setTextColor(Color.WHITE);add.setBackground(a.shape(orange,0,15));LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,a.dp(54));ap.topMargin=a.dp(24);blank.addView(add,ap);a.content.addView(blank);
+  Button add=a.button("바이크 등록",true,()->a.edit("vehicles",null));add.setTextColor(a.dark?0xFF18191B:Color.WHITE);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,a.dp(54));ap.topMargin=a.dp(24);blank.addView(add,ap);a.content.addView(blank);
  }
 
  void addHero(JSONObject bike){
@@ -106,7 +96,7 @@ final class GarageHomeUi {
    new int[]{0x00000000,0x15060B0F,0xC9081016}));imageArea.addView(shade,new FrameLayout.LayoutParams(-1,-1));
   int bikeCount=a.items("vehicles").size();
   boolean canSwitch=HomeBikeSwitch.visible(bikeCount);
-  TextView tag=a.text(HomeBikeSwitch.label(bikeCount),11,Color.WHITE,true);tag.setGravity(Gravity.CENTER);tag.setLetterSpacing(.07f);tag.setPadding(a.dp(12),a.dp(7),a.dp(12),a.dp(7));tag.setBackground(a.shape(orange,0,9));FrameLayout.LayoutParams tp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.START);tp.setMargins(a.dp(15),a.dp(15),0,0);imageArea.addView(tag,tp);
+  TextView tag=a.text(HomeBikeSwitch.label(bikeCount),11,Color.WHITE,true);tag.setGravity(Gravity.CENTER);tag.setLetterSpacing(.07f);tag.setPadding(a.dp(12),a.dp(7),a.dp(12),a.dp(7));tag.setBackground(a.shape(0xB91A1D21,0,7));FrameLayout.LayoutParams tp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.START);tp.setMargins(a.dp(15),a.dp(15),0,0);imageArea.addView(tag,tp);
   if(canSwitch){
    tag.setContentDescription("다른 바이크로 전환");tag.setClickable(true);tag.setFocusable(true);tag.setOnClickListener(v->new HubScreens(a).chooseBike());
    for(int direction:new int[]{-1,1}){
@@ -118,7 +108,7 @@ final class GarageHomeUi {
     ap.leftMargin=a.dp(5);ap.rightMargin=a.dp(5);imageArea.addView(arrow,ap);
    }
   }
-  TextView photo=a.text("▧  사진 변경",12,light,true);photo.setGravity(Gravity.CENTER);photo.setPadding(a.dp(10),a.dp(8),a.dp(10),a.dp(8));photo.setBackground(a.shape(0xB9121A20,0,9));photo.setContentDescription("내 바이크 사진 선택");FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT);pp.setMargins(0,a.dp(15),a.dp(15),0);imageArea.addView(photo,pp);photo.setClickable(true);photo.setFocusable(true);photo.setOnClickListener(v->changeHeroPhoto(bike,own));
+  TextView photo=a.text("사진 변경",12,Color.WHITE,true);photo.setGravity(Gravity.CENTER);photo.setPadding(a.dp(10),a.dp(8),a.dp(10),a.dp(8));photo.setBackground(a.shape(0xB9121A20,0,9));photo.setContentDescription("내 바이크 사진 선택");FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT);pp.setMargins(0,a.dp(15),a.dp(15),0);imageArea.addView(photo,pp);photo.setClickable(true);photo.setFocusable(true);photo.setOnClickListener(v->changeHeroPhoto(bike,own));
   TextView example=a.text(BikeVisual.caption(bike.optString("name"),own),10,0xFFD0DCE3,false);FrameLayout.LayoutParams ep=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.RIGHT);ep.setMargins(0,0,a.dp(15),a.dp(9));imageArea.addView(example,ep);
   if(!own){
    JSONObject known=MotorcycleCatalog.search(a,bike.optString("name"));
@@ -150,7 +140,7 @@ final class GarageHomeUi {
   box.addView(imageArea);
   LinearLayout meta=new LinearLayout(a);meta.setPadding(a.dp(17),a.dp(15),a.dp(14),a.dp(17));meta.setGravity(Gravity.CENTER_VERTICAL);
   LinearLayout info=a.col();TextView name=a.text(bike.optString("name"),24,light,true);name.setMaxLines(2);info.addView(name);
-  TextView sub=a.text((bike.optInt("year")>0?bike.optInt("year")+" · ":"")+(condition(bike).equals("점검 필요")?"MY BIKE · MAINTENANCE DUE":condition(bike).equals("곧 점검")?"MY BIKE · SERVICE SOON":condition(bike).equals("정비 일정 없음")?"MY BIKE · SET MAINTENANCE":"MY BIKE · READY TO RIDE"),12,soft,true);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(6);info.addView(sub,sp);meta.addView(info,new LinearLayout.LayoutParams(0,-2,1));
+  TextView sub=a.text((bike.optInt("year")>0?bike.optInt("year")+"년식 · ":"")+"내 바이크 · "+condition(bike),12,soft,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(6);info.addView(sub,sp);meta.addView(info,new LinearLayout.LayoutParams(0,-2,1));
   if(GarageBikeStatus.sold(bike.optString("soldDate"))){
    TextView archived=a.text("판매 완료 · 기록 보관 중",13,0xFFFFD58A,true);archived.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));archived.setBackground(a.shape(0xFF503E20,0,10));box.addView(archived);
   }
@@ -225,44 +215,62 @@ final class GarageHomeUi {
   }
  }catch(Exception ignored){}return count;
  }
- void stats(JSONObject b){LinearLayout row=new LinearLayout(a);row.setPadding(0,a.dp(10),0,0);
-  String[] values={a.num(b.optDouble("odo"))+" km",nextService(b),monthRides()+" 회"};String[] names={"누적 주행거리","다음 정비까지","이번 달 기기 기록"};String[] symbols={"◈","⚒","▥"};
+ void stats(JSONObject b){
+  String[] values={a.num(b.optDouble("odo"))+" km",nextService(b),monthRides()+"회"};
+  String[] names={"총 주행거리","다음 정비","이번 달 라이딩"};
+  LinearLayout panel=a.col();
+  panel.setPadding(a.dp(16),a.dp(17),a.dp(16),a.dp(17));
+  panel.setBackground(a.shape(surface,stroke,13));
+  LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
   for(int i=0;i<3;i++){
-   final int n=i;LinearLayout card=a.col();card.setGravity(Gravity.CENTER);card.setPadding(a.dp(5),a.dp(13),a.dp(5),a.dp(13));card.setBackground(a.shape(surface,stroke,15));
-   TextView icon=a.text(symbols[i],20,orange,true);icon.setGravity(Gravity.CENTER);card.addView(icon);
-   TextView number=a.text(values[i],i==1&&values[i].length()>8?15:18,light,true);number.setGravity(Gravity.CENTER);number.setMaxLines(1);number.setAutoSizeTextTypeUniformWithConfiguration(12,18,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams vl=new LinearLayout.LayoutParams(-1,a.dp(28));vl.topMargin=a.dp(7);card.addView(number,vl);
-   TextView label=a.text(names[i],11,soft,false);label.setGravity(Gravity.CENTER);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=a.dp(5);card.addView(label,lp);
-   if(n==1){card.setContentDescription("다음 정비까지 "+values[i]+". 정비 기록으로 이동");card.setOnClickListener(v->a.navigate("차고"));card.setClickable(true);}
-   LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)rp.leftMargin=a.dp(8);row.addView(card,rp);
+   final int n=i;
+   LinearLayout item=a.col();
+   TextView label=a.text(names[i],11,soft,false);
+   item.addView(label);
+   TextView number=a.text(values[i],17,light,true);
+   number.setMaxLines(1);
+   number.setAutoSizeTextTypeUniformWithConfiguration(12,17,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+   LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,a.dp(27));
+   np.topMargin=a.dp(8);item.addView(number,np);
+   if(n==1){item.setContentDescription("다음 정비 "+values[i]+" · 정비 기록 보기");item.setClickable(true);item.setFocusable(true);item.setOnClickListener(v->a.navigate("차고"));}
+   LinearLayout.LayoutParams cell=new LinearLayout.LayoutParams(0,-2,1);row.addView(item,cell);
+   if(i<2){View rule=new View(a);rule.setBackgroundColor(stroke);
+    LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(a.dp(1),a.dp(39));rp.leftMargin=a.dp(10);rp.rightMargin=a.dp(12);row.addView(rule,rp);}
   }
-  a.content.addView(row);
+  panel.addView(row);a.content.addView(panel);
  }
- void rideAction(){Button btn=a.button(RideService.autoArmed?"■  자동 감지 중지":RideService.running?"■  라이딩 종료":"➤  라이딩 시작  ›",true,()->{
+ void rideAction(){Button btn=a.button(RideService.autoArmed?"자동 감지 관리":RideService.running?"라이딩 종료":"라이딩 시작",true,()->{
   if(RideService.autoArmed){a.navigate("라이딩");a.toast("자동 감지는 라이딩 탭에서 중지할 수 있어요.");}
   else if(RideService.running){new AlertDialog.Builder(a).setTitle("주행 기록을 종료할까요?").setMessage("기록을 종료하면 현재 GPS 위치 수집을 중단합니다.").setNegativeButton("취소",null).setPositiveButton("종료",(d,w)->{a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));a.toast("정상 종료를 요청했어요.");a.root.postDelayed(()->{if(!a.isFinishing())a.render();},750);}).show();}
   else {a.navigate("라이딩");new RideUi(a).requestStart();}
- });btn.setTextColor(Color.WHITE);btn.setTextSize(19);btn.setMinHeight(a.dp(62));btn.setBackground(a.shape(RideService.running?Color.rgb(218,58,51):orange,0,16));a.content.addView(btn,new LinearLayout.LayoutParams(-1,a.dp(62)));}
+ });btn.setTextColor(RideService.running?Color.WHITE:(a.dark?0xFF18191B:Color.WHITE));btn.setTextSize(17);btn.setMinHeight(a.dp(56));btn.setBackground(a.shape(RideService.running?0xFFC34A43:orange,0,12));a.content.addView(btn,new LinearLayout.LayoutParams(-1,a.dp(56)));}
  void quickActions(){
-  String[] icons={"⛽","⚒","▤","▣"};
-  String[] labels={"주유 기록","정비 기록","라이딩 · GPX","내 차고"};
-  String[] details={"탭해서 바로 입력","탭해서 바로 입력","경로 보기 · 가져오기","바이크 관리"};
-  Runnable[] clicks={()->a.edit("expenses",null),()->a.edit("services",null),()->a.navigate("라이딩"),()->new HubScreens(a).manageBike()};
-  for(int rowIndex=0;rowIndex<2;rowIndex++){
-   LinearLayout row=new LinearLayout(a);
-   for(int colIndex=0;colIndex<2;colIndex++){
-    int i=rowIndex*2+colIndex;
-    LinearLayout tile=a.col();tile.setGravity(Gravity.CENTER);tile.setPadding(a.dp(8),a.dp(14),a.dp(8),a.dp(12));tile.setMinimumHeight(a.dp(92));tile.setBackground(a.shape(surface,stroke,15));
-    TextView ico=a.text(icons[i],22,orange,true);ico.setGravity(Gravity.CENTER);tile.addView(ico);
-    TextView name=a.text(labels[i],15,light,true);name.setGravity(Gravity.CENTER);LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.topMargin=a.dp(7);tile.addView(name,np);
-    TextView small=a.text(details[i],11,soft,false);small.setGravity(Gravity.CENTER);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(4);tile.addView(small,dp);
-    Runnable click=clicks[i];tile.setClickable(true);tile.setFocusable(true);tile.setContentDescription(labels[i]+" 바로가기");tile.setMinimumWidth(a.dp(120));
-    android.util.TypedValue ripple=new android.util.TypedValue();
-    if(a.getTheme().resolveAttribute(android.R.attr.selectableItemBackground,ripple,true))tile.setForeground(a.getDrawable(ripple.resourceId));
-    tile.setOnClickListener(v->click.run());
-    LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);if(colIndex>0)rp.leftMargin=a.dp(9);row.addView(tile,rp);
-   }
-   LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1,-2);if(rowIndex>0)rowParams.topMargin=a.dp(9);a.content.addView(row,rowParams);
+  sectionTitle("빠른 실행",null,null);
+  String[] labels={"주유 등록","정비 기록","주행 기록","바이크 관리"};
+  String[] details={"주유 금액과 주행거리","정비 내역과 점검 주기","GPS 기록과 GPX","바이크 정보 변경"};
+  Runnable[] clicks={()->a.edit("expenses",null),()->a.edit("services",null),
+   ()->a.navigate("라이딩"),()->new HubScreens(a).manageBike()};
+  LinearLayout panel=a.col();panel.setBackground(a.shape(surface,stroke,13));
+  for(int i=0;i<labels.length;i++){
+   final Runnable action=clicks[i];
+   LinearLayout row=new LinearLayout(a);row.setPadding(a.dp(16),a.dp(13),a.dp(15),a.dp(13));
+   row.setGravity(Gravity.CENTER_VERTICAL);row.setMinimumHeight(a.dp(69));
+   TextView index=a.text(String.format(Locale.ROOT,"%02d",i+1),12,orange,true);
+   index.setLetterSpacing(.08f);
+   LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(a.dp(37),-2);row.addView(index,ip);
+   LinearLayout text=a.col();text.addView(a.text(labels[i],15,light,true));
+   TextView description=a.text(details[i],12,soft,false);
+   LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(5);text.addView(description,dp);
+   row.addView(text,new LinearLayout.LayoutParams(0,-2,1));
+   TextView chevron=a.text("›",23,soft,false);row.addView(chevron);
+   row.setClickable(true);row.setFocusable(true);
+   row.setContentDescription(labels[i]+" 열기");
+   row.setOnClickListener(v->action.run());panel.addView(row);
+   if(i<labels.length-1){View line=new View(a);line.setBackgroundColor(stroke);
+    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,a.dp(1));
+    lp.leftMargin=a.dp(53);panel.addView(line,lp);}
   }
+  a.content.addView(panel);
  }
  void sectionTitle(String title,String action,Runnable click){LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
   TextView t=a.text(title,17,light,true);row.addView(t,new LinearLayout.LayoutParams(0,-2,1));if(action!=null){TextView more=a.text(action,12,soft,true);more.setPadding(a.dp(8),a.dp(9),a.dp(3),a.dp(9));more.setOnClickListener(v->click.run());row.addView(more);}a.content.addView(row);a.gap(a.content,10);
