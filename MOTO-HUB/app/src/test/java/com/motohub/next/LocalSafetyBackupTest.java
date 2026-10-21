@@ -46,7 +46,7 @@ public class LocalSafetyBackupTest {
    assertArrayEquals("Do not replace pre-edit daily snapshot",before,Files.readAllBytes(todays.toPath()));
    assertEquals(1,LocalSafetyBackup.available(context).length);
    File bad=new File(dailyDir,"motohub-2024-09-20.json");
-   Files.writeString(bad.toPath(),"{\"vehicles\":{\"bad\":1}}",StandardCharsets.UTF_8);
+   Files.write(bad.toPath(),"{\"vehicles\":{\"bad\":1}}".getBytes(StandardCharsets.UTF_8));
    assertEquals("Corrupted dated backup not offered for restore",1,LocalSafetyBackup.available(context).length);
    LocalSafetyBackup.checkpoint(context,valid);
    assertEquals(2,LocalSafetyBackup.recoveryPoints(context).length);
