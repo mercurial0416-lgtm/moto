@@ -8,9 +8,13 @@ import java.nio.charset.StandardCharsets;
 /** Local safety snapshots. Never sent to a server. */
 final class LocalSafetyBackup {
  private LocalSafetyBackup(){}
+ /** A filename and size alone cannot prove a usable restore point. */
+ static boolean verified(File file){
+  try{read(file);return true;}catch(Exception ignored){return false;}
+ }
  static File[] available(Context context){
   File folder=new File(context.getFilesDir(),"local-safety-backup");
-  File[] files=LocalBackupFilePolicy.safeFolder(folder)?folder.listFiles((dir,name)->name.matches("motohub-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.json") && LocalBackupFilePolicy.readable(new File(dir,name))):null;
+  File[] files=LocalBackupFilePolicy.safeFolder(folder)?folder.listFiles((dir,name)->name.matches("motohub-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.json") && verified(new File(dir,name))):null;
   if(files==null)return new File[0];
   java.util.Arrays.sort(files,(a,b)->b.getName().compareTo(a.getName()));
   return files;
@@ -20,7 +24,7 @@ final class LocalSafetyBackup {
  static File[] recoveryPoints(Context context){
   java.util.ArrayList<File> result=new java.util.ArrayList<>(java.util.Arrays.asList(available(context)));
   File folder=new File(new File(context.getFilesDir(),"local-safety-backup"),"updates");
-  File[] updates=LocalBackupFilePolicy.safeFolder(folder)?folder.listFiles((dir,name)->name.matches("motohub-[0-9]{13}-[a-f0-9]{8}\\.json") && LocalBackupFilePolicy.readable(new File(dir,name))):null;
+  File[] updates=LocalBackupFilePolicy.safeFolder(folder)?folder.listFiles((dir,name)->name.matches("motohub-[0-9]{13}-[a-f0-9]{8}\\.json") && verified(new File(dir,name))):null;
   if(updates!=null)java.util.Collections.addAll(result,updates);
   result.sort((a,b)->{int date=Long.compare(b.lastModified(),a.lastModified());return date!=0?date:b.getName().compareTo(a.getName());});
   return result.toArray(new File[0]);
@@ -40,7 +44,7 @@ final class LocalSafetyBackup {
    atomic=new AtomicFile(file);out=atomic.startWrite();out.write(bytes);atomic.finishWrite(out);out=null;
    read(file);
    if(!java.util.Arrays.equals(bytes,java.nio.file.Files.readAllBytes(file.toPath())))throw new java.io.IOException("검증되지 않은 복원 지점");
-   File[] points=LocalBackupFilePolicy.eligible(folder,"motohub-[0-9]{13}-[a-f0-9]{8}\\.json");
+   File[] points=LocalBackupFilePolicy.eligible(folder,"motohub-[0-9]{13}-[a-f0-9]{8}\\.json",LocalSafetyBackup::verified);
    if(points!=null&&points.length>12){
     java.util.Arrays.sort(points,(a,b)->{int date=Long.compare(a.lastModified(),b.lastModified());return date!=0?date:a.getName().compareTo(b.getName());});
     for(int i=0;i<points.length-12;i++)points[i].delete();
@@ -65,7 +69,7 @@ final class LocalSafetyBackup {
    // Do not overwrite the only pre-edit snapshot of the day.
    // Daily snapshots are immutable; the latest state remains in the primary database.
    if(destination.exists()||java.nio.file.Files.isSymbolicLink(destination.toPath()))return;
-   new JSONObject(new String(bytes,StandardCharsets.UTF_8));
+   Store.parse(new String(bytes,StandardCharsets.UTF_8));
    AtomicFile atomic=new AtomicFile(destination);FileOutputStream out=null;
    boolean written=false;
    try{
@@ -79,7 +83,7 @@ final class LocalSafetyBackup {
     destination.delete();
     return;
    }
-   File[] snapshots=LocalBackupFilePolicy.eligible(folder,"motohub-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.json");
+   File[] snapshots=LocalBackupFilePolicy.eligible(folder,"motohub-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.json",LocalSafetyBackup::verified);
    if(snapshots!=null&&snapshots.length>7){
     java.util.Arrays.sort(snapshots,(a,b)->a.getName().compareTo(b.getName()));
     for(int i=0;i<snapshots.length-7;i++)snapshots[i].delete();
