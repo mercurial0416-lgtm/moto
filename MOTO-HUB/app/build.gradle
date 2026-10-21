@@ -29,6 +29,11 @@ android {
    }
  }
  buildTypes {
+   // Side-by-side UX16 preview; never replaces fixed-signed v517 or UX15 preview.
+   debug {
+     applicationIdSuffix ".ux16preview"
+     versionNameSuffix "-preview"
+   }
    release {
      minifyEnabled false
      if (signingFields.every { it != null && !it.isEmpty() }) signingConfig signingConfigs.motoRelease
