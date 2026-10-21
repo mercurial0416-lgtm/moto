@@ -47,7 +47,7 @@ final class LocalSafetyBackup {
    file=new File(folder,"motohub-"+System.currentTimeMillis()+"-"+suffix+".json");
    atomic=new AtomicFile(file);out=atomic.startWrite();out.write(bytes);atomic.finishWrite(out);out=null;
    read(file);
-   if(!java.util.Arrays.equals(bytes,java.nio.file.Files.readAllBytes(file.toPath())))throw new java.io.IOException("검증되지 않은 복원 지점");
+   if(!java.util.Arrays.equals(bytes,LocalBackupFilePolicy.readBounded(file)))throw new java.io.IOException("검증되지 않은 복원 지점");
    LocalBackupValidationCache.invalidate(file);
    File[] points=LocalBackupFilePolicy.eligible(folder,"motohub-[0-9]{13}-[a-f0-9]{8}\\.json",LocalSafetyBackup::verified);
    if(points!=null&&points.length>12){
@@ -57,8 +57,7 @@ final class LocalSafetyBackup {
   }catch(Exception e){if(out!=null&&atomic!=null)atomic.failWrite(out);if(file!=null){LocalBackupValidationCache.invalidate(file);file.delete();}}
  }
  static JSONObject read(File file)throws Exception{
-  LocalBackupFilePolicy.requireReadable(file);
-  byte[] bytes=java.nio.file.Files.readAllBytes(file.toPath());
+  byte[] bytes=LocalBackupFilePolicy.readBounded(file);
   return Store.parse(new String(bytes,StandardCharsets.UTF_8));
  }
  static void snapshot(Context context,JSONObject data){
@@ -81,7 +80,7 @@ final class LocalSafetyBackup {
     out=atomic.startWrite();out.write(bytes);atomic.finishWrite(out);out=null;
     // Verify the persisted snapshot before rotating older recovery points.
     read(destination); // Validate the backup through the normal parser.
-    written=java.util.Arrays.equals(bytes,java.nio.file.Files.readAllBytes(destination.toPath()));
+    written=java.util.Arrays.equals(bytes,LocalBackupFilePolicy.readBounded(destination));
     LocalBackupValidationCache.invalidate(destination);
    }catch(Exception e){if(out!=null)atomic.failWrite(out);}
    if(!written){
