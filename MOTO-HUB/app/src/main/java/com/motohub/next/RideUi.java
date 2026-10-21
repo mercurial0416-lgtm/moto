@@ -39,10 +39,10 @@ final class RideUi {
  final MainActivity a;RideUi(MainActivity a){this.a=a;}
  void render(){
   final boolean saving=RideService.saving();
-  LinearLayout hero=a.col();hero.setPadding(a.dp(18),a.dp(18),a.dp(18),a.dp(18));hero.setBackground(a.shape(a.panel,a.line,19));
-  TextView eyebrow=a.text(saving?"●  GPS 저장 검증 중":RideService.running?"●  GPS 기록 중":RideService.autoArmed?"●  OBD2 자동 출발 대기":"●  라이딩 준비 완료",13,RideService.running?0xff48d99a:a.accent,true);hero.addView(eyebrow);
-  TextView title=a.text(saving?"SAVING RIDE":RideService.running?RideService.count+"개 좌표 저장":RideService.autoArmed?"AUTO RIDE ARMED":"READY TO RIDE",25,a.fg,true);LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
-  TextView sub=a.text(saving?"마지막 좌표까지 기기에 저장하고 검증 중이에요. 앱을 종료하지 마세요.":RideService.running?"화면을 꺼도 기기에 GPS 경로를 기록해요":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"출발 버튼 한 번으로 기록을 시작해요",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
+  LinearLayout hero=a.col();hero.setPadding(a.dp(18),a.dp(20),a.dp(18),a.dp(18));hero.setBackground(a.shape(a.panel,a.line,13));
+  TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?0xff48d99a:a.accent,true);hero.addView(eyebrow);
+  TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?RideService.count+"개 위치 기록":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",24,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
+  TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?"화면을 꺼도 기기에 GPS 경로를 기록해요":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
   RideReadiness.State readiness=readiness();
   if(!RideService.running){
    if(readiness!=RideReadiness.State.READY){
@@ -84,7 +84,7 @@ final class RideUi {
    }};hero.post(refresh);
   }
 
-  Button start=a.button(RideService.autoArmed?"■  OBD2 자동 감지 종료":RideService.running?"■  라이딩 종료":"➤  GPS 라이딩 시작",true,()->{
+  Button start=a.button(RideService.autoArmed?"자동 감지 종료":RideService.running?"라이딩 종료":"GPS 기록 시작",true,()->{
    if(RideService.autoArmed){new AlertDialog.Builder(a).setTitle("OBD2 자동 기록을 종료할까요?").setMessage("OBD2 자동 출발 감지만 끕니다. 진행 중인 GPS 기록은 계속되며, 종료하려면 라이딩 종료를 눌러 주세요.").setNegativeButton("취소",null).setPositiveButton("중지",(d,w)->{a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);}).show();return;}
    if(RideService.running){new AlertDialog.Builder(a).setTitle("라이딩 기록 종료").setMessage("기록을 끝내고 주행 분석에서 이동거리와 경로를 확인할 수 있어요.").setNegativeButton("취소",null).setPositiveButton("종료",(d,w)->{
     a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
@@ -95,7 +95,7 @@ final class RideUi {
   // developer-mode disarm button or relying exclusively on a notification.
   if(RideService.autoArmed&&RideService.running){
    a.gap(hero,8);
-   Button finishRide=a.button("■  라이딩 기록 저장 후 종료",false,()->{
+   Button finishRide=a.button("라이딩 저장 후 종료",false,()->{
     new AlertDialog.Builder(a).setTitle("자동 라이딩 기록 종료")
      .setMessage("진행 중인 GPS 기록을 저장하고 OBD2 자동 감지도 종료합니다. 그룹 위치 공유는 시작하지 않습니다.")
      .setNegativeButton("취소",null)
@@ -109,7 +109,7 @@ final class RideUi {
   }
   a.content.addView(hero);a.gap(a.content,12);
   // External navigation remains separate: no Kakao app key or GPS upload is required.
-  a.action(a.content,"↗  카카오내비 열기",false,()->KakaoNaviLaunch.open(a));
+  a.action(a.content,"카카오내비 열기",false,()->KakaoNaviLaunch.open(a));
   a.label(a.content,"카카오내비는 길 안내, MOTO HUB는 로컬 라이딩 기록을 담당합니다. 경로·위치 정보는 자동 전달되지 않아요.",12,a.muted,false);
   if(RideService.autoArmed&&a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
    LinearLayout diagnostics=a.col();diagnostics.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(14));diagnostics.setBackground(a.shape(a.panel,a.line,14));
@@ -128,7 +128,7 @@ final class RideUi {
   }
   a.gap(a.content,4);
   LinearLayout tools=new LinearLayout(a);
-  Button importButton=a.button("↧  GPX 가져오기",false,a::pickGpx);Button refresh=a.button("↻  새로고침",false,a::render);
+  Button importButton=a.button("GPX 가져오기",false,a::pickGpx);Button refresh=a.button("새로고침",false,a::render);
   tools.addView(importButton,new LinearLayout.LayoutParams(0,a.dp(50),1));LinearLayout.LayoutParams second=new LinearLayout.LayoutParams(0,a.dp(50),1);second.leftMargin=a.dp(8);tools.addView(refresh,second);a.content.addView(tools);
   a.gap(a.content,8);
   a.label(a.content,"GPX 가져오기: 다른 앱에서 저장한 코스 파일을 지도와 주행 기록으로 불러옵니다. 가져오기만으로 GPS 기록이나 길 안내가 시작되지는 않아요.",12,a.muted,false);
