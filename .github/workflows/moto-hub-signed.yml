@@ -1,5 +1,8 @@
 name: MOTO HUB DB existing-key signed release
 on:
+  push:
+    branches: ['build/di518-ux15-original-key-test-20261021']
+    paths: ['.github/workflows/moto-hub-signed.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,7 +39,7 @@ jobs:
           STORE_PASS: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
           KEY_PASS: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
-          EXPECTED: ${{ secrets.MOTO_EXPECTED_CERT_SHA256 }}
+          EXPECTED: '212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b'
         run: |
           test -n "$STORE_B64" && test -n "$STORE_PASS" && test -n "$KEY_ALIAS" && test -n "$KEY_PASS" && test -n "$EXPECTED" || { echo 'Missing original signing credentials'; exit 1; }
           umask 077
@@ -48,7 +51,7 @@ jobs:
           MOTO_SIGNING_STORE_PASSWORD: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
           MOTO_SIGNING_KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
           MOTO_SIGNING_KEY_PASSWORD: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
-          EXPECTED: ${{ secrets.MOTO_EXPECTED_CERT_SHA256 }}
+          EXPECTED: '212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b'
         run: |
           cd MOTO-HUB
           chmod +x gradlew
@@ -62,7 +65,7 @@ jobs:
       - name: Upload verified release
         uses: actions/upload-artifact@v4
         with:
-          name: moto-hub-alpha6-di-original-key-release
+          name: moto-hub-ux15-di518-original-key-verified
           path: MOTO-HUB/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
