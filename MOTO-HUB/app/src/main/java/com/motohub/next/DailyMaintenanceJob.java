@@ -66,31 +66,24 @@ public final class DailyMaintenanceJob extends JobService {
   if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
   NotificationManager manager=getSystemService(NotificationManager.class);
   if(manager==null||!manager.areNotificationsEnabled())return;
-  JSONArray bikes=db.optJSONArray("vehicles"),services=db.optJSONArray("services");
-  if(bikes==null||services==null)return;
-  LocalDate today=LocalDate.now(ZoneId.of("Asia/Seoul"));
-  int due=0,soon=0;
-  for(int j=0;j<bikes.length();j++){
-   JSONObject bike=bikes.optJSONObject(j);if(bike==null||GarageBikeStatus.sold(bike.optString("soldDate")))continue;
-   List<WidgetMaintenanceSummary.Service> history=new ArrayList<>();
-   for(int i=0;i<services.length();i++){
-    JSONObject s=services.optJSONObject(i);
-    if(s!=null&&bike.optString("id").equals(s.optString("vehicleId")))
-     history.add(new WidgetMaintenanceSummary.Service(s.optString("type"),s.optString("date"),s.optString("nextDate"),s.optDouble("nextKm")));
-   }
-   String status=WidgetMaintenanceSummary.label(history,today.toString(),bike.optDouble("odo"));
-   if(status.contains("점검 필요"))due++;else if(status.contains("곧 점검"))soon++;
+  String today=LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+  MaintenanceNotificationSummary reminder=MaintenanceNotificationSummary.from(db,today);
+  if(!reminder.hasNotice()){
+   manager.cancel(405);
+   getSharedPreferences("notifications",MODE_PRIVATE).edit().remove("last_maintenance_notice").apply();
+   return;
   }
-  if(due==0&&soon==0){manager.cancel(405);getSharedPreferences("notifications",MODE_PRIVATE).edit().remove("last_maintenance_notice").apply();return;}
-  String stamp=today.toString()+":"+due+":"+soon;
+  String stamp=today+":"+reminder.fingerprint;
   android.content.SharedPreferences prefs=getSharedPreferences("notifications",MODE_PRIVATE);
   if(stamp.equals(prefs.getString("last_maintenance_notice","")))return;
   manager.createNotificationChannel(new NotificationChannel("maintenance","정비 예정 알림",NotificationManager.IMPORTANCE_DEFAULT));
   Intent intent=new Intent(this,MainActivity.class);intent.putExtra(MotoWidgetProvider.EXTRA_TAB,"차고");
   PendingIntent open=PendingIntent.getActivity(this,103,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   Notification notification=new Notification.Builder(this,"maintenance")
-   .setSmallIcon(R.drawable.ic_launcher).setContentTitle("MOTO HUB · 정비 알림")
-   .setContentText("점검 필요 "+due+"대 · 곧 점검 "+soon+"대")
+   .setSmallIcon(R.drawable.ic_launcher)
+   .setContentTitle(reminder.title())
+   .setContentText(reminder.detail)
+   .setStyle(new Notification.BigTextStyle().bigText(reminder.detail))
    .setVisibility(Notification.VISIBILITY_PRIVATE)
    .setContentIntent(open).setAutoCancel(true).build();
   manager.notify(405,notification);

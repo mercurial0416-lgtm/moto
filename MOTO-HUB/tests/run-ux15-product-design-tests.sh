@@ -16,7 +16,7 @@ assert home.index('addHero(b);') < home.index('rideAction();') < home.index('sta
 assert 'String[] names={"총 주행거리","다음 정비"};' in home, "2-item KPI strip"
 assert 'String.format(Locale.ROOT,"%02d",i+1)' not in home, "no arbitrary numbered menu"
 assert 'MotoQuickIcon icon=new MotoQuickIcon(a,i,soft);' in home, "purpose-built action icons"
-assert 'a.edit("expenses",null)' in home and 'a.edit("services",null)' in home
+assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home, 'first-class quick fuel and reminders'
 assert 'a.navigate("라이딩")' in home and 'new HubScreens(a).manageBike()' in home
 assert 'if(!a.items("listings").isEmpty())' in home, "no empty marketplace section on home"
 assert 'friends();' not in home.split(' void render(){')[1].split(' void interruptedRideShortcut(')[0], "no unnecessary account card"

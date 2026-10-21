@@ -248,9 +248,9 @@ final class GarageHomeUi {
  });btn.setTextColor(RideService.running?Color.WHITE:(a.dark?0xFF18191B:Color.WHITE));btn.setTextSize(16);btn.setMinHeight(a.dp(56));btn.setBackground(a.shape(RideService.running?0xFFC34A43:orange,0,11));a.content.addView(btn,new LinearLayout.LayoutParams(-1,a.dp(56)));}
  void quickActions(){
   sectionTitle("바로가기",null,null);
-  String[] labels={"주유 기록","정비 기록","라이딩 기록","내 바이크"};
-  String[] details={"금액과 주행거리 입력","정비 내역과 점검 주기","경로와 주행 통계","차량 정보 수정"};
-  Runnable[] actions={()->a.edit("expenses",null),()->a.edit("services",null),
+  String[] labels={"간편 주유","정비주기 알림","라이딩 기록","내 바이크"};
+  String[] details={"금액·주유량만 입력","거리·날짜 주기 설정","경로와 주행 통계","차량 정보 수정"};
+  Runnable[] actions={()->new QuickEntryUi(a).fuel(),()->new QuickEntryUi(a).maintenance(),
    ()->a.navigate("라이딩"),()->new HubScreens(a).manageBike()};
   LinearLayout block=a.col();
   for(int i=0;i<labels.length;i++){

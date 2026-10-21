@@ -369,7 +369,7 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
   LinearLayout dock=col();dock.setPadding(dp(20),dp(8),dp(20),0);
   // Home contains contextual quick actions; keep the bottom dock uncluttered.
   if(tab.equals("매물"))pair(dock,"매물 추가",()->edit("listings",null),"선택 비교",()->new HubScreens(this).compare());
-  if(tab.equals("차고")&&bike()!=null)pair(dock,"주유 기록",()->edit("expenses",null),"정비 기록",()->edit("services",null));
+  if(tab.equals("차고")&&bike()!=null)pair(dock,"간편 주유",()->new QuickEntryUi(this).fuel(),"정비주기",()->new QuickEntryUi(this).maintenance());
   // Home quick actions are inside its content, not repeated above the navigation.
   root.addView(dock);
   MotoDesign.addNavigation(this,root);
@@ -1194,10 +1194,10 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
     new AlertDialog.Builder(this).setTitle("중복으로 보이는 기록")
      .setMessage("이 바이크에 같은 날짜·거리·항목·금액의 기록이 이미 있어요. 두 번 저장할까요?")
      .setNegativeButton("취소",null).setPositiveButton("그래도 저장",(d,which)->attempt(()->{
-      write(next);clearDraft();close();render();toast("중복 확인 후 저장했어요.");
+      write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();toast("중복 확인 후 저장했어요.");
       if(attachAfterSave.isChecked())offerReceiptForSavedRecord(key,item);
      })).show();return;
-   }write(next);clearDraft();close();render();toast("저장했어요.");
+   }write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();toast("저장했어요.");
    if(attachAfterSave.isChecked())offerReceiptForSavedRecord(key,item);}));if(existing!=null&&!key.equals("vehicles"))action(p,"기록 삭제",false,()->{close();remove(key,old);});show();
  }
  void offerReceiptForSavedRecord(String key,JSONObject item){
