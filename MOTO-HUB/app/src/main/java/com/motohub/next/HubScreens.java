@@ -13,20 +13,35 @@ final class HubScreens {
  void empty(String title,String description,String action,Runnable click){a.gap(a.content,16);a.label(a.content,title,22,a.fg,true);a.label(a.content,description,16,a.muted,false);a.gap(a.content,12);a.action(a.content,action,true,click);}
  void line(String title,String detail,String value,Runnable click){line(a.content,title,detail,value,click);}
  void line(LinearLayout target,String title,String detail,String value,Runnable click){
-  LinearLayout block=a.col();block.setPadding(a.dp(2),a.dp(15),a.dp(2),a.dp(15));block.setMinimumHeight(a.dp(66));
-  LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);TextView label=a.text(title,17,a.fg,true);head.addView(label,new LinearLayout.LayoutParams(0,-2,1));
-  if(!value.isEmpty()){TextView hint=a.text(value,14,a.accent,true);hint.setGravity(Gravity.END);hint.setPadding(a.dp(8),0,0,0);head.addView(hint);}block.addView(head);
-  if(!detail.isEmpty()){TextView summary=a.text(detail,14,a.muted,false);summary.setLineSpacing(a.dp(2),1f);LinearLayout.LayoutParams sl=new LinearLayout.LayoutParams(-1,-2);sl.topMargin=a.dp(7);block.addView(summary,sl);}
-  if(click!=null){block.setFocusable(true);block.setClickable(true);android.util.TypedValue out=new android.util.TypedValue();a.getTheme().resolveAttribute(android.R.attr.selectableItemBackground,out,true);block.setBackgroundResource(out.resourceId);block.setOnClickListener(v->click.run());block.setContentDescription(title+", "+detail+", "+value);}
-  target.addView(block);View rule=new View(a);rule.setBackgroundColor(a.line);target.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
+  LinearLayout block=a.col();block.setPadding(a.dp(2),a.dp(17),a.dp(2),a.dp(17));block.setMinimumHeight(a.dp(68));
+  LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);
+  TextView label=a.text(title,15,a.fg,true);label.setMaxLines(2);
+  head.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+  if(value!=null&&!value.isEmpty()){
+   TextView hint=a.text(value,13,a.muted,true);hint.setGravity(Gravity.END);
+   hint.setPadding(a.dp(10),0,0,0);hint.setMaxLines(2);head.addView(hint);
+  }block.addView(head);
+  if(detail!=null&&!detail.isEmpty()){
+   TextView summary=a.text(detail,12,a.muted,false);summary.setLineSpacing(a.dp(2),1f);
+   LinearLayout.LayoutParams sl=new LinearLayout.LayoutParams(-1,-2);sl.topMargin=a.dp(7);block.addView(summary,sl);
+  }
+  if(click!=null){
+   block.setFocusable(true);block.setClickable(true);
+   MotoDesign.ripple(a,block,a.bg,0,8);
+   block.setOnClickListener(v->click.run());
+   block.setContentDescription(title+", "+detail+", "+value);
+  }
+  target.addView(block);
+  View rule=new View(a);rule.setBackgroundColor(a.line);
+  target.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
  }
  void bikePicker(){JSONObject b=a.bike();if(b==null)return;Button picker=a.button(b.optString("name")+"  ▾",false,this::chooseBike);picker.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);a.content.addView(picker,new LinearLayout.LayoutParams(-1,-2));a.gap(a.content,12);}
  void chooseBike(){List<JSONObject> list=a.items("vehicles");list.sort((x,y)->Integer.compare(GarageBikeStatus.rank(x.optString("soldDate")),GarageBikeStatus.rank(y.optString("soldDate"))));String[] options=new String[list.size()+1];for(int i=0;i<list.size();i++)options[i]=GarageBikeStatus.label(list.get(i).optString("name"),list.get(i).optString("soldDate"));options[list.size()]="＋ 바이크 추가";new AlertDialog.Builder(a).setTitle("내 바이크").setItems(options,(d,n)->{if(n==list.size()){a.edit("vehicles",null);return;}a.selected=list.get(n).optString("id");a.getSharedPreferences("garage_ui",0).edit().putString("selected_bike",a.selected).apply();a.render();}).show();}
  // Signature screen: one strong garage hero, then one-tap actions and clear records.
  void home(){new GarageHomeUi(a).render();}
  LinearLayout quickTile(String name,String detail,Runnable click){
-  LinearLayout tile=a.col();tile.setGravity(Gravity.CENTER_VERTICAL);tile.setPadding(a.dp(13),a.dp(17),a.dp(9),a.dp(16));tile.setMinimumHeight(a.dp(86));tile.setBackground(a.shape(a.panel,0,15));
-  TextView t=a.text(name,17,a.fg,true);tile.addView(t);TextView d=a.text(detail,12,a.accent,true);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(9);tile.addView(d,dp);
+  LinearLayout tile=a.col();tile.setGravity(Gravity.CENTER_VERTICAL);tile.setPadding(a.dp(16),a.dp(14),a.dp(14),a.dp(14));tile.setMinimumHeight(a.dp(78));tile.setBackground(a.shape(a.panel,a.line,12));
+  TextView t=a.text(name,15,a.fg,true);tile.addView(t);TextView d=a.text(detail,12,a.muted,false);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(9);tile.addView(d,dp);
   tile.setClickable(true);tile.setFocusable(true);tile.setContentDescription(name+" "+detail);tile.setOnClickListener(v->click.run());return tile;
  }
  List<JSONObject> records(String mode,JSONObject bike){
@@ -42,13 +57,13 @@ final class HubScreens {
   return result;
  }
  void records(){
-  title("정비와 주유","내 바이크 기록 · 빠른 입력 · 비용 한눈에");
+  title("정비와 주유","주유, 정비와 지출을 한곳에서 기록합니다.");
   if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}
   bikePicker();
   LinearLayout actions=a.col();actions.setPadding(a.dp(14),a.dp(15),a.dp(14),a.dp(8));actions.setBackground(a.shape(a.panel,0,18));
-  a.label(actions,"＋ 바로 기록",17,a.fg,true);
-  a.pair(actions,"⛽ 주유",()->a.edit("expenses",null),"🔧 정비",()->a.edit("services",null));
-  a.action(actions,"정비 여러 항목 한번에 등록 →",false,a::batchServiceEntry);
+  a.label(actions,"빠른 기록",16,a.fg,true);
+  a.pair(actions,"주유 등록",()->a.edit("expenses",null),"정비 등록",()->a.edit("services",null));
+  a.action(actions,"정비 항목 일괄 등록",false,a::batchServiceEntry);
   a.content.addView(actions);a.gap(a.content,14);
   String bikeId=a.bike().optString("id");
   JSONObject lastFuel=null;
@@ -104,7 +119,7 @@ final class HubScreens {
     record.put("soldDate",sold?"":a.today());a.write(next);a.close();a.render();
    })).show());a.action(p,"대표 바이크로 설정",false,()->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("primary",b.getString("id"));a.write(next);a.selected="";a.getSharedPreferences("garage_ui",0).edit().remove("selected_bike").apply();a.close();a.render();}));a.action(p,"다른 바이크 추가",false,()->a.edit("vehicles",null));a.divider(p);a.action(p,"바이크와 관련 기록 삭제",false,()->{a.close();a.remove("vehicles",b);});a.show();}
  void listings(){
-  title("관심 매물","찾고, 저장하고, 세 대까지 비교하기");
+  title("관심 매물","매물을 저장하고 조건별로 비교하세요.");
   EditText search=new EditText(a);search.setSingleLine();search.setTextSize(16);search.setTextColor(a.fg);search.setHintTextColor(a.muted);search.setHint("모델명으로 빠르게 찾기");search.setText(a.query);search.setContentDescription("저장한 매물 검색");search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
   search.setPadding(a.dp(16),a.dp(12),a.dp(16),a.dp(12));search.setBackground(a.shape(a.panel,0,14));a.content.addView(search,new LinearLayout.LayoutParams(-1,a.dp(53)));
   a.gap(a.content,13);tabs(new String[]{"전체","확인필요","판매중","예약중","판매완료"},a.filter,v->{a.filter=v;a.listingPageOffset=0;a.render();});
