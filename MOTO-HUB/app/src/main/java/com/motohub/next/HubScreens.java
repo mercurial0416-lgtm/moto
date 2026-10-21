@@ -62,8 +62,8 @@ final class HubScreens {
   bikePicker();
   LinearLayout actions=a.col();actions.setPadding(a.dp(14),a.dp(15),a.dp(14),a.dp(8));actions.setBackground(a.shape(a.panel,0,18));
   a.label(actions,"빠른 기록",16,a.fg,true);
-  a.pair(actions,"주유 등록",()->a.edit("expenses",null),"정비 등록",()->a.edit("services",null));
-  a.action(actions,"정비 항목 일괄 등록",false,a::batchServiceEntry);
+  a.pair(actions,"간편 주유",()->new QuickEntryUi(a).fuel(),"정비주기 설정",()->new QuickEntryUi(a).maintenance());
+  a.action(actions,"정비 완료 내역 등록",false,()->a.edit("services",null));a.action(actions,"기타 비용·영수증 상세 입력",false,()->a.edit("expenses",null));a.action(actions,"정비 항목 일괄 등록",false,a::batchServiceEntry);
   a.content.addView(actions);a.gap(a.content,14);
   String bikeId=a.bike().optString("id");
   JSONObject lastFuel=null;
