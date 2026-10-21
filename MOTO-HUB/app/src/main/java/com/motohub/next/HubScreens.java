@@ -2,6 +2,10 @@ package com.motohub.next;
 import android.app.AlertDialog;import android.graphics.Color;import android.view.*;import android.widget.*;import org.json.*;import java.util.*;
 /** Screen composition only. Existing Store, forms and AtomicFile persistence are reused. */
 final class HubScreens {
+ // Content/schema validation of up to 19 local backups must not freeze settings UI.
+ private static final java.util.concurrent.ExecutorService LOCAL_BACKUP_IO=java.util.concurrent.Executors.newSingleThreadExecutor(r->{
+  Thread t=new Thread(r,"moto-local-backup-io");t.setDaemon(true);return t;
+ });
  final MainActivity a;
  HubScreens(MainActivity activity){a=activity;}
  void title(String name,String detail){a.heading(name,detail);}
@@ -180,13 +184,22 @@ final class HubScreens {
  void settings(){title("설정과 도구","내 기록은 로그인 없이 기기에 보관됩니다");a.section("데이터 및 복구");line("백업 · 복원","JSON 내보내기와 기존 데이터 이전","열기",()->{LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·정비·주유·GPS 원본·사진을 백업하고 복원할 수 있어요. 복원은 현재 기록을 교체하므로 기존 기록이 필요하다면 먼저 내보내세요.",16,a.muted,false);a.action(p,"전체 ZIP 백업 복원",true,a::importBundle);a.action(p,"암호화 백업 복원 (.mhub)",false,a::importEncryptedBundle);
   a.action(p,"지금 안전 백업 확인",false,()->{
    if(a.readOnly){a.toast("원본 보호 중에는 새 백업을 만들 수 없어요.");return;}
-   LocalSafetyBackup.snapshot(a,a.db);
-   java.io.File[] snapshots=LocalSafetyBackup.recoveryPoints(a);
-   if(snapshots.length==0){a.toast("백업을 확인하지 못했어요. 전체 ZIP으로 내보내 주세요.");return;}
-   a.attempt(()->{
-    // Report verified backups only, never treat a filename as proof of valid data.
-    LocalSafetyBackup.read(snapshots[0]);
-    a.error("정상 확인한 안전 백업: "+snapshots[0].getName()+"\n\n앱 삭제 전 전체 ZIP을 별도로 내보내세요.");
+   // Snapshot a consistent DB state on the UI thread; schema validation and file IO run off-main.
+   final String current=a.db.toString();
+   a.toast("로컬 백업 확인 중…");
+   LOCAL_BACKUP_IO.execute(()->{
+    String result;
+    try{
+     LocalSafetyBackup.snapshot(a,Store.parse(current));
+     java.io.File[] snapshots=LocalSafetyBackup.recoveryPoints(a);
+     if(snapshots.length==0)result="백업을 확인하지 못했어요. 전체 ZIP으로 내보내 주세요.";
+     else{
+      LocalSafetyBackup.read(snapshots[0]);
+      result="정상 확인한 안전 백업: "+snapshots[0].getName()+"\n\n앱 삭제 전 전체 ZIP을 별도로 내보내세요.";
+     }
+    }catch(Exception ex){result="로컬 백업 검증 실패: "+ex.getMessage();}
+    final String message=result;
+    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error(message);});
    });
   });
   a.action(p,"전체 ZIP 백업 사전 점검",false,()->{
@@ -198,19 +211,34 @@ final class HubScreens {
    },"moto-backup-readiness").start();
   });
   a.action(p,"최근 자동 백업 복원",false,()->{
-   java.io.File[] snapshots=LocalSafetyBackup.recoveryPoints(a);
-   if(snapshots.length==0){a.toast("자동 백업이 없습니다.");return;}
-   String[] choices=new String[snapshots.length];
-   for(int i=0;i<snapshots.length;i++){
-    String kind=snapshots[i].getParentFile().getName().equals("updates")?"변경 후":"편집 전";
-    String when=java.time.Instant.ofEpochMilli(snapshots[i].lastModified()).atZone(java.time.ZoneId.of("Asia/Seoul")).format(java.time.format.DateTimeFormatter.ofPattern("MM/dd HH:mm:ss"));
-    choices[i]=when+" · "+kind+" · "+(i+1);
-   }
-   a.choose("복원할 백업 날짜",choices,date->a.attempt(()->{
-    for(int i=0;i<choices.length;i++)if(choices[i].equals(date)){
-     a.confirmImport(LocalSafetyBackup.read(snapshots[i]));return;
-    }
-   }));
+   a.toast("사용 가능한 복원 지점 확인 중…");
+   LOCAL_BACKUP_IO.execute(()->{
+    final java.io.File[] snapshots=LocalSafetyBackup.recoveryPoints(a);
+    a.runOnUiThread(()->{
+     if(a.isFinishing()||a.isDestroyed())return;
+     if(snapshots.length==0){a.toast("정상 확인된 자동 백업이 없습니다.");return;}
+     String[] choices=new String[snapshots.length];
+     for(int i=0;i<snapshots.length;i++){
+      String kind=snapshots[i].getParentFile().getName().equals("updates")?"변경 후":"편집 전";
+      String when=java.time.Instant.ofEpochMilli(snapshots[i].lastModified()).atZone(java.time.ZoneId.of("Asia/Seoul")).format(java.time.format.DateTimeFormatter.ofPattern("MM/dd HH:mm:ss"));
+      choices[i]=when+" · "+kind+" · "+(i+1);
+     }
+     a.choose("복원할 백업 날짜",choices,date->{
+      for(int i=0;i<choices.length;i++)if(choices[i].equals(date)){
+       final java.io.File selected=snapshots[i];
+       LOCAL_BACKUP_IO.execute(()->{
+        try{
+         final JSONObject data=LocalSafetyBackup.read(selected);
+         a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.confirmImport(data);});
+        }catch(Exception error){
+         a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("자동 백업을 읽지 못했어요: "+error.getMessage());});
+        }
+       });
+       return;
+      }
+     });
+    });
+   });
   });a.label(p,"편집 전 일일 백업 7개 + 변경 후 최근 복원 지점 12개를 기기에 보관합니다. 앱 삭제 시 모두 사라지므로 전체 ZIP을 별도로 내보내세요.",14,a.muted,false);a.action(p,"암호화 전체 백업 만들기 (.mhub)",true,a::exportEncryptedBundle);a.action(p,"암호 없는 ZIP으로 내보내기",false,a::exportBundle);a.action(p,"JSON 백업만 내보내기",false,a::exportData);a.action(p,"JSON 백업 가져오기",false,()->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);a.startActivityForResult(i,42);});a.action(p,"이전 JSON 되돌리기 (사진·GPS 제외)",false,()->a.attempt(()->{android.util.AtomicFile f=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-import.json"));a.confirmImport(Store.parse(new String(f.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.show();});
   a.section("표시 및 알림");
   line("위젯 개인정보",a.getSharedPreferences("widget_privacy",0).getBoolean("hide_details",false)?"이름·주행거리·유지비 숨김":"이름·주행거리·유지비 표시","변경",()->{
