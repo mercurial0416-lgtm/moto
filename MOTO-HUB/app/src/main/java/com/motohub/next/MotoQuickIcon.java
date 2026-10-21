@@ -33,7 +33,7 @@ final class MotoQuickIcon extends View {
     break;
    case 2: // Two stops connected by a route
     c.drawCircle(6,18,2.6f,pen);c.drawCircle(18,6,2.6f,pen);
-    c.drawLine(6,15,6,11,pen);c.drawQuad(6,8,8,6,11,8);
+    c.drawLine(6,15,6,11,pen);c.drawLine(6,11,9,8,pen);c.drawLine(9,8,11,8,pen);
     c.drawLine(11,8,13,13,pen);c.drawLine(13,13,18,13,pen);c.drawLine(18,13,18,9,pen);
     break;
    default: // Motorcycle in profile
