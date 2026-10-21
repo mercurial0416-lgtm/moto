@@ -7,6 +7,7 @@ javac -encoding UTF-8 -d "$out" \
  app/src/main/java/com/motohub/next/{LocalBackupFilePolicy,LocalBackupValidationCache}.java \
  tests/Ux13BackupCacheTest.java
 java -cp "$out" com.motohub.next.Ux13BackupCacheTest
+python3 tests/test_alpha6_dc_integration.py
 python3 - <<'PY'
 from pathlib import Path
 base=Path("app/src/main/java/com/motohub/next")
