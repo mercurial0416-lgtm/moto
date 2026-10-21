@@ -8,7 +8,7 @@ java -cp "$out" com.motohub.next.RideHistoryPageTest
 python3 - <<'PYTEST'
 from pathlib import Path
 ui=Path('app/src/main/java/com/motohub/next/RideUi.java').read_text()
-assert 'if(shown>=historyVisibleLimit)break;' in ui
+assert 'if(page.size()<historyVisibleLimit)page.add(entry);' in ui and 'final int shown=page.size();' in ui, 'visible results remain capped while doing one scan'
 assert 'historyVisibleLimit=RideHistoryPage.PAGE_SIZE;' in ui
 assert 'RideHistoryPage.nextLimit(historyVisibleLimit)' in ui
 assert '라이딩 더 보기 · 남은 ' in ui
