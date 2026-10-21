@@ -22,9 +22,9 @@ assert 'root.addView(bar);' in design and 'new NavIcon(a,icons[i]' in design
 assert 'cell.setContentDescription(labels[i]+(selected?", 선택됨":""))' in design
 assert 'headerAction(a,"알림")' in design and '.showNotices()' in design
 assert 'orange=a.accent;light=a.fg;soft=a.muted;surface=a.panel' in home
-assert 'void quickActions(){' in home and 'String.format(Locale.ROOT,"%02d",i+1)' in home
+assert 'void quickActions(){' in home and 'new MotoQuickIcon(a,i,soft)' in home
 assert '"⛽","⚒","▤","▣"' not in home, 'no emoji shortcut placeholders'
-assert 'void stats(JSONObject b)' in home and 'LinearLayout panel=a.col()' in home
+assert 'void stats(JSONObject b)' in home and 'String[] names={"총 주행거리","다음 정비"};' in home
 assert 'void line(LinearLayout target' in lists and 'MotoDesign.ripple(a,block,a.bg,0,8)' in lists
 assert 'a.pair(actions,"주유 등록"' in lists and '🔧 정비' not in lists
 assert '"라이딩 시작하기"' in ride and 'title.setTypeface(MotoDesign.display())' in ride

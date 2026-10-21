@@ -142,7 +142,7 @@ public class MainActivity extends Activity {
  Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(14);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(50));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?(dark?0xFF18191B:Color.WHITE):fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,12);b.setPadding(dp(14),dp(8),dp(14),dp(8));b.setOnClickListener(v->r.run());return b;}
  void action(LinearLayout p,String s,boolean primary,Runnable r){if(p==formBody&&s.equals("저장")&&formFooter!=null)p=formFooter;LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(button(s,primary,r),lp);}
  void pair(LinearLayout p,String a,Runnable ra,String b,Runnable rb){LinearLayout row=new LinearLayout(this);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(0,0,dp(4),dp(8));row.addView(button(a,true,ra),lp);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);rp.setMargins(dp(4),0,0,dp(8));row.addView(button(b,false,rb),rp);p.addView(row);}
- void heading(String t,String sub){gap(content,12);TextView title=text(t,26,fg,true);title.setTypeface(MotoDesign.display());content.addView(title);if(sub!=null&&!sub.isEmpty()){gap(content,6);label(content,sub,13,muted,false);}gap(content,16);}
+ void heading(String t,String sub){gap(content,12);if(!t.equals(MotoDesign.heading(tab))){TextView title=text(t,25,fg,true);title.setTypeface(MotoDesign.display());content.addView(title);gap(content,6);}if(sub!=null&&!sub.isEmpty())label(content,sub,13,muted,false);gap(content,13);}
  void section(String s){gap(content,23);label(content,s,18,fg,true);}
  void note(String s){TextView t=text(s,13,muted,false);t.setLineSpacing(dp(3),1f);t.setPadding(dp(15),dp(15),dp(15),dp(15));t.setBackground(shape(panel,0,12));content.addView(t);gap(content,8);}
  void row(String title,String sub,String tail,Runnable r){new HubScreens(this).line(title,sub,tail,r);}
@@ -373,7 +373,7 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
   // Home quick actions are inside its content, not repeated above the navigation.
   root.addView(dock);
   MotoDesign.addNavigation(this,root);
-  content.setAlpha(0f);content.animate().alpha(1f).setDuration(120).start();
+  // Render immediately. Avoid fading the full screen on every tab selection or live GPS refresh.
   if(readOnly)note("저장 오류 · 원본을 보호하고 있습니다");
   // Keep abandoned drafts visible, but give users a deliberate, reversible way to dismiss the reminder.
   if(getSharedPreferences("draft",MODE_PRIVATE).contains("active")&&(tab.equals("홈")||tab.equals("차고"))){
