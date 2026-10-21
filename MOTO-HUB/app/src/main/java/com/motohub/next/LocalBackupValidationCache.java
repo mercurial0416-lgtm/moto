@@ -13,14 +13,14 @@ import java.util.function.BooleanSupplier;
 final class LocalBackupValidationCache {
  static final int MAX_ENTRIES=64;
  static final long MAX_AGE_NANOS=15_000_000_000L;
- private static final class Entry {
+ private static final class CacheResult {
   final long size,modified,atNanos;final boolean valid;
-  Entry(long size,long modified,long atNanos,boolean valid){
+  CacheResult(long size,long modified,long atNanos,boolean valid){
    this.size=size;this.modified=modified;this.atNanos=atNanos;this.valid=valid;
   }
  }
- private static final Map<String,Entry> cache=new LinkedHashMap<String,Entry>(32,0.75f,true){
-  @Override protected boolean removeEldestEntry(Map.Entry<String,Entry> eldest){
+ private static final Map<String,CacheResult> cache=new LinkedHashMap<String,CacheResult>(32,0.75f,true){
+  @Override protected boolean removeEldestEntry(Map.Entry<String,CacheResult> eldest){
    return size()>MAX_ENTRIES;
   }
  };
@@ -30,7 +30,7 @@ final class LocalBackupValidationCache {
   String path=file.getAbsolutePath();
   long size=file.length(),modified=file.lastModified(),now=System.nanoTime();
   synchronized(cache){
-   Entry previous=cache.get(path);
+   CacheResult previous=cache.get(path);
    if(previous!=null&&previous.size==size&&previous.modified==modified
      &&now>=previous.atNanos&&now-previous.atNanos<MAX_AGE_NANOS)
     return previous.valid;
@@ -40,7 +40,7 @@ final class LocalBackupValidationCache {
   catch(RuntimeException failure){valid=false;}
   // A concurrent rewrite or replacement must not cause stale metadata to be cached.
   if(LocalBackupFilePolicy.readable(file)&&size==file.length()&&modified==file.lastModified()){
-   synchronized(cache){cache.put(path,new Entry(size,modified,System.nanoTime(),valid));}
+   synchronized(cache){cache.put(path,new CacheResult(size,modified,System.nanoTime(),valid));}
   }else{
    synchronized(cache){cache.remove(path);}
   }
