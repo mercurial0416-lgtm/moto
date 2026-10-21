@@ -20,7 +20,7 @@ assert disconnect.index('if(autoFinishPending){')<disconnect.index('if(running){
 assert 'if(finishPending){' in auto and auto.index('if(finishPending){')<auto.index('if(!autoArmed){'), "User STOP takes priority"
 assert 'LocalBackupFilePolicy.requireReadable(file);' in backup
 assert backup.count('LocalBackupFilePolicy.safeFolder(folder)')>=3
-assert 'LocalBackupFilePolicy.readable(new File(dir,name))' in backup
+assert backup.count('verified(new File(dir,name))')>=2, 'local restore picker must verify full backup schema'
 assert 'destination.exists()||java.nio.file.Files.isSymbolicLink' in backup
 print('PASS UX10 OBD pending-close and local recovery file wiring')
 PY

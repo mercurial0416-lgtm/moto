@@ -27,6 +27,19 @@ final class LocalBackupFilePolicy {
     &&readable(new File(parent,name)));
   return files==null?new File[0]:files;
  }
+ /** Count only checkpoints whose JSON content passes the caller's full schema check.
+  *  Corrupt files are left on disk for diagnosis, not used to evict good backups.
+  */
+ static File[] eligible(File folder,String namePattern,java.util.function.Predicate<File> validContent){
+  if(validContent==null)return new File[0];
+  File[] candidates=eligible(folder,namePattern);
+  java.util.ArrayList<File> good=new java.util.ArrayList<>();
+  for(File file:candidates){
+   try{if(validContent.test(file))good.add(file);}
+   catch(RuntimeException ignored){/* One damaged backup must not hide other restore points. */}
+  }
+  return good.toArray(new File[0]);
+ }
  static void requireReadable(File file)throws IOException{
   if(!readable(file))throw new IOException("안전하지 않거나 손상된 로컬 복원 파일입니다.");
  }
