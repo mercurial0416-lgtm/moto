@@ -18,5 +18,11 @@ assert local.count('LocalSafetyBackup::verified') == 2, 'both 7-day and 12-point
 assert 'Store.parse(new String(bytes,StandardCharsets.UTF_8));' in local, 'validate daily backup before persisting'
 assert 'static File[] eligible(File folder,String namePattern,java.util.function.Predicate<File> validContent)' in policy
 assert 'catch(RuntimeException ignored)' in policy
-print('PASS UX12 restore picker, schema checks and retention wiring')
+screen=Path('app/src/main/java/com/motohub/next/HubScreens.java').read_text()
+assert 'Executors.newSingleThreadExecutor' in screen, 'bounded serial backup worker'
+assert screen.count('LOCAL_BACKUP_IO.execute(()->{')>=3, 'snapshot, picker and selected file read off UI'
+assert 'final String current=a.db.toString();' in screen, 'capture stable JSON before background work'
+assert 'a.confirmImport(data)' in screen and 'a.runOnUiThread(' in screen, 'restore confirmation remains on UI'
+assert 'LocalSafetyBackup.read(selected)' in screen, 'read must re-validate at selection time'
+print('PASS UX12 restore picker, schema, retention and responsive settings screen wiring')
 PY
