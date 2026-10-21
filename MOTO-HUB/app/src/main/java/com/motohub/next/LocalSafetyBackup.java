@@ -10,7 +10,11 @@ final class LocalSafetyBackup {
  private LocalSafetyBackup(){}
  /** A filename and size alone cannot prove a usable restore point. */
  static boolean verified(File file){
-  try{read(file);return true;}catch(Exception ignored){return false;}
+  // UI/retention previews can reuse recent results. Actual restore ALWAYS
+  // goes through read(file) and parses the entire original again.
+  return LocalBackupValidationCache.verify(file,()->{
+   try{read(file);return true;}catch(Exception ignored){return false;}
+  });
  }
  static File[] available(Context context){
   File folder=new File(context.getFilesDir(),"local-safety-backup");
@@ -44,12 +48,13 @@ final class LocalSafetyBackup {
    atomic=new AtomicFile(file);out=atomic.startWrite();out.write(bytes);atomic.finishWrite(out);out=null;
    read(file);
    if(!java.util.Arrays.equals(bytes,java.nio.file.Files.readAllBytes(file.toPath())))throw new java.io.IOException("검증되지 않은 복원 지점");
+   LocalBackupValidationCache.invalidate(file);
    File[] points=LocalBackupFilePolicy.eligible(folder,"motohub-[0-9]{13}-[a-f0-9]{8}\\.json",LocalSafetyBackup::verified);
    if(points!=null&&points.length>12){
     java.util.Arrays.sort(points,(a,b)->{int date=Long.compare(a.lastModified(),b.lastModified());return date!=0?date:a.getName().compareTo(b.getName());});
     for(int i=0;i<points.length-12;i++)points[i].delete();
    }
-  }catch(Exception e){if(out!=null&&atomic!=null)atomic.failWrite(out);if(file!=null)file.delete();}
+  }catch(Exception e){if(out!=null&&atomic!=null)atomic.failWrite(out);if(file!=null){LocalBackupValidationCache.invalidate(file);file.delete();}}
  }
  static JSONObject read(File file)throws Exception{
   LocalBackupFilePolicy.requireReadable(file);
@@ -77,6 +82,7 @@ final class LocalSafetyBackup {
     // Verify the persisted snapshot before rotating older recovery points.
     read(destination); // Validate the backup through the normal parser.
     written=java.util.Arrays.equals(bytes,java.nio.file.Files.readAllBytes(destination.toPath()));
+    LocalBackupValidationCache.invalidate(destination);
    }catch(Exception e){if(out!=null)atomic.failWrite(out);}
    if(!written){
     // A failed or unverifiable snapshot must not trigger deletion of older backups.
