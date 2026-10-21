@@ -368,7 +368,7 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);content=col();content.setPadding(dp(20),dp(10),dp(20),dp(26));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout dock=col();dock.setPadding(dp(20),dp(8),dp(20),0);
   // Home contains contextual quick actions; keep the bottom dock uncluttered.
-  if(tab.equals("매물"))pair(dock,"매물 추가",()->edit("listings",null),"비교",()->new HubScreens(this).compare());
+  if(tab.equals("매물"))pair(dock,"매물 추가",()->edit("listings",null),"선택 비교",()->new HubScreens(this).compare());
   if(tab.equals("차고")&&bike()!=null)pair(dock,"주유 기록",()->edit("expenses",null),"정비 기록",()->edit("services",null));
   // Home quick actions are inside its content, not repeated above the navigation.
   root.addView(dock);
