@@ -76,6 +76,3 @@ public final class Ux16QuickLogMaintenanceTest {
   System.out.println("PASS UX16 quick refuel + maintenance alert behavior: "+checks+" assertions");
  }
 }
-
- }
-}
