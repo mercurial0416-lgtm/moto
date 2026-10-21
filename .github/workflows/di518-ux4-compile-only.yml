@@ -1,7 +1,7 @@
 name: MOTO HUB DI518 UX4 compile-only verification (NO APK)
 on:
   push:
-    branches: ['build/di518-ux4-prebuild-20261020', 'fix/di518-ux5-record-stability-20261020', 'fix/di518-ux6-reliability-20261020', 'fix/di518-ux7-photo-ride-recovery-20261020', 'fix/di518-ux8-gps-photo-update-safety-20261020', 'fix/di518-ux9-last-mile-20261020', 'fix/di518-ux10-ride-backup-edgecases-20261020', 'fix/di518-ux11-backup-retention-20261020', 'fix/di518-ux12-valid-backup-content-20261021', 'fix/di518-ux13-backup-cache-20261021', 'design/di518-ux14-native-polish-20261021', 'design/di518-ux15-product-home-apk-20261021']
+    branches: ['build/di518-ux4-prebuild-20261020', 'fix/di518-ux5-record-stability-20261020', 'fix/di518-ux6-reliability-20261020', 'fix/di518-ux7-photo-ride-recovery-20261020', 'fix/di518-ux8-gps-photo-update-safety-20261020', 'fix/di518-ux9-last-mile-20261020', 'fix/di518-ux10-ride-backup-edgecases-20261020', 'fix/di518-ux11-backup-retention-20261020', 'fix/di518-ux12-valid-backup-content-20261021', 'fix/di518-ux13-backup-cache-20261021', 'design/di518-ux14-native-polish-20261021', 'design/di518-ux15-product-home-apk-20261021', 'feat/di518-ux16-quickfuel-maintenance-20261022']
     paths:
       - 'MOTO-HUB/**'
       - '.github/workflows/di518-ux4-compile-only.yml'
