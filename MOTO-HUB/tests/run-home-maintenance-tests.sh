@@ -12,7 +12,7 @@ python3 - <<'PYTEST'
 from pathlib import Path
 ui=Path('app/src/main/java/com/motohub/next/GarageHomeUi.java').read_text()
 assert 'HomeMaintenanceStatus.summary(schedules,a.today(),b.optDouble("odo"))' in ui
-assert 'condition(bike).equals("곧 점검")?"MY BIKE · SERVICE SOON"' in ui
+assert '내 바이크 · "+condition(bike)' in ui, 'human-readable maintenance state on hero'
 assert 'condition.equals("곧 점검")?0xFFFFD58A' in ui
 assert 'condition.equals("곧 점검")?0xFF503E20' in ui
 assert 'String nearest=ServiceDueSummary.nearest(' in ui and 'return nearest.equals("미설정")?summary:nearest;' in ui
