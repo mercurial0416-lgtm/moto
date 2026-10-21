@@ -28,6 +28,8 @@ public final class Ux16QuickLogMaintenanceTest {
   ok(fuel.getBoolean("fullTank"),"full tank independent choice");
   ok(fuel.getDouble("mileage")==7530,"fuel odometer stored");
   Store.upsert(db,"expenses",fuel);
+  // Saving fuel also advances the bike odometer. The notification threshold must use that value.
+  bike.put("odo",7530);
   JSONObject working=Store.parse(db.toString());
   ok(working.getJSONArray("expenses").length()==1,"valid quick fuel survives Store.parse");
   throwsException(()->QuickRecordDraft.fuel("bike1",today,7530,0,4,true),"zero amount rejected");
