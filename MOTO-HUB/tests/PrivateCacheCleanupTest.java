@@ -19,12 +19,9 @@ public final class PrivateCacheCleanupTest {
   File rideDir=new File(oldStage,"rides");ok(rideDir.mkdirs(),"rides");
   File track=new File(rideDir,"1728459876512-12345678-1234-1234-1234-123456789abc.track");write(track);
   // A real ZIP restore can stage receipts alongside garage photos and GPS.
-  String receiptName="receipt-12345678-1234-1234-1234-123456789abc-1.jpg";
-  // Obtain a name supported by the real shared receipt policy rather than guessing.
-  java.util.regex.Pattern receiptPattern=java.util.regex.Pattern.compile(BackupFormat.RECEIPT);
-  if(!receiptPattern.matcher(receiptName).matches())
-   receiptName="receipt-12345678-1234-1234-1234-123456789abc-1-1.jpg";
-  if(receiptPattern.matcher(receiptName).matches())write(new File(oldStage,receiptName));
+  String receiptName=ReceiptSlots.filename("12345678-1234-1234-1234-123456789abc",2);
+  ok(receiptName.matches(BackupFormat.RECEIPT),"valid staged receipt filename");
+  write(new File(oldStage,receiptName));
   oldStage.setLastModified(System.currentTimeMillis()-PrivateCacheCleanup.STAGE_EXPIRY_MS-1000);
   File freshStage=new File(files,"moto-stage-22222222-2222-2222-2222-222222222222");ok(freshStage.mkdirs(),"recent stage");
   File invalidStage=new File(files,"moto-stage-33333333-3333-3333-3333-333333333333");ok(invalidStage.mkdirs(),"invalid stage");
