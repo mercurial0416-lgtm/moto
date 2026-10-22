@@ -1,2 +1,6 @@
-MOTO HUB Alpha6 DI(518) UX4 PREBUILD — SOURCE + compile-only workflow, NO APK
-Branch: build/di518-ux4-prebuild-20261020
+MOTO HUB Alpha6 DI518 UX19 — SOURCE MERGED + DEBUG CI TESTED
+Latest source branch: build/di518-ux4-prebuild-20261020
+Merged source commit: f7b05136fefd38c3fc0b1085a5a480f3f68dfcb4
+Successful CI for UX19 code: https://github.com/mercurial0416-lgtm/moto/actions/runs/39755731137
+Debug artifact available in run above; NOT fixed-signed for existing installs.
+Fixed-signing workflow repaired on main in PR #17; requires private secrets.
