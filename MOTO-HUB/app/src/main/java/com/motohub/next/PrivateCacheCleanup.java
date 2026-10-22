@@ -50,9 +50,13 @@ final class PrivateCacheCleanup {
   for(File entry:entries){
    if(Files.isSymbolicLink(entry.toPath()))return false;
    if(entry.isDirectory()){
-    if(!entry.getName().equals("rides"))return false;
-    File[] tracks=entry.listFiles();if(tracks==null)return false;
-    for(File f:tracks)if(!safeFile(f,entry)||!recognizedTrack(f.getName()))return false;
+    if(!entry.getName().equals("rides")&&!entry.getName().equals("moto-year-photos"))return false;
+    File[] staged=entry.listFiles();if(staged==null)return false;
+    for(File f:staged){
+     boolean allowed=entry.getName().equals("rides")?recognizedTrack(f.getName()):
+       (f.getName().matches(BackupFormat.MODEL_PHOTO)||f.getName().matches(BackupFormat.MODEL_META));
+     if(!safeFile(f,entry)||!allowed)return false;
+    }
    }else if(!safeFile(entry,dir)||!(entry.getName().matches(BackupFormat.PHOTO)||
        entry.getName().matches(BackupFormat.RECEIPT)))return false;
   }
