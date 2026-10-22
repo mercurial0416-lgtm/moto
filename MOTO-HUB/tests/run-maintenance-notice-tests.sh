@@ -12,10 +12,10 @@ java -cp "$out" com.motohub.next.MaintenanceNoticeOrderTest
 python3 - <<'PYTEST'
 from pathlib import Path
 s=Path('app/src/main/java/com/motohub/next/GarageHomeUi.java').read_text()
-assert 'MaintenanceNoticeOrder.prioritized(history,a.today(),b.optDouble("odo"))' in s
+assert 'List<JSONObject> services=latestServices(bike);' in s
 assert 'LatestServiceByType.latest(a.items("services"),b.optString("id"))' in s
-assert 'Math.min(5,notices.size())' in s
-assert 'notices.size()-5' in s
+assert 'MaintenanceAlertWindow.status(' in s
+assert 'if(listed++>=6)continue;' in s
 assert 'MaintenancePlanner.caption(status)' in s
 print('PASS: 5 maintenance dialog integration checks')
 PYTEST

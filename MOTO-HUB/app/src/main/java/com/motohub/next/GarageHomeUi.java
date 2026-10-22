@@ -22,31 +22,30 @@ final class GarageHomeUi {
   orange=a.accent;light=a.fg;soft=a.muted;surface=a.panel;card=a.panel;stroke=a.line;
  }
 
- void showNotices(){JSONObject b=a.bike();if(b==null){a.toast("바이크를 먼저 등록해 주세요.");return;}
-  List<MaintenanceNoticeOrder.Notice> history=new ArrayList<>();
-  for(JSONObject s:latestServices(b))history.add(new MaintenanceNoticeOrder.Notice(
-   s.optString("type"),s.optString("date"),s.optString("nextDate"),s.optDouble("nextKm")));
-  List<MaintenanceNoticeOrder.Notice> notices=MaintenanceNoticeOrder.prioritized(history,a.today(),b.optDouble("odo"));
-  int overdue=0,soon=0;
-  for(MaintenanceNoticeOrder.Notice n:notices){
-   MaintenancePlanner.Status status=HomeMaintenanceStatus.safeStatus(n.nextDate,n.nextKm,a.today(),b.optDouble("odo"));
+ void showNotices(){
+  JSONObject bike=a.bike();if(bike==null){a.toast("바이크를 먼저 등록해 주세요.");return;}
+  List<JSONObject> services=latestServices(bike);
+  services.sort((x,y)->Integer.compare(
+   MaintenancePlanner.order(MaintenanceAlertWindow.status(x,a.today(),bike.optDouble("odo"))),
+   MaintenancePlanner.order(MaintenanceAlertWindow.status(y,a.today(),bike.optDouble("odo")))));
+  StringBuilder details=new StringBuilder();int overdue=0,soon=0,listed=0;
+  for(JSONObject service:services){
+   MaintenancePlanner.Status status=MaintenanceAlertWindow.status(service,a.today(),bike.optDouble("odo"));
    if(status==MaintenancePlanner.Status.OVERDUE)overdue++;
    else if(status==MaintenancePlanner.Status.SOON)soon++;
+   if(service.optDouble("nextKm")<=0&&service.optString("nextDate").isEmpty())continue;
+   if(listed++>=6)continue;
+   details.append("• ").append(service.optString("type")).append(" · ")
+    .append(MaintenancePlanner.caption(status)).append("\n  ")
+    .append(MaintenanceNoticeText.detail(service.optString("nextDate"),
+      service.optDouble("nextKm"),a.today(),bike.optDouble("odo"))).append("\n");
   }
-  StringBuilder sb=new StringBuilder();
-  if(overdue>0||soon>0)sb.append("점검 필요 ").append(overdue).append("건 · 곧 점검 ").append(soon).append("건\n\n");
-  for(int i=0;i<Math.min(5,notices.size());i++){
-   MaintenanceNoticeOrder.Notice n=notices.get(i);
-   MaintenancePlanner.Status status=HomeMaintenanceStatus.safeStatus(n.nextDate,n.nextKm,a.today(),b.optDouble("odo"));
-   sb.append("• ").append(n.type.isEmpty()?"정비":n.type).append("  ").append(MaintenancePlanner.caption(status));
-   String detail=MaintenanceNoticeText.detail(n.nextDate,n.nextKm,a.today(),b.optDouble("odo"));
-   if(!detail.isEmpty())sb.append("\n   ").append(detail);
-   sb.append("\n");
-  }
-  if(notices.size()>5)sb.append("외 ").append(notices.size()-5).append("건 · 정비 기록에서 모두 확인\n");
-  if(!b.optString("insuranceDate").isEmpty())sb.append("• 보험 만료: ").append(b.optString("insuranceDate")).append("\n");
-  if(sb.length()==0)sb.append("예정된 정비 일정이 없습니다. 정비 기록에서 다음 점검 거리를 설정할 수 있어요.");
-  new AlertDialog.Builder(a).setTitle("정비 알림").setMessage(sb.toString().trim()).setNegativeButton("닫기",null).setPositiveButton("정비 기록",(d,w)->a.navigate("차고")).show();
+  if(overdue>0||soon>0)details.insert(0,"점검 필요 "+overdue+"건 · 곧 정비 "+soon+"건\n\n");
+  if(listed>6)details.append("외 ").append(listed-6).append("건\n");
+  if(!bike.optString("insuranceDate").isEmpty())details.append("보험 만료: ").append(bike.optString("insuranceDate")).append("\n");
+  if(details.length()==0)details.append("예정된 정비가 없어요. 차고에서 정비주기를 등록할 수 있습니다.");
+  new AlertDialog.Builder(a).setTitle("정비 알림").setMessage(details.toString().trim())
+   .setNegativeButton("닫기",null).setPositiveButton("정비 관리",(d,w)->a.navigate("차고")).show();
  }
 
  void render(){
@@ -201,10 +200,12 @@ final class GarageHomeUi {
   return new ArrayList<>(LatestServiceByType.latest(a.items("services"),b.optString("id")).values());
  }
  String condition(JSONObject b){
-  List<HomeMaintenanceStatus.Schedule> schedules=new ArrayList<>();
-  for(JSONObject service:latestServices(b))
-   schedules.add(new HomeMaintenanceStatus.Schedule(service.optString("nextDate"),service.optDouble("nextKm")));
-  return HomeMaintenanceStatus.label(HomeMaintenanceStatus.summary(schedules,a.today(),b.optDouble("odo")));
+  MaintenancePlanner.Status worst=MaintenancePlanner.Status.NONE;
+  for(JSONObject service:latestServices(b)){
+   MaintenancePlanner.Status now=MaintenanceAlertWindow.status(service,a.today(),b.optDouble("odo"));
+   if(MaintenancePlanner.order(now)<MaintenancePlanner.order(worst))worst=now;
+  }
+  return HomeMaintenanceStatus.label(worst);
  }
  String nextService(JSONObject b){
   String summary=condition(b);

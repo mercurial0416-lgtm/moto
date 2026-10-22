@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+: "${JSON_JAR:?CI supplies org.json Java jar}"
+out="$(mktemp -d)"
+trap 'rm -rf "$out"' EXIT
+javac -encoding UTF-8 -cp "$JSON_JAR" -d "$out" \
+ app/src/main/java/com/motohub/next/{Store,FuelRecordValidation,QuickRecordDraft,ServiceCycle,MaintenanceNotificationSummary,MaintenanceAlertWindow,GarageBikeStatus,LatestServiceByType,RecentRecordReuse,MaintenancePlanner,HomeMaintenanceStatus,MaintenanceNoticeText}.java \
+ tests/Ux17ServiceCycleTest.java
+java -cp "$JSON_JAR:$out" com.motohub.next.Ux17ServiceCycleTest
+python3 - <<'PY'
+from pathlib import Path
+root=Path('app/src/main/java/com/motohub/next')
+quick=(root/'QuickEntryUi.java').read_text()
+dashboard=(root/'ServiceStatusUi.java').read_text()
+job=(root/'DailyMaintenanceJob.java').read_text()
+garage=(root/'HubScreens.java').read_text()
+assert 'ServiceCycle.calculatedFuelAmount(' in quick
+assert '지난 주유 금액·리터 불러오기' in quick
+assert 'alertKmBefore' in quick and 'alertDaysBefore' in quick
+assert 'kmBeforeChoices={100,300,500}' in quick and 'daysBeforeChoices={7,15,30}' in quick
+assert 'ServiceCycle.completed(' in dashboard
+assert 'Store.upsert(next,"services",done)' in dashboard
+assert 'DailyMaintenanceJob.checkSoon(a)' in dashboard
+assert 'Store.find(next,"vehicles",bike.optString("id")).put("odo",km)' in dashboard
+assert 'QuickLogDuplicate.same(x,done,"services")' in dashboard
+assert 'MaintenanceAlertWindow.status(item,a.today(),bike.optDouble("odo"))' in dashboard
+assert 'new ServiceStatusUi(a).render(a.content)' in garage
+assert 'String stamp="service:"+reminder.fingerprint' in job, 'no daily spam for identical reminders'
+print('PASS UX17 native UI, service rearm, explicit mileage and reminder wiring')
+PY

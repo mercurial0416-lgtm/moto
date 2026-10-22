@@ -48,15 +48,22 @@ public final class Ux16QuickLogMaintenanceTest {
   Store.upsert(db,"services",schedule);
   Store.parse(db.toString());
   MaintenanceNotificationSummary none=MaintenanceNotificationSummary.from(db,today);
-  ok(none.soon==1&&none.due==0,"within 500km alerts");
-  ok(none.detail.contains("엔진오일")&&none.detail.contains("500 km 남음"),"actual type and remaining distance shown");
-  ok(none.title().contains("곧"),"actionable notification title");
+  ok(!none.hasNotice(),"500km interval should not notify at the moment it is saved");
+  bike.put("odo",7930);
+  MaintenanceNotificationSummary approaching=MaintenanceNotificationSummary.from(db,today);
+  ok(approaching.soon==1&&approaching.due==0,"500km schedule notifies when only 100km remains");
+  ok(approaching.detail.contains("엔진오일")&&approaching.detail.contains("100 km 남음"),"specific item and distance shown");
+  ok(approaching.title().contains("곧"),"actionable notification title");
+  bike.put("odo",7960);
+  ok(approaching.fingerprint.equals(MaintenanceNotificationSummary.from(db,today).fingerprint),
+   "minor odometer updates must not repeat the same imminent warning");
+  bike.put("odo",7530);
   JSONObject revised=QuickRecordDraft.maintenance("bike1","엔진오일",today,7530,12000,"",3000,0);
   Store.upsert(db,"services",revised);
   ok(!MaintenanceNotificationSummary.from(db,today).hasNotice(),"latest record replaces same-day mileage plan");
-  JSONObject dateOnly=QuickRecordDraft.maintenance("bike1","체인",today,7530,0,"2026-11-15",0,1);
+  JSONObject dateOnly=QuickRecordDraft.maintenance("bike1","체인",today,7530,0,"2026-10-27",0,1);
   Store.upsert(db,"services",dateOnly);
-  ok(MaintenanceNotificationSummary.from(db,today).soon==1,"date within 30 days alerts");
+  ok(MaintenanceNotificationSummary.from(db,today).soon==1,"short one-month cycle only alerts within 6 days");
   JSONObject tooFar=QuickRecordDraft.maintenance("bike1","배터리",today,7530,0,"2027-10-22",0,12);
   Store.upsert(db,"services",tooFar);
   ok(MaintenanceNotificationSummary.from(db,today).soon==1,"future unrelated service does not alert");
