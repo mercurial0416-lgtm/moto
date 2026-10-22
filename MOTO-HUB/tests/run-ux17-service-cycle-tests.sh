@@ -32,7 +32,8 @@ assert 'MaintenanceAlertWindow.status(item,a.today(),bike.optDouble("odo"))' in 
 assert 'new ServiceStatusUi(a).render(a.content)' in garage
 assert 'String stamp="service:"+reminder.fingerprint' in job, 'no daily spam for identical reminders'
 assert 'static void clearReminderState(Context context)' in job, 'opt-out clears saved alert state'
-assert '.remove("last_maintenance_notice").apply()' in job, 'old dedupe key removed on opt-out'
+assert '.remove("last_maintenance_notice").remove("last_maintenance_notice_at").apply()' in job, 'opt-out clears dedupe stamp and last notice time'
+assert 'MaintenanceNoticeThrottle.shouldNotify(' in job, 'unchanged notices must be throttled, not blocked forever'
 assert 'else if(!enabled)clearReminderState(this)' in job, 'background opt-out clears old alerts'
 assert 'if(!manager.areNotificationsEnabled()){clearReminderState(this);return;}' in job, 'revoked OS notification access clears old alerts'
 settings=(root/'HubScreens.java').read_text()
