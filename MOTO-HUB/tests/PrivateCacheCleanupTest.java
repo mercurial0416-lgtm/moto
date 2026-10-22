@@ -22,6 +22,9 @@ public final class PrivateCacheCleanupTest {
   String receiptName=ReceiptSlots.filename("12345678-1234-1234-1234-123456789abc",2);
   ok(receiptName.matches(BackupFormat.RECEIPT),"valid staged receipt filename");
   write(new File(oldStage,receiptName));
+  File stagedModelDir=new File(oldStage,"moto-year-photos");ok(stagedModelDir.mkdirs(),"model cache staging");
+  write(new File(stagedModelDir,"abcdef0123456789abcdef01.jpg"));
+  write(new File(stagedModelDir,"abcdef0123456789abcdef01.jpg.json"));
   oldStage.setLastModified(System.currentTimeMillis()-PrivateCacheCleanup.STAGE_EXPIRY_MS-1000);
   File freshStage=new File(files,"moto-stage-22222222-2222-2222-2222-222222222222");ok(freshStage.mkdirs(),"recent stage");
   File invalidStage=new File(files,"moto-stage-33333333-3333-3333-3333-333333333333");ok(invalidStage.mkdirs(),"invalid stage");
