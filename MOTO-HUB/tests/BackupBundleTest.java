@@ -21,6 +21,16 @@ public class BackupBundleTest {
     "model-photos/"+selected.getName(),"model-photos/"+attribution.getName()})ok(entries.contains(n),"missing "+n);
    BackupIntegrity.Result verified=BackupIntegrity.verify(new ByteArrayInputStream(out.toByteArray()));
    ok(verified.photos==2,"selected gallery photo verified by ZIP readback");
+   // A misleading note or nested flag must not make an automatically found image appear user-selected.
+   Files.writeString(attribution.toPath(),"{\"userSelected\":false,\"note\":\"\\\"userSelected\\\":true\"}");
+   ByteArrayOutputStream autoOnly=new ByteArrayOutputStream();
+   BackupBundle.export("{\"version\":3}",root,autoOnly);
+   Set<String> autoEntries=new HashSet<>();
+   try(ZipInputStream in=new ZipInputStream(new ByteArrayInputStream(autoOnly.toByteArray()))){
+    ZipEntry item;while((item=in.getNextEntry())!=null)autoEntries.add(item.getName());
+   }
+   ok(!autoEntries.contains("model-photos/"+selected.getName()),"auto-selected photo never exported by misleading note");
+   Files.writeString(attribution.toPath(),"{\"userSelected\":true,\"label\":\"Honda Super Cub\"}");
    ok(entries.stream().noneMatch(x->x.contains("..")),"zip traversal");
    // Broken images must fail *before* a ZIP can be mistaken for a usable backup.
    Files.write(selected.toPath(),new byte[]{1,2,3,4,5,6});
