@@ -1,36 +1,49 @@
 name: Fixed-signature MOTO HUB update APK
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish verified APK and update manifest (requires private secrets)'
+        type: boolean
+        required: true
+        default: false
 permissions:
-  contents: read
+  contents: write
+concurrency:
+  group: moto-fixed-signed-release
+  cancel-in-progress: false
 jobs:
   verified-fixed-release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
-      # Workflow definition lives on main; reviewed Android source lives on the integrated branch.
-      - uses: actions/checkout@v4
+      - name: Checkout public update manifest
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: release-meta
+      - name: Checkout integrated Android source
+        uses: actions/checkout@v4
         with:
           ref: build/di518-ux4-prebuild-20261020
+          path: source
           persist-credentials: false
-      - name: Record exact application source revision
-        id: source-revision
-        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Verify Android source and next update version
+      - name: Select next version and test release policy
+        id: release-version
         run: |
-          test -f MOTO-HUB/gradlew && test -f MOTO-HUB/app/build.gradle
-          python3 - <<'PY'
-          import json,re
-          build=open('MOTO-HUB/app/build.gradle',encoding='utf-8').read()
-          version=int(re.search(r'\bversionCode\s+(\d+)',build).group(1))
-          public=int(json.load(open('updates/manifest.json',encoding='utf-8'))['versionCode'])
-          if version<=public: raise SystemExit('Refusing same-version or older fixed-signed APK')
-          PY
+          set -euo pipefail
+          CODE=$(python3 source/MOTO-HUB/tools/choose_release_version.py \
+            --gradle source/MOTO-HUB/app/build.gradle \
+            --manifest release-meta/updates/manifest.json)
+          printf 'code=%s\n' "$CODE" >> "$GITHUB_OUTPUT"
+          printf 'revision=%s\n' "$(git -C source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          python3 source/MOTO-HUB/tests/test_release_version.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Android SDK
+      - name: Install Android SDK
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
       - uses: gradle/actions/setup-gradle@v4
@@ -41,36 +54,81 @@ jobs:
           KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
         run: |
-          test -n "$KEYSTORE_B64" && test -n "$KEYSTORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD" || { echo 'Fixed signing secrets missing; refusing random-key APK'; exit 1; }
+          set -euo pipefail
+          test -n "$KEYSTORE_B64" && test -n "$KEYSTORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD" || { echo 'Missing fixed signing secrets; refusing APK'; exit 1; }
           umask 077
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/moto-fixed.p12"
           test -s "$RUNNER_TEMP/moto-fixed.p12"
-      - name: Sign release with required fixed identity
+      - name: Build, lint, and test fixed-signed release
         env:
           MOTO_SIGNING_STORE_FILE: ${{ runner.temp }}/moto-fixed.p12
           MOTO_SIGNING_STORE_PASSWORD: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
           MOTO_SIGNING_KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
           MOTO_SIGNING_KEY_PASSWORD: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
-        working-directory: MOTO-HUB
+          NEXT_CODE: ${{ steps.release-version.outputs.code }}
+        working-directory: source/MOTO-HUB
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleRelease --no-daemon
+          ./gradlew :app:assembleRelease :app:lintRelease :app:testReleaseUnitTest \
+            -PmotoReleaseCode="$NEXT_CODE" --no-daemon
+      - name: Verify APK package, version, certificate and checksum
+        env:
+          NEXT_CODE: ${{ steps.release-version.outputs.code }}
+          SOURCE_REVISION: ${{ steps.release-version.outputs.revision }}
+        working-directory: source/MOTO-HUB
+        run: |
+          set -euo pipefail
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
-          ACTUAL=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
-          EXPECTED=212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b
-          test "$ACTUAL" = "$EXPECTED" || { echo "WRONG SIGNING CERTIFICATE. Refusing APK. Expected: $EXPECTED; got: $ACTUAL"; exit 1; }
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='com.motohub.next'" > app/build/outputs/apk/release/version-check.txt
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$SIGNER" verify --verbose --print-certs "$APK" > app/build/outputs/apk/release/signature.txt
+          CERT=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' app/build/outputs/apk/release/signature.txt | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          test "$CERT" = "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b" || { echo "Wrong certificate"; exit 1; }
+          "$AAPT" dump badging "$APK" > app/build/outputs/apk/release/badging.txt
+          grep -q "package: name='com.motohub.next'" app/build/outputs/apk/release/badging.txt
+          grep -q "versionCode='$NEXT_CODE'" app/build/outputs/apk/release/badging.txt
           sha256sum "$APK" > app/build/outputs/apk/release/SHA256.txt
-          echo "$ACTUAL" > app/build/outputs/apk/release/certificate-SHA256.txt
-      - name: Publish verified release artifact
+          printf 'source_revision=%s\nversion_code=%s\ncertificate_sha256=%s\n' "$SOURCE_REVISION" "$NEXT_CODE" "$CERT" > app/build/outputs/apk/release/release-verification.txt
+          cat app/build/outputs/apk/release/SHA256.txt >> app/build/outputs/apk/release/release-verification.txt
+      - name: Archive exact built source (no keystore)
+        run: |
+          git -C source archive --format=zip --output="$GITHUB_WORKSPACE/MOTO-HUB-source.zip" HEAD:MOTO-HUB
+          sha256sum MOTO-HUB-source.zip > MOTO-HUB-source-SHA256.txt
+      - name: Preserve verified APK, reports and source
         uses: actions/upload-artifact@v4
         with:
-          name: MOTO-HUB-FIXED-SIGNED-${{ steps.source-revision.outputs.commit }}
-          path: MOTO-HUB/app/build/outputs/apk/release/
+          name: MOTO-HUB-FIXED-v${{ steps.release-version.outputs.code }}-${{ steps.release-version.outputs.revision }}
+          path: |
+            source/MOTO-HUB/app/build/outputs/apk/release/
+            source/MOTO-HUB/app/build/reports/
+            source/MOTO-HUB/app/build/test-results/
+            MOTO-HUB-source.zip
+            MOTO-HUB-source-SHA256.txt
           if-no-files-found: error
           retention-days: 90
-      - name: Scrub private material
+      - name: Publish verified release and manifest (opt-in only)
+        if: ${{ inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT_CODE: ${{ steps.release-version.outputs.code }}
+        run: |
+          set -euo pipefail
+          APK=source/MOTO-HUB/app/build/outputs/apk/release/app-release.apk
+          TAG="moto-hub-v$NEXT_CODE"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "Existing tag: refusing overwrite"; exit 1; fi
+          gh release create "$TAG" "$APK#MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" --title "MOTO HUB $NEXT_CODE (fixed signed)" --notes "Fixed certificate update; install only if current certificate matches."
+          ASSET="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
+          python3 source/MOTO-HUB/tools/make_update_manifest.py \
+            --apk "$APK" --apk-url "$ASSET" \
+            --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" \
+            --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            --output release-meta/updates/manifest.json
+          git -C release-meta config user.name 'github-actions[bot]'
+          git -C release-meta config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C release-meta add updates/manifest.json
+          git -C release-meta commit -m "Publish fixed-signed MOTO HUB $NEXT_CODE update [skip ci]"
+          git -C release-meta push origin HEAD:main
+      - name: Erase temporary signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/moto-fixed.p12"
