@@ -14,6 +14,13 @@ final class BackupFormat {
  static final String RECEIPT=ReceiptSlots.PATTERN;
  static final String PHOTO="garage-photo-[a-fA-F0-9-]{36}\\.jpg";
  static final String TRACK="[0-9]{10,15}-[a-f0-9-]{36}\\.track";
+ static final String MODEL_PHOTO="[a-f0-9]{24}\\.jpg";
+ static final String MODEL_META="[a-f0-9]{24}\\.jpg\\.json";
+ static boolean isModelPhoto(String name){return name!=null&&name.matches("model-photos/"+MODEL_PHOTO);}
+ static boolean isModelMetadata(String name){return name!=null&&name.matches("model-photos/"+MODEL_META);}
+ static boolean selectedModelMetadata(String data){
+  return data!=null&&java.util.regex.Pattern.compile("\\\"userSelected\\\"\\s*:\\s*true").matcher(data).find();
+ }
  static String sidecarSuffix(String name){
   for(String suffix:new String[]{".done",".imported",".recovered",".unmerged",".mergedinto",".bike",".category"})
    if(name.endsWith(suffix))return suffix;
@@ -28,16 +35,17 @@ final class BackupFormat {
   String suffix=sidecarSuffix(name);
   return !suffix.isEmpty()&&name.substring(0,name.length()-suffix.length()).matches("rides/"+TRACK);
  }
- static boolean isDirectory(String name){return "rides/".equals(name)||"photos/".equals(name)||"receipts/".equals(name)||"gpx/".equals(name);}
+ static boolean isDirectory(String name){return "rides/".equals(name)||"photos/".equals(name)||"receipts/".equals(name)||"gpx/".equals(name)||"model-photos/".equals(name);}
  static boolean allowed(String name,boolean directory){
   if(name==null||name.startsWith("/")||name.contains("..")||name.contains("\\")||name.indexOf('\0')>=0)return false;
   if(directory)return isDirectory(name);
-  return "MOTO-HUB-data.json".equals(name)||"README-KO.txt".equals(name)||isPhoto(name)||isReceipt(name)||isTrack(name)||isGpx(name)||isSidecar(name);
+  return "MOTO-HUB-data.json".equals(name)||"README-KO.txt".equals(name)||isPhoto(name)||isReceipt(name)||isTrack(name)||isGpx(name)||isSidecar(name)||isModelPhoto(name)||isModelMetadata(name);
  }
  static long entryLimit(String name){
   if("MOTO-HUB-data.json".equals(name))return MAX_JSON_BYTES;
   if("README-KO.txt".equals(name))return 8192;
   if(isGpx(name))return MAX_GPX_BYTES;
+  if(isModelMetadata(name))return 8192;
   if(isSidecar(name)){
    if(name.endsWith(".mergedinto"))return 100;
    if(name.endsWith(".category")||name.endsWith(".bike"))return 64;

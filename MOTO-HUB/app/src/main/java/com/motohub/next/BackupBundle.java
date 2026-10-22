@@ -83,6 +83,25 @@ public final class BackupBundle {
    Arrays.sort(receipts,Comparator.comparing(File::getName));
    for(File file:receipts){total=writeFile(zip,file,"receipts/"+file.getName(),total);count++;}
   }
+  // Save user-selected online gallery images, not auto-recoverable downloaded thumbnails.
+  File modelFolder=new File(internal,"moto-year-photos");
+  requireDirectoryIfPresent(modelFolder);
+  File[] selectedModels=modelFolder.listFiles((dir,name)->name.matches(BackupFormat.MODEL_PHOTO));
+  if(selectedModels!=null){
+   Arrays.sort(selectedModels,Comparator.comparing(File::getName));
+   if(selectedModels.length>BackupFormat.MAX_PHOTOS)throw new IOException("선택한 모델 사진이 너무 많습니다.");
+   int selectedCount=0;
+   for(File image:selectedModels){
+    requireRegular(image);
+    File metadata=new File(modelFolder,image.getName()+".json");
+    if(!metadata.exists()&&!Files.isSymbolicLink(metadata.toPath()))continue; // no manual selection
+    byte[] attribution=readSidecar(metadata,8192);
+    if(!BackupFormat.selectedModelMetadata(new String(attribution,StandardCharsets.UTF_8)))continue;
+    if(++selectedCount>BackupFormat.MAX_PHOTOS)throw new IOException("직접 고른 모델 사진이 너무 많습니다.");
+    total=writeFile(zip,image,"model-photos/"+image.getName(),total);count++;
+    total=writeFile(zip,metadata,"model-photos/"+metadata.getName(),total);count++;
+   }
+  }
   File rides=new File(internal,"rides");File[] tracks=rides.listFiles((dir,name)->name.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));
   if(tracks!=null){if(tracks.length>BackupFormat.MAX_TRACKS)throw new IOException("주행 기록 10,000건 백업 한도를 초과했습니다.");
    Arrays.sort(tracks,Comparator.comparing(File::getName));
