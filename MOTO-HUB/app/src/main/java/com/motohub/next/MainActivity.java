@@ -1281,14 +1281,23 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
          RestoreCapacity.ensure(RestoreCapacity.available(getFilesDir()),required);
          // Write old JSON rollback BEFORE replacing any user files.
          AtomicFile rollback=new AtomicFile(new File(getFilesDir(),"before-import.json"));atomic(rollback,previous);
-         boolean oldProtected=readOnly;
+         // Do not use write(next) here: it performs post-commit checkpoint work
+         // that can throw after the JSON is already persisted. At this point the
+         // asset rollback would otherwise undo files but leave NEW JSON on disk.
          ready.install(getFilesDir(),json->{
           JSONObject next=Store.parse(json);
           if(RideService.running||RideService.autoArmed)throw new IOException(RestoreRideGate.MESSAGE);
-          readOnly=false;try{write(next);}catch(Exception ex){readOnly=oldProtected;throw ex;}
+          atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));
+          db=next;readOnly=false; // no fallible work after the JSON commit
          });
-         readOnly=false;
-         runOnUiThread(()->{selected="";compare.clear();render();toast("복원 완료 · GPS "+ready.rides+"개 · 사진 "+ready.photos+"개");});
+         // Non-critical follow-up must never turn a successfully committed restore
+         // into an asset-only rollback. The previous JSON remains in before-import.json.
+         boolean checkpointOk=true;
+         try{LocalSafetyBackup.checkpoint(this,db);}catch(Exception ignored){checkpointOk=false;}
+         final boolean checkpointReady=checkpointOk;
+         runOnUiThread(()->{selected="";compare.clear();render();
+          toast("복원 완료 · GPS "+ready.rides+"개 · 사진 "+ready.photos+"개"+
+           (checkpointReady?"":" · 자동 안전 백업 갱신 실패"));});
         }catch(Exception e){runOnUiThread(()->error("전체 백업 복원 실패: "+e.getMessage()));}
         finally{if(entered)RestoreRideGate.end();ready.close();}
        },"MOTO-ZIP-restore-apply").start();
