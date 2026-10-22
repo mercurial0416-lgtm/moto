@@ -89,6 +89,9 @@ final class MotorcyclePhoto {
  private static Bitmap downloadImage(String s,int maxDimension)throws Exception{
   URL url=new URL(s);if(!"https".equals(url.getProtocol())||!"upload.wikimedia.org".equals(url.getHost()))return null;
   HttpURLConnection c=(HttpURLConnection)url.openConnection();try{c.setConnectTimeout(7000);c.setReadTimeout(10000);c.setInstanceFollowRedirects(false);
+   // Wikimedia discourages anonymous library-default User-Agent requests, including thumbnails.
+   c.setRequestProperty("User-Agent","MotoHubAndroid/4.0 (motorcycle photo lookup; https://github.com/mercurial0416-lgtm/moto)");
+   c.setRequestProperty("Accept","image/jpeg,image/png,image/webp");
    if(c.getResponseCode()!=200)return null;int length=c.getContentLength();if(length>4500000)return null;
    try(InputStream in=c.getInputStream()){
     ByteArrayOutputStream out=new ByteArrayOutputStream();byte[] chunk=new byte[4096];int n;while((n=in.read(chunk))!=-1){if(out.size()+n>4500000)return null;out.write(chunk,0,n);}

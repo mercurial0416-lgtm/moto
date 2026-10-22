@@ -28,6 +28,10 @@ final class MotorcyclePhotoGallery {
  private static final java.util.concurrent.ExecutorService PHOTO_IO=java.util.concurrent.Executors.newFixedThreadPool(2,r->{
   Thread t=new Thread(r,"moto-gallery-image");t.setDaemon(true);return t;
  });
+ // Photo selection must not sit behind a queue of six thumbnail downloads.
+ private static final java.util.concurrent.ExecutorService SAVE_IO=java.util.concurrent.Executors.newSingleThreadExecutor(r->{
+  Thread t=new Thread(r,"moto-gallery-selected-photo");t.setDaemon(true);return t;
+ });
 
  static void choose(MainActivity a,String brand,String model,int year){
   new AlertDialog.Builder(a).setTitle("바이크 사진 변경")
@@ -52,26 +56,37 @@ final class MotorcyclePhotoGallery {
   ScrollView scroll=new ScrollView(a);scroll.addView(body);
   AlertDialog dialog=new AlertDialog.Builder(a).setTitle("온라인 모델 사진 갤러리")
    .setView(scroll).setNegativeButton("닫기",null).create();
-  AtomicBoolean canceled=new AtomicBoolean(false);
+  AtomicBoolean canceled=new AtomicBoolean(false),applying=new AtomicBoolean(false);
+  // Accessed only on the UI thread; clear views before recycling their bitmaps.
+  List<Bitmap> previews=new ArrayList<>();
   PhotoGalleryLoadGate gate=new PhotoGalleryLoadGate();
-  dialog.setOnDismissListener(d->{canceled.set(true);gate.close();});
-  Button retry=a.button("다시 검색",false,()->loadChoices(a,brand,model,year,info,rows,recovery,dialog,canceled,gate));
+  dialog.setOnDismissListener(d->{
+   canceled.set(true);gate.close();
+   rows.removeAllViews();
+   for(Bitmap preview:previews)if(preview!=null&&!preview.isRecycled())preview.recycle();
+   previews.clear();
+  });
+  Button retry=a.button("다시 검색",false,()->loadChoices(a,brand,model,year,info,rows,recovery,dialog,canceled,applying,previews,gate));
   retry.setContentDescription("온라인 모델 사진 다시 검색");
   recovery.addView(retry,new LinearLayout.LayoutParams(-1,-2));
   Button local=a.button("휴대폰에서 사진 등록",true,()->{dialog.dismiss();a.chooseGaragePhoto();});
   LinearLayout.LayoutParams localParams=new LinearLayout.LayoutParams(-1,-2);
   localParams.topMargin=a.dp(8);recovery.addView(local,localParams);
   dialog.show();
-  loadChoices(a,brand,model,year,info,rows,recovery,dialog,canceled,gate);
+  loadChoices(a,brand,model,year,info,rows,recovery,dialog,canceled,applying,previews,gate);
  }
 
  /** A retry invalidates earlier asynchronous search results instead of letting them overwrite the new state. */
  private static void loadChoices(MainActivity a,String brand,String model,int year,TextView info,
                                  LinearLayout rows,LinearLayout recovery,AlertDialog dialog,
-                                 AtomicBoolean canceled,PhotoGalleryLoadGate gate){
+                                 AtomicBoolean canceled,AtomicBoolean applying,List<Bitmap> previews,
+                                 PhotoGalleryLoadGate gate){
   final int request=gate.begin();
   if(request<0)return;
-  rows.removeAllViews();recovery.setVisibility(View.GONE);
+  rows.removeAllViews();
+  for(Bitmap preview:previews)if(preview!=null&&!preview.isRecycled())preview.recycle();
+  previews.clear();
+  recovery.setVisibility(View.GONE);
   info.setText("Wikimedia Commons 사진 검색 중…");
   new Thread(()->{
    final List<JSONObject> choices;
@@ -89,7 +104,7 @@ final class MotorcyclePhotoGallery {
     }
     recovery.setVisibility(View.GONE);
     info.setText("검색 결과 "+choices.size()+"장 · 사진을 눌러 적용");
-    for(JSONObject choice:choices)addChoice(a,rows,dialog,canceled,choice,brand,model,year);
+    for(JSONObject choice:choices)addChoice(a,rows,dialog,canceled,applying,previews,choice,brand,model,year);
    });
   },"moto-photo-gallery-search").start();
  }
@@ -110,7 +125,7 @@ final class MotorcyclePhotoGallery {
  }
 
  private static void addChoice(MainActivity a,LinearLayout rows,AlertDialog dialog,AtomicBoolean canceled,
-                               JSONObject choice,String brand,String model,int year){
+                               AtomicBoolean applying,List<Bitmap> previews,JSONObject choice,String brand,String model,int year){
   LinearLayout row=new LinearLayout(a);row.setOrientation(LinearLayout.HORIZONTAL);
   row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(a.dp(10),a.dp(10),a.dp(10),a.dp(10));
   row.setBackground(a.shape(a.panel,a.line,12));
@@ -126,11 +141,10 @@ final class MotorcyclePhotoGallery {
   LinearLayout.LayoutParams rowp=new LinearLayout.LayoutParams(-1,-2);rowp.bottomMargin=a.dp(9);rows.addView(row,rowp);
   row.setContentDescription("모델 사진 선택: "+choice.optString("label"));
   row.setClickable(true);row.setFocusable(true);
-  final Bitmap[] preview={null};
   row.setOnClickListener(v->{
-   if(canceled.get())return;
+   if(canceled.get()||!applying.compareAndSet(false,true))return;
    row.setEnabled(false);caption.setText("사진 적용 중…");
-   PHOTO_IO.execute(()->{
+   SAVE_IO.execute(()->{
     String problem=null;
     Bitmap bitmap=null;
     try{
@@ -144,7 +158,7 @@ final class MotorcyclePhotoGallery {
     a.runOnUiThread(()->{
      if(canceled.get()||a.isFinishing()||a.isDestroyed())return;
      if(failure==null){dialog.dismiss();a.toast("모델 사진을 변경했어요.");a.render();}
-     else{caption.setText(failure);row.setEnabled(true);}
+     else{caption.setText(failure);row.setEnabled(true);applying.set(false);}
     });
    });
   });
@@ -156,7 +170,7 @@ final class MotorcyclePhotoGallery {
     if(ready!=null&&!ready.isRecycled())ready.recycle();
     return;
    }
-    if(ready!=null){image.setImageBitmap(ready);previewStatus.setText("미리보기 준비됨");}
+    if(ready!=null){previews.add(ready);image.setImageBitmap(ready);previewStatus.setText("미리보기 준비됨");}
     else{previewStatus.setText("미리보기 실패 · 선택하면 다시 시도");image.setContentDescription("사진 미리보기 불러오기 실패");}
    });
   });
