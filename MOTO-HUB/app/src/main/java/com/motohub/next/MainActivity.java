@@ -29,6 +29,7 @@ public class MainActivity extends Activity {
  String activeForm="";JSONObject activeOld=new JSONObject();
  String garagePhotoTarget="",receiptPhotoTarget="",receiptPhotoKey="";int receiptPhotoSlot=1;
  Map<String,EditText> ocrFields;String ocrKind="";LinearLayout ocrDateMileageFields;TextView ocrMetaSummary;String cameraCaptureName="";
+ EditText quickOdoField;
  String catalogBrand="", catalogModel="";
  boolean dark,readOnly;int bg,fg,muted,line,accent,panel,highlight;
  final Set<String> compare=new LinkedHashSet<>();
@@ -580,7 +581,7 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
  void more(){new HubScreens(this).settings();}
  void choose(String title,String[] values,Choice c){new AlertDialog.Builder(this).setTitle(title).setItems(values,(d,i)->c.pick(values[i])).show();}
  void open(String url){if(!Store.safeUrl(url)){error("올바른 웹 주소가 아닙니다.");return;}attempt(()->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url))));}
- void close(){hideKeyboard();boolean dirty=formDirty;if(dialog!=null){persistDraft();dialog.dismiss();dialog=null;}draftFields=null;draftSelectors=null;fullTankBox=null;ocrFields=null;ocrKind="";ocrDateMileageFields=null;ocrMetaSummary=null;formOptionalSection=null;formOptionalToggle=null;formOptionalKeys.clear();formDirty=false;if(dirty)render();}
+ void close(){hideKeyboard();boolean dirty=formDirty;if(dialog!=null){persistDraft();dialog.dismiss();dialog=null;}draftFields=null;draftSelectors=null;fullTankBox=null;ocrFields=null;ocrKind="";quickOdoField=null;ocrDateMileageFields=null;ocrMetaSummary=null;formOptionalSection=null;formOptionalToggle=null;formOptionalKeys.clear();formDirty=false;if(dirty)render();}
  LinearLayout page(String title){close();dialog=new Dialog(this);LinearLayout outer=col();outer.setBackgroundColor(bg);outer.setPadding(dp(20),dp(14),dp(20),dp(14));LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);TextView caption=text(title,24,fg,true);bar.addView(caption,new LinearLayout.LayoutParams(0,-2,1));Button done=button("닫기",false,this::close);done.setMinHeight(dp(42));done.setTextSize(13);done.setBackground(shape(panel,0,12));bar.addView(done);outer.addView(bar);View separator=new View(this);separator.setBackgroundColor(line);LinearLayout.LayoutParams sep=new LinearLayout.LayoutParams(-1,dp(1));sep.topMargin=dp(15);outer.addView(separator,sep);ScrollView scroll=new ScrollView(this);formBody=col();formBody.setPadding(0,dp(20),0,dp(20));scroll.addView(formBody);outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));formFooter=col();outer.addView(formFooter);dialog.setContentView(outer);outer.setOnApplyWindowInsetsListener((v,i)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets in=i.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());v.setPadding(dp(20)+in.left,dp(12)+in.top,dp(20)+in.right,dp(12)+in.bottom);}return i;});return formBody;}
  void show(){dialog.setOnDismissListener(d->{persistDraft();if(formDirty)render();});dialog.show();Window w=dialog.getWindow();w.setLayout(-1,-1);w.setStatusBarColor(bg);w.setNavigationBarColor(bg);w.getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);w.getDecorView().requestApplyInsets();}
  final Set<String> numbers=new HashSet<>(Arrays.asList("odo","year","purchase","price","mileage","cost","amount","liters","nextKm","distance"));
@@ -1342,6 +1343,39 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
   });
  }
  void exportData(){attempt(()->{pendingExport=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-"+today()+".json");startActivityForResult(i,41);});}
+ /** A quick-log odometer is suggested from a locally chosen photo and applied only after approval. */
+ void chooseQuickOdometerPhoto(EditText field){
+  if(readOnly||dialog==null||field==null||quickOdoField!=field){toast("주유 기록 화면을 확인해 주세요.");return;}
+  Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+  pick.addCategory(Intent.CATEGORY_OPENABLE);pick.setType("image/*");
+  startActivityForResult(pick,57);
+ }
+ void scanQuickOdometerPhoto(Uri uri){
+  final EditText target=quickOdoField;
+  if(target==null||dialog==null||!dialog.isShowing()){toast("주유 기록을 다시 열어 주세요.");return;}
+  toast("계기판 사진을 기기 안에서 인식 중이에요.");
+  ReceiptOcr.scan(this,uri,new ReceiptOcr.Callback(){
+   public void failure(String message){if(!isFinishing()&&!isDestroyed()&&quickOdoField==target)error(message);}
+   public void success(String recognized){
+    if(isFinishing()||isDestroyed()||quickOdoField!=target||dialog==null||!dialog.isShowing())return;
+    java.util.List<String> suggestions=OdometerOcrCandidates.fromText(recognized);
+    if(suggestions.isEmpty()){error("주행거리 숫자를 찾지 못했어요. 숫자가 선명한 사진을 선택하거나 직접 입력해 주세요.");return;}
+    String[] choices=new String[suggestions.size()];
+    for(int i=0;i<choices.length;i++)choices[i]=suggestions.get(i)+" km";
+    new AlertDialog.Builder(MainActivity.this)
+      .setTitle("계기판 주행거리 확인")
+      .setMessage("OCR 인식값이 실제 계기판과 같은지 확인하세요. 입력칸에만 적용하며 저장은 따로 해야 합니다.")
+      .setSingleChoiceItems(choices,0,(dialog,index)->{
+       if(quickOdoField==target&&MainActivity.this.dialog!=null&&MainActivity.this.dialog.isShowing()){
+        String candidate=suggestions.get(index);
+        target.setText(candidate);target.setSelection(target.getText().length());
+        toast("입력칸에만 적용했어요. 확인 후 저장해 주세요.");
+       }
+       dialog.dismiss();
+      }).setNegativeButton("직접 입력",null).show();
+   }
+  });
+ }
  /** The OCR suggestion is never persisted or applied without explicit user approval. */
  void scanReceiptOcr(Uri uri,Runnable cleanup){
   final Map<String,EditText> fields=ocrFields;final String key=ocrKind;
@@ -1397,6 +1431,7 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치가 취소되었거나 완료되지 않았습니다. 기존 기록은 삭제하지 않았습니다.");return;}if(request==55||request==56){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
    GARAGE_PHOTO_SAVER.execute(()->{try{saveGaragePhoto(uri,bikeId);}catch(Exception error){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())this.error("바이크 사진 저장 실패: "+error.getMessage());});}});return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
   if(request==54){scanReceiptOcr(uri,null);return;}
+  if(request==57){scanQuickOdometerPhoto(uri);return;}
   if(request==46){prepareBundleRestore(uri);return;}
   if(request==48){char[] password=pendingSecurePassword;pendingSecurePassword=null;
    if(password==null){error("암호를 다시 입력해 주세요.");return;}
