@@ -246,6 +246,7 @@ public class MainActivity extends Activity {
   }
   Uri local=Uri.fromFile(file); // Never exposed to another application.
   if(request==55){scanReceiptOcr(local,()->ReceiptCameraFiles.delete(getCacheDir(),name));return;}
+  if(request==58){scanQuickOdometerPhoto(local,()->ReceiptCameraFiles.delete(getCacheDir(),name));return;}
   new Thread(()->{try{saveReceiptPhoto(local);}catch(Exception e){runOnUiThread(()->error("사진 첨부 실패: "+e.getMessage()));}
    finally{ReceiptCameraFiles.delete(getCacheDir(),name);}},"moto-receipt-camera-save").start();
  }
@@ -1350,13 +1351,42 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
   pick.addCategory(Intent.CATEGORY_OPENABLE);pick.setType("image/*");
   startActivityForResult(pick,57);
  }
- void scanQuickOdometerPhoto(Uri uri){
+ void startQuickOdometerCamera(EditText target){
+  if(readOnly||dialog==null||!dialog.isShowing()||quickOdoField!=target){
+   toast("주유 기록 화면을 확인해 주세요.");return;
+  }
+  if(!cameraCaptureName.isEmpty()){toast("이미 촬영 중이에요.");return;}
+  File file=null;
+  try{
+   file=ReceiptCameraFiles.create(getCacheDir());
+   Uri photo=androidx.core.content.FileProvider.getUriForFile(this,getPackageName()+".receiptcamera",file);
+   Intent capture=new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+   capture.putExtra(android.provider.MediaStore.EXTRA_OUTPUT,photo);
+   capture.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_READ_URI_PERMISSION);
+   capture.setClipData(ClipData.newUri(getContentResolver(),"계기판 임시 사진",photo));
+   cameraCaptureName=file.getName();
+   startActivityForResult(capture,58);
+  }catch(Exception e){
+   if(file!=null)ReceiptCameraFiles.delete(getCacheDir(),file.getName());
+   cameraCaptureName="";
+   error("카메라를 열지 못했어요. 갤러리에서 선택하거나 직접 입력해 주세요.");
+  }
+ }
+ void scanQuickOdometerPhoto(Uri uri){scanQuickOdometerPhoto(uri,null);}
+ void scanQuickOdometerPhoto(Uri uri,Runnable cleanup){
   final EditText target=quickOdoField;
-  if(target==null||dialog==null||!dialog.isShowing()){toast("주유 기록을 다시 열어 주세요.");return;}
+  if(target==null||dialog==null||!dialog.isShowing()){
+   if(cleanup!=null)cleanup.run();
+   toast("주유 기록을 다시 열어 주세요.");return;
+  }
   toast("계기판 사진을 기기 안에서 인식 중이에요.");
   ReceiptOcr.scan(this,uri,new ReceiptOcr.Callback(){
-   public void failure(String message){if(!isFinishing()&&!isDestroyed()&&quickOdoField==target)error(message);}
+   public void failure(String message){
+    if(cleanup!=null)cleanup.run();
+    if(!isFinishing()&&!isDestroyed()&&quickOdoField==target)error(message);
+   }
    public void success(String recognized){
+    if(cleanup!=null)cleanup.run();
     if(isFinishing()||isDestroyed()||quickOdoField!=target||dialog==null||!dialog.isShowing())return;
     java.util.List<String> suggestions=OdometerOcrCandidates.fromText(recognized);
     if(suggestions.isEmpty()){error("주행거리 숫자를 찾지 못했어요. 숫자가 선명한 사진을 선택하거나 직접 입력해 주세요.");return;}
@@ -1428,7 +1458,7 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
     toast("입력칸에만 적용했어요. 확인 후 저장해 주세요.");
    }).show();
  }
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치가 취소되었거나 완료되지 않았습니다. 기존 기록은 삭제하지 않았습니다.");return;}if(request==55||request==56){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치가 취소되었거나 완료되지 않았습니다. 기존 기록은 삭제하지 않았습니다.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
    GARAGE_PHOTO_SAVER.execute(()->{try{saveGaragePhoto(uri,bikeId);}catch(Exception error){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())this.error("바이크 사진 저장 실패: "+error.getMessage());});}});return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
   if(request==54){scanReceiptOcr(uri,null);return;}
   if(request==57){scanQuickOdometerPhoto(uri);return;}
