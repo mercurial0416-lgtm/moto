@@ -45,6 +45,7 @@ final class BackupFormat {
   private boolean sawImage,sawPage,sawExact,selectionPresent;
   private boolean imageString,pageString,exactBoolean;
   private int selectionType;
+  private String currentString="";
   PhotoSelectionJson(String input){value=input;}
   boolean validAutomaticFields(){return sawImage&&sawPage&&sawExact&&imageString&&pageString&&exactBoolean;}
   boolean atEnd(){return index==value.length();}
@@ -125,7 +126,7 @@ final class BackupFormat {
      expect(',');skipSpace();
     }
    }
-   if(c=='"'){readString();return 3;}
+   if(c=='"'){currentString=readString();return 3;}
    if(c=='t'){keyword("true");return 1;}
    if(c=='f'){keyword("false");return 2;}
    if(c=='n'){keyword("null");return 0;}
@@ -146,10 +147,10 @@ final class BackupFormat {
       seen=true;selectionPresent=true;selectionType=typed;selected=typed==1;
      }else if("imageUrl".equals(key)){
       if(sawImage)throw new IllegalArgumentException("Duplicate imageUrl key");
-      sawImage=true;imageString=typed==3;
+      sawImage=true;imageString=typed==3&&currentString.startsWith("https://upload.wikimedia.org/");
      }else if("pageUrl".equals(key)){
       if(sawPage)throw new IllegalArgumentException("Duplicate pageUrl key");
-      sawPage=true;pageString=typed==3;
+      sawPage=true;pageString=typed==3&&currentString.startsWith("https://commons.wikimedia.org/");
      }else if("exactYearCandidate".equals(key)){
       if(sawExact)throw new IllegalArgumentException("Duplicate exactYearCandidate key");
       sawExact=true;exactBoolean=typed==1||typed==2;
