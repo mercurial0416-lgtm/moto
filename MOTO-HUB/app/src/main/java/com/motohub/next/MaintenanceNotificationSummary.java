@@ -20,8 +20,9 @@ final class MaintenanceNotificationSummary {
    JSONObject bike=bikes.optJSONObject(i);
    if(bike==null||GarageBikeStatus.sold(bike.optString("soldDate")))continue;
    List<JSONObject> history=new ArrayList<>();
-   // Latest appended record must win when dates and odometer match.
-   for(int j=services.length()-1;j>=0;j--){
+   // Keep append order: the shared latest-per-type resolver now selects the
+   // last saved record on exact ties, just like the garage and widget.
+   for(int j=0;j<services.length();j++){
     JSONObject record=services.optJSONObject(j);
     if(record!=null&&bike.optString("id").equals(record.optString("vehicleId")))history.add(record);
    }

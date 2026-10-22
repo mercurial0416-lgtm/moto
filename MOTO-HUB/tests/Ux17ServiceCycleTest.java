@@ -35,6 +35,17 @@ public final class Ux17ServiceCycleTest {
   Store.upsert(db,"services",completed);
   ok(!MaintenanceNotificationSummary.from(db,date).hasNotice(),"completion clears old due warning");
   Store.parse(db.toString());
+  // Completing a schedule immediately with the same date AND odometer used to
+  // leave the garage on the old plan while the notification followed the new one.
+  JSONObject sameDayPlan=QuickRecordDraft.maintenance("a","체인",date,15400,0,date,0,6);
+  Store.upsert(db,"services",sameDayPlan);
+  ok(MaintenanceNotificationSummary.from(db,date).due==1,"same-day due schedule detected");
+  JSONObject sameDayDone=ServiceCycle.completed(sameDayPlan,date,15400,0);
+  Store.upsert(db,"services",sameDayDone);
+  ok(LatestServiceByType.latest(java.util.Arrays.asList(sameDayPlan,sameDayDone),"a").get("체인")==sameDayDone,
+   "garage latest record uses just-completed cycle on exact ties");
+  ok(!MaintenanceNotificationSummary.from(db,date).hasNotice(),
+   "notification agrees with garage after same-day completion");
   bike.put("odo",18100);
   ok(MaintenanceNotificationSummary.from(db,date).soon==1,"next service fires at new cycle threshold");
   bad(()->ServiceCycle.completed(plan,date,-1,0),"negative odometer rejected");

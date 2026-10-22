@@ -30,6 +30,12 @@ public final class LatestServiceByTypeTest {
   check(LatestServiceByType.latest(Arrays.asList(old),null).isEmpty(),"null bike safe");
   check(LatestServiceByType.latest(Arrays.asList(row("cub"," ","2026-10-20",10,100)),"cub").isEmpty(),"empty service name ignored");
   check(LatestServiceByType.latest(Arrays.asList(old,old),"cub").get("엔진오일")==old,"stable equal record");
+  JSONObject registered=row("cub","체인","2026-10-22",6000,6050);
+  JSONObject completed=row("cub","체인","2026-10-22",6000,9000);
+  check(LatestServiceByType.latest(Arrays.asList(registered,completed),"cub").get("체인")==completed,
+   "same-day same-mileage completion supersedes earlier plan");
+  check(LatestServiceByType.latest(Arrays.asList(completed,registered),"cub").get("체인")==registered,
+   "exact ties follow stored append order, not due distance");
   System.out.println("PASS garage latest-service reminder: "+n+" checks");
  }
 }
