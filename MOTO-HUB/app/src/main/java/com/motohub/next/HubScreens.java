@@ -64,7 +64,8 @@ final class HubScreens {
   a.label(actions,"빠른 기록",16,a.fg,true);
   a.pair(actions,"간편 주유",()->new QuickEntryUi(a).fuel(),"정비주기 설정",()->new QuickEntryUi(a).maintenance());
   a.action(actions,"정비 완료 내역 등록",false,()->a.edit("services",null));a.action(actions,"기타 비용·영수증 상세 입력",false,()->a.edit("expenses",null));a.action(actions,"정비 항목 일괄 등록",false,a::batchServiceEntry);
-  a.content.addView(actions);a.gap(a.content,14);
+  a.content.addView(actions);a.gap(a.content,16);
+  new ServiceStatusUi(a).render(a.content);a.gap(a.content,15);
   String bikeId=a.bike().optString("id");
   JSONObject lastFuel=null;
   for(JSONObject record:a.items("expenses"))if(bikeId.equals(record.optString("vehicleId"))&&"주유".equals(record.optString("type"))){
