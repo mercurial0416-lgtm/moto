@@ -19,9 +19,10 @@ public final class RestoreArchive {
   private Prepared(File dir,String data,int p,int receipts,int r){staging=dir;json=data;photos=p;this.receipts=receipts;rides=r;}
   /** Snapshot disk-space requirement before replacing any of the current assets. */
   public long requiredSpace(File internal)throws IOException {
+   List<String> fresh=stagedAssets(staging);
    return RestoreCapacity.required(
-    RestoreCapacity.sum(internal,existingAssets(internal)),
-    RestoreCapacity.sum(staging,existingAssets(staging)),
+    RestoreCapacity.sum(internal,oldAssets(internal,fresh)),
+    RestoreCapacity.sum(staging,fresh),
     json.getBytes(StandardCharsets.UTF_8).length);
   }
   /** Replaces backed-up local assets and invokes caller's atomic JSON writer LAST. */
@@ -31,9 +32,9 @@ public final class RestoreArchive {
    RestoreCapacity.ensure(RestoreCapacity.available(internal),requiredSpace(internal));
    File backup=new File(internal,"moto-rollback-"+UUID.randomUUID());
    if(!backup.mkdirs())throw new IOException("복원 안전 사본 폴더 생성 실패");
-   List<String> old=existingAssets(internal);
+   List<String> fresh=stagedAssets(staging);
+   List<String> old=oldAssets(internal,fresh);
    Set<String> existing=new HashSet<>(old);
-   List<String> fresh=existingAssets(staging);
    boolean preserveRollback=false;
    try {
     for(String name:old)copy(new File(internal,name),new File(backup,name));
@@ -78,22 +79,30 @@ public final class RestoreArchive {
     }
     if(name.contains("..")||name.contains("\\")||name.startsWith("/")||name.indexOf('\0')>=0)throw new IOException("안전하지 않은 ZIP 경로입니다.");
     boolean data=name.equals("MOTO-HUB-data.json"),
+       modelPhoto=BackupFormat.isModelPhoto(name),
+       modelMeta=BackupFormat.isModelMetadata(name),
        photo=name.startsWith("photos/")&&name.substring(7).matches(PHOTO),
        receipt=name.startsWith("receipts/")&&name.substring(9).matches(RECEIPT),
        track=name.startsWith("rides/")&&name.substring(6).matches(RIDE),
        marker=name.startsWith("rides/")&&(name.substring(6).matches(RIDE+"\\.done")||name.substring(6).matches(RIDE+"\\.imported")||name.substring(6).matches(RIDE+"\\.recovered")||name.substring(6).matches(RIDE+"\\.mergedinto")||name.substring(6).matches(RIDE+"\\.unmerged")||name.substring(6).matches(RIDE+"\\.category")||name.substring(6).matches(RIDE+"\\.bike")),
        gpx=name.startsWith("gpx/")&&name.substring(4).matches("[0-9]{10,15}-[a-f0-9-]{36}\\.gpx"),
        readme=name.equals("README-KO.txt");
-    if(!data&&!photo&&!receipt&&!track&&!marker&&!gpx&&!readme)throw new IOException("지원하지 않는 ZIP 항목: "+name);
-    long limit=data?8_000_000L:(marker?(name.endsWith(".mergedinto")?100L:(name.endsWith(".category")||name.endsWith(".bike")?64L:0L)):(gpx?50_000_000L:MAX_ENTRY));long size=0;
+    if(!data&&!photo&&!receipt&&!track&&!marker&&!gpx&&!readme&&!modelPhoto&&!modelMeta)throw new IOException("지원하지 않는 ZIP 항목: "+name);
+    long limit=BackupFormat.entryLimit(name);long size=0;
     ByteArrayOutputStream jsonBytes=data?new ByteArrayOutputStream():null;
-    File destination=(photo||receipt||track||marker)?new File(stage,photo?name.substring(7):(receipt?name.substring(9):name)):null;
+    File destination=(photo||receipt||track||marker||modelPhoto||modelMeta)?
+     new File(stage,(modelPhoto||modelMeta)?"moto-year-photos/"+name.substring(13):
+       (photo?name.substring(7):(receipt?name.substring(9):name))):null;
     if(destination!=null&&!destination.getParentFile().isDirectory()&&!destination.getParentFile().mkdirs())throw new IOException("임시 파일 저장 실패");
     try(OutputStream out=destination==null?(jsonBytes==null?new OutputStream(){public void write(int b){}public void write(byte[] b,int off,int len){}}:jsonBytes):new BufferedOutputStream(new FileOutputStream(destination))){
      int n;while((n=zip.read(buffer))!=-1){size+=n;total+=n;if(size>limit||total>MAX_TOTAL)throw new IOException("백업 ZIP 용량 제한을 초과했어요.");out.write(buffer,0,n);}
     }
     if(data){json=new String(jsonBytes.toByteArray(),StandardCharsets.UTF_8);if(json.isEmpty())throw new IOException("JSON 기록이 비어 있어요.");}
-    if(photo||receipt){if(size<4||!jpeg(destination))throw new IOException("잘못된 JPG 사진입니다.");if(photo&&++photos>BackupFormat.MAX_PHOTOS)throw new IOException("바이크 사진이 너무 많습니다.");if(receipt&&++receipts>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증 사진이 너무 많습니다.");}
+    if(photo||receipt||modelPhoto){
+     if(size<4||!jpeg(destination))throw new IOException("잘못된 JPG 사진입니다.");
+     if((photo||modelPhoto)&&++photos>BackupFormat.MAX_PHOTOS*2)throw new IOException("바이크 사진이 너무 많습니다.");
+     if(receipt&&++receipts>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증 사진이 너무 많습니다.");
+    }
     if(track){
      int points=TrackFile.read(destination,(a,b,c,d)->{});
      if(points<1){
@@ -110,6 +119,15 @@ public final class RestoreArchive {
     zip.closeEntry();
    }
    if(json==null)throw new IOException("MOTO-HUB-data.json이 들어 있지 않아요.");
+   for(String name:seen){
+    if(modelPhotoName(name)&&!seen.contains(name+".json"))
+     throw new IOException("모델 사진의 출처 정보가 누락됐습니다.");
+    if(BackupFormat.isModelMetadata(name)){
+     if(!seen.contains(name.substring(0,name.length()-5))||
+        !BackupFormat.selectedModelMetadata(new String(Files.readAllBytes(new File(stage,"moto-year-photos/"+name.substring(13)).toPath()),StandardCharsets.UTF_8)))
+      throw new IOException("모델 사진의 선택 정보가 손상됐습니다.");
+    }
+   }
    for(String name:incomplete)if(seen.contains(name+".done")||seen.contains(name+".imported")||seen.contains(name+".recovered")||seen.contains(name+".mergedinto"))
     throw new IOException("완료 처리된 GPS 기록은 좌표가 있어야 합니다.");
    for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".mergedinto")){
@@ -135,11 +153,40 @@ public final class RestoreArchive {
  private static boolean jpeg(File f)throws IOException{
   try(RandomAccessFile in=new RandomAccessFile(f,"r")){if(in.readUnsignedByte()!=0xff||in.readUnsignedByte()!=0xd8)return false;in.seek(in.length()-2);return in.readUnsignedByte()==0xff&&in.readUnsignedByte()==0xd9;}
  }
+ private static boolean modelPhotoName(String name){return BackupFormat.isModelPhoto(name);}
+ private static List<String> stagedAssets(File stage)throws IOException{
+  List<String> out=existingAssets(stage);
+  File folder=new File(stage,"moto-year-photos");
+  if(Files.isSymbolicLink(folder.toPath()))throw new IOException("안전하지 않은 모델 사진 폴더입니다.");
+  File[] modelFiles=folder.listFiles();
+  if(modelFiles!=null)for(File file:modelFiles){
+   String name=file.getName();
+   if(name.matches(BackupFormat.MODEL_PHOTO)||name.matches(BackupFormat.MODEL_META))
+    addSafeAsset(out,stage,file,"moto-year-photos/"+name);
+  }
+  return out;
+ }
+ private static List<String> oldAssets(File internal,List<String> incoming)throws IOException{
+  File folder=new File(internal,"moto-year-photos");
+  if(Files.isSymbolicLink(folder.toPath())||
+      (Files.exists(folder.toPath(),LinkOption.NOFOLLOW_LINKS)&&
+       !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS)))
+   throw new IOException("기존 모델 사진 폴더가 안전하지 않습니다.");
+  List<String> old=existingAssets(internal);
+  for(String path:incoming)if(path.startsWith("moto-year-photos/")){
+   File file=new File(internal,path);
+   if(Files.exists(file.toPath(),LinkOption.NOFOLLOW_LINKS))
+    addSafeAsset(old,internal,file,path);
+  }
+  return old;
+ }
  private static void addSafeAsset(List<String> out,File root,File file,String path)throws IOException{
   if(Files.isSymbolicLink(file.toPath())||
     !Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS))
    throw new IOException("복원 대상에 안전하지 않은 파일이 있습니다: "+path);
-  if(!file.getParentFile().equals(path.startsWith("rides/")?new File(root,"rides"):root))
+  File expected=path.startsWith("rides/")?new File(root,"rides"):
+   (path.startsWith("moto-year-photos/")?new File(root,"moto-year-photos"):root);
+  if(!file.getParentFile().equals(expected))
    throw new IOException("복원 파일 경로가 앱 저장소 밖입니다.");
   out.add(path);
  }

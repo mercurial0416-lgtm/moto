@@ -8,11 +8,19 @@ public class BackupBundleTest {
   try{
    Files.writeString(track.toPath(),TrackFile.point(37,127,5,1792120000000L)+TrackFile.point(37.001,127,5,1792120010000L));
    new File(track.getPath()+".recovered").createNewFile();
-   File photo=new File(root,"garage-photo-12345678-1234-1234-1234-123456789abc.jpg");Files.write(photo.toPath(),new byte[]{1,2,3});
+   byte[] jpg={(byte)255,(byte)216,1,2,(byte)255,(byte)217};
+   File photo=new File(root,"garage-photo-12345678-1234-1234-1234-123456789abc.jpg");Files.write(photo.toPath(),jpg);
+   File galleryDir=new File(root,"moto-year-photos");galleryDir.mkdirs();
+   File selected=new File(galleryDir,"abcdef0123456789abcdef01.jpg");Files.write(selected.toPath(),jpg);
+   File attribution=new File(galleryDir,selected.getName()+".json");
+   Files.writeString(attribution.toPath(),"{\"userSelected\":true,\"label\":\"Honda Super Cub\"}");
    ByteArrayOutputStream out=new ByteArrayOutputStream();int files=BackupBundle.export("{\"version\":3}",root,out);
-   ok(files==3,"file count");
+   ok(files==5,"selected gallery image + attribution included");
    Set<String> entries=new HashSet<>();try(ZipInputStream zip=new ZipInputStream(new ByteArrayInputStream(out.toByteArray()))){ZipEntry e;while((e=zip.getNextEntry())!=null)entries.add(e.getName());}
-   for(String n:new String[]{"README-KO.txt","MOTO-HUB-data.json","rides/"+track.getName(),"photos/"+photo.getName(),"gpx/"+track.getName().replace(".track",".gpx"),"rides/"+track.getName()+".recovered"})ok(entries.contains(n),"missing "+n);
+   for(String n:new String[]{"README-KO.txt","MOTO-HUB-data.json","rides/"+track.getName(),"photos/"+photo.getName(),"gpx/"+track.getName().replace(".track",".gpx"),"rides/"+track.getName()+".recovered",
+    "model-photos/"+selected.getName(),"model-photos/"+attribution.getName()})ok(entries.contains(n),"missing "+n);
+   BackupIntegrity.Result verified=BackupIntegrity.verify(new ByteArrayInputStream(out.toByteArray()));
+   ok(verified.photos==2,"selected gallery photo verified by ZIP readback");
    ok(entries.stream().noneMatch(x->x.contains("..")),"zip traversal");
    // Reject symlinks even when their file names match our normal backup patterns.
    File outside=File.createTempFile("moto-external-secret",".jpg");
@@ -41,6 +49,12 @@ public class BackupBundleTest {
     rides.mkdirs();
    }finally{linkedRides.delete();}
    System.out.println("PASS full ZIP backup: file, photo, ride, GPX, privacy README");
-  }finally{for(File f:Objects.requireNonNull(rides.listFiles()))f.delete();rides.delete();for(File f:Objects.requireNonNull(root.listFiles()))f.delete();root.delete();}
+  }finally{
+   for(File f:Objects.requireNonNull(rides.listFiles()))f.delete();rides.delete();
+   File modelDir=new File(root,"moto-year-photos");
+   File[] chosen=modelDir.listFiles();if(chosen!=null)for(File f:chosen)f.delete();
+   modelDir.delete();
+   for(File f:Objects.requireNonNull(root.listFiles()))f.delete();root.delete();
+  }
  }
 }

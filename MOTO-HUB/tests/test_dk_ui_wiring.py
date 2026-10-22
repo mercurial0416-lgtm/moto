@@ -17,7 +17,7 @@ checks={
  'receipt backed up': '"receipts/"+file.getName()' in backup,
  'receipt restored': 'receipt=name.startsWith("receipts/")' in restore,
  'receipt path whitelisted': 'isReceipt(name)' in fmt,
- 'receipt valid JPEG required': 'if(photo||receipt){if(size<4||!jpeg(destination))' in restore,
+ 'receipt and selected model photos require valid JPEG': 'if(photo||receipt||modelPhoto)' in restore and 'if(size<4||!jpeg(destination))' in restore,
  'validation rejects corrupted JPEG': 'throw new IOException("손상된 사진 파일입니다.")' in integrity,
  'fast record cards': 'a.pair(actions,"간편 주유",()->new QuickEntryUi(a).fuel(),"정비주기 설정",()->new QuickEntryUi(a).maintenance())' in hub and 'a::batchServiceEntry' in hub,
  'record filtering': '"전체","주유","정비","기타"' in hub,

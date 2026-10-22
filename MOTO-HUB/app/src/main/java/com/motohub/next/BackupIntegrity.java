@@ -24,21 +24,21 @@ final class BackupIntegrity {
     if(!BackupFormat.allowed(name,entry.isDirectory())||!names.add(name))
      throw new IOException("백업 ZIP 항목이 유효하지 않습니다.");
     if(BackupFormat.isTrack(name)&&++tracks>BackupFormat.MAX_TRACKS)throw new IOException("GPS 기록이 너무 많습니다.");
-    if(BackupFormat.isPhoto(name)&&++photos>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 너무 많습니다.");
+    if((BackupFormat.isPhoto(name)||BackupFormat.isModelPhoto(name))&&++photos>BackupFormat.MAX_PHOTOS*2)throw new IOException("사진이 너무 많습니다.");
     if(BackupFormat.isReceipt(name)&&++receipts>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증 사진이 너무 많습니다.");
     if("MOTO-HUB-data.json".equals(name))hasData=true;
     long size=0,limit=BackupFormat.entryLimit(name);
-    ByteArrayOutputStream value=BackupFormat.isSidecar(name)&&limit>0?new ByteArrayOutputStream():null;
+    ByteArrayOutputStream value=(BackupFormat.isSidecar(name)&&limit>0)||BackupFormat.isModelMetadata(name)?new ByteArrayOutputStream():null;
     int n;byte[] header=new byte[2],trailer=new byte[2];
     while((n=zip.read(buffer))!=-1){
-     if(BackupFormat.isReceipt(name)||BackupFormat.isPhoto(name)){
+     if(BackupFormat.isReceipt(name)||BackupFormat.isPhoto(name)||BackupFormat.isModelPhoto(name)){
       for(int ix=0;ix<n;ix++){long pos=size+ix;if(pos<2)header[(int)pos]=buffer[ix];trailer[0]=trailer[1];trailer[1]=buffer[ix];}
      }
      size+=n;total+=n;
      if(size>limit||total>BackupFormat.MAX_TOTAL_BYTES)throw new IOException("백업 크기 제한을 초과했습니다.");
      if(value!=null)value.write(buffer,0,n);
     }
-    if((BackupFormat.isReceipt(name)||BackupFormat.isPhoto(name))&&(size<4||(header[0]&255)!=255||(header[1]&255)!=216||(trailer[0]&255)!=255||(trailer[1]&255)!=217))throw new IOException("손상된 사진 파일입니다.");
+    if((BackupFormat.isReceipt(name)||BackupFormat.isPhoto(name)||BackupFormat.isModelPhoto(name))&&(size<4||(header[0]&255)!=255||(header[1]&255)!=216||(trailer[0]&255)!=255||(trailer[1]&255)!=217))throw new IOException("손상된 사진 파일입니다.");
     if(name.equals("MOTO-HUB-data.json")&&size==0)throw new IOException("백업 기록이 비어 있습니다.");
     if(value!=null)small.put(name,value.toString("UTF-8"));
     zip.closeEntry(); // Checks the entry CRC before a success message is shown.
@@ -46,6 +46,13 @@ final class BackupIntegrity {
   }
   if(!hasData)throw new IOException("백업에서 데이터 파일을 찾지 못했어요.");
   for(String name:names){
+   if(BackupFormat.isModelPhoto(name)&&!names.contains(name+".json"))
+    throw new IOException("선택한 모델 사진 출처 정보가 누락됐습니다.");
+   if(BackupFormat.isModelMetadata(name)){
+    if(!names.contains(name.substring(0,name.length()-5))||
+       !BackupFormat.selectedModelMetadata(small.get(name)))
+     throw new IOException("선택한 모델 사진 출처 정보가 손상됐습니다.");
+   }
    if(!BackupFormat.isSidecar(name))continue;
    String suffix=BackupFormat.sidecarSuffix(name);
    String origin=name.substring(0,name.length()-suffix.length());
