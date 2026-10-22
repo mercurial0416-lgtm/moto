@@ -422,8 +422,9 @@ final class RideUi {
    File f=entry.file;String date=entry.date,status=entry.status;
    boolean live=RideHistoryFilter.ACTIVE.equals(status);
    boolean interrupted=RideHistoryFilter.INTERRUPTED.equals(status);
+   boolean starred=RideFavorite.isFavorite(f);
    String detail=live?"현재 기록 중 · 종료 후 상세 확인":RideHistoryFilter.IMPORTED.equals(status)?"가져온 GPX · 분석과 지도 보기":RideHistoryFilter.COMPLETE.equals(status)?"주행 완료 · 거리·시간·지도":RideHistoryFilter.RECOVERED.equals(status)?"복구된 라이딩 · 거리·시간·지도":"중단된 기록 · 복구하고 분석하기";
-    new HubScreens(a).line(results,date,detail,live?"기록 중":interrupted?"복구  ›":"자세히  ›",()->{
+    new HubScreens(a).line(results,(starred?"★  ":"")+date,detail,live?"기록 중":interrupted?"복구  ›":"자세히  ›",()->{
      if(live){a.toast("기록을 종료하면 주행 요약을 볼 수 있어요.");return;}
      if(interrupted){
       new AlertDialog.Builder(a).setTitle("중단된 GPS 기록 복구")
@@ -439,6 +440,17 @@ final class RideUi {
      }
      a.openRideInsights(f);
     });
+    if(!live&&!interrupted&&!a.readOnly){
+     Button star=a.button(starred?"★ 즐겨찾기 해제":"☆ 이 라이딩 즐겨찾기",false,()->{
+      a.attempt(()->{
+       boolean selected=RideFavorite.toggle(f);
+       a.toast(selected?"라이딩 즐겨찾기에 추가했어요.":"즐겨찾기를 해제했어요.");
+       // Refresh only the local row and re-read the exact sidecar state.
+       showHistoryResults(results,entries,total,selected,summary);
+      });
+     });
+     star.setTextSize(12);star.setMinHeight(a.dp(38));results.addView(star);
+    }
   }
   final int remaining=RideHistoryPage.remaining(count,shown);
   if(remaining>0){

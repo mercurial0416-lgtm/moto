@@ -71,5 +71,5 @@ final class PrivateCacheCleanup {
   }
   try{return Files.deleteIfExists(dir.toPath());}catch(IOException e){return false;}
  }
- private static boolean recognizedTrack(String name){return name.matches(BackupFormat.TRACK+"(\\.(done|imported|recovered|mergedinto|unmerged|category|bike))?");}
+ private static boolean recognizedTrack(String name){return name.matches(BackupFormat.TRACK+"(\\.(done|imported|recovered|mergedinto|unmerged|category|bike|favorite))?");}
 }
