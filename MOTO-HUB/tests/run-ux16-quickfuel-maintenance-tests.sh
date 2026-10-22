@@ -29,6 +29,7 @@ assert 'new QuickEntryUi(this).fuel()' in main and 'new QuickEntryUi(this).maint
 assert main.count('DailyMaintenanceJob.checkSoon(this)')>=4, 'original editor changes retrigger deadline checks'
 assert 'MaintenanceNotificationSummary.from(db,today)' in job
 assert '.setContentText(reminder.detail)' in job and '.setVisibility(Notification.VISIBILITY_PRIVATE)' in job
-assert 'if(remindersEnabled(this)&&!RideService.running)' in job, 'never alert without opt-in or while riding'
+assert 'boolean enabled=remindersEnabled(this)' in job and 'if(enabled&&!RideService.running)sendMaintenanceReminder(db)' in job, 'never alert without opt-in or while riding'
+assert 'else if(!enabled)clearReminderState(this)' in job, 'opt-out clears stale notification state'
 print('PASS UX16 quick forms, notification consent, privacy, duplicate warning, save and scheduling wiring')
 PY
