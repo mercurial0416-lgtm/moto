@@ -73,7 +73,7 @@ public final class DailyMaintenanceJob extends JobService {
    getSharedPreferences("notifications",MODE_PRIVATE).edit().remove("last_maintenance_notice").apply();
    return;
   }
-  String stamp=today+":"+reminder.fingerprint;
+  String stamp="service:"+reminder.fingerprint;
   android.content.SharedPreferences prefs=getSharedPreferences("notifications",MODE_PRIVATE);
   if(stamp.equals(prefs.getString("last_maintenance_notice","")))return;
   manager.createNotificationChannel(new NotificationChannel("maintenance","정비 예정 알림",NotificationManager.IMPORTANCE_DEFAULT));
