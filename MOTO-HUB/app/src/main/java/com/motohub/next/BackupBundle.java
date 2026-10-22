@@ -32,8 +32,22 @@ public final class BackupBundle {
   if(file.length()>maxBytes)throw new IOException("라이딩 부속 파일 크기가 너무 큽니다: "+file.getName());
   return Files.readAllBytes(file.toPath());
  }
+ /** Check the same JPEG envelope as the import path BEFORE publishing ZIP bytes. */
+ private static void requireJpeg(File file)throws IOException{
+  requireRegular(file);
+  if(file.length()<4)throw new IOException("백업 이미지가 손상됐습니다: "+file.getName());
+  try(RandomAccessFile jpeg=new RandomAccessFile(file,"r")){
+   if(jpeg.readUnsignedByte()!=0xff||jpeg.readUnsignedByte()!=0xd8)
+    throw new IOException("백업 이미지가 손상됐습니다: "+file.getName());
+   jpeg.seek(file.length()-2);
+   if(jpeg.readUnsignedByte()!=0xff||jpeg.readUnsignedByte()!=0xd9)
+    throw new IOException("백업 이미지가 손상됐습니다: "+file.getName());
+  }
+ }
  private static long writeFile(ZipOutputStream zip,File file,String name,long total)throws IOException{
   requireRegular(file);
+  if(BackupFormat.isPhoto(name)||BackupFormat.isReceipt(name)||BackupFormat.isModelPhoto(name))
+   requireJpeg(file);
   if(file.length()>TrackFile.MAX_BYTES)throw new IOException("백업 항목이 25MB를 넘었어요: "+file.getName());
   if(total+file.length()>MAX_TOTAL)throw new IOException("백업 최대 크기(250MB)를 넘었어요. GPX를 개별로 내보내 주세요.");
   zip.putNextEntry(new ZipEntry(name));byte[] buffer=new byte[32768];long done=0;

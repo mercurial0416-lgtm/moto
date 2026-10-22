@@ -22,6 +22,19 @@ public class BackupBundleTest {
    BackupIntegrity.Result verified=BackupIntegrity.verify(new ByteArrayInputStream(out.toByteArray()));
    ok(verified.photos==2,"selected gallery photo verified by ZIP readback");
    ok(entries.stream().noneMatch(x->x.contains("..")),"zip traversal");
+   // Broken images must fail *before* a ZIP can be mistaken for a usable backup.
+   Files.write(selected.toPath(),new byte[]{1,2,3,4,5,6});
+   try{
+    BackupBundle.export("{\"version\":3}",root,new ByteArrayOutputStream());
+    throw new AssertionError("corrupted selected photo was archived");
+   }catch(IOException expected){ok(expected.getMessage().contains("손상"),"corrupted gallery JPEG rejected");}
+   Files.write(selected.toPath(),jpg);
+   Files.write(photo.toPath(),new byte[]{1,2,3,4,5,6});
+   try{
+    BackupBundle.export("{\"version\":3}",root,new ByteArrayOutputStream());
+    throw new AssertionError("corrupted garage photo was archived");
+   }catch(IOException expected){ok(expected.getMessage().contains("손상"),"corrupted garage JPEG rejected");}
+   Files.write(photo.toPath(),jpg);
    // Reject symlinks even when their file names match our normal backup patterns.
    File outside=File.createTempFile("moto-external-secret",".jpg");
    try{

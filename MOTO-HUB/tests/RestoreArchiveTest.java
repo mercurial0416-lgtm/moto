@@ -25,6 +25,8 @@ public class RestoreArchiveTest {
   ByteArrayOutputStream b=new ByteArrayOutputStream();try(ZipOutputStream z=new ZipOutputStream(b)){
    put(z,"MOTO-HUB-data.json","{\"version\":3,\"vehicles\":[],\"listings\":[],\"services\":[],\"expenses\":[]}".getBytes());
    put(z,"photos/"+P,JPG);
+   // Standard ZIP creators often include explicit directory entries.
+   put(z,"model-photos/",new byte[0]);
    put(z,"model-photos/"+MODEL,MODEL_JPG);
    put(z,"model-photos/"+MODEL+".json","{\"userSelected\":true,\"label\":\"Honda Super Cub 110\"}".getBytes());
    put(z,"rides/"+T,(TrackFile.point(37,127,5,1792120000000L)+TrackFile.point(37.001,127,5,1792120010000L)).getBytes());
