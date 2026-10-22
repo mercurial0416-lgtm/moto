@@ -1294,6 +1294,7 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
          // into an asset-only rollback. The previous JSON remains in before-import.json.
          boolean checkpointOk=true;
          try{LocalSafetyBackup.checkpoint(this,db);}catch(Exception ignored){checkpointOk=false;}
+         try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){ /* Restore is already committed. */ }
          final boolean checkpointReady=checkpointOk;
          runOnUiThread(()->{selected="";compare.clear();render();
           toast("복원 완료 · GPS "+ready.rides+"개 · 사진 "+ready.photos+"개"+
