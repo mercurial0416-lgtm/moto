@@ -126,7 +126,7 @@ final class QuickEntryUi {
   };
   distanceChoice.setOnItemSelectedListener(revealCustom);
   dateChoice.setOnItemSelectedListener(revealCustom);
-  a.gap(body,13);a.label(body,"등록한 거리까지 500km 남거나 예정일까지 30일 남으면 알림을 보냅니다. 제조사 공식 정비주기는 직접 확인해 주세요.",13,a.muted,false);
+  a.gap(body,13);a.label(body,"정비주기 끝에 가까워지면 알림을 보냅니다. 짧은 주기는 등록 즉시 울리지 않도록 알림 시점을 조정해요. 공식 정비주기는 제조사 매뉴얼을 확인해 주세요.",13,a.muted,false);
   a.action(body,"저장",true,()->a.attempt(()->{
    int kmInterval=intervals[distanceChoice.getSelectedItemPosition()];
    int monthsInterval=months[dateChoice.getSelectedItemPosition()];
@@ -154,7 +154,7 @@ final class QuickEntryUi {
  }
  private void askEnableNotifications(){
   new AlertDialog.Builder(a).setTitle("정비 알림을 켤까요?")
-   .setMessage("다음 정비일까지 30일 이내 또는 정비 거리까지 500km 이내일 때 휴대폰 알림을 보냅니다. 주행거리는 기록된 계기판 기준이며, 배터리 제한에 따라 알림이 지연될 수 있습니다. 언제든 설정에서 끌 수 있습니다.")
+   .setMessage("등록한 정비주기가 다가오면 휴대폰 알림을 보냅니다. 주행거리는 앱에 저장한 계기판 기준이며, 짧은 주기에는 알림 범위가 더 좁아집니다. 배터리 제한에 따라 알림이 지연될 수 있고 설정에서 언제든 끌 수 있습니다.")
    .setNegativeButton("나중에",(d,w)->a.toast("정비주기는 저장됐어요. 알림은 설정에서 켤 수 있어요."))
    .setPositiveButton("알림 켜기",(d,w)->{
     a.getSharedPreferences("notifications",0).edit().putBoolean("maintenance_opt_in",true).apply();
