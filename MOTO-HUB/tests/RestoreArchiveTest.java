@@ -33,6 +33,15 @@ public class RestoreArchiveTest {
    put(z,"rides/"+T+".recovered",new byte[0]);
   }return b.toByteArray();
  }
+ static byte[] modelWithMetadata(String meta)throws Exception{
+  ByteArrayOutputStream b=new ByteArrayOutputStream();
+  try(ZipOutputStream z=new ZipOutputStream(b)){
+   put(z,"MOTO-HUB-data.json","{}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+   put(z,"model-photos/"+MODEL,MODEL_JPG);
+   put(z,"model-photos/"+MODEL+".json",meta.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  }
+  return b.toByteArray();
+ }
  static void put(ZipOutputStream z,String name,byte[] content)throws Exception{z.putNextEntry(new ZipEntry(name));z.write(content);z.closeEntry();}
  static void reject(File root,byte[] b){try(RestoreArchive.Prepared p=RestoreArchive.prepare(new ByteArrayInputStream(b),root)){throw new AssertionError("accepted unsafe archive");}catch(AssertionError e){throw e;}catch(Exception correct){checks++;}}
  public static void main(String[]args)throws Exception{
@@ -84,6 +93,10 @@ public class RestoreArchiveTest {
    reject(root,archive(new String[][]{{"MOTO-HUB-data.json","{}"},{"photos/"+P,"not JPEG"}}));
    reject(root,archive(new String[][]{{"README-KO.txt","missing json"}}));
    reject(root,archive(new String[][]{{"MOTO-HUB-data.json","{}"},{"model-photos/"+MODEL+".json","{\"userSelected\":true}"}}));
+   reject(root,modelWithMetadata("{\"note\":{\"userSelected\":true}}"));
+   reject(root,modelWithMetadata("{\"userSelected\":false,\"note\":\"\\\"userSelected\\\":true\"}"));
+   reject(root,modelWithMetadata("{\"userSelected\":true,\"userSelected\":false}"));
+   reject(root,modelWithMetadata("{\"userSelected\":true,}"));
    reject(root,archive(new String[][]{{"MOTO-HUB-data.json","{}"},{"model-photos/"+MODEL,"badPhoto"}}));
    reject(root,archive(new String[][]{{"MOTO-HUB-data.json","{}"},{"rides/"+T+".done","evil"}}));
    reject(root,archive(new String[][]{{"MOTO-HUB-data.json","{}"},{"rides/"+T+".recovered",""}}));
