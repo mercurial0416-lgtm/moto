@@ -13,6 +13,13 @@ public class RestoreArchiveTest {
  static final byte[] MODEL_JPG={(byte)0xff,(byte)0xd8,0x55,0x66,(byte)0xff,(byte)0xd9};
  static final byte[] JPG={(byte)0xff,(byte)0xd8,0x01,0x02,(byte)0xff,(byte)0xd9};
  static byte[] archive(String[][] entries)throws Exception {ByteArrayOutputStream b=new ByteArrayOutputStream();try(ZipOutputStream z=new ZipOutputStream(b)){for(String[] pair:entries){z.putNextEntry(new ZipEntry(pair[0]));z.write(pair[1].getBytes(java.nio.charset.StandardCharsets.UTF_8));z.closeEntry();}}return b.toByteArray();}
+ static byte[] legacy()throws Exception{
+  ByteArrayOutputStream b=new ByteArrayOutputStream();try(ZipOutputStream z=new ZipOutputStream(b)){
+   put(z,"MOTO-HUB-data.json","{\"version\":3,\"vehicles\":[],\"listings\":[],\"services\":[],\"expenses\":[]}".getBytes());
+   put(z,"photos/"+P,JPG);
+   put(z,"rides/"+T,(TrackFile.point(37,127,5,1792120000000L)+TrackFile.point(37.001,127,5,1792120010000L)).getBytes());
+  }return b.toByteArray();
+ }
  static byte[] good()throws Exception{
   ByteArrayOutputStream b=new ByteArrayOutputStream();try(ZipOutputStream z=new ZipOutputStream(b)){
    put(z,"MOTO-HUB-data.json","{\"version\":3,\"vehicles\":[],\"listings\":[],\"services\":[],\"expenses\":[]}".getBytes());
@@ -45,6 +52,11 @@ public class RestoreArchiveTest {
    File galleryMetadata=new File(root,"moto-year-photos/"+MODEL+".json");
    ok(Arrays.equals(MODEL_JPG,Files.readAllBytes(galleryImage.toPath())),"chosen model JPG roundtrips");
    ok(Files.readString(galleryMetadata.toPath()).contains("userSelected"),"chosen image attribution roundtrips");
+   try(RestoreArchive.Prepared earlier=RestoreArchive.prepare(new ByteArrayInputStream(legacy()),root)){
+    earlier.install(root,value->{});
+   }
+   ok(Arrays.equals(MODEL_JPG,Files.readAllBytes(galleryImage.toPath())),"legacy ZIP retains current selected model image");
+   ok(Files.readString(galleryMetadata.toPath()).contains("userSelected"),"legacy ZIP keeps selected attribution");
    ok(TrackFile.read(new File(rides,T),(a,b,c,d)->{})==2,"GPS restored");
    ok(new File(rides,T+".recovered").exists(),"recovery marker copied");
    byte[] original=Files.readAllBytes(new File(rides,T).toPath());

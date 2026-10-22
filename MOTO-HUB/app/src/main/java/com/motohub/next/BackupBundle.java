@@ -68,6 +68,7 @@ public final class BackupBundle {
    "MOTO-HUB-data.json은 앱 설정 > JSON 백업 가져오기로 복원합니다.\n"+
    "rides 폴더는 원본 기록, gpx 폴더는 가져오기로 복원 가능한 GPX 경로입니다.\n"+
    "photos에는 바이크 사진, receipts에는 정비·주유 영수증 사진이 있습니다.\n"+
+   "model-photos에는 온라인 갤러리에서 직접 고른 모델 사진과 출처 정보가 포함됩니다.\n"+
    "현재 버전에서는 설정 > 백업·복원 > 전체 ZIP 백업 복원으로 사진과 GPS도 한 번에 불러올 수 있습니다.\n"+
    "친구 로그인 토큰/인증키는 포함되지 않습니다. 위치가 포함될 수 있으니 공유하지 마세요.\n";
   zip.putNextEntry(new ZipEntry("README-KO.txt"));zip.write(readme.getBytes(StandardCharsets.UTF_8));zip.closeEntry();
