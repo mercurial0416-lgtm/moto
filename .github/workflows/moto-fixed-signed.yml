@@ -116,8 +116,8 @@ jobs:
           set -euo pipefail
           APK=source/MOTO-HUB/app/build/outputs/apk/release/app-release.apk
           TAG="moto-hub-v$NEXT_CODE"
-          if gh release view "$TAG" >/dev/null 2>&1; then echo "Existing tag: refusing overwrite"; exit 1; fi
-          gh release create "$TAG" "$APK#MOTO-HUB.apk" --title "MOTO HUB $NEXT_CODE (fixed signed)" --notes "Fixed certificate update; install only if current certificate matches."
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "Existing tag: refusing overwrite"; exit 1; fi
+          gh release create "$TAG" "$APK#MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" --title "MOTO HUB $NEXT_CODE (fixed signed)" --notes "Fixed certificate update; install only if current certificate matches."
           ASSET="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
           python3 source/MOTO-HUB/tools/make_update_manifest.py \
             --apk "$APK" --apk-url "$ASSET" \
