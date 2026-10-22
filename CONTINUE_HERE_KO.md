@@ -1,10 +1,10 @@
-# MOTO HUB 개발 재개 · 2026-10-22 · UX26
+# MOTO HUB 개발 재개 · 2026-10-23 · UX29
 
 ## 정확한 현재 소스
 - 저장소: https://github.com/mercurial0416-lgtm/moto
 - 브랜치: `build/di518-ux4-prebuild-20261020`
 - Android 소스: `MOTO-HUB/`
-- 최신 기능 통합 커밋: `648da5f86ba029bddc0b2817b65698b12741b4a6` (UX26)
+- 최신 기능 통합 커밋: `ac783ddacfd6050dcd13f991f3aa2c2fd07e7783` (UX29)
 - 패키지: `com.motohub.next`; 일반 debug `versionCode 518`
 - `main`은 릴리스 manifest·워크플로·역사적 ZIP 중심. **루트 ZIP에서 앱을 다시 만들지 말 것.**
 
@@ -30,10 +30,17 @@
 - **서명 주의:** 이번 APK는 Android Debug 인증서로 서명된 테스트본. 기존 고정 서명 앱에 덮어쓰기 불가. 현재 설치 앱 삭제 금지. 진짜 업데이트 APK는 비공개 고정 서명 인증서 검증이 선행되어야 함.
 - 유지비 6개월 바이크별 대시보드·계정 없는 로컬 저장은 **기존 소스에 이미 구현**, 이번에는 재작성하지 않음.
 
+## UX27 ~ UX29 최신 완료 (2026-10-23)
+- UX27: 신규 바이크/매물 등록의 '슈퍼커브 110', '2024' 고정 입력 예시를 제거; 실제로 저장된 값과 카탈로그 연식 선택은 유지. [PR #27](https://github.com/mercurial0416-lgtm/moto/pull/27), [CI 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39790863477).
+- UX28: 라이딩 즐겨찾기를 별도 큰 버튼 대신 기존 기록 행 내부 작은 별 버튼으로 변경; 주유 기록에서 계기판 카메라 즉시 촬영 → 온디바이스 OCR → 수동 확인 지원; 전체 ZIP 복원 후 부가 체크포인트 실패와 실제 복원 커밋 분리. [PR #28](https://github.com/mercurial0416-lgtm/moto/pull/28), [CI 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39799730195).
+- UX29: 전체 ZIP 복원 중 프로세스 종료 시 안전 저널(`moto-rollback-UUID`)에서 기존 GPS/사진 및 JSON 복구. 사전 스냅샷+pending/committed 표식, 시작 시 DB 읽기 이전에 원복, 중간 오류·악성 심볼릭 링크 차단 및 저장 보호. [PR #29](https://github.com/mercurial0416-lgtm/moto/pull/29), [CI 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39809333668).
+- 최신 테스트 APK: `MOTO-HUB-UX29-DEBUG-TEST.apk`, SHA-256 `954affcbb8f236ef7f13dbe6adfe6b9956f9f93d26d9ef72a49f22d56cc61cef`. **Android Debug 서명 인증서**. 기존 고정 서명 앱 위에 업데이트 설치 불가; 앱 삭제 금지. 고정 서명 인증서 SHA-256은 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`.
+- 이번 UX29에서 구현한 건 **프로세스 강제 종료를 가정한 순수 Java 회귀**이며 전원 차단/파일시스템 손상/Android 16 실기기 복구는 검증되지 않았음.
+
 ## 미완료, 별도 검증 필요
 - 갤럭시/Android 16 실기기의 온라인 사진 호출/실제 이미지 선택, 장시간 GPS 백그라운드, 대량 기록 UI, 정비 알림 권한/시간.
 - 사용자가 현재 설치한 앱과 고정 서명 인증서의 일치 여부. `main/.github/workflows/moto-fixed-signed.yml`에 비공개 서명 secrets가 구성됐는지는 확인하지 못했고 **실제 고정 서명 APK를 만들지 않았음**.
-- 진행 중 프로세스가 강제 종료된 순간의 복원 트랜잭션에 대해 앱 재시작 후 자동 롤백하는 별도 영속 저널은 아직 구현/검증되지 않았음. 현재 예외에 따른 롤백과 오래된 stage 정리는 있음.
+- 복원 영속 저널은 UX29에서 Java 회귀까지 구현·검증 완료. 갤럭시 Android 16 실기기 강제 종료·배터리 제거 수준 전원 차단 및 스토리지 부족 상황의 종단 간 검증은 여전히 필요.
 - 종단 간 UI 테스트 및 단말의 저사양/대량 데이터 성능 검증.
 
 ## 이어서 작업하는 절차
@@ -42,4 +49,4 @@
 3. 실기기 이전에는 **현재 앱을 삭제하거나 debug APK로 업데이트할 것을 지시하지 않는다.**
 4. 배포 시 고정 서명 키를 공개 저장소에 올리지 말고 인증서 SHA-256 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`와 현재 설치 앱 인증서를 먼저 확인한다.
 
-다른 대화에선 이 문서와 `MOTO-HUB/docs/DEVELOPMENT_RULES_AND_QUEUE_UX24_KO.md`를 읽고 UX27부터 이어서 수정해.
+다른 대화에선 이 문서와 `MOTO-HUB/docs/DEVELOPMENT_RULES_AND_QUEUE_UX24_KO.md`를 읽고 UX30부터 이어서 수정해.
