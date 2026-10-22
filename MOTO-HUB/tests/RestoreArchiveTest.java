@@ -18,6 +18,7 @@ public class RestoreArchiveTest {
    put(z,"MOTO-HUB-data.json","{\"version\":3,\"vehicles\":[],\"listings\":[],\"services\":[],\"expenses\":[]}".getBytes());
    put(z,"photos/"+P,JPG);
    put(z,"rides/"+T,(TrackFile.point(37,127,5,1792120000000L)+TrackFile.point(37.001,127,5,1792120010000L)).getBytes());
+   put(z,"rides/"+T+".recovered",new byte[0]);
   }return b.toByteArray();
  }
  static byte[] good()throws Exception{
