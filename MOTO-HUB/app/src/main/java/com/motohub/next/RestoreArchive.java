@@ -124,7 +124,7 @@ public final class RestoreArchive {
      throw new IOException("모델 사진의 출처 정보가 누락됐습니다.");
     if(BackupFormat.isModelMetadata(name)){
      if(!seen.contains(name.substring(0,name.length()-5))||
-        !BackupFormat.selectedModelMetadata(Files.readString(new File(stage,"moto-year-photos/"+name.substring(13)).toPath(),StandardCharsets.UTF_8)))
+        !BackupFormat.selectedModelMetadata(new String(Files.readAllBytes(new File(stage,"moto-year-photos/"+name.substring(13)).toPath()),StandardCharsets.UTF_8)))
       throw new IOException("모델 사진의 선택 정보가 손상됐습니다.");
     }
    }
