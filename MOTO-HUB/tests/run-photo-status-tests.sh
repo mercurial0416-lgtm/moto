@@ -13,6 +13,7 @@ p=Path('app/src/main/java/com/motohub/next/MotorcyclePhoto.java').read_text()
 checks={
  'lookup reports classified failures': 'candidateWithStatus(brand,model,year)' in p,
  'network error kept for UI': 'trace.searchFailed(error)' in p,
+ 'image download network failure kept for UI': 'trace.downloadFailed(downloadError)' in p,
  'missing photos identified': 'trace.searchSucceeded(candidates.size())' in p,
  'download failures identified': 'trace.imageFailed()' in p,
  'retry is clickable for catalog': 'credit.setOnClickListener(v->show(a,target,credit,brand,model,year,null));' in p,

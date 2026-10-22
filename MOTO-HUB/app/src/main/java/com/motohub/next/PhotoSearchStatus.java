@@ -31,14 +31,20 @@ final class PhotoSearchStatus {
   private boolean matchingCandidate;
   private boolean imageFailure;
   private Kind networkOrService;
+  private Kind downloadProblem;
   void searchSucceeded(int candidateCount){successfulSearch=true;if(candidateCount>0)matchingCandidate=true;}
   void imageFailed(){imageFailure=true;}
+  void downloadFailed(Exception error){
+   // Unlike search errors, these happened while reading an already matched photo.
+   Kind problem=classify(error);
+   if(problem==Kind.NETWORK||downloadProblem==null)downloadProblem=problem;
+  }
   void searchFailed(Exception error){
    Kind kind=classify(error);
    if(kind==Kind.NETWORK||networkOrService==null)networkOrService=kind;
   }
   Kind result(){
-   if(matchingCandidate||imageFailure)return Kind.IMAGE;
+   if(matchingCandidate||imageFailure)return downloadProblem==Kind.NETWORK?Kind.NETWORK:Kind.IMAGE;
    if(successfulSearch)return Kind.NO_MATCH;
    return networkOrService==null?Kind.SERVICE:networkOrService;
   }
