@@ -3,6 +3,8 @@ package com.motohub.next;
 /** Safe live fuel-price calculator: an incomplete formula cannot leave an old auto total. */
 final class FuelAutoAmount {
  private String lastAuto="";
+ /** A manually reused fuel entry must no longer be treated as our generated amount. */
+ void reset(){lastAuto="";}
  String update(String enteredAmount,String litersText,String priceText){
   String current=enteredAmount==null?"":enteredAmount;
   try{

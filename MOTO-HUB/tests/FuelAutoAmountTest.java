@@ -18,6 +18,8 @@ public final class FuelAutoAmountTest {
   eq("",entry.update("","0","1800"),"zero liters invalid");
   eq("8000",entry.update("8000",null,"1800"),"null input preserves manual amount");
   eq("9000",entry.update("","5","1,800"),"thousands separator accepted");
+  entry.reset();
+  eq("9000",entry.update("9000","",""),"manual reused amount not cleared after reset");
   System.out.println("PASS safe auto fuel amount: "+assertions+" cases");
  }
 }
