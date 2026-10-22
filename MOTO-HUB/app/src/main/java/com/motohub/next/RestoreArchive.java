@@ -74,7 +74,7 @@ public final class RestoreArchive {
     String name=entry.getName();if(++entries>MAX_ENTRIES)throw new IOException("백업 항목이 너무 많아요.");
     if(!seen.add(name))throw new IOException("중복 파일: "+name);
     if(entry.isDirectory()){
-     if(!name.equals("rides/")&&!name.equals("photos/")&&!name.equals("receipts/")&&!name.equals("gpx/"))throw new IOException("지원하지 않는 폴더입니다.");
+     if(!BackupFormat.allowed(name,true))throw new IOException("지원하지 않는 폴더입니다.");
      zip.closeEntry();continue;
     }
     if(name.contains("..")||name.contains("\\")||name.startsWith("/")||name.indexOf('\0')>=0)throw new IOException("안전하지 않은 ZIP 경로입니다.");
