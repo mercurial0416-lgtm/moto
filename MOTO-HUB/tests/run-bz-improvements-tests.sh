@@ -19,7 +19,7 @@ checks={
 'GPS gap resets previous fix': 'lastGood=null;lastFixElapsed=0;' in java('RideService') and 'Sharing.stop();' in java('RideService').split('@Override public void onProviderDisabled')[1].split('@Override public void onProviderEnabled')[0],
 'GPS peak metric updated': 'livePeakKmh=Math.max(' in java('RideService') and 'RideService.livePeakKmh' in java('RideUi'),
 'maintenance private on lockscreen': 'setVisibility(Notification.VISIBILITY_PRIVATE)' in java('DailyMaintenanceJob'),
-'gallery IO bounded': 'newFixedThreadPool(2' in java('MotorcyclePhotoGallery') and java('MotorcyclePhotoGallery').count('PHOTO_IO.execute(')==2,
+'gallery IO bounded': 'newFixedThreadPool(2' in java('MotorcyclePhotoGallery') and java('MotorcyclePhotoGallery').count('PHOTO_IO.execute(')==1 and java('MotorcyclePhotoGallery').count('SAVE_IO.execute(')==1,
 'restore comparison before consent': 'RestorePreview.text(verified,db,ready.rides,ready.photos)' in java('MainActivity') and '.setPositiveButton("전체 복원"' in java('MainActivity'),
 'ride comparison visible': 'RideTrend.compare(report.current.km,report.previous.km)' in java('RideUi'),
 'group consent untouched': '.setPositiveButton("동의하고 공유"' in java('GroupUi') and 'Sharing.start(id)' in java('GroupUi'),
