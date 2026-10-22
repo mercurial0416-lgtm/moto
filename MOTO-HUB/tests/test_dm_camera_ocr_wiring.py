@@ -7,7 +7,7 @@ checks={
  'separate provider': 'MotoCameraFileProvider' in a and 'android:exported="false"' in a and 'android:grantUriPermissions="true"' in a,
  'no CAMERA permission': 'android.permission.CAMERA' not in a,
  'persist capture across rotation':'out.putString("cameraCaptureName"' in m and 'state.getString("cameraCaptureName"' in m,
- 'camera result handled before null data guard':'if(request==55||request==56){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null' in m,
+ 'camera result handled before null data guard':'if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null' in m,
  'explicit high-resolution output':'MediaStore.EXTRA_OUTPUT' in m,
  'temporary content uri grant':'FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_READ_URI_PERMISSION' in m and 'setClipData(' in m,
  'camera gallery both':'카메라로 촬영' in m and '갤러리에서 선택' in m,
