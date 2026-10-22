@@ -104,7 +104,7 @@ final class MotorcyclePhotoGallery {
     }
     recovery.setVisibility(View.GONE);
     info.setText("검색 결과 "+choices.size()+"장 · 사진을 눌러 적용");
-    for(JSONObject choice:choices)addChoice(a,rows,dialog,canceled,applying,previews,choice,brand,model,year);
+    for(JSONObject choice:choices)addChoice(a,rows,dialog,canceled,applying,previews,gate,request,choice,brand,model,year);
    });
   },"moto-photo-gallery-search").start();
  }
@@ -125,7 +125,8 @@ final class MotorcyclePhotoGallery {
  }
 
  private static void addChoice(MainActivity a,LinearLayout rows,AlertDialog dialog,AtomicBoolean canceled,
-                               AtomicBoolean applying,List<Bitmap> previews,JSONObject choice,String brand,String model,int year){
+                               AtomicBoolean applying,List<Bitmap> previews,PhotoGalleryLoadGate gate,
+                               int request,JSONObject choice,String brand,String model,int year){
   LinearLayout row=new LinearLayout(a);row.setOrientation(LinearLayout.HORIZONTAL);
   row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(a.dp(10),a.dp(10),a.dp(10),a.dp(10));
   row.setBackground(a.shape(a.panel,a.line,12));
@@ -142,7 +143,7 @@ final class MotorcyclePhotoGallery {
   row.setContentDescription("모델 사진 선택: "+choice.optString("label"));
   row.setClickable(true);row.setFocusable(true);
   row.setOnClickListener(v->{
-   if(canceled.get()||!applying.compareAndSet(false,true))return;
+   if(canceled.get()||!gate.accepts(request)||!applying.compareAndSet(false,true))return;
    row.setEnabled(false);caption.setText("사진 적용 중…");
    SAVE_IO.execute(()->{
     String problem=null;
@@ -166,7 +167,7 @@ final class MotorcyclePhotoGallery {
    Bitmap bitmap=null;
    try{bitmap=MotorcyclePhoto.downloadPreview(choice.optString("imageUrl"));}catch(Exception ignored){}
    final Bitmap ready=bitmap;
-   a.runOnUiThread(()->{if(canceled.get()||a.isFinishing()||a.isDestroyed()){
+   a.runOnUiThread(()->{if(canceled.get()||!gate.accepts(request)||a.isFinishing()||a.isDestroyed()){
     if(ready!=null&&!ready.isRecycled())ready.recycle();
     return;
    }

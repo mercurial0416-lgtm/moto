@@ -36,6 +36,7 @@ checks={
  'dismissed gallery ignores async updates': 'canceled.get()' in s and 'dialog.setOnDismissListener' in s,
  'retry and local photo fallback on empty results': 'recovery.setVisibility(View.VISIBLE)' in s and 'a.chooseGaragePhoto();' in s and '다시 검색' in s,
  'older searches cannot overwrite retry results': 'gate.accepts(request)' in s and 'gate.begin()' in s,
+ 'old preview network callback is ignored and recycled after retry': 'if(canceled.get()||!gate.accepts(request)||a.isFinishing()||a.isDestroyed())' in s,
  'dialog close invalidates search': 'gate.close()' in s,
  'no new location sharing or cloud writes': 'Sharing.' not in s and 'GroupClient' not in s,
 }
