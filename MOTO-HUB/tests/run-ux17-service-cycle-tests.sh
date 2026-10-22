@@ -5,9 +5,10 @@ cd "$(dirname "$0")/.."
 out="$(mktemp -d)"
 trap 'rm -rf "$out"' EXIT
 javac -encoding UTF-8 -cp "$JSON_JAR" -d "$out" \
- app/src/main/java/com/motohub/next/{Store,FuelRecordValidation,QuickRecordDraft,ServiceCycle,MaintenanceNotificationSummary,MaintenanceAlertWindow,GarageBikeStatus,LatestServiceByType,RecentRecordReuse,MaintenancePlanner,HomeMaintenanceStatus,MaintenanceNoticeText}.java \
- tests/Ux17ServiceCycleTest.java
+ app/src/main/java/com/motohub/next/{Store,FuelRecordValidation,QuickRecordDraft,ServiceCycle,FuelAutoAmount,MaintenanceNotificationSummary,MaintenanceAlertWindow,GarageBikeStatus,LatestServiceByType,RecentRecordReuse,MaintenancePlanner,HomeMaintenanceStatus,MaintenanceNoticeText}.java \
+ tests/Ux17ServiceCycleTest.java tests/FuelAutoAmountTest.java
 java -cp "$JSON_JAR:$out" com.motohub.next.Ux17ServiceCycleTest
+java -cp "$JSON_JAR:$out" com.motohub.next.FuelAutoAmountTest
 python3 - <<'PY'
 from pathlib import Path
 root=Path('app/src/main/java/com/motohub/next')
@@ -15,7 +16,8 @@ quick=(root/'QuickEntryUi.java').read_text()
 dashboard=(root/'ServiceStatusUi.java').read_text()
 job=(root/'DailyMaintenanceJob.java').read_text()
 garage=(root/'HubScreens.java').read_text()
-assert 'ServiceCycle.calculatedFuelAmount(' in quick
+assert 'FuelAutoAmount fuelAuto=new FuelAutoAmount()' in quick
+assert 'fuelAuto.update(' in quick and 'amount.setText(nextAmount)' in quick
 assert '지난 주유 금액·리터 불러오기' in quick
 assert 'alertKmBefore' in quick and 'alertDaysBefore' in quick
 assert 'kmBeforeChoices={100,300,500}' in quick and 'daysBeforeChoices={7,15,30}' in quick

@@ -58,15 +58,14 @@ final class QuickEntryUi {
   Button calcToggle=a.button("리터당 가격으로 자동 계산",false,
    ()->calculator.setVisibility(calculator.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
   body.addView(calcToggle);body.addView(calculator);
+  FuelAutoAmount fuelAuto=new FuelAutoAmount();
   android.text.TextWatcher autoCalc=new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence value,int start,int count,int after){}
    public void onTextChanged(CharSequence value,int start,int before,int count){
     if(calculator.getVisibility()!=View.VISIBLE)return;
-    try{
-     double litres=Double.parseDouble(liters.getText().toString().trim());
-     double price=Double.parseDouble(unitPrice.getText().toString().trim());
-     amount.setText(String.valueOf((long)ServiceCycle.calculatedFuelAmount(litres,price)));
-    }catch(Exception ignore){} // Never substitute fabricated price for a blank or incomplete input.
+    String beforeAmount=amount.getText().toString();
+    String nextAmount=fuelAuto.update(beforeAmount,liters.getText().toString(),unitPrice.getText().toString());
+    if(!beforeAmount.equals(nextAmount))amount.setText(nextAmount);
    }
    public void afterTextChanged(android.text.Editable text){}
   };
