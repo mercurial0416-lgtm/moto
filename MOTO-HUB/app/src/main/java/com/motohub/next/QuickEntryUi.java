@@ -72,9 +72,17 @@ final class QuickEntryUi {
   };
   unitPrice.addTextChangedListener(autoCalc);liters.addTextChangedListener(autoCalc);
   a.label(body,"금액과 리터만 입력하면 바로 저장할 수 있어요.",13,a.muted,false);
-  JSONObject recentFuel=null;
-  for(JSONObject old:a.items("expenses"))if(bike.optString("id").equals(old.optString("vehicleId"))
-   &&"주유".equals(old.optString("type"))){recentFuel=old;break;}
+  TextView costPerLiter=a.text("금액·주유량을 입력하면 리터당 가격을 표시합니다",12,a.muted,false);
+  body.addView(costPerLiter);
+  android.text.TextWatcher unitHint=new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence value,int start,int count,int after){}
+   public void onTextChanged(CharSequence value,int start,int before,int count){
+    costPerLiter.setText(FuelEntryMath.unitPrice(amount.getText().toString(),liters.getText().toString()));
+   }
+   public void afterTextChanged(android.text.Editable value){}
+  };
+  amount.addTextChangedListener(unitHint);liters.addTextChangedListener(unitHint);
+  JSONObject recentFuel=RecentFuelRecord.latest(a.items("expenses"),bike.optString("id"));
   if(recentFuel!=null){
    final JSONObject previous=recentFuel;
    Button reuse=a.button("지난 주유 금액·리터 불러오기",false,()->{
@@ -95,7 +103,12 @@ final class QuickEntryUi {
   a.gap(extra,12);
   a.action(extra,"전체 주유·비용 편집 열기",false,()->a.edit("expenses",null));
   Button toggle=a.button("주행거리·날짜 수정",false,()->extra.setVisibility(extra.getVisibility()==View.GONE?View.VISIBLE:View.GONE));
-  body.addView(toggle);body.addView(extra);a.gap(body,12);
+  body.addView(toggle);body.addView(extra);
+  // Full-to-full efficiency requires the real odometer; don't hide it on a full fill.
+  full.setOnCheckedChangeListener((button,checked)->{
+   if(checked)extra.setVisibility(View.VISIBLE);
+  });
+  a.gap(body,12);
   a.action(body,"저장",true,()->a.attempt(()->{
    JSONObject record=QuickRecordDraft.fuel(bike.optString("id"),date.getText().toString().trim(),
     numeric(odo,"계기판",true),numeric(amount,"주유 금액",true),numeric(liters,"주유량",true),full.isChecked());
