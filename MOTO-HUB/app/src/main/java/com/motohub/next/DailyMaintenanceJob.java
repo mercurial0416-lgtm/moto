@@ -26,6 +26,15 @@ import java.util.List;
 /** Periodic local safety backup; maintenance notifications are strictly opt-in. No network calls. */
 public final class DailyMaintenanceJob extends JobService {
  static final int JOB_ID=4839;
+ /** Each JobScheduler job ID owns at most one cancellable worker. */
+ private static final class ActiveJob {
+  volatile boolean stopped;
+  Thread worker;
+ }
+ private final java.util.concurrent.ConcurrentHashMap<Integer,ActiveJob> runningJobs=new java.util.concurrent.ConcurrentHashMap<>();
+ private static boolean cancelled(ActiveJob job){
+  return job.stopped||Thread.currentThread().isInterrupted();
+ }
  static boolean remindersEnabled(Context c){return c.getSharedPreferences("notifications",Context.MODE_PRIVATE).getBoolean("maintenance_opt_in",false);}
  /** A new opt-in session must not inherit the previous session's dedupe stamp. */
  static void clearReminderState(Context context){
@@ -55,22 +64,45 @@ public final class DailyMaintenanceJob extends JobService {
   }catch(Exception ignored){}
  }
  @Override public boolean onStartJob(JobParameters params){
-  new Thread(()->{
+  final ActiveJob job=new ActiveJob();
+  job.worker=new Thread(()->{
    try{
+    if(cancelled(job))return;
     File file=new File(getFilesDir(),"motohub-v3.json");
     if(file.isFile()&&file.length()>0&&file.length()<8_000_000){
      JSONObject db=Store.parse(new String(new AtomicFile(file).readFully(),StandardCharsets.UTF_8));
-     LocalSafetyBackup.snapshot(this,db); // immutable daily snapshots
+     if(cancelled(job))return;
+     // Keep daily recovery snapshots; never let an interrupted worker send alerts.
+     synchronized(LocalSafetyBackup.class){
+      if(cancelled(job))return;
+      LocalSafetyBackup.snapshot(this,db);
+     }
+     if(cancelled(job))return;
      // Do not distract with a noncritical service reminder during an active ride.
      boolean enabled=remindersEnabled(this);
+     if(cancelled(job))return;
      if(enabled&&!RideService.running)sendMaintenanceReminder(db);
      else if(!enabled)clearReminderState(this);
      else {NotificationManager notificationManager=getSystemService(NotificationManager.class);if(notificationManager!=null)notificationManager.cancel(405);}
     }
-   }catch(Exception ignored){}finally{jobFinished(params,false);}
-  },"MOTO-local-daily").start();return true;
+   }catch(Exception ignored){}finally{
+    runningJobs.remove(params.getJobId(),job);
+    if(!job.stopped)jobFinished(params,false);
+   }
+  },"MOTO-local-daily");
+  ActiveJob earlier=runningJobs.put(params.getJobId(),job);
+  if(earlier!=null){earlier.stopped=true;earlier.worker.interrupt();}
+  job.worker.start();
+  return true;
  }
- @Override public boolean onStopJob(JobParameters params){return true;}
+ @Override public boolean onStopJob(JobParameters params){
+  ActiveJob job=runningJobs.remove(params.getJobId());
+  if(job==null)return false;
+  job.stopped=true;
+  job.worker.interrupt();
+  // Scheduler may retry the unfinished local check. The old worker must not call jobFinished.
+  return true;
+ }
  void sendMaintenanceReminder(JSONObject db){
   if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
    clearReminderState(this);return;
