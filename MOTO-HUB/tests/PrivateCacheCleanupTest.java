@@ -18,6 +18,10 @@ public final class PrivateCacheCleanupTest {
   File oldStage=new File(files,"moto-stage-"+oldId);ok(oldStage.mkdirs(),"stage");
   File rideDir=new File(oldStage,"rides");ok(rideDir.mkdirs(),"rides");
   File track=new File(rideDir,"1728459876512-12345678-1234-1234-1234-123456789abc.track");write(track);
+  // A real ZIP restore can stage receipts alongside garage photos and GPS.
+  String receiptName=ReceiptSlots.filename("12345678-1234-1234-1234-123456789abc",2);
+  ok(receiptName.matches(BackupFormat.RECEIPT),"valid staged receipt filename");
+  write(new File(oldStage,receiptName));
   oldStage.setLastModified(System.currentTimeMillis()-PrivateCacheCleanup.STAGE_EXPIRY_MS-1000);
   File freshStage=new File(files,"moto-stage-22222222-2222-2222-2222-222222222222");ok(freshStage.mkdirs(),"recent stage");
   File invalidStage=new File(files,"moto-stage-33333333-3333-3333-3333-333333333333");ok(invalidStage.mkdirs(),"invalid stage");

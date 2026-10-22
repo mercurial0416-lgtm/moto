@@ -2,6 +2,8 @@ package com.motohub.next;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.util.*;
 import java.util.zip.*;
 
@@ -9,8 +11,29 @@ import java.util.zip.*;
 public final class BackupBundle {
  private BackupBundle() {}
  static final long MAX_TOTAL=BackupFormat.MAX_TOTAL_BYTES;
+ /** Follow no links: backup ZIP must never read an unrelated file through an app-data symlink. */
+ private static boolean regular(File file){
+  return file!=null&&Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS)
+   &&!Files.isSymbolicLink(file.toPath());
+ }
+ private static void requireRegular(File file)throws IOException{
+  if(!regular(file))throw new IOException("백업 대상이 일반 파일이 아닙니다: "+(file==null?"unknown":file.getName()));
+ }
+ private static boolean regularDirectory(File folder){
+  return Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS)&&!Files.isSymbolicLink(folder.toPath());
+ }
+ private static void requireDirectoryIfPresent(File dir)throws IOException{
+  if(Files.exists(dir.toPath(),LinkOption.NOFOLLOW_LINKS)&&
+    (Files.isSymbolicLink(dir.toPath())||!Files.isDirectory(dir.toPath(),LinkOption.NOFOLLOW_LINKS)))
+   throw new IOException("백업 폴더가 안전하지 않습니다: "+dir.getName());
+ }
+ private static byte[] readSidecar(File file,long maxBytes)throws IOException{
+  requireRegular(file);
+  if(file.length()>maxBytes)throw new IOException("라이딩 부속 파일 크기가 너무 큽니다: "+file.getName());
+  return Files.readAllBytes(file.toPath());
+ }
  private static long writeFile(ZipOutputStream zip,File file,String name,long total)throws IOException{
-  if(!file.isFile())throw new IOException("백업 파일을 찾지 못했어요: "+file.getName());
+  requireRegular(file);
   if(file.length()>TrackFile.MAX_BYTES)throw new IOException("백업 항목이 25MB를 넘었어요: "+file.getName());
   if(total+file.length()>MAX_TOTAL)throw new IOException("백업 최대 크기(250MB)를 넘었어요. GPX를 개별로 내보내 주세요.");
   zip.putNextEntry(new ZipEntry(name));byte[] buffer=new byte[32768];long done=0;
@@ -35,6 +58,8 @@ public final class BackupBundle {
   BoundedCounter counter=new BoundedCounter();TrackFile.gpx(track,counter);return counter.count;
  }
  public static int export(String json,File internal,OutputStream target)throws Exception{
+  if(internal==null||!regularDirectory(internal))throw new IOException("앱 백업 폴더를 확인하지 못했어요.");
+  requireDirectoryIfPresent(new File(internal,"rides"));
   byte[] data=json.getBytes(StandardCharsets.UTF_8);if(data.length>8_000_000)throw new IOException("JSON 데이터가 8MB를 넘었어요.");
   long total=data.length;int count=0;
   ZipOutputStream zip=new ZipOutputStream(new BufferedOutputStream(target),StandardCharsets.UTF_8);
@@ -64,6 +89,7 @@ public final class BackupBundle {
    for(File file:tracks){
     // A completely empty crashed session has no location bytes worth archiving.
     // Preserve non-empty interrupted tracks, including their unfinished final row.
+    requireRegular(file);
     if(file.length()==0){
      if(new File(file.getPath()+".done").exists()||new File(file.getPath()+".imported").exists()||new File(file.getPath()+".recovered").exists())
       throw new IOException("완료 표시가 있는 빈 GPS 기록을 백업할 수 없습니다: "+file.getName());
@@ -90,8 +116,8 @@ public final class BackupBundle {
     // Merged source metadata must round-trip. Without it restored monthly
     // statistics would count both originals plus the combined ride.
     File merged=new File(file.getPath()+".mergedinto");
-    if(merged.isFile()){
-     byte[] markerBytes=java.nio.file.Files.readAllBytes(merged.toPath());
+    if(merged.isFile()||Files.isSymbolicLink(merged.toPath())){
+     byte[] markerBytes=readSidecar(merged,100);
      String destination=new String(markerBytes,StandardCharsets.US_ASCII);
      if(markerBytes.length>100||!destination.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track")||
        !new File(rides,destination+".done").isFile())
@@ -99,20 +125,21 @@ public final class BackupBundle {
      total=writeFile(zip,merged,"rides/"+merged.getName(),total);
     }
     File rideBike=new File(file.getPath()+".bike");
-    if(rideBike.isFile()){
-     if(rideBike.length()>64||!new String(java.nio.file.Files.readAllBytes(rideBike.toPath()),StandardCharsets.US_ASCII)
+    if(rideBike.isFile()||Files.isSymbolicLink(rideBike.toPath())){
+     if(!new String(readSidecar(rideBike,64),StandardCharsets.US_ASCII)
        .matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))
       throw new IOException("라이딩 바이크 연결 정보가 손상됐습니다: "+file.getName());
      total=writeFile(zip,rideBike,"rides/"+rideBike.getName(),total);
     }
     File category=new File(file.getPath()+".category");
-    if(category.isFile()){
-     if(category.length()>64||!java.util.Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(new String(java.nio.file.Files.readAllBytes(category.toPath()),StandardCharsets.UTF_8)))
+    if(category.isFile()||Files.isSymbolicLink(category.toPath())){
+     if(!java.util.Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(new String(readSidecar(category,64),StandardCharsets.UTF_8)))
       throw new IOException("라이딩 분류가 손상됐습니다: "+file.getName());
      total=writeFile(zip,category,"rides/"+category.getName(),total);
     }
     for(String suffix:new String[]{".done",".imported",".recovered",".unmerged"}){
-     File marker=new File(file.getPath()+suffix);if(marker.isFile()){
+     File marker=new File(file.getPath()+suffix);if(marker.isFile()||Files.isSymbolicLink(marker.toPath())){
+      requireRegular(marker);
       if(marker.length()!=0)throw new IOException("라이딩 상태 표시가 손상됐습니다: "+marker.getName());
       zip.putNextEntry(new ZipEntry("rides/"+marker.getName()));zip.closeEntry();
      }

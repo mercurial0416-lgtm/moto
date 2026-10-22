@@ -53,8 +53,13 @@ final class MotorcyclePhoto {
    List<JSONObject> candidates=searchCommons(query,brand,model,year,exactYear);
    trace.searchSucceeded(candidates.size());
    PhotoLoad result=PhotoRetry.firstSuccess(candidates,3,meta->{
-    Bitmap bitmap=downloadImage(meta.optString("imageUrl"));
-    return bitmap==null?null:new PhotoLoad(meta,bitmap);
+    try{
+     Bitmap bitmap=downloadImage(meta.optString("imageUrl"));
+     return bitmap==null?null:new PhotoLoad(meta,bitmap);
+    }catch(Exception downloadError){
+     trace.downloadFailed(downloadError); // Keep the real network reason after fallback retries.
+     throw downloadError;
+    }
    });
    if(result==null&&!candidates.isEmpty())trace.imageFailed();
    return result;

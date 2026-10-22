@@ -46,14 +46,15 @@ final class PrivateCacheCleanup {
  }
  private static boolean cleanStage(File dir){
   File[] entries=dir.listFiles();if(entries==null)return false;
-  // Staging can hold only a rides subfolder and restored photos.
+  // Staging can hold a rides subfolder and restored bike/receipt photos.
   for(File entry:entries){
    if(Files.isSymbolicLink(entry.toPath()))return false;
    if(entry.isDirectory()){
     if(!entry.getName().equals("rides"))return false;
     File[] tracks=entry.listFiles();if(tracks==null)return false;
     for(File f:tracks)if(!safeFile(f,entry)||!recognizedTrack(f.getName()))return false;
-   }else if(!safeFile(entry,dir)||!entry.getName().matches(BackupFormat.PHOTO))return false;
+   }else if(!safeFile(entry,dir)||!(entry.getName().matches(BackupFormat.PHOTO)||
+       entry.getName().matches(BackupFormat.RECEIPT)))return false;
   }
   for(File entry:entries){
    try{
