@@ -109,13 +109,23 @@ final class QuickEntryUi {
   EditText mileage=number(advanced,"현재 계기판 (km)",String.valueOf((long)bike.optDouble("odo")),"km");
   EditText nextKm=number(advanced,"직접 지정하는 다음 정비 거리 (km)","","예: 14000");
   a.label(advanced,"직접 지정하는 다음 정비일",14,a.fg,true);
-  EditText nextDate=new EditText(a);nextDate.setText(a.today());nextDate.setTextColor(a.fg);nextDate.setSingleLine(true);
+  EditText nextDate=new EditText(a);nextDate.setText(LocalDate.parse(a.today()).plusMonths(1).toString());nextDate.setTextColor(a.fg);nextDate.setSingleLine(true);
   nextDate.setFocusable(false);nextDate.setClickable(true);nextDate.setMinHeight(a.dp(54));
   nextDate.setBackground(a.shape(a.panel,a.line,11));nextDate.setPadding(a.dp(13),0,a.dp(13),0);
   nextDate.setOnClickListener(v->a.pickDate(nextDate));advanced.addView(nextDate);
   Button advancedToggle=a.button("계기판·직접 지정 수정",false,
    ()->advanced.setVisibility(advanced.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
   body.addView(advancedToggle);body.addView(advanced);
+  // A custom interval must reveal its required input immediately; no second hidden tap.
+  android.widget.AdapterView.OnItemSelectedListener revealCustom=new android.widget.AdapterView.OnItemSelectedListener(){
+   @Override public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
+    if(distanceChoice.getSelectedItemPosition()==intervals.length-1
+      ||dateChoice.getSelectedItemPosition()==months.length-1)advanced.setVisibility(View.VISIBLE);
+   }
+   @Override public void onNothingSelected(android.widget.AdapterView<?> parent){}
+  };
+  distanceChoice.setOnItemSelectedListener(revealCustom);
+  dateChoice.setOnItemSelectedListener(revealCustom);
   a.gap(body,13);a.label(body,"등록한 거리까지 500km 남거나 예정일까지 30일 남으면 알림을 보냅니다. 제조사 공식 정비주기는 직접 확인해 주세요.",13,a.muted,false);
   a.action(body,"저장",true,()->a.attempt(()->{
    int kmInterval=intervals[distanceChoice.getSelectedItemPosition()];
