@@ -52,7 +52,38 @@ final class QuickEntryUi {
   a.gap(body,12);
   EditText amount=number(body,"주유 금액 (원)","","예: 12000");
   EditText liters=number(body,"실제 주유량 (L)","","예: 4.5");
+  LinearLayout calculator=a.col();calculator.setVisibility(View.GONE);
+  EditText unitPrice=number(calculator,"리터당 가격 (원)","","예: 1750");
+  a.label(calculator,"리터당 가격 × 주유량으로 예상 금액을 자동 채웁니다. 실제 결제액이 다르면 금액을 수정하세요.",12,a.muted,false);
+  Button calcToggle=a.button("리터당 가격으로 자동 계산",false,
+   ()->calculator.setVisibility(calculator.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
+  body.addView(calcToggle);body.addView(calculator);
+  android.text.TextWatcher autoCalc=new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence value,int start,int count,int after){}
+   public void onTextChanged(CharSequence value,int start,int before,int count){
+    if(calculator.getVisibility()!=View.VISIBLE)return;
+    try{
+     double litres=Double.parseDouble(liters.getText().toString().trim());
+     double price=Double.parseDouble(unitPrice.getText().toString().trim());
+     amount.setText(String.valueOf((long)ServiceCycle.calculatedFuelAmount(litres,price)));
+    }catch(Exception ignore){} // Never substitute fabricated price for a blank or incomplete input.
+   }
+   public void afterTextChanged(android.text.Editable text){}
+  };
+  unitPrice.addTextChangedListener(autoCalc);liters.addTextChangedListener(autoCalc);
   a.label(body,"금액과 리터만 입력하면 바로 저장할 수 있어요.",13,a.muted,false);
+  JSONObject recentFuel=null;
+  for(JSONObject old:a.items("expenses"))if(bike.optString("id").equals(old.optString("vehicleId"))
+   &&"주유".equals(old.optString("type"))){recentFuel=old;break;}
+  if(recentFuel!=null){
+   final JSONObject previous=recentFuel;
+   Button reuse=a.button("지난 주유 금액·리터 불러오기",false,()->{
+    amount.setText(String.valueOf((long)previous.optDouble("amount")));
+    liters.setText(String.valueOf(previous.optDouble("liters")));
+    calculator.setVisibility(View.GONE);
+   });
+   body.addView(reuse);
+  }
   CheckBox full=new CheckBox(a);full.setText("가득 주유했어요 (연비 계산용)");
   full.setTextColor(a.fg);full.setTextSize(14);full.setMinHeight(a.dp(50));body.addView(full);
   LinearLayout extra=a.col();extra.setVisibility(View.GONE);
@@ -105,6 +136,13 @@ final class QuickEntryUi {
   String[] periods={"날짜 주기 설정 안 함","1개월 뒤","3개월 뒤","6개월 뒤","12개월 뒤","날짜 직접 선택"};
   int[] months={0,1,3,6,12,-1};
   Spinner dateChoice=options(body,"또는 몇 개월 뒤에 정비할까요?",periods);
+  Spinner kmAlert=options(body,"몇 km 전에 알림을 받을까요?",
+   new String[]{"100km 전","300km 전","500km 전"});
+  kmAlert.setSelection(2);
+  Spinner dateAlert=options(body,"며칠 전에 알림을 받을까요?",
+   new String[]{"7일 전","15일 전","30일 전"});
+  dateAlert.setSelection(2);
+  final int[] kmBeforeChoices={100,300,500},daysBeforeChoices={7,15,30};
   LinearLayout advanced=a.col();advanced.setVisibility(View.GONE);
   EditText mileage=number(advanced,"현재 계기판 (km)",String.valueOf((long)bike.optDouble("odo")),"km");
   EditText nextKm=number(advanced,"직접 지정하는 다음 정비 거리 (km)","","예: 14000");
@@ -136,6 +174,8 @@ final class QuickEntryUi {
    String type=service.getSelectedItemPosition()==items.length-1?customType.getText().toString().trim():service.getSelectedItem().toString();
    JSONObject record=QuickRecordDraft.maintenance(bike.optString("id"),type,a.today(),odo,dueKm,dueDate,
     Math.max(0,kmInterval),Math.max(0,monthsInterval));
+   record.put("alertKmBefore",kmBeforeChoices[kmAlert.getSelectedItemPosition()]);
+   record.put("alertDaysBefore",daysBeforeChoices[dateAlert.getSelectedItemPosition()]);
    Runnable save=()->a.attempt(()->{
     JSONObject next=new JSONObject(a.db.toString());Store.upsert(next,"services",record);
     JSONObject vehicle=Store.find(next,"vehicles",bike.optString("id"));
