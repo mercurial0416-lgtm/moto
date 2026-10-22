@@ -29,6 +29,10 @@ android {
    }
  }
  buildTypes {
+   debug {
+     applicationIdSuffix ".ux17preview"
+     versionNameSuffix "-preview"
+   }
    release {
      minifyEnabled false
      if (signingFields.every { it != null && !it.isEmpty() }) signingConfig signingConfigs.motoRelease
