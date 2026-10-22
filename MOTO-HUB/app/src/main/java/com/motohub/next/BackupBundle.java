@@ -89,7 +89,6 @@ public final class BackupBundle {
   File[] selectedModels=modelFolder.listFiles((dir,name)->name.matches(BackupFormat.MODEL_PHOTO));
   if(selectedModels!=null){
    Arrays.sort(selectedModels,Comparator.comparing(File::getName));
-   if(selectedModels.length>BackupFormat.MAX_PHOTOS)throw new IOException("선택한 모델 사진이 너무 많습니다.");
    int selectedCount=0;
    for(File image:selectedModels){
     requireRegular(image);
