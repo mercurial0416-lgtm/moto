@@ -39,7 +39,7 @@ public final class DailyMaintenanceJob extends JobService {
  /** A new opt-in session must not inherit the previous session's dedupe stamp. */
  static void clearReminderState(Context context){
   context.getSharedPreferences("notifications",Context.MODE_PRIVATE).edit()
-   .remove("last_maintenance_notice").apply();
+   .remove("last_maintenance_notice").remove("last_maintenance_notice_at").apply();
   NotificationManager manager=context.getSystemService(NotificationManager.class);
   if(manager!=null)manager.cancel(405);
  }
@@ -114,12 +114,21 @@ public final class DailyMaintenanceJob extends JobService {
   MaintenanceNotificationSummary reminder=MaintenanceNotificationSummary.from(db,today);
   if(!reminder.hasNotice()){
    manager.cancel(405);
-   getSharedPreferences("notifications",MODE_PRIVATE).edit().remove("last_maintenance_notice").apply();
+   getSharedPreferences("notifications",MODE_PRIVATE).edit().remove("last_maintenance_notice").remove("last_maintenance_notice_at").apply();
    return;
   }
   String stamp="service:"+reminder.fingerprint;
   android.content.SharedPreferences prefs=getSharedPreferences("notifications",MODE_PRIVATE);
-  if(stamp.equals(prefs.getString("last_maintenance_notice","")))return;
+  long now=System.currentTimeMillis();
+  String previousStamp=prefs.getString("last_maintenance_notice","");
+  long lastSent=prefs.getLong("last_maintenance_notice_at",0L);
+  // One-time migration: old installations have a notice fingerprint but no
+  // timestamp. Start a fresh 7-day quiet period instead of spamming on upgrade.
+  if(stamp.equals(previousStamp)&&lastSent<=0){
+   prefs.edit().putLong("last_maintenance_notice_at",now).apply();
+   return;
+  }
+  if(!MaintenanceNoticeThrottle.shouldNotify(stamp,previousStamp,lastSent,now))return;
   manager.createNotificationChannel(new NotificationChannel("maintenance","정비 예정 알림",NotificationManager.IMPORTANCE_DEFAULT));
   Intent intent=new Intent(this,MainActivity.class);intent.putExtra(MotoWidgetProvider.EXTRA_TAB,"차고");
   PendingIntent open=PendingIntent.getActivity(this,103,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
@@ -131,6 +140,7 @@ public final class DailyMaintenanceJob extends JobService {
    .setVisibility(Notification.VISIBILITY_PRIVATE)
    .setContentIntent(open).setAutoCancel(true).build();
   manager.notify(405,notification);
-  prefs.edit().putString("last_maintenance_notice",stamp).apply();
+  prefs.edit().putString("last_maintenance_notice",stamp)
+   .putLong("last_maintenance_notice_at",now).apply();
  }
 }

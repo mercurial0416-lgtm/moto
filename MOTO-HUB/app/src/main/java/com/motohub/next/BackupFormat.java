@@ -27,11 +27,27 @@ final class BackupFormat {
    return chosen&&reader.atEnd();
   }catch(IllegalArgumentException invalid){return false;}
  }
+ /** Never evict a photo unless complete, structurally sound metadata proves automatic origin. */
+ static boolean automaticallyCachedModelMetadata(String data){
+  if(data==null||data.length()>8192)return false;
+  try{
+   PhotoSelectionJson reader=new PhotoSelectionJson(data);
+   boolean selected=reader.readObject(true,0);
+   reader.skipSpace();
+   return reader.atEnd()&&!selected&&reader.validAutomaticFields()
+    &&(!reader.selectionPresent||reader.selectionType==2);
+  }catch(IllegalArgumentException invalid){return false;}
+ }
  /** Small strict JSON reader, avoiding an Android-only JSON dependency in backup policies. */
  private static final class PhotoSelectionJson {
   private final String value;
   private int index;
+  private boolean sawImage,sawPage,sawExact,selectionPresent;
+  private boolean imageString,pageString,exactBoolean;
+  private int selectionType;
+  private String currentString="";
   PhotoSelectionJson(String input){value=input;}
+  boolean validAutomaticFields(){return sawImage&&sawPage&&sawExact&&imageString&&pageString&&exactBoolean;}
   boolean atEnd(){return index==value.length();}
   void skipSpace(){
    while(index<value.length()){
@@ -100,21 +116,21 @@ final class BackupFormat {
    skipSpace();
    if(index>=value.length())throw new IllegalArgumentException("Missing JSON value");
    char c=value.charAt(index);
-   if(c=='{'){readObject(false,depth);return 0;}
+   if(c=='{'){readObject(false,depth);return 4;}
    if(c=='['){
     index++;skipSpace();
-    if(eat(']'))return 0;
+    if(eat(']'))return 5;
     while(true){
      readValue(depth+1);skipSpace();
-     if(eat(']'))return 0;
+     if(eat(']'))return 5;
      expect(',');skipSpace();
     }
    }
-   if(c=='"'){readString();return 0;}
+   if(c=='"'){currentString=readString();return 3;}
    if(c=='t'){keyword("true");return 1;}
    if(c=='f'){keyword("false");return 2;}
    if(c=='n'){keyword("null");return 0;}
-   number();return 0;
+   number();return 6;
   }
   boolean readObject(boolean outer,int depth){
    if(depth>24)throw new IllegalArgumentException("JSON depth exceeded");
@@ -125,9 +141,20 @@ final class BackupFormat {
     String key=readString();
     skipSpace();expect(':');
     int typed=readValue(depth+1);
-    if(outer&&"userSelected".equals(key)){
-     if(seen)throw new IllegalArgumentException("Duplicate userSelected key");
-     seen=true;selected=typed==1;
+    if(outer){
+     if("userSelected".equals(key)){
+      if(seen)throw new IllegalArgumentException("Duplicate userSelected key");
+      seen=true;selectionPresent=true;selectionType=typed;selected=typed==1;
+     }else if("imageUrl".equals(key)){
+      if(sawImage)throw new IllegalArgumentException("Duplicate imageUrl key");
+      sawImage=true;imageString=typed==3&&currentString.startsWith("https://upload.wikimedia.org/");
+     }else if("pageUrl".equals(key)){
+      if(sawPage)throw new IllegalArgumentException("Duplicate pageUrl key");
+      sawPage=true;pageString=typed==3&&currentString.startsWith("https://commons.wikimedia.org/");
+     }else if("exactYearCandidate".equals(key)){
+      if(sawExact)throw new IllegalArgumentException("Duplicate exactYearCandidate key");
+      sawExact=true;exactBoolean=typed==1||typed==2;
+     }
     }
     skipSpace();
     if(eat('}'))return selected;

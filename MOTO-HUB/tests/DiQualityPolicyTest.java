@@ -40,7 +40,7 @@ final class DiQualityPolicyTest {
    File chosen=new File(dir,"cccccccccccccccccccccccc.jpg"),chosenMeta=new File(dir,chosen.getName()+".json");
    File unknown=new File(dir,"dddddddddddddddddddddddd.jpg"),unknownMeta=new File(dir,unknown.getName()+".json");
    for(File photo:List.of(old,newer,chosen,unknown))try(RandomAccessFile f=new RandomAccessFile(photo,"rw")){f.setLength(35L*1024*1024);}
-   String auto="{\"imageUrl\":\"https://upload.wikimedia.org/abc\",\"pageUrl\":\"https://commons.wikimedia.org\",\"exactYearCandidate\":true}";
+   String auto="{\"imageUrl\":\"https://upload.wikimedia.org/abc\",\"pageUrl\":\"https://commons.wikimedia.org/wiki/File:Example\",\"exactYearCandidate\":true}";
    Files.writeString(oldMeta.toPath(),auto);Files.writeString(newerMeta.toPath(),auto);
    Files.writeString(chosenMeta.toPath(),auto.substring(0,auto.length()-1)+",\"userSelected\": true}");
    Files.writeString(unknownMeta.toPath(),"{\"other\":\"manual\"}");

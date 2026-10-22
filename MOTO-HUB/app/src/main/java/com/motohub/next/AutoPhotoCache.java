@@ -15,9 +15,8 @@ final class AutoPhotoCache {
    if(!photo.getName().matches("[a-f0-9]{24}\\.jpg")||!plainFile(photo,folder))continue;
    File meta=new File(folder,photo.getName()+".json");if(!plainFile(meta,folder)||meta.length()>8192||meta.length()<10)continue;
    String json;try{json=new String(Files.readAllBytes(meta.toPath()),java.nio.charset.StandardCharsets.UTF_8);}catch(Exception e){continue;}
-   // Fail closed on missing/unknown metadata; never delete manually chosen images.
-   if(!json.contains("\"imageUrl\"")||!json.contains("\"pageUrl\"")||!json.contains("\"exactYearCandidate\"") ||
-    json.matches("(?s).*\"userSelected\"\\s*:\\s*true.*"))continue;
+   // Escaped strings, nested values and duplicate fields cannot prove an automatic cache.
+   if(!BackupFormat.automaticallyCachedModelMetadata(json))continue;
    auto.add(photo);total+=Math.max(0,photo.length());
   }
   if(total<=LIMIT_BYTES)return 0;
