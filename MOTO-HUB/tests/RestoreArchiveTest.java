@@ -73,6 +73,23 @@ public class RestoreArchiveTest {
    reject(root,archive(new String[][]{{"MOTO-HUB-data.json","{}"},{"rides/"+T+".done","evil"}}));
    reject(root,archive(new String[][]{{"MOTO-HUB-data.json","{}"},{"rides/"+T+".recovered",""}}));
    ok(new File(root,"bad").exists()==false,"zip slip blocked");
+   // A manipulated year-photo cache folder must never redirect restored files
+   // outside the app's private files directory.
+   File modelFolder=new File(root,"moto-year-photos"),parked=new File(root,"preserved-model-cache");
+   File external=Files.createTempDirectory("moto-external-model-photo").toFile();
+   try{
+    ok(modelFolder.renameTo(parked),"park existing year-photo cache");
+    Files.createSymbolicLink(modelFolder.toPath(),external.toPath());
+    try(RestoreArchive.Prepared ready=RestoreArchive.prepare(new ByteArrayInputStream(zip),root)){
+     try{ready.install(root,json->{});throw new AssertionError("unsafe model cache dir allowed");}
+     catch(IOException expected){ok(expected.getMessage().contains("안전하지"),"symlink year-photo folder blocked");}
+    }
+    ok(Objects.requireNonNull(external.listFiles()).length==0,"no files created outside private storage");
+   }finally{
+    Files.deleteIfExists(modelFolder.toPath());
+    ok(parked.renameTo(modelFolder),"restore original year-photo cache");
+    external.delete();
+   }
    System.out.println("PASS ZIP restore safety and rollback checks: "+checks);
   } finally {clean(root);}
  }

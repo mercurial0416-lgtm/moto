@@ -167,6 +167,11 @@ public final class RestoreArchive {
   return out;
  }
  private static List<String> oldAssets(File internal,List<String> incoming)throws IOException{
+  File folder=new File(internal,"moto-year-photos");
+  if(Files.isSymbolicLink(folder.toPath())||
+      (Files.exists(folder.toPath(),LinkOption.NOFOLLOW_LINKS)&&
+       !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS)))
+   throw new IOException("기존 모델 사진 폴더가 안전하지 않습니다.");
   List<String> old=existingAssets(internal);
   for(String path:incoming)if(path.startsWith("moto-year-photos/")){
    File file=new File(internal,path);
