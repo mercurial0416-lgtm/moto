@@ -16,9 +16,11 @@ final class LatestServiceByType {
    String type=item.optString("type").trim();
    if(type.isEmpty())continue;
    JSONObject previous=selected.get(type);
-   if(previous==null||RecentRecordReuse.isNewer(
-    item.optString("date"),item.optDouble("mileage",Double.NaN),
-    previous.optString("date"),previous.optDouble("mileage",Double.NaN))){
+   // Store.upsert appends records. On equal date AND mileage, the later saved
+   // completion must replace the earlier schedule (same-day service is common).
+   if(previous==null||!RecentRecordReuse.isNewer(
+    previous.optString("date"),previous.optDouble("mileage",Double.NaN),
+    item.optString("date"),item.optDouble("mileage",Double.NaN))){
     selected.put(type,item);
    }
   }

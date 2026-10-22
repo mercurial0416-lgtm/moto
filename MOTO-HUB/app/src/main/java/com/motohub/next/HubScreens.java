@@ -278,7 +278,7 @@ final class HubScreens {
     .setPositiveButton(enabled?"끄기":"동의하고 켜기",(d,w)->{
      a.getSharedPreferences("notifications",0).edit().putBoolean("maintenance_opt_in",!enabled).apply();
      DailyMaintenanceJob.schedule(a);
-     if(enabled){android.app.NotificationManager nm=a.getSystemService(android.app.NotificationManager.class);if(nm!=null)nm.cancel(405);}
+     if(enabled)DailyMaintenanceJob.clearReminderState(a);
      a.render();
      if(!enabled){
       if(android.os.Build.VERSION.SDK_INT>=33&&a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)

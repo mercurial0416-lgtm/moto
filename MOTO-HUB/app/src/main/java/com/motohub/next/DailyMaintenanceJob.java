@@ -27,6 +27,13 @@ import java.util.List;
 public final class DailyMaintenanceJob extends JobService {
  static final int JOB_ID=4839;
  static boolean remindersEnabled(Context c){return c.getSharedPreferences("notifications",Context.MODE_PRIVATE).getBoolean("maintenance_opt_in",false);}
+ /** A new opt-in session must not inherit the previous session's dedupe stamp. */
+ static void clearReminderState(Context context){
+  context.getSharedPreferences("notifications",Context.MODE_PRIVATE).edit()
+   .remove("last_maintenance_notice").apply();
+  NotificationManager manager=context.getSystemService(NotificationManager.class);
+  if(manager!=null)manager.cancel(405);
+ }
  static void schedule(Context context){
   try{JobScheduler scheduler=context.getSystemService(JobScheduler.class);
    if(scheduler==null)return;
@@ -55,7 +62,9 @@ public final class DailyMaintenanceJob extends JobService {
      JSONObject db=Store.parse(new String(new AtomicFile(file).readFully(),StandardCharsets.UTF_8));
      LocalSafetyBackup.snapshot(this,db); // immutable daily snapshots
      // Do not distract with a noncritical service reminder during an active ride.
-     if(remindersEnabled(this)&&!RideService.running)sendMaintenanceReminder(db);
+     boolean enabled=remindersEnabled(this);
+     if(enabled&&!RideService.running)sendMaintenanceReminder(db);
+     else if(!enabled)clearReminderState(this);
      else {NotificationManager notificationManager=getSystemService(NotificationManager.class);if(notificationManager!=null)notificationManager.cancel(405);}
     }
    }catch(Exception ignored){}finally{jobFinished(params,false);}
@@ -63,9 +72,12 @@ public final class DailyMaintenanceJob extends JobService {
  }
  @Override public boolean onStopJob(JobParameters params){return true;}
  void sendMaintenanceReminder(JSONObject db){
-  if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
+  if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+   clearReminderState(this);return;
+  }
   NotificationManager manager=getSystemService(NotificationManager.class);
-  if(manager==null||!manager.areNotificationsEnabled())return;
+  if(manager==null)return;
+  if(!manager.areNotificationsEnabled()){clearReminderState(this);return;}
   String today=LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
   MaintenanceNotificationSummary reminder=MaintenanceNotificationSummary.from(db,today);
   if(!reminder.hasNotice()){
