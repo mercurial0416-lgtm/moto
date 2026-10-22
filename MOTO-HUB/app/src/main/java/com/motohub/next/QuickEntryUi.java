@@ -85,9 +85,11 @@ final class QuickEntryUi {
   if(recentFuel!=null){
    final JSONObject previous=recentFuel;
    Button reuse=a.button("지난 주유 금액·리터 불러오기",false,()->{
+    // Hide the calculator first: liters.setText triggers listeners synchronously.
+    calculator.setVisibility(View.GONE);
+    fuelAuto.reset();
     amount.setText(String.valueOf((long)previous.optDouble("amount")));
     liters.setText(String.valueOf(previous.optDouble("liters")));
-    calculator.setVisibility(View.GONE);
    });
    body.addView(reuse);
   }
@@ -101,7 +103,10 @@ final class QuickEntryUi {
   a.label(extra,"주유 날짜",14,a.fg,true);extra.addView(date,new LinearLayout.LayoutParams(-1,a.dp(52)));
   a.gap(extra,12);
   a.action(extra,"전체 주유·비용 편집 열기",false,()->a.edit("expenses",null));
-  Button toggle=a.button("주행거리·날짜 수정",false,()->extra.setVisibility(extra.getVisibility()==View.GONE?View.VISIBLE:View.GONE));
+  Button toggle=a.button("주행거리·날짜 수정",false,()->{
+   if(full.isChecked()){extra.setVisibility(View.VISIBLE);return;}
+   extra.setVisibility(extra.getVisibility()==View.GONE?View.VISIBLE:View.GONE);
+  });
   body.addView(toggle);body.addView(extra);
   // Full-to-full efficiency requires the real odometer; don't hide it on a full fill.
   full.setOnCheckedChangeListener((button,checked)->{
