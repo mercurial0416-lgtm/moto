@@ -424,7 +424,7 @@ final class RideUi {
    boolean interrupted=RideHistoryFilter.INTERRUPTED.equals(status);
    boolean starred=RideFavorite.isFavorite(f);
    String detail=live?"현재 기록 중 · 종료 후 상세 확인":RideHistoryFilter.IMPORTED.equals(status)?"가져온 GPX · 분석과 지도 보기":RideHistoryFilter.COMPLETE.equals(status)?"주행 완료 · 거리·시간·지도":RideHistoryFilter.RECOVERED.equals(status)?"복구된 라이딩 · 거리·시간·지도":"중단된 기록 · 복구하고 분석하기";
-    new HubScreens(a).line(results,(starred?"★  ":"")+date,detail,live?"기록 중":interrupted?"복구  ›":"자세히  ›",()->{
+    new HubScreens(a).line(results,date,detail,live?"기록 중":interrupted?"복구  ›":starred?"★  자세히  ›":"자세히  ›",()->{
      if(live){a.toast("기록을 종료하면 주행 요약을 볼 수 있어요.");return;}
      if(interrupted){
       new AlertDialog.Builder(a).setTitle("중단된 GPS 기록 복구")
