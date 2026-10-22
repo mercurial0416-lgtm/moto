@@ -26,8 +26,20 @@ final class MaintenanceNotificationSummary {
     if(record!=null&&bike.optString("id").equals(record.optString("vehicleId")))history.add(record);
    }
    for(JSONObject service:LatestServiceByType.latest(history,bike.optString("id")).values()){
-    MaintenancePlanner.Status status=HomeMaintenanceStatus.safeStatus(service.optString("nextDate"),
-     service.optDouble("nextKm"),today,bike.optDouble("odo"));
+    int daysBefore=30;double kmBefore=500;
+    if(service.optBoolean("scheduleOnly",false)){
+     // Short 500 km / 1 month schedules must not alert immediately on save.
+     int periodKm=service.optInt("intervalKm",0),periodMonths=service.optInt("intervalMonths",0);
+     if(periodKm>0)kmBefore=Math.min(500,Math.max(50,periodKm*0.20));
+     if(periodMonths>0)daysBefore=Math.min(30,Math.max(3,periodMonths*6));
+    }
+    MaintenancePlanner.Status status;
+    try{status=MaintenancePlanner.status(service.optString("nextDate"),service.optDouble("nextKm"),
+     today,bike.optDouble("odo"),daysBefore,kmBefore);}
+    catch(java.time.DateTimeException invalidDate){
+     status=MaintenancePlanner.status("",service.optDouble("nextKm"),today,bike.optDouble("odo"),
+      daysBefore,kmBefore);
+    }
     if(status!=MaintenancePlanner.Status.OVERDUE&&status!=MaintenancePlanner.Status.SOON)continue;
     if(status==MaintenancePlanner.Status.OVERDUE)overdue++;else approaching++;
     String item=service.optString("type","정비");
@@ -37,7 +49,7 @@ final class MaintenanceNotificationSummary {
     String specific=item+(remaining.isEmpty()?"":" · "+remaining);
     if(rank<bestRank){bestRank=rank;selected=specific;}
     // Detect a change to any service even if due/soon item counts stay the same.
-    signature+=bike.optString("id")+":"+service.optString("id")+":"+item+":"+status+":"+remaining+";";
+    signature+=bike.optString("id")+":"+service.optString("id")+":"+item+":"+status+";";
    }
   }
   return new MaintenanceNotificationSummary(overdue,approaching,selected,
