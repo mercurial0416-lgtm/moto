@@ -45,7 +45,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: MOTO-HUB-DI518-${{ github.sha }}
+          name: MOTO-HUB-DEBUG-TEST-ONLY-${{ github.sha }}
           path: |
             MOTO-HUB/app/build/outputs/apk/debug/
             MOTO-HUB/app/build/reports/
