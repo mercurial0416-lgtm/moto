@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 out="$(mktemp -d)"
 trap 'rm -rf "$out"' EXIT
 javac -encoding UTF-8 -cp "$JSON_JAR" -d "$out" \
- app/src/main/java/com/motohub/next/{Store,FuelRecordValidation,QuickRecordDraft,MaintenanceNotificationSummary,GarageBikeStatus,LatestServiceByType,RecentRecordReuse,MaintenancePlanner,HomeMaintenanceStatus,MaintenanceNoticeText}.java \
+ app/src/main/java/com/motohub/next/{Store,FuelRecordValidation,QuickRecordDraft,MaintenanceNotificationSummary,MaintenanceAlertWindow,GarageBikeStatus,LatestServiceByType,RecentRecordReuse,MaintenancePlanner,HomeMaintenanceStatus,MaintenanceNoticeText}.java \
  tests/Ux16QuickLogMaintenanceTest.java
 java -cp "$JSON_JAR:$out" com.motohub.next.Ux16QuickLogMaintenanceTest
 python3 - <<'PY'
