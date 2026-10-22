@@ -8,7 +8,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
+      # Workflow definition lives on main; reviewed Android source lives on the integrated branch.
       - uses: actions/checkout@v4
+        with:
+          ref: build/di518-ux4-prebuild-20261020
+          persist-credentials: false
+      - name: Record exact application source revision
+        id: source-revision
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Verify Android source and next update version
+        run: |
+          test -f MOTO-HUB/gradlew && test -f MOTO-HUB/app/build.gradle
+          python3 - <<'PY'
+          import json,re
+          build=open('MOTO-HUB/app/build.gradle',encoding='utf-8').read()
+          version=int(re.search(r'\bversionCode\s+(\d+)',build).group(1))
+          public=int(json.load(open('updates/manifest.json',encoding='utf-8'))['versionCode'])
+          if version<=public: raise SystemExit('Refusing same-version or older fixed-signed APK')
+          PY
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -50,7 +67,7 @@ jobs:
       - name: Publish verified release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MOTO-HUB-FIXED-SIGNED-${{ github.sha }}
+          name: MOTO-HUB-FIXED-SIGNED-${{ steps.source-revision.outputs.commit }}
           path: MOTO-HUB/app/build/outputs/apk/release/
           if-no-files-found: error
           retention-days: 90
