@@ -16,6 +16,7 @@ c=Path("app/src/main/java/com/motohub/next/AutoPhotoCache.java").read_text()
 b=Path("app/src/main/java/com/motohub/next/BootRideReminder.java").read_text()
 assert 'MaintenanceNoticeThrottle.shouldNotify(' in j
 assert 'prefs.getLong("last_maintenance_notice_at",0L)' in j
+assert 'if(stamp.equals(previousStamp)&&lastSent<=0)' in j
 assert 'putLong("last_maintenance_notice_at",now)' in j
 assert j.count('remove("last_maintenance_notice_at")')==2
 assert 'if(enabled&&!RideService.running)sendMaintenanceReminder(db)' in j

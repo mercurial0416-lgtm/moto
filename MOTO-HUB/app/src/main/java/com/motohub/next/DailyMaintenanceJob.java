@@ -120,8 +120,15 @@ public final class DailyMaintenanceJob extends JobService {
   String stamp="service:"+reminder.fingerprint;
   android.content.SharedPreferences prefs=getSharedPreferences("notifications",MODE_PRIVATE);
   long now=System.currentTimeMillis();
-  if(!MaintenanceNoticeThrottle.shouldNotify(stamp,prefs.getString("last_maintenance_notice",""),
-    prefs.getLong("last_maintenance_notice_at",0L),now))return;
+  String previousStamp=prefs.getString("last_maintenance_notice","");
+  long lastSent=prefs.getLong("last_maintenance_notice_at",0L);
+  // One-time migration: old installations have a notice fingerprint but no
+  // timestamp. Start a fresh 7-day quiet period instead of spamming on upgrade.
+  if(stamp.equals(previousStamp)&&lastSent<=0){
+   prefs.edit().putLong("last_maintenance_notice_at",now).apply();
+   return;
+  }
+  if(!MaintenanceNoticeThrottle.shouldNotify(stamp,previousStamp,lastSent,now))return;
   manager.createNotificationChannel(new NotificationChannel("maintenance","정비 예정 알림",NotificationManager.IMPORTANCE_DEFAULT));
   Intent intent=new Intent(this,MainActivity.class);intent.putExtra(MotoWidgetProvider.EXTRA_TAB,"차고");
   PendingIntent open=PendingIntent.getActivity(this,103,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
