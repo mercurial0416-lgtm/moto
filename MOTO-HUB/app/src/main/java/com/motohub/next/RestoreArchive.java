@@ -25,8 +25,10 @@ public final class RestoreArchive {
     RestoreCapacity.sum(staging,fresh),
     json.getBytes(StandardCharsets.UTF_8).length);
   }
-  /** Replaces backed-up local assets and invokes caller's atomic JSON writer LAST. */
-  public void install(File internal,DataWriter writer)throws Exception {
+  /** Compatibility API for existing direct callers; Android ZIP restore uses the journal overload. */
+  public void install(File internal,DataWriter writer)throws Exception {install(internal,null,writer);}
+  /** Protected restore: retain the original JSON alongside the old assets for crash replay. */
+  public void install(File internal,byte[] previousJson,DataWriter writer)throws Exception {
    // Existing assets are copied into a rollback directory while staged assets
    // are copied into place. Reserve space for BOTH copies before mutation.
    RestoreCapacity.ensure(RestoreCapacity.available(internal),requiredSpace(internal));
@@ -38,6 +40,8 @@ public final class RestoreArchive {
    boolean preserveRollback=false;
    try {
     for(String name:old)copy(new File(internal,name),new File(backup,name));
+    // Persist a replayable rollback BEFORE touching any live GPS/photo file.
+    if(previousJson!=null)CrashJournal.begin(internal,backup,old,fresh,previousJson);
     for(String name:fresh){
      File staged=new File(staging,name),installed=new File(internal,name);
      copy(staged,installed);
@@ -51,13 +55,21 @@ public final class RestoreArchive {
      Files.deleteIfExists(new File(internal,name).toPath());
     // The caller's atomic JSON write is the last committing operation.
     writer.write(json);
+    if(previousJson!=null)CrashJournal.markCommitted(backup);
    }catch(Exception failure){
-    for(String name:fresh)if(!existing.contains(name))new File(internal,name).delete();
-    for(String name:old)try{
-     File saved=new File(backup,name);
-     if(saved.isFile())copy(saved,new File(internal,name));
-     else {preserveRollback=true;failure.addSuppressed(new IOException("복구용 안전 사본 누락: "+name));}
-    }catch(Exception e){preserveRollback=true;failure.addSuppressed(e);}
+    if(previousJson!=null&&new File(backup,"pending").isFile()){
+     try{
+      // Restore JSON as well as every asset, even if writer failed AFTER saving new JSON.
+      CrashJournal.recoverOne(internal,backup,bytes->writer.write(new String(bytes,StandardCharsets.UTF_8)));
+     }catch(Exception recovered){preserveRollback=true;failure.addSuppressed(recovered);}
+    }else{
+     for(String name:fresh)if(!existing.contains(name))new File(internal,name).delete();
+     for(String name:old)try{
+      File saved=new File(backup,name);
+      if(saved.isFile())copy(saved,new File(internal,name));
+      else {preserveRollback=true;failure.addSuppressed(new IOException("복구용 안전 사본 누락: "+name));}
+     }catch(Exception e){preserveRollback=true;failure.addSuppressed(e);}
+    }
     throw failure;
    }finally{if(!preserveRollback)clean(backup);}
   }
@@ -150,6 +162,159 @@ public final class RestoreArchive {
    return new Prepared(stage,json,photos,receipts,rides);
   }catch(Exception e){clean(stage);throw e;}
  }
+
+ /** Bounded, internal-only journal. A pending marker is written after all old files are safe.
+  * A crash before commit replays original JSON + assets; after commit only cleanup remains.
+  * Never read external ZIP filenames here or follow symbolic links. */
+ static final class CrashJournal {
+  private static final String OLD_JSON="old-db.json", MANIFEST="journal.bin";
+  private static final String PENDING="pending", COMMITTED="committed";
+  private static final String DIRECTORY="moto-rollback-[0-9a-fA-F-]{36}";
+  private static final int MAX_NAMES=BackupFormat.MAX_ENTRIES;
+  interface OriginalWriter {void write(byte[] oldJson)throws Exception;}
+  static void begin(File internal,File backup,List<String> old,List<String> fresh,byte[] oldJson)throws IOException {
+   safeDir(internal,backup);
+   if(oldJson==null||oldJson.length<2||oldJson.length>BackupFormat.MAX_JSON_BYTES)
+    throw new IOException("복원 이전 JSON 크기가 올바르지 않습니다.");
+   for(String name:old)validate(name);
+   for(String name:fresh)validate(name);
+   if(old.size()+fresh.size()>MAX_NAMES)throw new IOException("복원 목록이 너무 큽니다.");
+   // No live file is modified until this manifest, JSON and all asset copies exist.
+   writeSync(new File(backup,OLD_JSON),oldJson);
+   File f=new File(backup,MANIFEST);
+   try(FileOutputStream stream=new FileOutputStream(f);
+       DataOutputStream out=new DataOutputStream(new BufferedOutputStream(stream))){
+    out.writeInt(0x4d4f544f);out.writeInt(1);
+    out.writeInt(old.size());for(String name:old)out.writeUTF(name);
+    out.writeInt(fresh.size());for(String name:fresh)out.writeUTF(name);
+    out.flush();stream.getFD().sync();
+   }
+   for(String name:old){
+    File saved=new File(backup,name);
+    if(!Files.isRegularFile(saved.toPath(),LinkOption.NOFOLLOW_LINKS)||
+       Files.isSymbolicLink(saved.toPath()))throw new IOException("복원 안전 사본이 불완전합니다.");
+   }
+   Files.createFile(new File(backup,PENDING).toPath());
+  }
+  static void markCommitted(File backup)throws IOException {
+   File pending=new File(backup,PENDING);
+   if(!Files.isRegularFile(pending.toPath(),LinkOption.NOFOLLOW_LINKS))
+    throw new IOException("복원 저널이 누락됐습니다.");
+   Files.createFile(new File(backup,COMMITTED).toPath());
+  }
+  static int recoverAll(File internal,OriginalWriter writer)throws Exception {
+   if(internal==null||!Files.isDirectory(internal.toPath(),LinkOption.NOFOLLOW_LINKS)||
+      Files.isSymbolicLink(internal.toPath()))throw new IOException("앱 데이터 폴더 안전 확인 실패");
+   File[] dirs=internal.listFiles(f->f.getName().matches(DIRECTORY));
+   if(dirs==null)return 0;
+   Arrays.sort(dirs,(a,b)->Long.compare(b.lastModified(),a.lastModified()));
+   int recovered=0;
+   for(File dir:dirs){
+    safeDir(internal,dir);
+    File pending=new File(dir,PENDING),committed=new File(dir,COMMITTED);
+    if(Files.exists(committed.toPath(),LinkOption.NOFOLLOW_LINKS)){
+     // All files and JSON were committed; interrupted cleanup is safe.
+     if(Files.isSymbolicLink(committed.toPath())||!Files.isRegularFile(committed.toPath(),LinkOption.NOFOLLOW_LINKS))
+      throw new IOException("손상된 복원 완료 표시입니다.");
+     if(Files.exists(pending.toPath(),LinkOption.NOFOLLOW_LINKS)&&
+        (!Files.isRegularFile(pending.toPath(),LinkOption.NOFOLLOW_LINKS)||Files.isSymbolicLink(pending.toPath())))
+      throw new IOException("손상된 복원 진행 표시입니다.");
+     safeClean(dir);
+    }else if(Files.exists(pending.toPath(),LinkOption.NOFOLLOW_LINKS)){
+     if(!Files.isRegularFile(pending.toPath(),LinkOption.NOFOLLOW_LINKS)||
+        Files.isSymbolicLink(pending.toPath()))throw new IOException("손상된 복원 진행 표시입니다.");
+     recoverOne(internal,dir,writer);recovered++;
+    }
+    // A crash before PENDING is harmless: old live files were not yet touched.
+   }
+   return recovered;
+  }
+  static void recoverOne(File internal,File backup,OriginalWriter writer)throws Exception {
+   safeDir(internal,backup);
+   File pending=new File(backup,PENDING);
+   if(Files.isSymbolicLink(pending.toPath())||
+      !Files.isRegularFile(pending.toPath(),LinkOption.NOFOLLOW_LINKS))
+    throw new IOException("복원 진행 표시가 없습니다.");
+   File oldJson=new File(backup,OLD_JSON),manifest=new File(backup,MANIFEST);
+   if(Files.isSymbolicLink(oldJson.toPath())||Files.isSymbolicLink(manifest.toPath())||
+      !Files.isRegularFile(oldJson.toPath(),LinkOption.NOFOLLOW_LINKS)||
+      !Files.isRegularFile(manifest.toPath(),LinkOption.NOFOLLOW_LINKS)||
+      oldJson.length()>BackupFormat.MAX_JSON_BYTES||manifest.length()>12_000_000)
+    throw new IOException("이전 데이터 안전 사본이 유효하지 않습니다.");
+   List<String> old=new ArrayList<>(),fresh=new ArrayList<>();
+   try(DataInputStream in=new DataInputStream(new BufferedInputStream(new FileInputStream(manifest)))){
+    if(in.readInt()!=0x4d4f544f||in.readInt()!=1)throw new IOException("복원 저널 형식 오류");
+    int count=in.readInt();if(count<0||count>MAX_NAMES)throw new IOException("이전 파일 목록 초과");
+    for(int i=0;i<count;i++){String path=in.readUTF();validate(path);old.add(path);}
+    count=in.readInt();if(count<0||count>MAX_NAMES-old.size())throw new IOException("복원 파일 목록 초과");
+    for(int i=0;i<count;i++){String path=in.readUTF();validate(path);fresh.add(path);}
+    if(in.read()!=-1)throw new IOException("복원 저널 추가 데이터");
+   }
+   Set<String> original=new HashSet<>(old);
+   if(original.size()!=old.size()||new HashSet<>(fresh).size()!=fresh.size())
+    throw new IOException("중복된 복원 목록입니다.");
+   // Verify EVERY old copy before deleting any newly installed file.
+   for(String name:old){
+    File saved=new File(backup,name),target=new File(internal,name);
+    safePath(backup,saved);safePath(internal,target);
+    if(!Files.isRegularFile(saved.toPath(),LinkOption.NOFOLLOW_LINKS)||
+       Files.isSymbolicLink(saved.toPath()))throw new IOException("안전 사본이 누락됐습니다: "+name);
+   }
+   byte[] bytes=Files.readAllBytes(oldJson.toPath());
+   if(bytes.length<2)throw new IOException("복원 JSON 안전 사본이 비어 있습니다.");
+   for(String name:fresh)if(!original.contains(name)){
+    File target=new File(internal,name);safePath(internal,target);
+    if(Files.exists(target.toPath(),LinkOption.NOFOLLOW_LINKS)){
+     if(Files.isSymbolicLink(target.toPath())||!Files.isRegularFile(target.toPath(),LinkOption.NOFOLLOW_LINKS))
+      throw new IOException("복원 새 파일이 안전하지 않습니다: "+name);
+     Files.delete(target.toPath());
+    }
+   }
+   for(String name:old){
+    File target=new File(internal,name);safePath(internal,target);
+    copy(new File(backup,name),target);
+   }
+   // LAST: pair original JSON with original asset state. This is idempotent across crashes.
+   writer.write(bytes);
+   Files.delete(pending.toPath());
+   safeClean(backup);
+  }
+  private static void validate(String name)throws IOException {
+   if(name==null||name.length()>180||name.contains("..")||name.startsWith("/")||name.contains("\\"))throw new IOException("위험한 복원 저널 경로");
+   boolean photo=name.matches(BackupFormat.PHOTO),receipt=name.matches(BackupFormat.RECEIPT),
+     ride=name.startsWith("rides/")&&(name.substring(6).matches(BackupFormat.TRACK)||
+      BackupFormat.isSidecar(name)),model=name.startsWith("moto-year-photos/")&&
+      (name.substring(17).matches(BackupFormat.MODEL_PHOTO)||name.substring(17).matches(BackupFormat.MODEL_META));
+   if(!photo&&!receipt&&!ride&&!model)throw new IOException("지원되지 않는 복원 저널 파일: "+name);
+  }
+  private static void safeDir(File internal,File backup)throws IOException {
+   if(!backup.getName().matches(DIRECTORY)||!backup.getParentFile().equals(internal)||
+      Files.isSymbolicLink(backup.toPath())||!Files.isDirectory(backup.toPath(),LinkOption.NOFOLLOW_LINKS))
+    throw new IOException("복원 저널 폴더가 안전하지 않습니다.");
+  }
+  private static void safePath(File root,File target)throws IOException{
+   String relative=root.toPath().relativize(target.toPath()).toString().replace(File.separatorChar,'/');
+   validate(relative);
+   File parent=target.getParentFile();
+   if(Files.isSymbolicLink(parent.toPath())||
+      (Files.exists(parent.toPath(),LinkOption.NOFOLLOW_LINKS)&&
+       !Files.isDirectory(parent.toPath(),LinkOption.NOFOLLOW_LINKS))||
+      Files.isSymbolicLink(target.toPath()))throw new IOException("복원 대상 경로가 안전하지 않습니다.");
+  }
+  private static void writeSync(File file,byte[] data)throws IOException {
+   try(FileOutputStream out=new FileOutputStream(file)){out.write(data);out.getFD().sync();}
+  }
+  private static void safeClean(File path)throws IOException {
+   if(Files.isSymbolicLink(path.toPath()))throw new IOException("복원 저널 삭제 경로가 안전하지 않습니다.");
+   if(Files.isDirectory(path.toPath(),LinkOption.NOFOLLOW_LINKS)){
+    File[] files=path.listFiles();
+    if(files==null)throw new IOException("복원 저널 폴더를 읽지 못했습니다.");
+    for(File file:files)safeClean(file);
+   }
+   Files.deleteIfExists(path.toPath());
+  }
+ }
+
  private static boolean jpeg(File f)throws IOException{
   try(RandomAccessFile in=new RandomAccessFile(f,"r")){if(in.readUnsignedByte()!=0xff||in.readUnsignedByte()!=0xd8)return false;in.seek(in.length()-2);return in.readUnsignedByte()==0xff&&in.readUnsignedByte()==0xd9;}
  }

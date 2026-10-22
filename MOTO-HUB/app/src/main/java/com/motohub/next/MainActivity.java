@@ -39,6 +39,9 @@ public class MainActivity extends Activity {
  interface Work{void run()throws Exception;}
  interface Choice{void pick(String value);}
  @Override public void onCreate(Bundle state){super.onCreate(state);PrivateCacheCleanup.atProcessStart(getCacheDir(),getFilesDir(),System.currentTimeMillis());ReceiptCameraFiles.cleanOld(getCacheDir(),System.currentTimeMillis());new Thread(()->{synchronized(MotorcyclePhoto.class){AutoPhotoCache.trim(new File(getFilesDir(),"moto-year-photos"),System.currentTimeMillis());}},"moto-photo-cache-maintenance").start();if(!RideService.running)Sharing.stop();disk=new AtomicFile(new File(getFilesDir(),"motohub-v3.json"));
+  boolean crashedRestoreRecovered=false,crashedRestoreNeedsHelp=false;
+  try{crashedRestoreRecovered=RestoreArchive.CrashJournal.recoverAll(getFilesDir(),bytes->atomic(disk,bytes))>0;}
+  catch(Exception e){readOnly=true;crashedRestoreNeedsHelp=true;}
   try{db=disk.getBaseFile().exists()||new File(disk.getBaseFile()+".bak").exists()?Store.parse(new String(disk.readFully(),StandardCharsets.UTF_8)):Store.empty();}
   catch(Exception e){try{db=Store.empty();}catch(Exception ignored){}readOnly=true;}
   // Restore local list preference across process death; rotation state wins when available.
@@ -54,7 +57,10 @@ public class MainActivity extends Activity {
   applyWidgetForm(getIntent());
   DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
-  if(state==null)receiveSharedListing(getIntent());if(readOnly)error("저장 파일을 읽지 못해 원본을 보존하고 새 저장을 차단했습니다. 더보기에서 백업을 복원해 주세요.");
+  if(state==null)receiveSharedListing(getIntent());
+  if(crashedRestoreNeedsHelp)error("미완료 백업 복원의 원본 사본을 안전하게 되돌리지 못했어요. 추가 저장을 차단하고 복구용 파일을 보존했습니다. 앱을 삭제하지 말고 백업 상태를 확인해 주세요.");
+  else if(readOnly)error("저장 파일을 읽지 못해 원본을 보존하고 새 저장을 차단했습니다. 더보기에서 백업을 복원해 주세요.");
+  else if(crashedRestoreRecovered)toast("중단됐던 백업 복원을 이전 기록으로 안전하게 되돌렸어요.");
   if(state==null && !RideService.running && !RideService.autoArmed)showInterruptedRidePrompt();
  }
  /** Process death/reboot leaves a local .track without .done. Only offers a manual review. */
@@ -1284,7 +1290,7 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
          // Do not use write(next) here: it performs post-commit checkpoint work
          // that can throw after the JSON is already persisted. At this point the
          // asset rollback would otherwise undo files but leave NEW JSON on disk.
-         ready.install(getFilesDir(),json->{
+         ready.install(getFilesDir(),previous,json->{
           JSONObject next=Store.parse(json);
           if(RideService.running||RideService.autoArmed)throw new IOException(RestoreRideGate.MESSAGE);
           atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));
