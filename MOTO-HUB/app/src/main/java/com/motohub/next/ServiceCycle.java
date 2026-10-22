@@ -9,7 +9,7 @@ final class ServiceCycle {
  static JSONObject completed(JSONObject previous,String date,double currentKm,double cost)throws Exception {
   if(previous==null||previous.optString("vehicleId").isEmpty()||previous.optString("type").isEmpty())
    throw new IllegalArgumentException("완료할 정비 항목이 없습니다.");
-  Store.validateDate(date);
+  try{Store.validateDate(date);}catch(java.time.format.DateTimeParseException invalid){throw new IllegalArgumentException("정비 완료 날짜가 올바르지 않습니다.");}
   if(date.isEmpty())throw new IllegalArgumentException("정비 완료 날짜를 입력해 주세요.");
   if(!Double.isFinite(currentKm)||currentKm<0||currentKm>1e9)throw new IllegalArgumentException("계기판을 확인해 주세요.");
   if(!Double.isFinite(cost)||cost<0||cost>1_000_000_000)
