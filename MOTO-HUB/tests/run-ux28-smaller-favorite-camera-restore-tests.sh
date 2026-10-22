@@ -6,10 +6,10 @@ from pathlib import Path
 src=Path('app/src/main/java/com/motohub/next/MainActivity.java').read_text()
 section=src[src.index('boolean entered=false;',src.index('void prepareBundleRestore(Uri uri,char[] password)')):]
 section=section[:section.index('},"MOTO-ZIP-restore-apply").start()')]
-assert 'ready.install(getFilesDir(),json->{' in section
+assert 'ready.install(getFilesDir(),previous,json->{' in section
 assert 'atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));' in section
 assert 'db=next;readOnly=false;' in section
-assert 'write(next)' not in section.split('ready.install(getFilesDir(),json->{',1)[1].split('LocalSafetyBackup.checkpoint(this,db)',1)[0]
+assert 'write(next)' not in section.split('ready.install(getFilesDir(),previous,json->{',1)[1].split('LocalSafetyBackup.checkpoint(this,db)',1)[0]
 assert section.index('LocalSafetyBackup.checkpoint(this,db)') > section.index('ready.install(getFilesDir()')
 assert 'before-import.json' in section and 'atomic(rollback,previous)' in section
 ui=Path('app/src/main/java/com/motohub/next/RideUi.java').read_text()
