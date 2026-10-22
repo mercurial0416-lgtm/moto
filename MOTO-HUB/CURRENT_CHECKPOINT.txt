@@ -1,6 +1,8 @@
-MOTO HUB Alpha6 DI518 UX19 — SOURCE MERGED + DEBUG CI TESTED
-Latest source branch: build/di518-ux4-prebuild-20261020
-Merged source commit: f7b05136fefd38c3fc0b1085a5a480f3f68dfcb4
-Successful CI for UX19 code: https://github.com/mercurial0416-lgtm/moto/actions/runs/39755731137
-Debug artifact available in run above; NOT fixed-signed for existing installs.
-Fixed-signing workflow repaired on main in PR #17; requires private secrets.
+MOTO HUB Alpha6 DI518 UX21 — MERGED + DEBUG CI VERIFIED
+SOURCE BRANCH: build/di518-ux4-prebuild-20261020
+SOURCE SHA: fdfebbaee7cb0dd8793e413dc310044b99c6b9fe
+UX20 CI: https://github.com/mercurial0416-lgtm/moto/actions/runs/39759995384 SUCCESS
+UX21 CI: https://github.com/mercurial0416-lgtm/moto/actions/runs/39760731453 SUCCESS
+Fixed signing workflow: main/.github/workflows/moto-fixed-signed.yml
+Signing release NOT executed; signing secrets and existing install signature unverified.
+CI DEBUG APK IS TEST ONLY. Keep the installed app and local data.

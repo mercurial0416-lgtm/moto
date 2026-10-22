@@ -1,33 +1,31 @@
-# MOTO HUB — 최신 개발 재개 지점 (2026-10-22)
+# MOTO HUB 최신 작업 재개 — Alpha6 DI518 UX21 (2026-10-22)
 
-## 반드시 이 기준 사용
-- 저장소: https://github.com/mercurial0416-lgtm/moto
-- **실제 최신 소스 브랜치:** `build/di518-ux4-prebuild-20261020`, 디렉터리 `MOTO-HUB/`.
-- 최신 통합 커밋: `f7b05136fefd38c3fc0b1085a5a480f3f68dfcb4` (UX19).
-- Android: `com.motohub.next`, `versionCode 518`.
-- `main`은 아직 역사적 ZIP + 업데이트 manifest + GitHub Actions 위주이고 최신 앱 소스 전체가 없음. `main`이나 루트 ZIP 기준으로 앱을 새로 만들지 말 것.
-- UX17/UX18/UX19와 앞선 변경이 통합 브랜치에 누적됨. 특히 로그인 제거, 로컬 데이터, 정비주기·알림, 사진, GPS, GPX, 백업 및 기존 코드 보호.
-- **고정 서명 개인키는 GitHub 공개 저장소에 업로드하지 말 것.** 고정 서명 SHA-256: `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`.
+## 최신 기준
+- GitHub: https://github.com/mercurial0416-lgtm/moto
+- 소스: `build/di518-ux4-prebuild-20261020` 브랜치의 `MOTO-HUB/`
+- UX21 통합 커밋: `fdfebbaee7cb0dd8793e413dc310044b99c6b9fe`
+- Android 패키지 `com.motohub.next`, 일반 빌드 `versionCode 518`.
+- `main`은 release/update manifest와 workflow 중심이며 **완전한 최신 Android 소스는 위 통합 브랜치에 있음**. 이전 ZIP을 다시 풀어 소스를 덮어쓰지 말 것.
+- 기존 로컬 데이터, 백업, GPS 라이딩, GPX, 정비/주유, 사진, 위젯, OBD 읽기 전용 개발자 기능을 유지.
 
-## 가장 최근 완료
-1. UX18: 정비 기록 등록·완료 동률 선택, 알림 OFF/ON 중복 방지 초기화 — PR #16 병합, 전체 CI 성공.
-2. UX19: 가장 최근 유효한 주유 기록만 불러오기, 입력 금액/리터 기반 단가 표시, 만땅 주유 시 계기판 표시.
-3. UX19: 사진 선택 작업과 미리보기 다운로드 분리, 중복 선택 방지, 오래된 비동기 이미지 폐기, 메모리 정리, Wikimedia 요청 식별 정보.
-4. UX19: 신규 회귀 테스트 및 기존 BZ 검사 업데이트 — PR #18 병합, 성공한 CI: https://github.com/mercurial0416-lgtm/moto/actions/runs/39755731137 (Java, Android build, Lint, unit tests).
-5. GitHub `main`의 고정 서명 빌드 workflow가 최신 통합 브랜치 소스를 체크아웃하도록 PR #17 병합. 서명키가 구성돼야 고정 서명 빌드 가능.
+## 반영 완료
+1. UX18: 같은 날짜/거리에서 정비 완료 기록 선택 통일, 알림 OFF/ON 상태 초기화.
+2. UX19: 최근 주유·주유 단가 UI, 가득 주유 계기판 표시, 갤러리 선택/미리보기 분리, 비트맵 정리.
+3. UX20: 자동 계산 금액의 오래된 값 제거 및 수동 입력 보호, JobService 중단/스냅샷 경쟁 완화, 공개 업데이트 버전에 따라 고정 서명 릴리스 버전 자동 선택. [PR #19](https://github.com/mercurial0416-lgtm/moto/pull/19), [Android 빌드 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39759995384).
+4. UX20 main: 고정 서명 APK 검증 (패키지명·인증서 SHA-256·버전·SHA256), 소스 ZIP과 체크섬 아티팩트, 명시적 수동 publish [PR #20](https://github.com/mercurial0416-lgtm/moto/pull/20) 병합.
+5. UX21: 지난 주유 불러오기 중 계산기가 실제 결제액을 덮어쓰는 오류 수정, 가득 주유 계기판 편집칸 유지, 추적 상태 초기화. [PR #21](https://github.com/mercurial0416-lgtm/moto/pull/21), [Android 빌드 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39760731453).
 
-## 확인되지 않은 항목
-- Galaxy S25/Android 16 실기기 사진 검색 성공, 사진 미리보기, 갤러리 교체, GPS 장시간 주행, 푸시 알림 시간 지연.
-- 현재 사용자가 설치한 APK의 서명과 고정 서명키가 같은지 여부.
-- Actions debug APK는 **고정 서명 업데이트 APK가 아님**. 기존 설치본을 지우거나 덮어쓰지 말 것.
-- 전체 세계 바이크/연식 사진은 공개 이미지 제공자와 실제 매칭 이미지 존재 여부에 좌우됨. 100% 보장하지 말 것.
+## 미완료·검증 필요
+- 고정 서명 private keystore 및 Secrets 설정 여부는 확인하지 못함. `main` 서명 workflow는 아직 실행·검증하지 않음.
+- 사용자가 현재 설치 중인 앱의 인증서 SHA-256이 고정 서명 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`와 일치하는지 확인 필요.
+- 갤럭시 실기기에서 온라인 바이크 사진, 라이딩 GPS 백그라운드 장시간 기록, 정비 알림 예약, 고정 서명 업데이트 설치·데이터 보존 테스트 미실행.
+- 향후 개선 후보는 실제 기기 문제 로그 기반 사진 로드 폴백, 접근성·대형 데이터 UI 검증, 백업/복원 중단 복구의 계측 테스트 등.
 
-## 다음 수정 순서
-1. 실기기 갤러리 HTTP 오류·다운로드 상태를 개인정보 노출 없이 점검하고 결과에 따라 추가 수정.
-2. 기존 설치본 signing fingerprint 비교 → 맞는 release keystore 확보 → `main`의 Fixed-signature MOTO HUB update APK 실행 → 해시/서명/versionCode 확인.
-3. signed APK 설치 전 데이터 ZIP 백업·복원 테스트, 실제 설치/업데이트 검증.
-4. 그 후 GPS 서비스, 배터리 제한, 모델 연식 사진, UI 스크롤·접근성 보완.
-5. 기능 하나마다 GitHub 커밋과 CI로 검증; 기존 소스/기능 재작성 금지.
+## 절대 하지 말 것
+- 서명키/비밀번호를 공개 저장소에 올리기.
+- GitHub CI debug APK를 기존 설치본의 고정 서명 업데이트로 주장하기.
+- 이전 ZIP에서 프로젝트를 새로 만들어 UX20/21 코드를 지우기.
+- 사진 매칭/업데이트/GPS가 실기기에서 검증됐다고 주장하기.
 
-## 다른 대화에서 이어갈 때
-`mercurial0416-lgtm/moto`의 `build/di518-ux4-prebuild-20261020` 브랜치에서 `CONTINUE_HERE_KO.md`와 `MOTO-HUB/docs/CHECKPOINT_ALPHA6_DI518_UX19_KO.md`를 읽어. UX19까지 통합돼 있고 APK debug CI는 성공했지만 실기기 사진 로딩과 고정 서명 업데이트는 미검증이야. 최신 기능을 보존한 채 이어서 수정하고, 각 단계마다 커밋·검증해.
+## 새 대화에서 바로 시작
+`mercurial0416-lgtm/moto`의 `build/di518-ux4-prebuild-20261020` 최신 HEAD에서 `CONTINUE_HERE_KO.md`를 읽고 UX21 이후 개발을 이어가. CI Java/Android 빌드/Lint/유닛 테스트는 성공했고, 고정 서명 릴리스 및 실기기 검증은 별도야. 변경 후 GitHub 커밋·검증·PR 병합으로 결과를 보존해.

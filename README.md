@@ -1,16 +1,14 @@
-# MOTO HUB · Android Alpha6 DI518 UX19
+# MOTO HUB · Android Alpha6 DI518 UX21
 
-현재 **실제 Android 소스**는 이 브랜치의 [MOTO-HUB/](MOTO-HUB/)에 있습니다.
-루트의 AB/AH/AQ ZIP은 과거 보관본입니다. 최신 소스를 이 ZIP으로 덮어쓰지 마세요.
+**실제 최신 Android 소스:** [MOTO-HUB/](MOTO-HUB/) · 통합 브랜치 `build/di518-ux4-prebuild-20261020`.
+과거 루트 AB/AH/AQ ZIP으로 앱 소스를 덮어쓰지 마세요.
 
-- 가장 최신 통합 브랜치: `build/di518-ux4-prebuild-20261020`
-- 이어서 작업할 때: [CONTINUE_HERE_KO.md](CONTINUE_HERE_KO.md)
-- 최신 주요 변경: [UX19 체크포인트](MOTO-HUB/docs/CHECKPOINT_ALPHA6_DI518_UX19_KO.md)
-- 빠른 주유, 정비 알림, 갤러리, 주행기록, GPX, 사진, 백업, 로컬 앱 기능은 같은 프로젝트에 유지됩니다.
-- [성공한 UX19 APK·Lint·Unit Test CI](https://github.com/mercurial0416-lgtm/moto/actions/runs/39755731137)
+- [작업 재개 가이드](CONTINUE_HERE_KO.md)
+- [UX20+UX21 변경 및 검증](MOTO-HUB/docs/CHECKPOINT_ALPHA6_DI518_UX21_KO.md)
+- [검증된 UX20 Android APK 빌드](https://github.com/mercurial0416-lgtm/moto/actions/runs/39759995384)
+- [검증된 UX21 Android APK 빌드](https://github.com/mercurial0416-lgtm/moto/actions/runs/39760731453)
+- 주유·정비·사진·GPS·GPX·백업·로컬 저장 기능을 기존 프로젝트에서 이어서 관리함.
 
-**중요:** CI의 `assembleDebug` APK는 기존 앱의 서명과 호환된다는 보장이 없습니다.
-설치본을 지우지 마세요. 데이터 백업 없이 재설치하거나 임의 서명 APK로 교체하지 마세요.
-고정 서명 APK는 비공개 키가 있는 [수동 Release Workflow](https://github.com/mercurial0416-lgtm/moto/actions/workflows/moto-fixed-signed.yml)에서 별도 인증서 검증 후 생성해야 합니다.
+**릴리스:** `main`의 [고정 서명 워크플로](https://github.com/mercurial0416-lgtm/moto/actions/workflows/moto-fixed-signed.yml)는 최신 소스를 가져와 공개 manifest보다 높은 버전을 선택하고, 고정 인증서를 검증한 뒤 APK와 같은 커밋의 소스 ZIP을 산출하도록 수정됐습니다. 그러나 실제 고정 서명 빌드는 개인키 비밀값이 필요하며 이번 작업에서 실행하지 않았습니다.
 
-현재 코드와 APK 빌드 통과 사실은 실제 휴대폰의 갤러리 통신, 권한, 사진 로드, GPS 및 업데이트 설치 성공을 의미하지 않습니다.
+**설치 주의:** CI의 debug APK를 기존 설치본에 덮어쓸 수 있다고 보장하지 않습니다. 데이터 백업 없이 앱 삭제나 재설치를 하지 마세요.
