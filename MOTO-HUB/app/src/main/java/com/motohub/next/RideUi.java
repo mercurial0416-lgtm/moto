@@ -439,18 +439,13 @@ final class RideUi {
       return;
      }
      a.openRideInsights(f);
-    });
-    if(!live&&!interrupted&&!a.readOnly){
-     Button star=a.button(starred?"★ 즐겨찾기 해제":"☆ 이 라이딩 즐겨찾기",false,()->{
-      a.attempt(()->{
-       boolean isNowFavorite=RideFavorite.toggle(f);
-       a.toast(isNowFavorite?"라이딩 즐겨찾기에 추가했어요.":"즐겨찾기를 해제했어요.");
-       // Refresh only the local row and re-read the exact sidecar state.
-       showHistoryResults(results,entries,total,selected,summary);
-      });
+    },live||interrupted||a.readOnly?null:()->{
+     a.attempt(()->{
+      boolean isNowFavorite=RideFavorite.toggle(f);
+      a.toast(isNowFavorite?"라이딩 즐겨찾기에 추가했어요.":"즐겨찾기를 해제했어요.");
+      showHistoryResults(results,entries,total,selected,summary);
      });
-     star.setTextSize(12);star.setMinHeight(a.dp(38));results.addView(star);
-    }
+    },starred);
   }
   final int remaining=RideHistoryPage.remaining(count,shown);
   if(remaining>0){

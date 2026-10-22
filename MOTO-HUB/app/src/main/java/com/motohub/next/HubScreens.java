@@ -13,6 +13,9 @@ final class HubScreens {
  void empty(String title,String description,String action,Runnable click){a.gap(a.content,16);a.label(a.content,title,22,a.fg,true);a.label(a.content,description,16,a.muted,false);a.gap(a.content,12);a.action(a.content,action,true,click);}
  void line(String title,String detail,String value,Runnable click){line(a.content,title,detail,value,click);}
  void line(LinearLayout target,String title,String detail,String value,Runnable click){
+  line(target,title,detail,value,click,null,false);
+ }
+ void line(LinearLayout target,String title,String detail,String value,Runnable click,Runnable favorite,boolean starred){
   LinearLayout block=a.col();block.setPadding(a.dp(2),a.dp(17),a.dp(2),a.dp(17));block.setMinimumHeight(a.dp(68));
   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);
   TextView label=a.text(title,15,a.fg,true);label.setMaxLines(2);
@@ -20,7 +23,16 @@ final class HubScreens {
   if(value!=null&&!value.isEmpty()){
    TextView hint=a.text(value,13,a.muted,true);hint.setGravity(Gravity.END);
    hint.setPadding(a.dp(10),0,0,0);hint.setMaxLines(2);head.addView(hint);
-  }block.addView(head);
+  }
+  if(favorite!=null){
+   Button star=a.button(starred?"★":"☆",false,favorite);
+   star.setContentDescription(starred?"라이딩 즐겨찾기 해제":"라이딩 즐겨찾기");
+   star.setMinHeight(a.dp(44));star.setMinimumWidth(a.dp(44));
+   star.setTextSize(20);star.setPadding(0,0,0,0);
+   LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(a.dp(46),a.dp(44));
+   sp.leftMargin=a.dp(6);head.addView(star,sp);
+  }
+  block.addView(head);
   if(detail!=null&&!detail.isEmpty()){
    TextView summary=a.text(detail,12,a.muted,false);summary.setLineSpacing(a.dp(2),1f);
    LinearLayout.LayoutParams sl=new LinearLayout.LayoutParams(-1,-2);sl.topMargin=a.dp(7);block.addView(summary,sl);

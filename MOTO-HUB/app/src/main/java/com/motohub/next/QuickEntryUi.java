@@ -99,7 +99,7 @@ final class QuickEntryUi {
   EditText odo=number(extra,"현재 계기판 (km)",String.valueOf((long)bike.optDouble("odo")),"현재 주행거리");
   // Reuse the bundled offline OCR model; nothing is sent to a server or saved before confirmation.
   a.quickOdoField=odo;
-  a.action(extra,"계기판 사진에서 주행거리 읽기",false,()->a.chooseQuickOdometerPhoto(odo));
+  a.action(extra,"갤러리에서 계기판 사진 선택",false,()->a.chooseQuickOdometerPhoto(odo));
   EditText date=new EditText(a);date.setText(a.today());date.setTextSize(16);date.setTextColor(a.fg);
   date.setFocusable(false);date.setClickable(true);date.setMinHeight(a.dp(50));date.setBackground(a.shape(a.panel,a.line,11));
   date.setPadding(a.dp(13),0,a.dp(13),0);date.setOnClickListener(v->a.pickDate(date));
@@ -111,6 +111,10 @@ final class QuickEntryUi {
    extra.setVisibility(extra.getVisibility()==View.GONE?View.VISIBLE:View.GONE);
   });
   body.addView(toggle);body.addView(extra);
+  a.action(body,"계기판 바로 촬영",false,()->{
+   extra.setVisibility(View.VISIBLE);
+   a.startQuickOdometerCamera(odo);
+  });
   // Full-to-full efficiency requires the real odometer; don't hide it on a full fill.
   full.setOnCheckedChangeListener((button,checked)->{
    if(checked)extra.setVisibility(View.VISIBLE);
