@@ -170,7 +170,7 @@ public final class BackupBundle {
       throw new IOException("라이딩 분류가 손상됐습니다: "+file.getName());
      total=writeFile(zip,category,"rides/"+category.getName(),total);
     }
-    for(String suffix:new String[]{".done",".imported",".recovered",".unmerged"}){
+    for(String suffix:new String[]{".done",".imported",".recovered",".unmerged",".favorite"}){
      File marker=new File(file.getPath()+suffix);if(marker.isFile()||Files.isSymbolicLink(marker.toPath())){
       requireRegular(marker);
       if(marker.length()!=0)throw new IOException("라이딩 상태 표시가 손상됐습니다: "+marker.getName());

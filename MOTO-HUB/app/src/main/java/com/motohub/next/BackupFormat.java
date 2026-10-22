@@ -136,7 +136,7 @@ final class BackupFormat {
   }
  }
  static String sidecarSuffix(String name){
-  for(String suffix:new String[]{".done",".imported",".recovered",".unmerged",".mergedinto",".bike",".category"})
+  for(String suffix:new String[]{".done",".imported",".recovered",".unmerged",".mergedinto",".bike",".category",".favorite"})
    if(name.endsWith(suffix))return suffix;
   return "";
  }

@@ -97,6 +97,9 @@ final class QuickEntryUi {
   full.setTextColor(a.fg);full.setTextSize(14);full.setMinHeight(a.dp(50));body.addView(full);
   LinearLayout extra=a.col();extra.setVisibility(View.GONE);
   EditText odo=number(extra,"현재 계기판 (km)",String.valueOf((long)bike.optDouble("odo")),"현재 주행거리");
+  // Reuse the bundled offline OCR model; nothing is sent to a server or saved before confirmation.
+  a.quickOdoField=odo;
+  a.action(extra,"계기판 사진에서 주행거리 읽기",false,()->a.chooseQuickOdometerPhoto(odo));
   EditText date=new EditText(a);date.setText(a.today());date.setTextSize(16);date.setTextColor(a.fg);
   date.setFocusable(false);date.setClickable(true);date.setMinHeight(a.dp(50));date.setBackground(a.shape(a.panel,a.line,11));
   date.setPadding(a.dp(13),0,a.dp(13),0);date.setOnClickListener(v->a.pickDate(date));
