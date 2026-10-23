@@ -118,6 +118,25 @@ public class RestoreArchiveTest {
     ok(parked.renameTo(modelFolder),"restore original year-photo cache");
     external.delete();
    }
+   // Disposal of a stage directory must NEVER traverse symbolic links to a
+   // folder elsewhere in app storage (or outside it).
+   File outsideStage=Files.createTempDirectory("moto-stage-clean-guard").toFile();
+   File privateOutside=new File(outsideStage,"precious.txt");
+   Files.writeString(privateOutside.toPath(),"keep original");
+   try{
+    RestoreArchive.Prepared p=RestoreArchive.prepare(new ByteArrayInputStream(zip),root);
+    java.lang.reflect.Field stageField=RestoreArchive.Prepared.class.getDeclaredField("staging");
+    stageField.setAccessible(true);
+    File staged=(File)stageField.get(p);
+    Files.createSymbolicLink(new File(staged,"rogue-link").toPath(),outsideStage.toPath());
+    p.close();
+    ok(Files.readString(privateOutside.toPath()).equals("keep original"),
+       "staging cleanup does not follow external symlink");
+    ok(!staged.exists(),"cleanup deletes stage itself");
+   }finally{
+    Files.deleteIfExists(privateOutside.toPath());
+    Files.deleteIfExists(outsideStage.toPath());
+   }
    System.out.println("PASS ZIP restore safety and rollback checks: "+checks);
   } finally {clean(root);}
  }

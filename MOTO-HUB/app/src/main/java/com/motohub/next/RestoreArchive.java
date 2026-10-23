@@ -394,5 +394,15 @@ public final class RestoreArchive {
   File temp=new File(dest.getParentFile(),dest.getName()+".restoring");
   try{Files.copy(source.toPath(),temp.toPath(),StandardCopyOption.REPLACE_EXISTING);Files.move(temp.toPath(),dest.toPath(),StandardCopyOption.REPLACE_EXISTING);}finally{temp.delete();}
  }
- private static void clean(File path){if(path.isDirectory()){File[] children=path.listFiles();if(children!=null)for(File child:children)clean(child);}path.delete();}
+ /** Never follow links encountered while discarding temporary restore directories.
+  * A compromised staged link must not delete external files during cleanup. */
+ private static void clean(File path){
+  if(path==null)return;
+  if(Files.isDirectory(path.toPath(),LinkOption.NOFOLLOW_LINKS)
+      &&!Files.isSymbolicLink(path.toPath())){
+   File[] children=path.listFiles();
+   if(children!=null)for(File child:children)clean(child);
+  }
+  path.delete();
+ }
 }

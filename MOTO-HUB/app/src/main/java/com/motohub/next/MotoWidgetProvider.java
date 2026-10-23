@@ -70,8 +70,14 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
   String headline="바이크를 등록해 주세요",detail="차고에서 차량을 추가할 수 있어요",cost="";
   try{
    java.io.File file=new java.io.File(context.getFilesDir(),"motohub-v3.json");
-   if(file.exists()&&file.length()<8_000_000){
-    byte[] bytes=java.nio.file.Files.readAllBytes(file.toPath());
+   java.io.File rollback=new java.io.File(file.getPath()+".bak");
+   // Mirror the main database's AtomicFile reader. A half-written widget read
+   // must not treat an in-flight save as an empty garage.
+   if((file.isFile()&&file.length()>0&&file.length()<8_000_000)
+       ||(rollback.isFile()&&rollback.length()>0&&rollback.length()<8_000_000)){
+    byte[] bytes=new android.util.AtomicFile(file).readFully();
+    if(bytes.length==0||bytes.length>=8_000_000)
+     throw new java.io.IOException("위젯 데이터 크기를 확인할 수 없습니다.");
     JSONObject db=Store.parse(new String(bytes,java.nio.charset.StandardCharsets.UTF_8));
     JSONArray bikes=db.optJSONArray("vehicles");
     if(bikes!=null&&bikes.length()>0){

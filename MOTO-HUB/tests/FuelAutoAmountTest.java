@@ -20,6 +20,18 @@ public final class FuelAutoAmountTest {
   eq("9000",entry.update("","5","1,800"),"thousands separator accepted");
   entry.reset();
   eq("9000",entry.update("9000","",""),"manual reused amount not cleared after reset");
+  entry.reset();
+  eq("9000",entry.update("","5","1800"),"calculate for later manual edit");
+  entry.noteAmountEdited("9000"); // programmatic setText of our generated amount
+  eq("9250",entry.update("9000","5","1850"),"generated value may still update");
+  entry.noteAmountEdited("9300"); // explicit user edit
+  eq("9300",entry.update("9300","6","1800"),"manual correction survives liters edit");
+  eq("9300",entry.update("9300","6","1700"),"manual correction survives unit price edit");
+  entry.noteAmountEdited(""); // clearing amount means automatic entry again
+  eq("10200",entry.update("","6","1700"),"clearing restores auto calculation");
+  entry.noteAmountEdited("10200");
+  entry.reset();
+  eq("9000",entry.update("","5","1800"),"reset starts a new automatic session");
   System.out.println("PASS safe auto fuel amount: "+assertions+" cases");
  }
 }
