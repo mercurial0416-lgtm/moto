@@ -54,7 +54,7 @@ final class MaintenanceNotificationSummary {
    }
   }
   return new MaintenanceNotificationSummary(overdue,approaching,selected,
-   Integer.toHexString(signature.hashCode())+":"+overdue+":"+approaching);
+   Integer.toHexString(signature.toString().hashCode())+":"+overdue+":"+approaching);
  }
  String title(){return due>0?"정비 시기가 지났어요":soon>0?"정비가 곧 필요해요":"정비 일정 없음";}
  boolean hasNotice(){return due>0||soon>0;}
