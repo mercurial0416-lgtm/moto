@@ -3,11 +3,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-javac -encoding UTF-8 -d "$tmp" \
- app/src/main/java/com/motohub/next/{ReceiptSlots,BackupFormat,TrackFile,RestoreArchive,RestoreCapacity,ServiceCycle,FuelAutoAmount}.java \
+: "${JSON_JAR:?CI supplies org.json Java jar}"
+javac -encoding UTF-8 -cp "$JSON_JAR" -d "$tmp" \
+ app/src/main/java/com/motohub/next/{ReceiptSlots,BackupFormat,TrackFile,RestoreArchive,RestoreCapacity,Store,FuelRecordValidation,QuickRecordDraft,ServiceCycle,FuelAutoAmount,MaintenanceNotificationSummary,MaintenanceAlertWindow,GarageBikeStatus,LatestServiceByType,RecentRecordReuse,MaintenancePlanner,HomeMaintenanceStatus,MaintenanceNoticeText}.java \
  tests/{RestoreArchiveTest,FuelAutoAmountTest}.java
-java -cp "$tmp" com.motohub.next.RestoreArchiveTest
-java -cp "$tmp" com.motohub.next.FuelAutoAmountTest
+java -cp "$JSON_JAR:$tmp" com.motohub.next.RestoreArchiveTest
+java -cp "$JSON_JAR:$tmp" com.motohub.next.FuelAutoAmountTest
 python3 - <<'PY'
 from pathlib import Path
 root=Path('app/src/main/java/com/motohub/next')
