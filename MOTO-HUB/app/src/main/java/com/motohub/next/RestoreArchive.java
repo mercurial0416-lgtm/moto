@@ -262,6 +262,9 @@ public final class RestoreArchive {
    }
    byte[] bytes=Files.readAllBytes(oldJson.toPath());
    if(bytes.length<2)throw new IOException("복원 JSON 안전 사본이 비어 있습니다.");
+   // Never remove newly restored assets unless the complete rollback set is intact.
+   // Validate target paths in advance so a late symlink cannot cause partial rollback.
+   for(String name:fresh)safePath(internal,new File(internal,name));
    for(String name:fresh)if(!original.contains(name)){
     File target=new File(internal,name);safePath(internal,target);
     if(Files.exists(target.toPath(),LinkOption.NOFOLLOW_LINKS)){
