@@ -14,19 +14,25 @@ final class MaintenanceNotificationSummary {
   JSONArray bikes=db.optJSONArray("vehicles"),services=db.optJSONArray("services");
   if(bikes==null||services==null)return new MaintenanceNotificationSummary(0,0,"","");
   int overdue=0,approaching=0;
-  String selected="",signature="";
+  String selected="";
+  StringBuilder signature=new StringBuilder();
   int bestRank=99;
+  // Index once in saved order. The previous implementation scanned all service
+  // rows separately for each vehicle, causing O(bikes * services) work.
+  Map<String,List<JSONObject>> byBike=new HashMap<>();
+  for(int j=0;j<services.length();j++){
+   JSONObject record=services.optJSONObject(j);
+   if(record==null)continue;
+   String bikeId=record.optString("vehicleId");
+   if(!bikeId.isEmpty())byBike.computeIfAbsent(bikeId,k->new ArrayList<>()).add(record);
+  }
   for(int i=0;i<bikes.length();i++){
    JSONObject bike=bikes.optJSONObject(i);
    if(bike==null||GarageBikeStatus.sold(bike.optString("soldDate")))continue;
-   List<JSONObject> history=new ArrayList<>();
-   // Keep append order: the shared latest-per-type resolver now selects the
-   // last saved record on exact ties, just like the garage and widget.
-   for(int j=0;j<services.length();j++){
-    JSONObject record=services.optJSONObject(j);
-    if(record!=null&&bike.optString("id").equals(record.optString("vehicleId")))history.add(record);
-   }
-   for(JSONObject service:LatestServiceByType.latest(history,bike.optString("id")).values()){
+   String bikeId=bike.optString("id");
+   List<JSONObject> history=byBike.getOrDefault(bikeId,Collections.emptyList());
+   // Retain original insertion order and latest-record tie breaking.
+   for(JSONObject service:LatestServiceByType.latest(history,bikeId).values()){
     MaintenancePlanner.Status status=MaintenanceAlertWindow.status(service,today,bike.optDouble("odo"));
     if(status!=MaintenancePlanner.Status.OVERDUE&&status!=MaintenancePlanner.Status.SOON)continue;
     if(status==MaintenancePlanner.Status.OVERDUE)overdue++;else approaching++;
@@ -37,11 +43,18 @@ final class MaintenanceNotificationSummary {
     String specific=item+(remaining.isEmpty()?"":" · "+remaining);
     if(rank<bestRank){bestRank=rank;selected=specific;}
     // Detect a change to any service even if due/soon item counts stay the same.
-    signature+=bike.optString("id")+":"+service.optString("id")+":"+item+":"+status+";";
+    // Rescheduling a still-SOON item is meaningful even if the count, type
+    // and ID stay unchanged. Odometer readings are excluded to avoid spam.
+    signature.append(bikeId).append(':').append(service.optString("id"))
+     .append(':').append(item).append(':').append(status)
+     .append(':').append(service.optString("nextDate"))
+     .append(':').append(service.optDouble("nextKm"))
+     .append(':').append(service.optInt("alertKmBefore"))
+     .append(':').append(service.optInt("alertDaysBefore")).append(';');
    }
   }
   return new MaintenanceNotificationSummary(overdue,approaching,selected,
-   Integer.toHexString(signature.hashCode())+":"+overdue+":"+approaching);
+   Integer.toHexString(signature.toString().hashCode())+":"+overdue+":"+approaching);
  }
  String title(){return due>0?"정비 시기가 지났어요":soon>0?"정비가 곧 필요해요":"정비 일정 없음";}
  boolean hasNotice(){return due>0||soon>0;}
