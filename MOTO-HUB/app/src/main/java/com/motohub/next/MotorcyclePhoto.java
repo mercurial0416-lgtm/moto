@@ -153,17 +153,28 @@ final class MotorcyclePhoto {
    }
   }
   credit.setText(garageMode?"사진 검색 중… · 탭해서 직접 등록 가능":"모델 사진 검색 중…");if(garageMode)credit.setOnClickListener(v->a.chooseGaragePhoto());
-  new Thread(()->{
+  boolean accepted=PhotoLookupQueue.submit(()->{
+   // When a card has been replaced while waiting in the queue, skip all HTTP work.
+   if(!PhotoRequestGuard.isCurrent(target,requestToken))return;
    PhotoSearchResult lookup=candidateWithStatus(brand,model,year);
    PhotoLoad loaded=lookup.photo;
    JSONObject found=loaded==null?null:loaded.source;
    Bitmap b=loaded==null?null:loaded.bitmap;
+   Bitmap manualOverride=null;
+   JSONObject manualAttribution=null;
    if(found!=null&&b!=null&&PhotoRequestGuard.isCurrent(target,requestToken))try{
     synchronized(MotorcyclePhoto.class){
      // Never overwrite a model photo deliberately chosen in the gallery with a late automatic lookup.
      boolean selected=false;
      if(attribution.isFile())try{selected=new JSONObject(readSmall(attribution)).optBoolean("userSelected");}catch(Exception ignored){}
-     if(!selected){
+     if(selected){
+      // A gallery selection made while the network was loading must win.
+      Bitmap current=decodeLocalSampled(file,1200);
+      if(current!=null){
+       manualOverride=current;
+       try{manualAttribution=new JSONObject(readSmall(attribution));}catch(Exception ignored){}
+      }
+     }else{
       file.getParentFile().mkdirs();
       AtomicFile imageDisk=new AtomicFile(file);FileOutputStream imageOut=null;
       try{imageOut=imageDisk.startWrite();if(!b.compress(Bitmap.CompressFormat.JPEG,87,imageOut))throw new IOException("image encode failed");imageDisk.finishWrite(imageOut);imageOut=null;}
@@ -175,10 +186,21 @@ final class MotorcyclePhoto {
     }
    }catch(Exception ignored){} // A cache write failure must not hide a downloaded photo.
    final JSONObject data=found;final Bitmap image=b;
+   final Bitmap selectedImage=manualOverride;final JSONObject selectedMeta=manualAttribution;
    a.runOnUiThread(()->{if(a.isFinishing()||a.isDestroyed()||target.getParent()==null||!PhotoRequestGuard.isCurrent(target,requestToken)){
-    // Downloaded preview is not attached to any ImageView; return bitmap memory immediately.
-    if(image!=null&&!image.isRecycled())image.recycle();return;
+    if(image!=null&&!image.isRecycled())image.recycle();
+    if(selectedImage!=null&&!selectedImage.isRecycled())selectedImage.recycle();
+    return;
    }
+    if(selectedImage!=null){
+     target.setImageBitmap(selectedImage);
+     if(image!=null&&!image.isRecycled())image.recycle();
+     String url=selectedMeta==null?"":selectedMeta.optString("pageUrl");
+     credit.setText("내가 고른 모델 사진"+(url.startsWith("https://commons.wikimedia.org/")?" · 출처 보기":" · 사진 변경 버튼 사용"));
+     if(url.startsWith("https://commons.wikimedia.org/"))credit.setOnClickListener(v->a.open(url));
+     else if(garageMode)credit.setOnClickListener(v->a.chooseGaragePhoto());
+     return;
+    }
     if(data!=null&&image!=null){target.setImageBitmap(image);credit.setText((data.optBoolean("exactYearCandidate")?"연식 검색 후보":"동일 모델 참고 · 연식 미확인")+" · "+data.optString("license")+" · 출처 보기");credit.setOnClickListener(v->a.open(data.optString("pageUrl")));}
     else {
      String reason=PhotoSearchStatus.message(lookup.failure);
@@ -196,7 +218,16 @@ final class MotorcyclePhoto {
      }
     }
    });
-  },"moto-commons-image").start();
+  });
+  if(!accepted&&PhotoRequestGuard.isCurrent(target,requestToken)){
+   credit.setText("사진 요청이 많아요 · 탭해서 다시 검색"+(garageMode?"/직접 등록":""));
+   if(garageMode)credit.setOnClickListener(v->new android.app.AlertDialog.Builder(a)
+    .setTitle("바이크 사진").setItems(new String[]{"사진 다시 검색","내 사진 등록"},(dialog,choice)->{
+     if(choice==0)show(a,target,credit,brand,model,year,garageBikeId);
+     else a.chooseGaragePhoto();
+    }).show());
+   else credit.setOnClickListener(v->show(a,target,credit,brand,model,year,null));
+  }
  }
  static String readSmall(File f)throws IOException{try(InputStream in=new FileInputStream(f)){byte[] b=new byte[(int)Math.min(f.length(),8192)];int len=in.read(b);return len<=0?"":new String(b,0,len,"UTF-8");}}
 }
