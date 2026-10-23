@@ -1,10 +1,10 @@
-# MOTO HUB 개발 재개 · 2026-10-23 · UX33
+# MOTO HUB 개발 재개 · 2026-10-23 · UX35
 
 ## 정확한 현재 소스
 - 저장소: https://github.com/mercurial0416-lgtm/moto
 - 브랜치: `build/di518-ux4-prebuild-20261020`
 - Android 소스: `MOTO-HUB/`
-- 최신 기능 통합 커밋: `399a01d0f878b4228c9e5aa456b4489b5579c40c` (UX33)
+- 최신 기능 통합 커밋: `c9463f664bc3995d211f45d65fd0d7859f7fd5e4` (UX35)
 - 패키지: `com.motohub.next`; 일반 debug `versionCode 518`
 - `main`은 릴리스 manifest·워크플로·역사적 ZIP 중심. **루트 ZIP에서 앱을 다시 만들지 말 것.**
 
@@ -43,7 +43,14 @@
 - UX32: JSON 단독 백업 복원은 JSON의 원자적 저장을 먼저 완료하고 체크포인트/위젯 새로고침을 후처리로 분리. 저널의 늦은 심볼릭 링크 탐지 테스트 추가. [PR #32](https://github.com/mercurial0416-lgtm/moto/pull/32), [CI 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39899213448).
 - UX33: 주유 자동 계산값을 사용자가 수동 수정하면 이후 리터·단가 입력이 직접 수정 금액을 덮어쓰지 않음(금액 지우기 시 자동 계산 재개). ZIP 복원 임시 폴더 삭제 시 심볼릭 링크를 재귀로 따라가지 않음. 위젯의 데이터베이스 읽기는 `AtomicFile.readFully()` 이용. [PR #34](https://github.com/mercurial0416-lgtm/moto/pull/34), [전체 CI 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39901211779).
 - UX33 실제 테스트용 APK: `MOTO-HUB-UX33-DEBUG-TEST.apk`, 48,371,678 bytes, SHA-256 `60e9f7d6914927bb3b7e64b7fbe22b1969beaeca74c5af0e1e6e6e36eaf17cb0`. 단위 테스트 69개, 실패 0개, 건너뜀 2개. debug v2 서명 인증서 `5b01da503ada11c205408644453db6c9a0fecd67ee0ff92c8c80b781d49b6216`, 기존 고정 서명 인증서 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`와 다름. **기존 설치 앱 삭제 금지.**
-- 중요: `main` 트리는 12개 경로뿐이며 `MOTO-HUB/app/build.gradle`/Java 앱 소스가 없음. 그러나 `.github/workflows/moto-fixed-signed.yml`은 `main`에서만 실행 및 앱 빌드하도록 되어 있음. 이는 정식 서명 APK 배포를 막는 구조적 문제. 비공개 서명키 존재 여부는 확인 못함. 기능 개발과 분리해서 안전한 소스 체크아웃·고정 서명 검증·버전 증가·업데이트 매니페스트 배포 경로를 정리해야 함.
+- 정정: 이 시점의 `main/.github/workflows/moto-fixed-signed.yml`은 별도 개발 브랜치를 안전하게 체크아웃하도록 이미 수정됨. 소스 부재가 직접 빌드 장애라는 판단은 더 이상 해당하지 않음. signing secrets는 확인 불가, 정식 Release 검증 별도.
+
+## UX34~UX35 추가 완료 (2026-10-23)
+- UX33 사진 보완도 이전 체크포인트 직후 통합됨: 유효한 자동 사진 로딩 대기 시간 제한, 사용자 직접 선택 사진 우선 적용. 통합 커밋 `06a55c05`.
+- UX34: 정비 알림을 바이크마다 모든 서비스 레코드를 재검색하지 않고 한 번 바이크별로 분류하여 대량 기록 성능 개선. 정비 예정일·예정주행거리·알림 기준 변경은 알림 식별값에 반영하고, 실제 주행거리 소폭 변경은 반복 알림으로 취급하지 않음. 7,500건 규모 회귀 + 전체 Android CI 통과. [PR #35](https://github.com/mercurial0416-lgtm/moto/pull/35), [CI 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39952626466).
+- UX35: OBD 자동 감지 중 실제 GPS 트랙을 기록할 때 GPS가 꺼지는 경우 자동 감지만 중지하고 기존 트랙 및 서비스를 보존. 기록이 시작되지 않은 OBD 대기 상태는 종료. 네 가지 정책 조합 회귀 + Android CI 성공. [PR #36](https://github.com/mercurial0416-lgtm/moto/pull/36), [CI 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39953215930).
+- UX35 테스트 APK: `MOTO-HUB-UX35-DEBUG-TEST.apk` (48,371,678 bytes), SHA-256 `9e6f04491123a63c2cea0ac03e7d6eb82a8e7e2e292156f38f50eb150c01f95d`, Android 단위 69개 중 실패 0·건너뜀 2, debug signer SHA-256 `e8d688d776e7e3133c44026307521f48553e4b62162a0b2bd5547f355cfe3f9f`. **기존 고정 서명 설치 앱은 삭제하지 말 것.**
+- 정정: `main`의 실제 최신 `.github/workflows/moto-fixed-signed.yml`은 이미 `source/`에 최신 개발 브랜치 Android 소스를 따로 checkout 하며 버전 자동 증가, 고정 인증서 검증, opt-in 공개 manifest 갱신을 구현했다. 초기 체크포인트의 “main에 소스가 없어 정식 릴리스 불가” 설명은 현재 워크플로 기준으로는 잘못됨. 다만 비공개 signing secrets 존재 여부를 읽을 권한이 없어 검증하지 못했고, 정식 고정 서명 APK 발급·기존 설치본의 인증서 검증도 미완료.
 
 ## 미완료, 별도 검증 필요
 - 갤럭시/Android 16 실기기의 온라인 사진 호출/실제 이미지 선택, 장시간 GPS 백그라운드, 대량 기록 UI, 정비 알림 권한/시간.
@@ -57,4 +64,4 @@
 3. 실기기 이전에는 **현재 앱을 삭제하거나 debug APK로 업데이트할 것을 지시하지 않는다.**
 4. 배포 시 고정 서명 키를 공개 저장소에 올리지 말고 인증서 SHA-256 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`와 현재 설치 앱 인증서를 먼저 확인한다.
 
-다른 대화에선 이 문서와 `MOTO-HUB/docs/DEVELOPMENT_RULES_AND_QUEUE_UX24_KO.md`를 읽고 UX34부터 이어서 수정해.
+다른 대화에선 이 문서와 `MOTO-HUB/docs/DEVELOPMENT_RULES_AND_QUEUE_UX24_KO.md`를 읽고 UX36부터 이어서 수정해. UX35의 GPS 전환을 갤럭시 실기기에서 확인하고, 진짜 고정 서명 APK/사진/대량 UI 성능 문제를 우선한다.
