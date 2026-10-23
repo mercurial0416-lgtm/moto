@@ -38,7 +38,18 @@ public final class RideService extends Service implements LocationListener {
     if(monitor!=null)monitor.stop();
     onObdDisconnected("개발자 모드가 종료되어 자동 감지를 중지했습니다.");
     if(!running)return;
-   }if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}if(autoArmed&&(manager==null||!manager.isProviderEnabled(LocationManager.GPS_PROVIDER))){stopWith("GPS가 꺼져 자동 기록을 중지했습니다.",false);return;}long now=SystemClock.elapsedRealtime();
+   }if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}if(autoArmed&&(manager==null||!manager.isProviderEnabled(LocationManager.GPS_PROVIDER))){
+     // A GPS toggle must never close a track already being written by an OBD-
+     // armed session. Stop only automatic detection; preserve manual GPS intent.
+     if(GpsProviderLossPolicy.onLoss(running,autoArmed)==GpsProviderLossPolicy.Action.KEEP_ACTIVE_TRACK){
+      ObdAutoSpeedMonitor monitor=obdMonitor;
+      if(monitor!=null)monitor.stop();
+      onObdDisconnected("GPS가 꺼져 자동 감지를 중지했습니다.");
+      status="GPS 꺼짐 · 기존 라이딩 보존 · 다시 켜면 기록 재개";
+      NotificationManager notifications=getSystemService(NotificationManager.class);
+      if(notifications!=null)notifications.notify(404,notification(status));
+     }else{stopWith("GPS가 꺼져 자동 출발 감지를 중지했습니다.",false);return;}
+    }long now=SystemClock.elapsedRealtime();
    if(autoArmed){
     if(!ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now))obdSpeedKmh=-1;
     if(!ObdTelemetryFreshness.fresh(obdRpmAt,now))obdRpm=Double.NaN;
