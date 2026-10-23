@@ -59,6 +59,13 @@ final class QuickEntryUi {
    ()->calculator.setVisibility(calculator.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
   body.addView(calcToggle);body.addView(calculator);
   FuelAutoAmount fuelAuto=new FuelAutoAmount();
+  amount.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence value,int start,int count,int after){}
+   public void onTextChanged(CharSequence value,int start,int before,int count){
+    fuelAuto.noteAmountEdited(value.toString());
+   }
+   public void afterTextChanged(android.text.Editable value){}
+  });
   android.text.TextWatcher autoCalc=new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence value,int start,int count,int after){}
    public void onTextChanged(CharSequence value,int start,int before,int count){
