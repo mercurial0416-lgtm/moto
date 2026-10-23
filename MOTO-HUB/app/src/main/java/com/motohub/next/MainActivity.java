@@ -1538,10 +1538,18 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
    .setPositiveButton("복원",(d,w)->attempt(()->{
     if(!RestoreRideGate.begin(RideService.running,RideService.autoArmed))throw new IOException(RestoreRideGate.MESSAGE);
     try{
+     // Validate first; restore should not mutate the live database on bad JSON.
+     JSONObject validated=Store.parse(next.toString());
+     byte[] previous=(readOnly?disk.readFully():db.toString(2).getBytes(StandardCharsets.UTF_8));
      AtomicFile rollback=new AtomicFile(new File(getFilesDir(),"before-import.json"));
-     atomic(rollback,(readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2)).getBytes(StandardCharsets.UTF_8));
-     boolean previous=readOnly;readOnly=false;
-     try{write(next);}catch(Exception e){readOnly=previous;throw e;}
+     atomic(rollback,previous);
+     // The daily pre-edit snapshot is a best-effort extra recovery point.
+     LocalSafetyBackup.snapshot(this,db);
+     // Commit JSON exactly once. Never run a fallible checkpoint inside the commit.
+     atomic(disk,validated.toString(2).getBytes(StandardCharsets.UTF_8));
+     db=validated;readOnly=false;
+     try{LocalSafetyBackup.checkpoint(this,validated);}catch(Exception ignored){}
+     try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){}
      selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();compare.clear();render();toast("복원했어요.");
     }finally{RestoreRideGate.end();}
    })).show();

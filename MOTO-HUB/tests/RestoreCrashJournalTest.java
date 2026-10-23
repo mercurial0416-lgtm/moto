@@ -72,6 +72,24 @@ public final class RestoreCrashJournalTest {
    ok(new File(brokenWriter,"pending").exists(),"leave retryable journal after failed JSON recovery");
    ok(RestoreArchive.CrashJournal.recoverAll(root,bytes->Files.write(db.toPath(),bytes))==1,"retry recovery");
    expect(original,"new committed photo");
+   // A hostile LATE fresh path must be rejected before an earlier new-only file is deleted.
+   File late=journal(root);copy(original,new File(late,P));copy(ride,new File(late,"rides/"+T));
+   RestoreArchive.CrashJournal.begin(root,late,old,fresh,Files.readAllBytes(db.toPath()));
+   Files.writeString(newlyAdded.toPath(),"new photo must survive failed preflight");
+   Path externalFresh=Files.createTempFile("moto-crash-fresh-outside","txt");
+   Files.writeString(externalFresh,"outside untouched");
+   Files.delete(ride.toPath());Files.createSymbolicLink(ride.toPath(),externalFresh);
+   try{
+    RestoreArchive.CrashJournal.recoverAll(root,bytes->Files.write(db.toPath(),bytes));
+    throw new AssertionError("late unsafe fresh path accepted");
+   }catch(IOException expected){checks++;}
+   ok(newlyAdded.exists(),"late unsafe path must not delete earlier new photo");
+   ok(Files.readString(externalFresh).equals("outside untouched"),"late symlink untouched");
+   Files.delete(ride.toPath());Files.writeString(ride.toPath(),"old GPS");
+   Files.delete(externalFresh);
+   ok(RestoreArchive.CrashJournal.recoverAll(root,bytes->Files.write(db.toPath(),bytes))==1,
+      "retry after removing unsafe path");
+   ok(!newlyAdded.exists(),"safe retry removes only new photo");
    // Tampered old copy (symlink to outside) must fail closed and never touch outside bytes.
    File unsafe=journal(root);copy(original,new File(unsafe,P));copy(ride,new File(unsafe,"rides/"+T));
    RestoreArchive.CrashJournal.begin(root,unsafe,old,fresh,Files.readAllBytes(db.toPath()));
