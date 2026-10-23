@@ -1,10 +1,10 @@
-# MOTO HUB 개발 재개 · 2026-10-23 · UX29
+# MOTO HUB 개발 재개 · 2026-10-23 · UX33
 
 ## 정확한 현재 소스
 - 저장소: https://github.com/mercurial0416-lgtm/moto
 - 브랜치: `build/di518-ux4-prebuild-20261020`
 - Android 소스: `MOTO-HUB/`
-- 최신 기능 통합 커밋: `ac783ddacfd6050dcd13f991f3aa2c2fd07e7783` (UX29)
+- 최신 기능 통합 커밋: `399a01d0f878b4228c9e5aa456b4489b5579c40c` (UX33)
 - 패키지: `com.motohub.next`; 일반 debug `versionCode 518`
 - `main`은 릴리스 manifest·워크플로·역사적 ZIP 중심. **루트 ZIP에서 앱을 다시 만들지 말 것.**
 
@@ -37,6 +37,14 @@
 - 최신 테스트 APK: `MOTO-HUB-UX29-DEBUG-TEST.apk`, SHA-256 `954affcbb8f236ef7f13dbe6adfe6b9956f9f93d26d9ef72a49f22d56cc61cef`. **Android Debug 서명 인증서**. 기존 고정 서명 앱 위에 업데이트 설치 불가; 앱 삭제 금지. 고정 서명 인증서 SHA-256은 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`.
 - 이번 UX29에서 구현한 건 **프로세스 강제 종료를 가정한 순수 Java 회귀**이며 전원 차단/파일시스템 손상/Android 16 실기기 복구는 검증되지 않았음.
 
+## UX30 ~ UX33 추가 완료 (2026-10-23)
+- UX30: 정비 반복 알림(사용자 동의 기반·주 단위 억제) 및 모델 사진 캐시 정리 보호. 통합 커밋 `ddbb65a63017521ab5b10fb4fc474fa3f265484c`.
+- UX31: 재시작 복원 저널에서 삭제 전에 모든 새로운 파일 경로의 안전을 확인. [PR #31](https://github.com/mercurial0416-lgtm/moto/pull/31), [CI 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39890795302).
+- UX32: JSON 단독 백업 복원은 JSON의 원자적 저장을 먼저 완료하고 체크포인트/위젯 새로고침을 후처리로 분리. 저널의 늦은 심볼릭 링크 탐지 테스트 추가. [PR #32](https://github.com/mercurial0416-lgtm/moto/pull/32), [CI 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39899213448).
+- UX33: 주유 자동 계산값을 사용자가 수동 수정하면 이후 리터·단가 입력이 직접 수정 금액을 덮어쓰지 않음(금액 지우기 시 자동 계산 재개). ZIP 복원 임시 폴더 삭제 시 심볼릭 링크를 재귀로 따라가지 않음. 위젯의 데이터베이스 읽기는 `AtomicFile.readFully()` 이용. [PR #34](https://github.com/mercurial0416-lgtm/moto/pull/34), [전체 CI 성공](https://github.com/mercurial0416-lgtm/moto/actions/runs/39901211779).
+- UX33 실제 테스트용 APK: `MOTO-HUB-UX33-DEBUG-TEST.apk`, 48,371,678 bytes, SHA-256 `60e9f7d6914927bb3b7e64b7fbe22b1969beaeca74c5af0e1e6e6e36eaf17cb0`. 단위 테스트 69개, 실패 0개, 건너뜀 2개. debug v2 서명 인증서 `5b01da503ada11c205408644453db6c9a0fecd67ee0ff92c8c80b781d49b6216`, 기존 고정 서명 인증서 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`와 다름. **기존 설치 앱 삭제 금지.**
+- 중요: `main` 트리는 12개 경로뿐이며 `MOTO-HUB/app/build.gradle`/Java 앱 소스가 없음. 그러나 `.github/workflows/moto-fixed-signed.yml`은 `main`에서만 실행 및 앱 빌드하도록 되어 있음. 이는 정식 서명 APK 배포를 막는 구조적 문제. 비공개 서명키 존재 여부는 확인 못함. 기능 개발과 분리해서 안전한 소스 체크아웃·고정 서명 검증·버전 증가·업데이트 매니페스트 배포 경로를 정리해야 함.
+
 ## 미완료, 별도 검증 필요
 - 갤럭시/Android 16 실기기의 온라인 사진 호출/실제 이미지 선택, 장시간 GPS 백그라운드, 대량 기록 UI, 정비 알림 권한/시간.
 - 사용자가 현재 설치한 앱과 고정 서명 인증서의 일치 여부. `main/.github/workflows/moto-fixed-signed.yml`에 비공개 서명 secrets가 구성됐는지는 확인하지 못했고 **실제 고정 서명 APK를 만들지 않았음**.
@@ -49,4 +57,4 @@
 3. 실기기 이전에는 **현재 앱을 삭제하거나 debug APK로 업데이트할 것을 지시하지 않는다.**
 4. 배포 시 고정 서명 키를 공개 저장소에 올리지 말고 인증서 SHA-256 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`와 현재 설치 앱 인증서를 먼저 확인한다.
 
-다른 대화에선 이 문서와 `MOTO-HUB/docs/DEVELOPMENT_RULES_AND_QUEUE_UX24_KO.md`를 읽고 UX30부터 이어서 수정해.
+다른 대화에선 이 문서와 `MOTO-HUB/docs/DEVELOPMENT_RULES_AND_QUEUE_UX24_KO.md`를 읽고 UX34부터 이어서 수정해.
