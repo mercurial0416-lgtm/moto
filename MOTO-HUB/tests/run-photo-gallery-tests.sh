@@ -27,7 +27,7 @@ checks={
  'gallery saves JPEG atomically': 'AtomicFile photoFile=new AtomicFile(photo)' in s and 'photoFile.failWrite(photoOut)' in s,
  'gallery saves source and license metadata': 'selected.put("userSelected",true)' in s and 'AtomicFile metaFile=new AtomicFile(metadata)' in s,
  'failed JPEG commit rolls metadata back': 'restore.write(previous)' in s and 'if(previous==null)metadata.delete();' in s,
- 'delayed automatic photo cannot replace gallery choice': 'synchronized(MotorcyclePhoto.class)' in p and 'if(!selected)' in p and 'synchronized(MotorcyclePhoto.class)' in s,
+ 'delayed automatic photo cannot replace gallery choice': 'synchronized(MotorcyclePhoto.class)' in p and 'if(selected){' in p and 'manualOverride=current;' in p and 'if(selectedImage!=null){' in p and 'synchronized(MotorcyclePhoto.class)' in s,
  'gallery network operations off UI thread': '"moto-photo-gallery-search").start()' in s and 'newFixedThreadPool(2' in s and 'PHOTO_IO.execute(' in s,
  'gallery saves selected photo without waiting for all thumbnails': 'newSingleThreadExecutor(' in s and 'SAVE_IO.execute(' in s,
  'gallery refuses concurrent double selection': 'applying.compareAndSet(false,true)' in s and 'applying.set(false)' in s,
