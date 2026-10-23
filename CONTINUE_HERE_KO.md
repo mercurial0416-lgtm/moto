@@ -1,10 +1,10 @@
-# MOTO HUB 개발 재개 · 2026-10-23 · UX35
+# MOTO HUB 개발 재개 · 2026-10-23 · UX36
 
 ## 정확한 현재 소스
 - 저장소: https://github.com/mercurial0416-lgtm/moto
 - 브랜치: `build/di518-ux4-prebuild-20261020`
 - Android 소스: `MOTO-HUB/`
-- 최신 기능 통합 커밋: `c9463f664bc3995d211f45d65fd0d7859f7fd5e4` (UX35)
+- 최신 기능 통합 커밋: `e0df7daf88bc1fa3a718bb7a41b3c1770c82e352` (UX36)
 - 패키지: `com.motohub.next`; 일반 debug `versionCode 518`
 - `main`은 릴리스 manifest·워크플로·역사적 ZIP 중심. **루트 ZIP에서 앱을 다시 만들지 말 것.**
 
@@ -52,6 +52,12 @@
 - UX35 테스트 APK: `MOTO-HUB-UX35-DEBUG-TEST.apk` (48,371,678 bytes), SHA-256 `9e6f04491123a63c2cea0ac03e7d6eb82a8e7e2e292156f38f50eb150c01f95d`, Android 단위 69개 중 실패 0·건너뜀 2, debug signer SHA-256 `e8d688d776e7e3133c44026307521f48553e4b62162a0b2bd5547f355cfe3f9f`. **기존 고정 서명 설치 앱은 삭제하지 말 것.**
 - 정정: `main`의 실제 최신 `.github/workflows/moto-fixed-signed.yml`은 이미 `source/`에 최신 개발 브랜치 Android 소스를 따로 checkout 하며 버전 자동 증가, 고정 인증서 검증, opt-in 공개 manifest 갱신을 구현했다. 초기 체크포인트의 “main에 소스가 없어 정식 릴리스 불가” 설명은 현재 워크플로 기준으로는 잘못됨. 다만 비공개 signing secrets 존재 여부를 읽을 권한이 없어 검증하지 못했고, 정식 고정 서명 APK 발급·기존 설치본의 인증서 검증도 미완료.
 
+## UX36 GPS 부가 기능 오류 분리 (2026-10-23)
+- GPS 파일 쓰기·flush·fsync 성공 뒤 실행하는 그룹 위치 공유·알림 전송을 `RidePostCommit.afterWrite`로 격리. 공유 서비스 오류 시 공유를 중지하더라도 로컬 GPS 트랙은 종료하지 않음. 알림 전송 실패도 로컬 기록을 중단하지 않음. 실제 GPS 기록 파일 쓰기 실패만 중단.
+- 순수 Java 예외 조합 회귀 테스트, 기존 전체 Java 회귀, Android assembleDebug/lintDebug/testDebugUnitTest 성공. [PR #37](https://github.com/mercurial0416-lgtm/moto/pull/37), [최종 CI](https://github.com/mercurial0416-lgtm/moto/actions/runs/39954458590).
+- UX36 최신 테스트 APK `MOTO-HUB-UX36-DEBUG-TEST.apk`, 48,371,678 bytes, SHA-256 `0b6d39cae97e5715cc52f585fd1c96cd1696edafa228c05accb882a72fd4eb6d`, 단위 테스트 69건 중 실패 0·건너뜀 2. Android DEBUG 인증서 SHA-256 `05925dcc25e3e03ccae89c4630928b66cc10f1277fac92dadeac12eec1958500`. **고정 서명과 불일치; 기존 앱 삭제·업데이트 덮어쓰기 권고 금지.**
+- 사용자가 요청한 다른 기능들은 재분석 시 이미 일부 구현됨(사진 조회 대기 제한 UX33, 대량 라이딩 비동기/페이징, 기존 로그인 없는 로컬 데이터, OBD 재연결, 정비·GPX·위젯). 실기기 검증 없이 “전체 완성”으로 오인시키지 말 것.
+
 ## 미완료, 별도 검증 필요
 - 갤럭시/Android 16 실기기의 온라인 사진 호출/실제 이미지 선택, 장시간 GPS 백그라운드, 대량 기록 UI, 정비 알림 권한/시간.
 - 사용자가 현재 설치한 앱과 고정 서명 인증서의 일치 여부. `main/.github/workflows/moto-fixed-signed.yml`에 비공개 서명 secrets가 구성됐는지는 확인하지 못했고 **실제 고정 서명 APK를 만들지 않았음**.
@@ -64,4 +70,4 @@
 3. 실기기 이전에는 **현재 앱을 삭제하거나 debug APK로 업데이트할 것을 지시하지 않는다.**
 4. 배포 시 고정 서명 키를 공개 저장소에 올리지 말고 인증서 SHA-256 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`와 현재 설치 앱 인증서를 먼저 확인한다.
 
-다른 대화에선 이 문서와 `MOTO-HUB/docs/DEVELOPMENT_RULES_AND_QUEUE_UX24_KO.md`를 읽고 UX36부터 이어서 수정해. UX35의 GPS 전환을 갤럭시 실기기에서 확인하고, 진짜 고정 서명 APK/사진/대량 UI 성능 문제를 우선한다.
+다른 대화에선 이 문서와 `MOTO-HUB/docs/DEVELOPMENT_RULES_AND_QUEUE_UX24_KO.md`를 읽고 UX37부터 이어서 수정해. UX35·36의 GPS 전환·부가 오류를 갤럭시 실기기에서 확인하고, 진짜 고정 서명 APK/사진/대량 UI 성능 문제를 우선한다.
