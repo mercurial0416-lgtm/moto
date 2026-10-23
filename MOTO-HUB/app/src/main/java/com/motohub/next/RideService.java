@@ -347,7 +347,27 @@ public final class RideService extends Service implements LocationListener {
      livePeakKmh=Math.max(livePeakKmh,measuredKmh);
     }else liveSpeedKmh=0; // A long GPS gap must never be treated as travelled distance.
    }
-   lastGood=new Location(location);if(!autoArmed&&location.getAccuracy()<=40)Sharing.offer(location);status=count+"개 좌표 · 마지막 "+java.time.Instant.ofEpochMilli(lastTime)+(location.getAccuracy()>40?" · 정확도 낮음":"");if(notificationRate.shouldNotify(SystemClock.elapsedRealtime()))getSystemService(NotificationManager.class).notify(404,notification(String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+(Sharing.enabled?"그룹 위치 공유 켜짐":(gpsOnlyAfterObd?"OBD2 종료 · GPS 단독 기록":"위치 공유 꺼짐"))));}catch(Exception e){stopWith("저장 오류로 기록 중지: "+e.getMessage(),false);}
+   lastGood=new Location(location);
+   status=count+"개 좌표 · 마지막 "+java.time.Instant.ofEpochMilli(lastTime)+(location.getAccuracy()>40?" · 정확도 낮음":"");
+  }catch(Exception e){
+   // Only a real GPS file/track calculation failure can stop local recording.
+   stopWith("저장 오류로 기록 중지: "+e.getMessage(),false);
+   return;
+  }
+  // Neither optional group transmission nor the notification manager may
+  // invalidate an already synced local track or stop this ride.
+  RidePostCommit.afterWrite(
+   ()->{if(!autoArmed&&location.getAccuracy()<=40)Sharing.offer(location);},
+   ()->{Sharing.stop();status="그룹 공유 실패 · 로컬 GPS 기록 유지";},
+   ()->{
+    if(notificationRate.shouldNotify(SystemClock.elapsedRealtime())){
+     NotificationManager notifications=getSystemService(NotificationManager.class);
+     if(notifications!=null)notifications.notify(404,notification(
+      String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+
+      (Sharing.enabled?"그룹 위치 공유 켜짐":(gpsOnlyAfterObd?"OBD2 종료 · GPS 단독 기록":"위치 공유 꺼짐"))));
+    }
+   }
+  );
  }
  @Override public void onProviderDisabled(String provider){if(LocationManager.GPS_PROVIDER.equals(provider)){
   // Security-critical: disable remote sharing synchronously, before any UI message is queued.
