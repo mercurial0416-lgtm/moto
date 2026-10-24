@@ -69,11 +69,11 @@ final class HubScreens {
   return result;
  }
  void records(){
-  a.gap(a.content,4);a.label(a.content,"주유·정비 내역을 한곳에서 관리하세요.",12,a.muted,false);
+  a.gap(a.content,4);
   if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}
   bikePicker();
-  LinearLayout actions=a.col();actions.setPadding(a.dp(14),a.dp(15),a.dp(14),a.dp(8));actions.setBackground(a.shape(a.panel,0,18));
-  a.label(actions,"빠른 기록",16,a.fg,true);
+  LinearLayout actions=a.col();actions.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(6));actions.setBackground(a.shape(a.panel,a.line,8));
+  a.label(actions,"기록 추가",15,a.fg,true);
   a.pair(actions,"간편 주유",()->new QuickEntryUi(a).fuel(),"정비주기 설정",()->new QuickEntryUi(a).maintenance());
   LinearLayout details=a.col();details.setVisibility(View.GONE);
   a.action(details,"정비 완료 내역 상세 입력",false,()->a.edit("services",null));
@@ -95,7 +95,7 @@ final class HubScreens {
    if(lastFuel==null||RecentRecordReuse.isNewer(record.optString("date"),record.optDouble("mileage"),lastFuel.optString("date"),lastFuel.optDouble("mileage")))lastFuel=record;
   }
   if(lastFuel!=null){
-   LinearLayout summary=a.col();summary.setPadding(a.dp(15),a.dp(15),a.dp(15),a.dp(13));summary.setBackground(a.shape(a.panel,a.line,15));
+   LinearLayout summary=a.col();summary.setPadding(a.dp(15),a.dp(15),a.dp(15),a.dp(13));summary.setBackground(a.shape(a.panel,a.line,8));
    a.label(summary,"최근 주유  ·  "+lastFuel.optString("date"),13,a.muted,false);
    a.label(summary,a.won(lastFuel.optDouble("amount"))+"  /  "+a.num(lastFuel.optDouble("liters"))+"L",19,a.fg,true);
    double price=lastFuel.optDouble("amount")/lastFuel.optDouble("liters");
@@ -104,7 +104,7 @@ final class HubScreens {
   }
   FuelStats fuelStats=FuelStats.forBike(a.items("expenses"),bikeId);
   if(fuelStats.fills>0){
-   LinearLayout insight=a.col();insight.setPadding(a.dp(15),a.dp(12),a.dp(15),a.dp(12));insight.setBackground(a.shape(a.panel,a.line,15));
+   LinearLayout insight=a.col();insight.setPadding(a.dp(15),a.dp(12),a.dp(15),a.dp(12));insight.setBackground(a.shape(a.panel,a.line,8));
    a.label(insight,"주유 기록 "+fuelStats.fills+"회 · 평균 리터당 "+a.won(Math.round(fuelStats.averageWonPerLiter)),14,a.fg,true);
    if(fuelStats.fullIntervals>0&&Double.isFinite(fuelStats.kmPerLiter))
     a.label(insight,"만땅 간격 추정 연비 약 "+String.format(java.util.Locale.KOREA,"%.1f",fuelStats.kmPerLiter)+" km/L · "+fuelStats.fullIntervals+"구간",13,a.muted,false);
@@ -143,7 +143,7 @@ final class HubScreens {
  void listings(){
   a.gap(a.content,4);a.label(a.content,"저장한 매물을 검색하고 비교하세요.",12,a.muted,false);
   EditText search=new EditText(a);search.setSingleLine();search.setTextSize(16);search.setTextColor(a.fg);search.setHintTextColor(a.muted);search.setHint("모델명으로 빠르게 찾기");search.setText(a.query);search.setContentDescription("저장한 매물 검색");search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-  search.setPadding(a.dp(16),a.dp(12),a.dp(16),a.dp(12));search.setBackground(a.shape(a.panel,0,14));a.content.addView(search,new LinearLayout.LayoutParams(-1,a.dp(53)));
+  search.setPadding(a.dp(13),a.dp(10),a.dp(13),a.dp(10));search.setBackground(a.shape(a.panel,a.line,8));a.content.addView(search,new LinearLayout.LayoutParams(-1,a.dp(53)));
   a.gap(a.content,13);tabs(new String[]{"전체","확인필요","판매중","예약중","판매완료"},a.filter,v->{a.filter=v;a.listingPageOffset=0;a.render();});
   LinearLayout toolbar=new LinearLayout(a);toolbar.setGravity(Gravity.CENTER_VERTICAL);TextView label=a.text("저장한 매물",17,a.fg,true);toolbar.addView(label,new LinearLayout.LayoutParams(0,-2,1));Button order=a.button(a.sort+"  ▾",false,()->a.choose("정렬",new String[]{"최신순","가격 낮은순","주행거리순"},v->{a.sort=v;a.listingPageOffset=0;a.render();}));order.setMinHeight(a.dp(42));order.setTextSize(13);toolbar.addView(order);a.content.addView(toolbar);
   LinearLayout results=a.col();a.content.addView(results);
@@ -164,11 +164,11 @@ final class HubScreens {
   list.removeIf(x->!x.optString("model").toLowerCase(Locale.ROOT).contains(query)||!a.filter.equals("전체")&&!a.filter.equals(x.optString("status","확인필요")));
   if(a.sort.equals("가격 낮은순"))list.sort(Comparator.comparingDouble(x->x.optDouble("price")));if(a.sort.equals("주행거리순"))list.sort(Comparator.comparingDouble(x->x.optDouble("mileage")));
   a.gap(into,12);a.label(into,list.size()+"개 매물",13,a.muted,false);
-  if(list.isEmpty()){TextView none=a.text("조건에 맞는 매물이 없어.\n필터를 바꾸거나 매물을 추가해 봐.",15,a.muted,false);none.setPadding(a.dp(18),a.dp(25),a.dp(18),a.dp(25));none.setBackground(a.shape(a.panel,0,16));into.addView(none);return;}
+  if(list.isEmpty()){TextView none=a.text("표시할 매물이 없습니다. 필터를 변경하거나 매물을 추가하세요.",14,a.muted,false);none.setPadding(a.dp(16),a.dp(20),a.dp(16),a.dp(20));none.setBackground(a.shape(a.panel,a.line,8));into.addView(none);return;}
   for(int i=ListPageLimit.start(list.size(),a.listingPageOffset);i<ListPageLimit.end(list.size(),a.listingPageOffset);i++){JSONObject x=list.get(i);
-   LinearLayout card=a.col();card.setPadding(a.dp(16),a.dp(17),a.dp(16),a.dp(10));card.setBackground(a.shape(a.panel,0,17));
-   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);TextView model=a.text(x.optString("model"),19,a.fg,true);head.addView(model,new LinearLayout.LayoutParams(0,-2,1));TextView status=a.text(x.optString("status","확인필요"),12,a.accent,true);status.setPadding(a.dp(8),a.dp(5),a.dp(8),a.dp(5));status.setBackground(a.shape(a.highlight,0,9));head.addView(status);card.addView(head);
-   TextView price=a.text(a.won(x.optDouble("price")),25,a.fg,true);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(-1,-2);pp.topMargin=a.dp(11);card.addView(price,pp);
+   LinearLayout card=a.col();card.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(10));card.setBackground(a.shape(a.panel,a.line,8));
+   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);TextView model=a.text(x.optString("model"),19,a.fg,true);head.addView(model,new LinearLayout.LayoutParams(0,-2,1));TextView status=a.text(x.optString("status","확인필요"),12,a.muted,true);status.setPadding(a.dp(8),a.dp(5),0,a.dp(5));head.addView(status);card.addView(head);
+   TextView price=a.text(a.won(x.optDouble("price")),22,a.fg,true);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(-1,-2);pp.topMargin=a.dp(11);card.addView(price,pp);
    TextView specs=a.text(x.optInt("year")+"년식  ·  "+a.num(x.optDouble("mileage"))+" km  ·  "+x.optString("region","지역 미입력"),13,a.muted,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(9);card.addView(specs,sp);
    card.setClickable(true);card.setFocusable(true);card.setContentDescription(x.optString("model")+", "+a.won(x.optDouble("price"))+". 자세히 보기");card.setOnClickListener(v->a.detail(x));
    CheckBox check=new CheckBox(a);check.setText("비교에 담기");check.setTextSize(13);check.setTextColor(a.muted);check.setMinHeight(a.dp(44));check.setChecked(a.compare.contains(x.optString("id")));check.setOnCheckedChangeListener((v,on)->{String id=x.optString("id");if(on&&a.compare.size()>=3){check.setChecked(false);a.toast("최대 3개까지 비교할 수 있어요.");return;}if(on)a.compare.add(id);else a.compare.remove(id);});
