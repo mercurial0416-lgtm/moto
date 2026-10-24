@@ -71,3 +71,14 @@
 4. 배포 시 고정 서명 키를 공개 저장소에 올리지 말고 인증서 SHA-256 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`와 현재 설치 앱 인증서를 먼저 확인한다.
 
 다른 대화에선 이 문서와 `MOTO-HUB/docs/DEVELOPMENT_RULES_AND_QUEUE_UX24_KO.md`를 읽고 UX37부터 이어서 수정해. UX35·36의 GPS 전환·부가 오류를 갤럭시 실기기에서 확인하고, 진짜 고정 서명 APK/사진/대량 UI 성능 문제를 우선한다.
+
+## UX38 네이티브 UI 정리 (2026-10-25)
+- 소스 브랜치: `design/ux38-workshop-ui-20261025` (`MOTO-HUB/`), UX37 알림 안정성 PR과 변경 파일 겹치지 않음.
+- 테마: 무광 그레이/블랙, 절제된 KTM 오렌지, 명암비 검증된 라이트/다크 글자.
+- 홈: 사진 190~211dp 반응형, 컴팩트 바이크 이름/연식/정비 상태, 계기판 거리·다음 정비, 주유/정비주기 바로 입력, GPS 시작/종료 보조 버튼, 최근 기록 플랫 리스트.
+- 네비게이션: 짧은 5탭(홈·차고·매물·주행·설정), 선택 표시줄, 기존 탭 ID/핸들러 보존.
+- 차고/매물: 경계선 있는 사각형 카드, 소형 가격/상태 표시, 과한 설명 제거. 48dp 안팎 터치 목표 유지.
+- 변경 소스: `MotoDesign.java`, `GarageHomeUi.java`, `HubScreens.java`, `MainActivity.java`, `app/src/main/res/values/styles.xml`. 개인 데이터, DB 스키마, GPS 권한/서비스 로직, 서명, 백업은 수정하지 않음.
+- 자동 검증용 `tests/test_workshop_ui.py` 추가. 브랜치 실제 코드 기준 19개 정적 구조/대비 조건 통과; 색상 대비 4.5:1 이상 확인.
+- **Android assembleDebug/lintDebug/testDebugUnitTest, 기기 시각 검수, 정식 서명 APK는 아직 확인되지 않았음.** 기존 설치 APK 삭제 금지.
+- 최종 병합은 Android CI 성공/코드 검토 후. 갤럭시 Android 16에서 360dp·큰 글꼴·라이트/다크 모드·바이크 2대 전환·사진 수정·GPS 동의/종료·주유/정비 버튼 작동을 검증할 것.

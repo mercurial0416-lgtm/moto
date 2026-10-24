@@ -146,11 +146,11 @@ public class MainActivity extends Activity {
  void label(LinearLayout p,String s,int size,int color,boolean bold){TextView t=text(s,size,color,bold);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(t,lp);}
  void gap(LinearLayout p,int n){p.addView(new Space(this),new LinearLayout.LayoutParams(1,dp(n)));}
  void divider(LinearLayout p){View v=new View(this);v.setBackgroundColor(line);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(1));lp.topMargin=dp(12);lp.bottomMargin=dp(12);p.addView(v,lp);}
- Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(14);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(50));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?(dark?0xFF18191B:Color.WHITE):fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,12);b.setPadding(dp(14),dp(8),dp(14),dp(8));b.setOnClickListener(v->r.run());return b;}
+ Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(14);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(48));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?(dark?0xFF18191B:Color.WHITE):fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,8);b.setPadding(dp(14),dp(8),dp(14),dp(8));b.setOnClickListener(v->r.run());return b;}
  void action(LinearLayout p,String s,boolean primary,Runnable r){if(p==formBody&&s.equals("저장")&&formFooter!=null)p=formFooter;LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(button(s,primary,r),lp);}
  void pair(LinearLayout p,String a,Runnable ra,String b,Runnable rb){LinearLayout row=new LinearLayout(this);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(0,0,dp(4),dp(8));row.addView(button(a,true,ra),lp);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);rp.setMargins(dp(4),0,0,dp(8));row.addView(button(b,false,rb),rp);p.addView(row);}
- void heading(String t,String sub){gap(content,12);if(!t.equals(MotoDesign.heading(tab))){TextView title=text(t,25,fg,true);title.setTypeface(MotoDesign.display());content.addView(title);gap(content,6);}if(sub!=null&&!sub.isEmpty())label(content,sub,13,muted,false);gap(content,13);}
- void section(String s){gap(content,23);label(content,s,18,fg,true);}
+ void heading(String t,String sub){gap(content,8);if(!t.equals(MotoDesign.heading(tab))){TextView title=text(t,22,fg,true);title.setTypeface(MotoDesign.display());content.addView(title);gap(content,6);}if(sub!=null&&!sub.isEmpty())label(content,sub,13,muted,false);gap(content,13);}
+ void section(String s){gap(content,18);label(content,s,17,fg,true);}
  void note(String s){TextView t=text(s,13,muted,false);t.setLineSpacing(dp(3),1f);t.setPadding(dp(15),dp(15),dp(15),dp(15));t.setBackground(shape(panel,0,12));content.addView(t);gap(content,8);}
  void row(String title,String sub,String tail,Runnable r){new HubScreens(this).line(title,sub,tail,r);}
  File garagePhotoFile(String id){
@@ -361,7 +361,8 @@ public class MainActivity extends Activity {
  }
  void render(){String theme=settings().optString("theme","dark");dark=theme.equals("dark")||(theme.equals("system")&&(getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);
   int[] palette=MotoDesign.colors(dark);bg=palette[0];fg=palette[1];muted=palette[2];line=palette[3];accent=palette[4];panel=palette[5];highlight=palette[6];
-getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(panel);
+ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
   root=col();root.setBackgroundColor(bg);setContentView(root);root.setOnApplyWindowInsetsListener((v,i)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets x=i.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());v.setPadding(x.left,x.top,x.right,x.bottom);}else v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});root.requestApplyInsets();
   MotoDesign.addHeader(this,root);
   if(Sharing.enabled){
@@ -373,8 +374,8 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
    TextView offline=text("오프라인 · 주유·정비·GPS 기록은 기기에 저장됩니다",12,muted,false);
    offline.setPadding(dp(20),dp(7),dp(20),dp(7));root.addView(offline);
   }
-  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);content=col();content.setPadding(dp(20),dp(10),dp(20),dp(26));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-  LinearLayout dock=col();dock.setPadding(dp(20),dp(8),dp(20),0);
+  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);content=col();content.setPadding(dp(18),dp(8),dp(18),dp(22));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+  LinearLayout dock=col();dock.setPadding(dp(18),dp(7),dp(18),0);
   // Home contains contextual quick actions; keep the bottom dock uncluttered.
   if(tab.equals("매물"))pair(dock,"매물 추가",()->edit("listings",null),"선택 비교",()->new HubScreens(this).compare());
   if(tab.equals("차고")&&bike()!=null)pair(dock,"간편 주유",()->new QuickEntryUi(this).fuel(),"정비주기",()->new QuickEntryUi(this).maintenance());
@@ -387,7 +388,7 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
   if(getSharedPreferences("draft",MODE_PRIVATE).contains("active")&&(tab.equals("홈")||tab.equals("차고"))){
    String draftType="";
    try{draftType=new JSONObject(getSharedPreferences("draft",MODE_PRIVATE).getString("active","{}")).optString("key");}catch(Exception ignored){}
-   LinearLayout draftCard=col();draftCard.setPadding(dp(14),dp(12),dp(14),dp(12));draftCard.setBackground(shape(highlight,0,14));
+   LinearLayout draftCard=col();draftCard.setPadding(dp(14),dp(12),dp(14),dp(12));draftCard.setBackground(shape(highlight,line,8));
    TextView draftTitle=text("작성 중인 "+DraftBanner.label(draftType)+" 기록",15,fg,true);draftCard.addView(draftTitle);
    TextView draftHelp=text("저장되지 않은 입력이 있어요. 이어서 작성하거나 초안만 삭제할 수 있어요.",12,muted,false);
    LinearLayout.LayoutParams helpLp=new LinearLayout.LayoutParams(-1,-2);helpLp.topMargin=dp(5);draftCard.addView(draftHelp,helpLp);
