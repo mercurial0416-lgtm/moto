@@ -71,3 +71,13 @@
 4. 배포 시 고정 서명 키를 공개 저장소에 올리지 말고 인증서 SHA-256 `212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b`와 현재 설치 앱 인증서를 먼저 확인한다.
 
 다른 대화에선 이 문서와 `MOTO-HUB/docs/DEVELOPMENT_RULES_AND_QUEUE_UX24_KO.md`를 읽고 UX37부터 이어서 수정해. UX35·36의 GPS 전환·부가 오류를 갤럭시 실기기에서 확인하고, 진짜 고정 서명 APK/사진/대량 UI 성능 문제를 우선한다.
+
+## UX37 작업 진행 (2026-10-25 · 이번 대화)
+- 브랜치: `fix/ux37-notification-failure-isolation-20261025`
+- PR: https://github.com/mercurial0416-lgtm/moto/pull/38 (Android CI 검증 전 · **아직 병합하지 않음**)
+- `RideService`의 위치 샘플/워치독/OBD/공유/프로바이더 상태 알림 갱신은 `RideNotificationSafety`로 격리. 알림 서비스 오류가 동기화된 로컬 GPS 기록을 종료하지 않도록 구현.
+- 위치 공유 가능 여부 확인 시 권한·알림 서비스 예외는 `false`로 처리하여 공유 중단(개인정보 보호 방향).
+- 추가 테스트: `bash MOTO-HUB/tests/run-ux37-notification-safe-tests.sh` / `RideNotificationSafetyTest`.
+- 로컬 순수 Java 회귀 **7/7 통과**, GitHub의 `RideService` 호출 경로 정적 점검 **6/6 통과**. Android SDK·실기기가 없어 `assembleDebug`, `lintDebug`, `testDebugUnitTest`, 서명 검증은 **아직 미수행/미확인**.
+- 차기 작업자는 PR #38 검토 및 Android CI 실행·성공 확인 후 원본 통합 브랜치에 병합하고, 고정 서명 인증서가 일치하는 릴리스 APK만 기존 앱에 덮어쓰기 허용할 것.
+- 기존 설치 앱 삭제 금지. 일반 debug APK는 기존 설치본과 서명이 달라 덮어쓰기 불가.
