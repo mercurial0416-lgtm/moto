@@ -80,8 +80,8 @@ final class GarageHomeUi {
   }catch(Exception ignored){} // Home remains usable if storage is temporarily unavailable.
  }
  void emptyGarage(){
-  LinearLayout blank=a.col();blank.setGravity(Gravity.CENTER);blank.setPadding(a.dp(24),a.dp(45),a.dp(24),a.dp(44));blank.setBackground(a.shape(surface,stroke,20));
-  TextView intro=a.text("GARAGE",12,orange,true);intro.setLetterSpacing(.16f);blank.addView(intro);
+  LinearLayout blank=a.col();blank.setGravity(Gravity.CENTER);blank.setPadding(a.dp(24),a.dp(45),a.dp(24),a.dp(44));blank.setBackground(a.shape(surface,stroke,8));
+  TextView intro=a.text("내 차고",12,orange,true);intro.setLetterSpacing(.16f);blank.addView(intro);
   TextView big=a.text("첫 바이크 등록",24,light,true);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=a.dp(15);big.setGravity(Gravity.CENTER);blank.addView(big,bp);
   TextView hint=a.text("바이크를 등록하면 주행거리와 정비 기록을 볼 수 있어.",14,soft,false);hint.setGravity(Gravity.CENTER);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=a.dp(12);blank.addView(hint,hp);
   Button add=a.button("바이크 등록",true,()->a.edit("vehicles",null));add.setTextColor(a.dark?0xFF18191B:Color.WHITE);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,a.dp(54));ap.topMargin=a.dp(24);blank.addView(add,ap);a.content.addView(blank);
@@ -268,7 +268,7 @@ final class GarageHomeUi {
      }).show();
    }else{a.navigate("라이딩");new RideUi(a).requestStart();}
   });
-  btn.setTextColor(recording?0xFFFFC5BE:light);btn.setTextSize(14);btn.setMinHeight(a.dp(48));
+  btn.setTextColor(recording?(a.dark?0xFFFFC5BE:0xFF8F352E):light);btn.setTextSize(14);btn.setMinHeight(a.dp(48));
   btn.setBackground(a.shape(recording?(a.dark?0xFF372422:0xFFFCE8E6):surface,
    recording?(a.dark?0xFFAD615B:0xFFD99792):stroke,8));
   a.content.addView(btn,new LinearLayout.LayoutParams(-1,a.dp(48)));
