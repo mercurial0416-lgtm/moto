@@ -17,7 +17,12 @@ assert 'a.listingPageOffset' in (src/'HubScreens.java').read_text()
 assert 'a.recordPageOffset' in (src/'HubScreens.java').read_text()
 assert 'searchDelay.postDelayed(pending[0],180)' in (src/'HubScreens.java').read_text()
 assert 'decodeLocalSampled(manual,1200)' in (src/'MotorcyclePhoto.java').read_text()
-assert '업데이트 파일 다운로드 ' in (src/'AppUpdater.java').read_text()
+updater=(src/'AppUpdater.java').read_text()
+# The legacy literal progress label was replaced by validated, resumable UX42-43 progress UI.
+assert 'UpdateProgressPolicy.label(action,percent)' in updater
+assert 'updateProgress("APK 다운로드 중"' in updater
+assert 'cancelDownloadButton' in updater
+assert 'UpdateDownloadPolicy.safeRedirect' in updater
 assert 'UpdateDownloadPolicy.safeRedirect' in (src/'AppUpdater.java').read_text()
 assert 'ObdConnectionPolicy.MAX_RETRIES' in (src/'ObdAutoSpeedMonitor.java').read_text()
 assert 'ObdReadOnlyProtocol.query' in (src/'ObdAutoSpeedMonitor.java').read_text()
