@@ -11,11 +11,11 @@ activity=(src/"MainActivity.java").read_text()
 assert 'ImageView.ScaleType.FIT_CENTER' in home, "keep bike visible without cropping"
 assert '0x58000000' in home and '0xC9081016' not in home, "avoid thick faux-cinematic overlay"
 assert 'TextView tag=a.text(HomeBikeSwitch.label' not in home, "no promotional badge covering photos"
-assert 'meta.addView(picker);' in home and 'new HubScreens(a).chooseBike()' in home, "switch bikes below photo"
-assert home.index('addHero(b);') < home.index('rideAction();') < home.index('stats(b);'), "ride is primary action directly below vehicle"
-assert 'String[] names={"총 주행거리","다음 정비"};' in home, "2-item KPI strip"
+assert 'imageArea.setOnTouchListener' in home and 'switchBike(direction)' in home and 'new HubScreens(a).chooseBike()' in home, "switch bikes via swipe/arrows without cropping photo"
+assert home.index('addHero(b);') < home.index('stats(b);') < home.index('quickActions();') < home.index('rideAction();'), "clear hero, metrics, quick recording, GPS controls"
+assert 'String[] names={"계기판 거리","다음 정비"};' in home, "honest odometer and maintenance KPIs"
 assert 'String.format(Locale.ROOT,"%02d",i+1)' not in home, "no arbitrary numbered menu"
-assert 'MotoQuickIcon icon=new MotoQuickIcon(a,i,soft);' in home, "purpose-built action icons"
+assert 'Button fuel=a.button("주유 기록",true' in home and 'Button maintenance=a.button("정비주기",false' in home, "native buttons replace unreadable mini icons"
 assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home, 'first-class quick fuel and reminders'
 assert 'a.navigate("라이딩")' in home and 'new HubScreens(a).manageBike()' in home
 assert 'if(!a.items("listings").isEmpty())' in home, "no empty marketplace section on home"
