@@ -60,13 +60,19 @@ final class RideUi {
   }
   if(RideService.running){
    LinearLayout live=new LinearLayout(a);
+   boolean stackLive=a.getResources().getConfiguration().fontScale>=1.35f||
+      a.getResources().getConfiguration().screenWidthDp<360;
+   if(stackLive)live.setOrientation(LinearLayout.VERTICAL);
    TextView[] values=new TextView[3];String[] names={"주행거리","경과시간","실시간 속도"};
    for(int i=0;i<3;i++){
     LinearLayout box=a.col();box.setPadding(a.dp(9),a.dp(12),a.dp(9),a.dp(12));box.setBackground(a.shape(a.bg,0,13));
     values[i]=a.text("—",19,a.fg,true);values[i].setGravity(Gravity.CENTER);box.addView(values[i]);
     TextView name=a.text(names[i],11,a.muted,false);name.setGravity(Gravity.CENTER);
     LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.topMargin=a.dp(7);box.addView(name,np);
-    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)lp.leftMargin=a.dp(7);live.addView(box,lp);
+    LinearLayout.LayoutParams lp=stackLive?new LinearLayout.LayoutParams(-1,-2):
+     new LinearLayout.LayoutParams(0,-2,1);
+    if(i>0){if(stackLive)lp.topMargin=a.dp(7);else lp.leftMargin=a.dp(7);}
+    live.addView(box,lp);
    }hero.addView(live);
    TextView average=a.text("평균속도 계산 중",13,a.muted,false);average.setPadding(a.dp(6),a.dp(10),0,a.dp(8));hero.addView(average);
    TextView peak=a.text("최고속도 계산 중",13,a.muted,false);peak.setPadding(a.dp(6),0,0,a.dp(9));hero.addView(peak);
@@ -84,7 +90,7 @@ final class RideUi {
    }};hero.post(refresh);
   }
 
-  Button start=a.button(RideService.autoArmed?"자동 감지 종료":RideService.running?"라이딩 종료":"GPS 기록 시작",true,()->{
+  Button start=a.button(RideService.autoArmed?"OBD 자동 감지만 중지":RideService.running?"라이딩 종료":"GPS 기록 시작",true,()->{
    if(RideService.autoArmed){new AlertDialog.Builder(a).setTitle("OBD2 자동 기록을 종료할까요?").setMessage("OBD2 자동 출발 감지만 끕니다. 진행 중인 GPS 기록은 계속되며, 종료하려면 라이딩 종료를 눌러 주세요.").setNegativeButton("취소",null).setPositiveButton("중지",(d,w)->{a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);}).show();return;}
    if(RideService.running){new AlertDialog.Builder(a).setTitle("라이딩 기록 종료").setMessage("기록을 끝내고 주행 분석에서 이동거리와 경로를 확인할 수 있어요.").setNegativeButton("취소",null).setPositiveButton("종료",(d,w)->{
     a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
@@ -106,6 +112,32 @@ final class RideUi {
    });
    finishRide.setMinHeight(a.dp(48));finishRide.setEnabled(!saving);
    hero.addView(finishRide);
+   a.gap(hero,8);
+   Button rest=a.button("주유·휴식 중 기록 유지 (10분)",false,()->{
+    long now=android.os.SystemClock.elapsedRealtime();
+    if(!RideService.autoArmed||!RideService.running||
+       !ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,now)||
+       RideService.obdSpeedKmh<0||RideService.obdSpeedKmh>2){
+     a.toast("바이크가 정차했고 OBD 속도가 정상 수신될 때만 사용할 수 있어요.");return;
+    }
+    new AlertDialog.Builder(a).setTitle("주유·휴식 중 기록 유지")
+     .setMessage("이번 라이딩만 정차 종료 기준을 최대 10분으로 늘립니다. GPS 기록은 계속됩니다. 긴 휴식인지 자동 판별하지 않으며 다음 라이딩에는 기존 정차 설정이 적용됩니다.")
+     .setNegativeButton("취소",null)
+     .setPositiveButton("10분까지 유지",(d,w)->a.attempt(()->{
+      a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_BREAK));
+      a.toast("이번 라이딩 정차 종료 시간을 연장하도록 요청했어요.");
+     })).show();
+   });
+   rest.setMinHeight(a.dp(48));hero.addView(rest);
+   Runnable restVisibility=new Runnable(){@Override public void run(){
+    if(!hero.isAttachedToWindow()||a.isFinishing()||a.isDestroyed())return;
+    long now=android.os.SystemClock.elapsedRealtime();
+    boolean stopped=RideService.autoArmed&&RideService.running&&
+     ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,now)&&
+     RideService.obdSpeedKmh>=0&&RideService.obdSpeedKmh<=2;
+    rest.setVisibility(stopped?View.VISIBLE:View.GONE);
+    if(RideService.autoArmed&&RideService.running)hero.postDelayed(this,2500);
+   }};rest.setVisibility(View.GONE);hero.post(restVisibility);
   }
   a.content.addView(hero);a.gap(a.content,12);
   // The first-connection flow belongs near ride controls, not buried in Settings.
@@ -156,6 +188,9 @@ final class RideUi {
   a.gap(a.content,8);
   a.label(a.content,"GPX 가져오기: 다른 앱에서 저장한 코스 파일을 지도와 주행 기록으로 불러옵니다. 가져오기만으로 GPS 기록이나 길 안내가 시작되지는 않아요.",12,a.muted,false);
   a.gap(a.content,12);
+  if(!RideService.running&&!RideService.autoArmed){
+   a.action(a.content,"최근 완료 라이딩 · 주행거리·정비 확인",false,this::reviewLatestCompletedRide);
+  }
   a.action(a.content,"최근 30일 주행 통계 · 바이크별",false,this::chooseRideReport);
   a.action(a.content,"라이딩 2건 통합 · 원본 보존",false,this::chooseMerge);
   a.gap(a.content,8);a.label(a.content,"기록된 라이딩",20,a.fg,true);
@@ -490,6 +525,31 @@ final class RideUi {
   android.app.NotificationManager nm=a.getSystemService(android.app.NotificationManager.class);
   boolean notifyEnabled=nm!=null&&nm.areNotificationsEnabled();
   return RideReadiness.check(RideService.running,fine,gps,notifyPermission,notifyEnabled);
+ }
+ /** Finding saved rides and reading disk markers must not freeze tab navigation. */
+ void reviewLatestCompletedRide(){
+  a.toast("최근 완료된 주행 기록을 확인합니다.");
+  new Thread(()->{
+   File chosen=null;
+   try{
+    for(File track:TrackFile.tracks(a.getFilesDir())){
+     if(RideService.running&&track.getName().equals(RideService.active))continue;
+     if(!new File(track.getPath()+".done").isFile())continue;
+     if(new File(track.getPath()+".imported").exists())continue;
+     if(RideTrackMerge.archived(track)||RideTrackMerge.mergedSource(track))continue;
+     chosen=track;break;
+    }
+    final File latest=chosen;
+    a.runOnUiThread(()->{
+     if(a.isFinishing()||a.isDestroyed())return;
+     if(RideService.running){a.toast("진행 중인 라이딩은 종료 후 확인해 주세요.");return;}
+     if(latest==null){a.toast("확인할 완료된 GPS 라이딩이 없어요.");return;}
+     a.openRideInsights(latest);
+    });
+   }catch(Exception e){a.runOnUiThread(()->{
+    if(!a.isFinishing()&&!a.isDestroyed())a.error("최근 라이딩 확인 실패: "+e.getMessage());
+   });}
+  },"moto-last-ride-review").start();
  }
  void chooseRideReport(){
   String selectedBike=a.bike()==null?"":a.bike().optString("id","");

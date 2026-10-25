@@ -16,6 +16,12 @@ import java.util.*;
 
 /** Alpha6-H: MY GARAGE visual home. All numbers are read from local records, never demo values. */
 final class GarageHomeUi {
+ // Avoid a whole rides-directory walk on the UI thread every time Home renders.
+ private static final java.util.concurrent.ExecutorService HOME_RIDE_SCAN=
+  java.util.concurrent.Executors.newSingleThreadExecutor(r->{
+   Thread t=new Thread(r,"moto-home-ride-scan");t.setDaemon(true);return t;
+  });
+ private static final java.util.concurrent.atomic.AtomicLong HOME_SCAN_GEN=new java.util.concurrent.atomic.AtomicLong();
  final MainActivity a;
  final int orange,light,soft,surface,card,stroke;
  GarageHomeUi(MainActivity a){this.a=a;
@@ -67,17 +73,28 @@ final class GarageHomeUi {
  }
  void interruptedRideShortcut(){
   if(RideService.running)return;
-  try{
+  LinearLayout placeholder=a.col();a.content.addView(placeholder);
+  long generation=HOME_SCAN_GEN.incrementAndGet();
+  HOME_RIDE_SCAN.execute(()->{
+   if(generation!=HOME_SCAN_GEN.get())return;
    int broken=0;
-   for(File track:TrackFile.tracks(a.getFilesDir()))
-    if(RideHistoryFilter.INTERRUPTED.equals(RideHistoryFilter.status(track,RideService.active,false)))broken++;
-   if(broken==0)return;
+   try{
+    for(File track:TrackFile.tracks(a.getFilesDir())){
+     if(generation!=HOME_SCAN_GEN.get())return;
+     if(RideHistoryFilter.INTERRUPTED.equals(RideHistoryFilter.status(track,RideService.active,false)))broken++;
+    }
+   }catch(Exception ignored){return;} // An unreadable history cannot break Home.
    final int count=broken;
-   Button recover=a.button("중단된 GPS 기록 "+count+"건 · 복구 확인",false,()->{
-    a.navigate("라이딩");a.selectRideHistoryFilter(RideHistoryFilter.INTERRUPTED);
+   a.runOnUiThread(()->{
+    if(generation!=HOME_SCAN_GEN.get()||a.isFinishing()||a.isDestroyed()||
+       !placeholder.isAttachedToWindow()||count<=0||RideService.running)return;
+    Button recover=a.button("중단된 GPS 기록 "+count+"건 · 복구 확인",false,()->{
+     a.navigate("라이딩");a.selectRideHistoryFilter(RideHistoryFilter.INTERRUPTED);
+    });
+    recover.setContentDescription("중단된 GPS 기록 "+count+"건, 직접 확인 후 복구");
+    placeholder.addView(recover);
    });
-   recover.setContentDescription("중단된 GPS 기록 "+count+"건, 직접 확인 후 복구");a.content.addView(recover);
-  }catch(Exception ignored){} // Home remains usable if storage is temporarily unavailable.
+  });
  }
  void emptyGarage(){
   LinearLayout blank=a.col();blank.setGravity(Gravity.CENTER);blank.setPadding(a.dp(24),a.dp(45),a.dp(24),a.dp(44));blank.setBackground(a.shape(surface,stroke,8));
