@@ -32,8 +32,11 @@ final class RideUi {
  private static final class HistoryData {
   final List<File> rides;final List<HistoryEntry> entries;
   final Map<String,Integer> counts;final String selected;final int damaged,unfinished;
-  HistoryData(List<File> rides,List<HistoryEntry> entries,Map<String,Integer> counts,String selected,int damaged,int unfinished){
+  final File latestUnapplied;final int unappliedCount;
+  HistoryData(List<File> rides,List<HistoryEntry> entries,Map<String,Integer> counts,String selected,int damaged,int unfinished,
+              File latestUnapplied,int unappliedCount){
    this.rides=rides;this.entries=entries;this.counts=counts;this.selected=selected;this.damaged=damaged;this.unfinished=unfinished;
+   this.latestUnapplied=latestUnapplied;this.unappliedCount=unappliedCount;
   }
  }
  final MainActivity a;RideUi(MainActivity a){this.a=a;}
@@ -179,6 +182,12 @@ final class RideUi {
   // Capture garage names on the UI thread; org.json and Activity state are not thread-safe.
   final Map<String,String> bikeNames=new HashMap<>();
   for(org.json.JSONObject bike:a.items("vehicles"))bikeNames.put(bike.optString("id",""),bike.optString("name","이름 없는 바이크"));
+  // Capture mutable org.json state on UI thread; background scan never touches the live database.
+  final org.json.JSONObject selectedBike=a.bike();
+  final String currentBike=selectedBike==null?"":selectedBike.optString("id");
+  final Set<String> appliedNames=new HashSet<>();
+  final org.json.JSONObject ledger=a.settings().optJSONObject("appliedRides");
+  if(ledger!=null)for(java.util.Iterator<String> keys=ledger.keys();keys.hasNext();)appliedNames.add(keys.next());
   HISTORY_EXECUTOR.execute(()->{
    if(generation!=HISTORY_GENERATION.get())return;
    try{
@@ -205,7 +214,17 @@ final class RideUi {
     }
     int unfinished=0;
     for(File file:bikeRides)if(RideHistoryFilter.INTERRUPTED.equals(RideHistoryFilter.status(file,activeName,recording)))unfinished++;
-    final HistoryData data=new HistoryData(rides,entries,counts,selected,damagedBindings,unfinished);
+    File unapplied=null;int unappliedCount=0;
+    if(!currentBike.isEmpty())for(File file:rides){
+     if(generation!=HISTORY_GENERATION.get())return;
+     // Imported GPX files are not automatic mileage suggestions.
+     if(new File(file.getPath()+".imported").isFile())continue;
+     if(RideMileageIntegrity.eligibleForReview(file,appliedNames,currentBike)){
+      unappliedCount++;
+      if(unapplied==null)unapplied=file;
+     }
+    }
+    final HistoryData data=new HistoryData(rides,entries,counts,selected,damagedBindings,unfinished,unapplied,unappliedCount);
     a.runOnUiThread(()->{
      if(generation!=HISTORY_GENERATION.get()||a.isFinishing()||a.isDestroyed()||
         !"라이딩".equals(a.tab)||a.content!=requestedContent||historyPanel.getParent()!=requestedContent)return;
@@ -230,6 +249,16 @@ final class RideUi {
  }
  /** Only Android view creation runs on the UI thread; the file scan has already completed. */
  void populateHistory(LinearLayout historyPanel,HistoryData data){
+  if(data.latestUnapplied!=null&&data.unappliedCount>0){
+   LinearLayout review=a.col();review.setPadding(a.dp(14),a.dp(12),a.dp(14),a.dp(12));
+   review.setBackground(a.shape(a.panel,a.line,12));
+   review.addView(a.text("주행거리 확인 대기 · "+data.unappliedCount+"건",15,a.fg,true));
+   review.addView(a.text("완료된 GPS 기록을 검토한 뒤 원하는 경우에만 계기판 누적거리에 반영해요. 중복 반영은 막습니다.",12,a.muted,false));
+   a.gap(review,7);
+   review.addView(a.button("최근 미반영 라이딩 확인",false,()->a.openRideInsights(data.latestUnapplied)));
+   historyPanel.addView(review);
+   a.gap(historyPanel,14);
+  }
   List<File> rides=data.rides;
   List<HistoryEntry> entries=data.entries;
   Map<String,Integer> counts=data.counts;
@@ -368,6 +397,9 @@ final class RideUi {
  void chooseMerge(){
   if(a.readOnly||RideService.running||RideService.autoArmed){a.toast("라이딩 기록 또는 자동 감지를 종료한 뒤 통합해 주세요.");return;}
   final long request=MERGE_GENERATION.incrementAndGet();
+  final Set<String> alreadyApplied=new HashSet<>();
+  org.json.JSONObject appliedLedger=a.settings().optJSONObject("appliedRides");
+  if(appliedLedger!=null)for(java.util.Iterator<String> keys=appliedLedger.keys();keys.hasNext();)alreadyApplied.add(keys.next());
   a.toast("통합 가능한 라이딩을 확인 중이에요.");
   HISTORY_EXECUTOR.execute(()->{
    try{
@@ -375,7 +407,7 @@ final class RideUi {
     for(File file:TrackFile.tracks(a.getFilesDir())){
      if(request!=MERGE_GENERATION.get())return;
      if(candidates.size()>=80)break;
-     if(!file.isFile()||file.length()>TrackFile.MAX_BYTES/2||RideTrackMerge.mergedSource(file)||RideTrackMerge.archived(file)||
+     if(!file.isFile()||alreadyApplied.contains(file.getName())||file.length()>TrackFile.MAX_BYTES/2||RideTrackMerge.mergedSource(file)||RideTrackMerge.archived(file)||
         new File(file.getPath()+".imported").isFile())continue;
      if(new File(file.getPath()+".done").isFile()||new File(file.getPath()+".recovered").isFile())candidates.add(file);
     }
@@ -400,6 +432,10 @@ final class RideUi {
    for(int i=0;i<candidates.size();i++)if(i!=first){others.add(candidates.get(i));captions.add(names[i]);}
    new AlertDialog.Builder(a).setTitle("두 번째 라이딩 선택").setItems(captions.toArray(new String[0]),(d,second)->{
     final File left=candidates.get(first),right=others.get(second);
+    org.json.JSONObject latestApplied=a.settings().optJSONObject("appliedRides");
+    if(latestApplied!=null&&(latestApplied.has(left.getName())||latestApplied.has(right.getName()))){
+     a.toast("이미 계기판 누적거리에 반영한 라이딩은 통합할 수 없어요.");return;
+    }
     new AlertDialog.Builder(a).setTitle("라이딩 2건 통합")
      .setMessage("휴식 간격이 30분 이내이고 시간이 겹치지 않는 기록만 통합합니다. 원본 2건은 그대로 보존하며, 통계는 통합본 1건만 계산해요. 필요하면 통합본에서 취소할 수 있습니다.")
      .setNegativeButton("취소",null).setPositiveButton("통합",(confirm,button)->new Thread(()->{
