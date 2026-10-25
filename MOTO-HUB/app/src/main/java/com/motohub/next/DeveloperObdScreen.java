@@ -30,6 +30,7 @@ import java.util.UUID;
 final class DeveloperObdScreen {
  static final int CONNECT_PERMISSION_REQUEST=88;
  static final int AUTO_CONNECT_PERMISSION_REQUEST=89;
+ static final int ODO_CONNECT_PERMISSION_REQUEST=90;
  private static final String PREFERRED_ADAPTER="obd_remembered_device";
  static final UUID SPP=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
  private final MainActivity activity;
@@ -47,13 +48,18 @@ final class DeveloperObdScreen {
   activity.label(p,"실험 기능 · KTM 390 DUKE 호환성 미검증",16,activity.accent,true);
   activity.label(p,"페어링된 ELM327 호환 Bluetooth Classic(SPP) 어댑터로 표준 OBD-II 센서만 조회합니다. 바이크 ECU가 지원하는 항목만 표시됩니다. 순정 계기판 Bluetooth 연결과는 별개입니다.",14,activity.muted,false);
   activity.label(p,"ECU 설정 변경 · 고장코드 삭제 · 출력 제어 없음. 주행 중 조작하지 마세요. 장치 연결은 사용자 선택 시에만 시작되고 원격 전송은 없습니다. 자동 라이딩 도중 일시적 연결 실패 시 최대 8회 재접속하며 앱 재시작 후에는 재연결하지 않습니다.",14,activity.muted,false);
-  status=activity.text("연결 안 됨",15,activity.muted,true);p.addView(status);
+  activity.gap(p,10);
+  activity.label(p,"첫 연결 · ① 진단 케이블과 동글 연결 → ② 바이크 시동 ON → ③ 갤럭시에서 Vgate BT3.0 페어링 → ④ 아래에서 센서 테스트",13,activity.fg,false);
+  activity.action(p,"갤럭시 Bluetooth 설정 열기",false,this::openBluetoothSettings);
+  activity.label(p,"Bluetooth에 연결됐어도 차량 센서가 응답하지 않을 수 있어요. 속도·RPM 수신 여부를 확인한 다음 자동 기록을 사용하세요.",12,activity.muted,false);
+  activity.gap(p,8);
+  status=activity.text("센서 연결 전 · 시동과 Bluetooth 페어링을 확인하세요",15,activity.muted,true);p.addView(status);
   for(int i=0;i<fields.length;i++){
    fields[i]=activity.text(ObdReadOnlyProtocol.SENSOR_NAMES[i]+": —",17,activity.fg,false);
    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=activity.dp(10);p.addView(fields[i],lp);
   }
   activity.gap(p,18);
-  activity.action(p,"페어링된 OBD2 장치 선택",true,this::loadPaired);
+  activity.action(p,"페어링된 장치로 센서 연결 테스트",true,this::loadPaired);
   activity.gap(p,15);
   activity.label(p,"자동 라이딩 기록 (개발자 모드 한정)",17,activity.accent,true);
   activity.label(p,"OBD2에서 속도 7km/h 이상을 연속 3회 확인하면 GPS 경로 기록을 자동 시작합니다. 설정한 연속 정차 시간(기본 3분) 후 완료하고 다음 출발을 기다립니다. 블루투스가 끊겨도 진행 중인 GPS 기록은 수동 종료까지 유지합니다. 최초 활성화에는 별도 동의가 필요합니다.",13,activity.muted,false);
@@ -167,11 +173,15 @@ final class DeveloperObdScreen {
  private boolean permissionGranted(){return Build.VERSION.SDK_INT<31||activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED;}
  void loadPaired(){loadPaired(false,false);}
  void loadPairedAuto(){loadPaired(true,false);}
- private void loadPairedOdo(){loadPaired(false,true);}
+ void loadPairedOdo(){loadPaired(false,true);}
+ private void openBluetoothSettings(){
+  try{activity.startActivity(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS));}
+  catch(Exception unavailable){setStatus("갤럭시 설정 → 연결 → Bluetooth에서 동글을 페어링해 주세요.");}
+ }
  private void loadPaired(boolean automatic,boolean odo){
   if(owner==null||!owner.isShowing())return;
   if(!permissionGranted()){
-   activity.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},automatic?AUTO_CONNECT_PERMISSION_REQUEST:CONNECT_PERMISSION_REQUEST);
+   activity.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},automatic?AUTO_CONNECT_PERMISSION_REQUEST:odo?ODO_CONNECT_PERMISSION_REQUEST:CONNECT_PERMISSION_REQUEST);
    return;
   }
   BluetoothManager manager=(BluetoothManager)activity.getSystemService(Context.BLUETOOTH_SERVICE);
@@ -180,11 +190,19 @@ final class DeveloperObdScreen {
   if(!adapter.isEnabled()){setStatus("휴대폰 설정에서 Bluetooth를 켜고 어댑터를 페어링해 주세요.");return;}
   try{
    Set<BluetoothDevice> bonded=adapter.getBondedDevices();
-   if(bonded==null||bonded.isEmpty()){setStatus("먼저 휴대폰 Bluetooth 설정에서 OBD2 어댑터를 페어링해 주세요.");return;}
+   if(bonded==null||bonded.isEmpty()){
+    setStatus("페어링된 장치가 없어요. 갤럭시 Bluetooth 설정에서 Vgate/OBDII를 먼저 연결하세요.");
+    new AlertDialog.Builder(activity).setTitle("OBD2 동글 먼저 페어링")
+     .setMessage("바이크 시동을 켠 뒤 갤럭시 설정 → 연결 → Bluetooth에서 Vgate iCar Pro BT3.0을 페어링해 주세요. 이후 앱으로 돌아와 다시 선택하면 됩니다.")
+     .setNegativeButton("나중에",null)
+     .setPositiveButton("Bluetooth 설정", (d,w)->openBluetoothSettings()).show();
+    return;
+   }
    List<BluetoothDevice> devices=new ArrayList<>(bonded);
-   devices.sort(Comparator.comparing(d->{String n=d.getName();return n==null?"":n.toLowerCase(java.util.Locale.ROOT);}));
+   devices.sort(Comparator.comparingInt((BluetoothDevice device)->ObdFirstConnectionGuide.adapterPriority(device.getName()))
+    .thenComparing(device->{String name=device.getName();return name==null?"":name.toLowerCase(java.util.Locale.ROOT);}));
    String[] labels=new String[devices.size()];
-   for(int i=0;i<devices.size();i++){String name=devices.get(i).getName();labels[i]=(name==null||name.trim().isEmpty()?"이름 없는 장치":name)+" · "+devices.get(i).getAddress();}
+   for(int i=0;i<devices.size();i++){String name=devices.get(i).getName();labels[i]=ObdFirstConnectionGuide.adapterLabel(name)+(name==null||name.trim().isEmpty()?"이름 없는 장치":name)+" · "+devices.get(i).getAddress();}
    new AlertDialog.Builder(activity).setTitle("OBD2 어댑터 선택")
     .setItems(labels,(d,index)->{if(automatic)confirmAuto(devices.get(index));else if(odo)confirmOdo(devices.get(index));else confirmConnect(devices.get(index));})
     .setNegativeButton("취소",null).show();
@@ -325,17 +343,28 @@ final class DeveloperObdScreen {
    try{supported00=request(in,out,ObdReadOnlyProtocol.query("0100"),2500);}catch(Exception ignored){}
    try{supported40=request(in,out,ObdReadOnlyProtocol.query("0140"),2500);}catch(Exception ignored){}
    ObdPidCapabilities capabilities=ObdPidCapabilities.fromResponses(supported00,supported40);
-   setStatus("읽기 전용 연결됨 · "+capabilities.summary());
+   setStatus("Bluetooth 연결됨 · 차량 센서 응답 확인 중…");
+   int noDataCycles=0,validSensors=0;
+   boolean gotSpeed=false;
    while(!stopped){
+    int successThisCycle=0;
     for(int i=0;i<ObdReadOnlyProtocol.SENSOR_PIDS.length&&!stopped;i++){
      String pid=ObdReadOnlyProtocol.SENSOR_PIDS[i];
      if(capabilities.forPid(pid)==ObdPidCapabilities.Support.NO){updateField(i,"미지원 (PID 목록)");continue;}
-     String result=ObdReadOnlyProtocol.decode(pid,request(in,out,ObdReadOnlyProtocol.query(pid),2500));
-     updateField(i,result);
+     try{
+      String result=ObdReadOnlyProtocol.decode(pid,request(in,out,ObdReadOnlyProtocol.query(pid),2500));
+      if(!"지원 안 함".equals(result)){successThisCycle++;validSensors++;if("010D".equals(pid))gotSpeed=true;}
+      updateField(i,result);
+     }catch(InterruptedException interrupted){throw interrupted;}
+     catch(Exception temporary){if(stopped)return;updateField(i,"응답 지연 · 다음 주기 재시도");}
     }
-    if(!stopped)Thread.sleep(750);
+    if(stopped)break;
+    setStatus(ObdFirstConnectionGuide.result(capabilities.forPid("010D"),gotSpeed,validSensors)+"\n"+capabilities.summary());
+    if(successThisCycle==0){if(++noDataCycles>=3)throw new java.io.IOException("ECU 응답을 확인하지 못했습니다. 시동 ON과 유로5 6핀 변환 케이블을 확인해 주세요.");}
+    else noDataCycles=0;
+    Thread.sleep(750);
    }
-  }catch(Exception e){if(!stopped)setStatus("연결 실패/종료: "+e.getClass().getSimpleName()+" · 어댑터와 전원을 확인해 주세요.");}
+  }catch(Exception e){if(!stopped)setStatus(ObdFirstConnectionGuide.failure(e));}
   finally{closeSocket();stopped=true;}
  }
  private String request(InputStream in,OutputStream out,String command,long timeoutMs)throws Exception{

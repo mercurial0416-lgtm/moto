@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - 'fix/ux43-stability-forms-cancel-20261025'
+      - 'feat/ux44-obd-first-connection-20261025'
 permissions:
   contents: read
 jobs:
@@ -34,6 +35,7 @@ jobs:
           bash tests/run-ux41-update-progress-tests.sh
           bash tests/run-ux42-update-integrity-tests.sh
           bash tests/run-ux43-stability-tests.sh
+          bash tests/run-ux44-obd-connect-tests.sh
       - name: Compile Android application and run lint and unit tests
         working-directory: MOTO-HUB
         run: |
