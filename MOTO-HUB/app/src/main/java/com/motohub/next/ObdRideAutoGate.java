@@ -22,7 +22,7 @@ final class ObdRideAutoGate {
 
  Event accept(int speedKmh,long elapsedMs){
   if(elapsedMs<0||lastSample>elapsedMs)return Event.NONE;
-  if(lastSample>=0&&elapsedMs-lastSample>15_000){movingSamples=0;stationarySince=-1;}
+  if(lastSample>=0&&elapsedMs-lastSample>(recording?15_000:5_500)){movingSamples=0;stationarySince=-1;}
   lastSample=elapsedMs;
   if(speedKmh<0||speedKmh>200){movingSamples=0;stationarySince=-1;return Event.NONE;}
   if(!recording){
