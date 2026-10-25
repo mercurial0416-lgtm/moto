@@ -43,7 +43,7 @@ final class QuickEntryUi {
    }
   };spinner.setAdapter(adapter);spinner.setBackground(a.shape(a.panel,a.line,11));
   spinner.setPadding(a.dp(10),0,a.dp(8),0);
-  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,a.dp(56));lp.bottomMargin=a.dp(18);body.addView(spinner,lp);
+  spinner.setMinimumHeight(a.dp(56));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=a.dp(14);body.addView(spinner,lp);
   return spinner;
  }
  void fuel(){
