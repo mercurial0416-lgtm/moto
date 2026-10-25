@@ -108,6 +108,14 @@ final class RideUi {
    hero.addView(finishRide);
   }
   a.content.addView(hero);a.gap(a.content,12);
+  // The first-connection flow belongs near ride controls, not buried in Settings.
+  // It is still explicitly gated by the opted-in experimental OBD mode.
+  if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
+   a.action(a.content,"OBD2 동글 연결 · ECU 센서 테스트",false,()->{
+    if(a.developerObd!=null)a.developerObd.stop();
+    a.developerObd=new DeveloperObdScreen(a);a.developerObd.show();
+   });
+  }
   // External navigation remains separate: no Kakao app key or GPS upload is required.
   a.action(a.content,"카카오내비 열기",false,()->KakaoNaviLaunch.open(a));
   a.label(a.content,"카카오내비는 길 안내, MOTO HUB는 로컬 라이딩 기록을 담당합니다. 경로·위치 정보는 자동 전달되지 않아요.",12,a.muted,false);
