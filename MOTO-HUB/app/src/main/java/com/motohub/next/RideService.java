@@ -375,10 +375,9 @@ public final class RideService extends Service implements LocationListener {
    ()->{Sharing.stop();status="그룹 공유 실패 · 로컬 GPS 기록 유지";},
    ()->{
     if(notificationRate.shouldNotify(SystemClock.elapsedRealtime())){
-     NotificationManager notifications=getSystemService(NotificationManager.class);
-     if(notifications!=null)notifications.notify(404,notification(
-      String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+
-      (Sharing.enabled?"그룹 위치 공유 켜짐":(gpsOnlyAfterObd?"OBD2 종료 · GPS 단독 기록":"위치 공유 꺼짐"))));
+     notifySafely(String.format(java.util.Locale.KOREA,
+      "%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+
+      (Sharing.enabled?"그룹 위치 공유 켜짐":(gpsOnlyAfterObd?"OBD2 종료 · GPS 단독 기록":"위치 공유 꺼짐")));
     }
    }
   );
