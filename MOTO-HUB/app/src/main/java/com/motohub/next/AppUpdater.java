@@ -2,11 +2,11 @@ package com.motohub.next;
 import android.app.*;import android.content.*;import android.content.pm.*;import android.net.Uri;import android.os.*;import android.provider.Settings;import android.widget.*;import java.io.*;import java.net.*;import java.nio.charset.StandardCharsets;import java.security.*;import java.util.*;import java.util.concurrent.*;import java.util.concurrent.atomic.AtomicBoolean;
 final class AppUpdater {
  static final ExecutorService WORKER=Executors.newSingleThreadExecutor();static final AtomicBoolean BUSY=new AtomicBoolean();
- final MainActivity a;TextView progressLabel,cacheLabel;ProgressBar progressBar;Button cachedInstallButton;
+ final MainActivity a;Dialog owner;TextView progressLabel,cacheLabel;ProgressBar progressBar;Button cachedInstallButton;
  AppUpdater(MainActivity a){this.a=a;}
 
  void show(){
-  LinearLayout p=a.page("앱 업데이트");
+  LinearLayout p=a.page("앱 업데이트");owner=a.dialog;
   a.label(p,"현재 버전  "+BuildConfig.VERSION_NAME+" ("+BuildConfig.VERSION_CODE+")",20,a.fg,true);
   String current=SigningIdentity.current(a);
   boolean fixed=UpdateReadiness.fixedIdentity(current,UpdateManifest.PINNED_CERT_SHA256);
@@ -88,7 +88,13 @@ final class AppUpdater {
    }
   });
  }
- void ui(Runnable r){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())r.run();});}
+ void ui(Runnable r){
+  // Downloads can finish after the user dismisses the update page.
+  // Persist verified files, but never open a surprise popup on another screen.
+  a.runOnUiThread(()->{
+   if(!a.isFinishing()&&!a.isDestroyed()&&owner!=null&&owner==a.dialog&&owner.isShowing())r.run();
+  });
+ }
  static HttpURLConnection connect(String address)throws Exception{
   for(int redirects=0;redirects<=UpdateDownloadPolicy.MAX_REDIRECTS;redirects++){
    URL url=UpdateManifest.https(address);
