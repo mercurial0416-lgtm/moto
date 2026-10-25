@@ -38,6 +38,9 @@ checks={
  "old-ride scan off main":'HOME_RIDE_SCAN.execute(' in home and 'a.runOnUiThread(' in home,
  "stale home results discarded":'generation!=HOME_SCAN_GEN.get()' in home,
  "responsive live GPS boxes":'if(stackLive)live.setOrientation(LinearLayout.VERTICAL)' in ride,
+ "optional landscape OBD screen":'SCREEN_ORIENTATION_SENSOR_LANDSCAPE' in get("ObdDashboardActivity.java"),
+ "screen-on only while user opted/OBD armed":'visible&&RideService.autoArmed&&keepScreenPreference()' in get("ObdDashboardActivity.java"),
+ "screen-on cleared on pause":'visible=false;handler.removeCallbacks(update);syncScreenAwake()' in get("ObdDashboardActivity.java"),
  "No GPS resume on app relaunch":'AUTO_ARM.equals(action)' in service and 'AUTO_BREAK.equals(action)' in service,
 }
 for desc,success in checks.items():
