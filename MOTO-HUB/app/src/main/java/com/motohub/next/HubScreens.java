@@ -16,13 +16,17 @@ final class HubScreens {
   line(target,title,detail,value,click,null,false);
  }
  void line(LinearLayout target,String title,String detail,String value,Runnable click,Runnable favorite,boolean starred){
-  LinearLayout block=a.col();block.setPadding(a.dp(2),a.dp(17),a.dp(2),a.dp(17));block.setMinimumHeight(a.dp(68));
+  LinearLayout block=a.col();block.setPadding(a.dp(4),a.dp(14),a.dp(4),a.dp(14));block.setMinimumHeight(a.dp(70));
   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);
-  TextView label=a.text(title,15,a.fg,true);label.setMaxLines(2);
+  TextView label=a.text(title,16,a.fg,true);label.setMaxLines(2);label.setEllipsize(android.text.TextUtils.TruncateAt.END);
   head.addView(label,new LinearLayout.LayoutParams(0,-2,1));
   if(value!=null&&!value.isEmpty()){
-   TextView hint=a.text(value,13,a.muted,true);hint.setGravity(Gravity.END);
-   hint.setPadding(a.dp(10),0,0,0);hint.setMaxLines(2);head.addView(hint);
+   boolean monetary=value.endsWith("원");
+   TextView hint=monetary?MotoDesign.figure(a,value,16,a.fg):a.text(value,13,a.muted,true);
+   hint.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
+   hint.setPadding(a.dp(10),0,0,0);hint.setMaxLines(2);
+   hint.setEllipsize(android.text.TextUtils.TruncateAt.END);
+   head.addView(hint);
   }
   if(favorite!=null){
    Button star=a.button(starred?"★":"☆",false,favorite);
@@ -34,7 +38,7 @@ final class HubScreens {
   }
   block.addView(head);
   if(detail!=null&&!detail.isEmpty()){
-   TextView summary=a.text(detail,12,a.muted,false);summary.setLineSpacing(a.dp(2),1f);
+   TextView summary=a.text(detail,13,a.muted,false);summary.setMaxLines(3);
    LinearLayout.LayoutParams sl=new LinearLayout.LayoutParams(-1,-2);sl.topMargin=a.dp(7);block.addView(summary,sl);
   }
   if(click!=null){
@@ -97,7 +101,7 @@ final class HubScreens {
   if(lastFuel!=null){
    LinearLayout summary=a.col();summary.setPadding(a.dp(15),a.dp(15),a.dp(15),a.dp(13));summary.setBackground(a.shape(a.panel,a.line,8));
    a.label(summary,"최근 주유  ·  "+lastFuel.optString("date"),13,a.muted,false);
-   a.label(summary,a.won(lastFuel.optDouble("amount"))+"  /  "+a.num(lastFuel.optDouble("liters"))+"L",19,a.fg,true);
+   TextView fuelValue=MotoDesign.figure(a,a.won(lastFuel.optDouble("amount"))+"  ·  "+a.num(lastFuel.optDouble("liters"))+" L",20,a.fg);summary.addView(fuelValue);a.gap(summary,8);
    double price=lastFuel.optDouble("amount")/lastFuel.optDouble("liters");
    if(Double.isFinite(price))a.label(summary,"리터당 약 "+a.won(Math.round(price))+" · 실제 영수증 기준",12,a.muted,false);
    a.content.addView(summary);a.gap(a.content,10);
@@ -121,13 +125,26 @@ final class HubScreens {
    JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";
    if(!month.equals(last)){a.section(month);last=month;}
    boolean receipt=a.receiptCount(x.optString("id"))>0;
-   line((receipt?"▣ ":"")+x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km",
+   line(x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km"+(receipt?" · 영수증":""),
     a.won(x.optDouble(x.has("amount")?"amount":"cost")),()->a.edit(x.has("amount")?"expenses":"services",x));
   }
   if(ListPageLimit.canPrevious(list.size(),a.recordPageOffset))a.action(a.content,"◀ 최근 기록",false,()->{a.recordPageOffset=ListPageLimit.previous(list.size(),a.recordPageOffset);a.render();});
   if(ListPageLimit.canNext(list.size(),a.recordPageOffset))a.action(a.content,"이전 기록 ▶ · "+ListPageLimit.end(list.size(),a.recordPageOffset)+"/"+list.size(),false,()->{a.recordPageOffset=ListPageLimit.next(list.size(),a.recordPageOffset);a.render();});
  }
- void tabs(String[] values,String current,MainActivity.Choice select){HorizontalScrollView sc=new HorizontalScrollView(a);sc.setHorizontalScrollBarEnabled(false);LinearLayout group=new LinearLayout(a);for(String value:values){Button b=a.button(value,current.equals(value),()->select.pick(value));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.rightMargin=a.dp(8);group.addView(b,lp);}sc.addView(group);a.content.addView(sc);a.gap(a.content,12);}
+ void tabs(String[] values,String current,MainActivity.Choice select){
+  HorizontalScrollView sc=new HorizontalScrollView(a);sc.setHorizontalScrollBarEnabled(false);
+  LinearLayout group=new LinearLayout(a);
+  for(String value:values){
+   boolean selected=current.equals(value);
+   Button b=a.button(value,false,()->select.pick(value));
+   b.setTextSize(13);b.setMinHeight(a.dp(44));
+   b.setTextColor(selected?a.accent:a.fg);
+   MotoDesign.ripple(a,b,selected?a.highlight:a.panel,selected?a.accent:a.line,7);
+   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,a.dp(44));
+   lp.rightMargin=a.dp(7);group.addView(b,lp);
+  }
+  sc.addView(group);a.content.addView(sc);a.gap(a.content,12);
+ }
  void manageBike(){JSONObject b=a.bike();if(b==null){a.edit("vehicles",null);return;}LinearLayout p=a.page("내 바이크 관리");a.label(p,b.optString("name"),25,a.fg,true);a.label(p,b.optInt("year")+"년식 · "+a.num(b.optDouble("odo"))+" km",17,a.muted,false);a.label(p,"구매가 "+a.won(b.optDouble("purchase")),17,a.fg,false);
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
@@ -167,9 +184,9 @@ final class HubScreens {
   if(list.isEmpty()){TextView none=a.text("표시할 매물이 없습니다. 필터를 변경하거나 매물을 추가하세요.",14,a.muted,false);none.setPadding(a.dp(16),a.dp(20),a.dp(16),a.dp(20));none.setBackground(a.shape(a.panel,a.line,8));into.addView(none);return;}
   for(int i=ListPageLimit.start(list.size(),a.listingPageOffset);i<ListPageLimit.end(list.size(),a.listingPageOffset);i++){JSONObject x=list.get(i);
    LinearLayout card=a.col();card.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(10));card.setBackground(a.shape(a.panel,a.line,8));
-   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);TextView model=a.text(x.optString("model"),19,a.fg,true);head.addView(model,new LinearLayout.LayoutParams(0,-2,1));TextView status=a.text(x.optString("status","확인필요"),12,a.muted,true);status.setPadding(a.dp(8),a.dp(5),0,a.dp(5));head.addView(status);card.addView(head);
-   TextView price=a.text(a.won(x.optDouble("price")),22,a.fg,true);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(-1,-2);pp.topMargin=a.dp(11);card.addView(price,pp);
-   TextView specs=a.text(x.optInt("year")+"년식  ·  "+a.num(x.optDouble("mileage"))+" km  ·  "+x.optString("region","지역 미입력"),13,a.muted,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(9);card.addView(specs,sp);
+   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);TextView model=a.text(x.optString("model"),18,a.fg,true);model.setMaxLines(2);model.setEllipsize(android.text.TextUtils.TruncateAt.END);head.addView(model,new LinearLayout.LayoutParams(0,-2,1));TextView status=a.text(x.optString("status","확인필요"),12,a.muted,true);status.setPadding(a.dp(8),a.dp(5),0,a.dp(5));status.setMaxLines(1);head.addView(status);card.addView(head);
+   TextView price=MotoDesign.figure(a,a.won(x.optDouble("price")),23,a.fg);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(-1,-2);pp.topMargin=a.dp(11);card.addView(price,pp);
+   String year=x.optInt("year")>0?x.optInt("year")+"년식  ·  ":"";TextView specs=a.text(year+a.num(x.optDouble("mileage"))+" km  ·  "+x.optString("region","지역 미입력"),13,a.muted,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(9);card.addView(specs,sp);
    card.setClickable(true);card.setFocusable(true);card.setContentDescription(x.optString("model")+", "+a.won(x.optDouble("price"))+". 자세히 보기");card.setOnClickListener(v->a.detail(x));
    CheckBox check=new CheckBox(a);check.setText("비교에 담기");check.setTextSize(13);check.setTextColor(a.muted);check.setMinHeight(a.dp(44));check.setChecked(a.compare.contains(x.optString("id")));check.setOnCheckedChangeListener((v,on)->{String id=x.optString("id");if(on&&a.compare.size()>=3){check.setChecked(false);a.toast("최대 3개까지 비교할 수 있어요.");return;}if(on)a.compare.add(id);else a.compare.remove(id);});
    card.addView(check);LinearLayout.LayoutParams cr=new LinearLayout.LayoutParams(-1,-2);cr.bottomMargin=a.dp(11);into.addView(card,cr);
