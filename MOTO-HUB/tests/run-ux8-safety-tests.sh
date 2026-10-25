@@ -26,8 +26,10 @@ assert 'PhotoTitleMatcher.matchesFallback(title,brand,model,year)' in photo
 provider=ride.split('@Override public void onProviderDisabled')[1].split('@Override public void onProviderEnabled')[0]
 assert provider.index('Sharing.stop();')<provider.index('handler.post('), 'privacy: stop location sharing immediately'
 signed=Path("../.github/workflows/moto-fixed-signed.yml").read_text()
-assert 'test "$CODE" -gt "$CURRENT"' in signed
+release=Path("tools/choose_release_version.py").read_text()
+assert 'next_code = max(source_code, published + 1)' in release and 'Published package/signing identity mismatch' in release, 'strictly monotonic signed release code and manifest identity'
 assert "if: github.ref == 'refs/heads/main'" in signed
-assert 'WRONG SIGNING CERTIFICATE. Refusing APK.' in signed
+assert 'test "$CERT" = "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b"' in signed, 'verified old-installed signing identity required'
+assert 'ref: ${{ github.sha }}' in signed, 'release must build triggering source commit'
 print("PASS UX8 GPS off-main ordering, final fsync and year-aware photo selection")
 PY
