@@ -76,7 +76,7 @@ final class ObdAutoSpeedMonitor {
   listener.capabilities(capabilities);
   if(ObdSpeedResponsePolicy.unsupported(capabilities.forPid("010D")))throw new UnsupportedSpeed();
   connectedAtNanos=System.nanoTime();listener.connected();
-  int unsupported=0,samples=0;
+  int unsupported=0,samples=0,auxiliaryTurn=0;
   ObdAuxSensorPolicy auxiliary=new ObdAuxSensorPolicy();
   while(!stopped){
    String response=query(in,out,ObdReadOnlyProtocol.query("010D"),2500);
@@ -90,8 +90,11 @@ final class ObdAutoSpeedMonitor {
    }
    else {unsupported=0;listener.speed(speed);}
    // Rotate low-rate supported sensors without ever requesting a write-capable PID.
-   if(!stopped&&++samples%4==0){
-    String pid=new String[]{"010C","0105","0142"}[(samples/4-1)%3];
+   // One optional reading per parked loop, one per fourth moving loop.
+   // Keeps temperature/voltage reasonably fresh without flooding the bus at speed.
+   int auxiliaryEvery=speed<=0?1:4;
+   if(!stopped&&++samples%auxiliaryEvery==0){
+    String pid=new String[]{"010C","0105","0142"}[(auxiliaryTurn++)%3];
     if(capabilities.forPid(pid)!=ObdPidCapabilities.Support.NO&&auxiliary.mayPoll(pid,System.nanoTime())){
      try{
       double value=ObdSensorReading.number(pid,query(in,out,ObdReadOnlyProtocol.query(pid),2500));
