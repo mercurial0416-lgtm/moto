@@ -516,6 +516,17 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       },"moto-unmerge").start()).show());
      gap(p,16);
      action(p,"지도에서 경로 보기",true,()->{Intent i=new Intent(this,RideMapActivity.class);i.putExtra("track",track.getName());startActivity(i);});
+     action(p,"15분 구간별 속도·이동 분석",false,()->{
+      toast("GPS 좌표를 로컬에서 구간별로 분석합니다.");
+      new Thread(()->{
+       try{
+        String summary=RidePaceSegments.analyze(track);
+        runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())
+         new AlertDialog.Builder(this).setTitle("라이딩 구간 분석")
+          .setMessage(summary).setPositiveButton("닫기",null).show();});
+       }catch(Exception ex){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("구간 분석 실패: "+ex.getMessage());});}
+      },"moto-ride-pace-summary").start();
+     });
      action(p,"GPX 파일로 내보내기",false,()->attempt(()->{
       if(TrackFile.read(track,(x,y,z,t)->{})==0)throw new IOException("저장된 좌표가 없습니다.");
       pendingTrack=track.getName();Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/gpx+xml").putExtra(Intent.EXTRA_TITLE,track.getName().replace(".track",".gpx"));
