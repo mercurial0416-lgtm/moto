@@ -7,6 +7,8 @@ import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Button;
+import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.os.Handler;
 import android.os.Looper;
 import java.util.Locale;
@@ -14,7 +16,8 @@ import java.util.Locale;
 /** Experimental, local-only telemetry view. No interactive riding controls. */
 public final class ObdDashboardActivity extends Activity {
  private final Handler handler=new Handler(Looper.getMainLooper());
- private TextView speed,rpm,temperature,voltage,ride,status;
+ private TextView speed,rpm,temperature,voltage,ride,status,advisory;
+ private ProgressBar rpmMeter;
  private boolean visible;
  private final Runnable update=new Runnable(){@Override public void run(){
   if(!visible)return;
@@ -22,9 +25,17 @@ public final class ObdDashboardActivity extends Activity {
   long now=android.os.SystemClock.elapsedRealtime();
   boolean speedFresh=RideService.autoArmed&&ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,now);
   speed.setText(speedFresh&&RideService.obdSpeedKmh>=0?RideService.obdSpeedKmh+"":"—");
-  rpm.setText(RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdRpmAt,now)?format(RideService.obdRpm,"%.0f"):"—");
+  boolean rpmFresh=RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdRpmAt,now);
+  rpm.setText(rpmFresh?format(RideService.obdRpm,"%.0f"):"—");
+  rpmMeter.setProgress(rpmFresh?ObdGaugeWarnings.rpmBar(RideService.obdRpm):0);
   temperature.setText(RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdCoolantAt,now)?format(RideService.obdCoolantC,"%.0f °C"):"—");
-  voltage.setText(RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdVoltageAt,now)?format(RideService.obdVoltage,"%.1f V"):"—");
+  boolean tempFresh=RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdCoolantAt,now);
+  boolean voltFresh=RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdVoltageAt,now);
+  voltage.setText(voltFresh?format(RideService.obdVoltage,"%.1f V"):"—");
+  advisory.setText(ObdGaugeWarnings.advisory(
+   rpmFresh?RideService.obdRpm:Double.NaN,
+   tempFresh?RideService.obdCoolantC:Double.NaN,
+   voltFresh?RideService.obdVoltage:Double.NaN));
   ride.setText(RideService.running?String.format(Locale.KOREA,"GPS %.2f km · 최고 %.0f km/h",RideService.liveDistanceKm,RideService.livePeakKmh):
     RideService.autoArmed?"자동 기록 대기 · GPS 기록 시작 전":"라이딩 미작동");
   status.setText("OBD2 · "+RideService.obdLink+" · 재연결 "+RideService.obdReconnects+"회\n"+
@@ -43,16 +54,30 @@ public final class ObdDashboardActivity extends Activity {
  }
  @Override public void onCreate(Bundle state){super.onCreate(state);
   if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){finish();return;}
-  base=new LinearLayout(this);base.setBackgroundColor(0xff0c131a);base.setPadding(24,36,24,20);base.setOrientation(LinearLayout.VERTICAL);
-  setContentView(base);
+  ScrollView scroll=new ScrollView(this);
+  scroll.setFillViewport(true);
+  base=new LinearLayout(this);base.setBackgroundColor(0xff0c131a);
+  base.setPadding(24,36,24,30);base.setOrientation(LinearLayout.VERTICAL);
+  scroll.addView(base);
+  setContentView(scroll);
   TextView title=new TextView(this);title.setText("MOTO HUB · DEV DASH");title.setTextColor(0xffff8641);title.setTextSize(20);title.setGravity(Gravity.CENTER);title.setPadding(0,0,0,18);base.addView(title);
   speed=value("차량 속도  ·  km/h",52);
   rpm=value("엔진 회전수  ·  RPM",29);
+  rpmMeter=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
+  rpmMeter.setMax(15000);rpmMeter.setProgress(0);
+  rpmMeter.setContentDescription("RPM 참조 막대 · 전체 범위 0~15000 · KTM 제조사 레드라인 아님");
+  base.addView(rpmMeter,new LinearLayout.LayoutParams(-1,24));
   temperature=value("냉각수 온도",23);
   voltage=value("ECU 전압",23);
+  advisory=new TextView(this);
+  advisory.setTextSize(14);advisory.setTextColor(0xffffc78d);
+  advisory.setPadding(12,8,12,20);
+  advisory.setText("센서 응답 대기 · 참고용 정보");
+  advisory.setGravity(Gravity.CENTER);
+  base.addView(advisory);
   ride=value("GPS 라이딩 기록",18);
   status=new TextView(this);status.setTextColor(0xffb8c5d3);status.setTextSize(13);status.setGravity(Gravity.CENTER);base.addView(status);
-  TextView warning=new TextView(this);warning.setText("실험용 읽기 전용 · ODO 및 연료소모량 미검증\n카카오내비 길 안내와 독립 동작 · 주행 중 화면 조작 금지");warning.setGravity(Gravity.CENTER);warning.setTextColor(0xffa3a9b0);warning.setTextSize(12);warning.setPadding(0,14,0,14);base.addView(warning);
+  TextView warning=new TextView(this);warning.setText("실험용 읽기 전용 · ODO 및 연료소모량 미검증\nRPM 막대 최대값은 앱 표시 범위이며 레드라인이 아닙니다.\n순정 계기판 경고를 우선하고 주행 중 화면을 조작하지 마세요.");warning.setGravity(Gravity.CENTER);warning.setTextColor(0xffa3a9b0);warning.setTextSize(12);warning.setPadding(0,14,0,14);base.addView(warning);
   Button close=new Button(this);close.setText("닫기");close.setOnClickListener(v->finish());base.addView(close);
  }
  @Override protected void onResume(){super.onResume();visible=true;handler.post(update);}
