@@ -283,16 +283,16 @@ final class GarageHomeUi {
  }
  void quickActions(){
   sectionTitle("빠른 기록",null,null);
-  LinearLayout entries=new LinearLayout(a);entries.setGravity(Gravity.CENTER_VERTICAL);
+  LinearLayout entries=new LinearLayout(a);entries.setGravity(Gravity.CENTER_VERTICAL);boolean narrow=a.getResources().getConfiguration().fontScale>=1.35f||a.getResources().getConfiguration().screenWidthDp<360;if(narrow)entries.setOrientation(LinearLayout.VERTICAL);
   Button fuel=a.button("주유 기록",true,()->new QuickEntryUi(a).fuel());
   fuel.setMinHeight(a.dp(49));fuel.setBackground(a.shape(orange,0,8));
   Button maintenance=a.button("정비주기",false,()->new QuickEntryUi(a).maintenance());
   maintenance.setMinHeight(a.dp(49));maintenance.setBackground(a.shape(surface,stroke,8));
-  LinearLayout.LayoutParams first=new LinearLayout.LayoutParams(0,-2,1);
-  first.rightMargin=a.dp(8);entries.addView(fuel,first);
-  entries.addView(maintenance,new LinearLayout.LayoutParams(0,-2,1));
+  LinearLayout.LayoutParams first=narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1);
+  if(narrow)first.bottomMargin=a.dp(8);else first.rightMargin=a.dp(8);entries.addView(fuel,first);
+  entries.addView(maintenance,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
   a.content.addView(entries);
-  LinearLayout links=new LinearLayout(a);links.setGravity(Gravity.CENTER_VERTICAL);
+  LinearLayout links=new LinearLayout(a);links.setGravity(Gravity.CENTER_VERTICAL);if(narrow)links.setOrientation(LinearLayout.VERTICAL);
   TextView history=a.text("주행 내역  ›",13,soft,true);
   history.setGravity(Gravity.CENTER_VERTICAL);history.setMinHeight(a.dp(46));
   history.setClickable(true);history.setFocusable(true);
@@ -303,8 +303,8 @@ final class GarageHomeUi {
   edit.setClickable(true);edit.setFocusable(true);
   edit.setContentDescription("바이크 정보 수정");
   edit.setOnClickListener(v->new HubScreens(a).manageBike());
-  links.addView(history,new LinearLayout.LayoutParams(0,-2,1));
-  links.addView(edit,new LinearLayout.LayoutParams(0,-2,1));
+  links.addView(history,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
+  links.addView(edit,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
   a.content.addView(links);
  }
  void sectionTitle(String title,String action,Runnable click){LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
