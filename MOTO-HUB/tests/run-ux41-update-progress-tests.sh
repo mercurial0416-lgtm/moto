@@ -29,6 +29,8 @@ checks={
     "dynamic cached installer":'cachedInstallButton.setVisibility(ready?' in s,
     "refresh after download":'updateProgress("검사 완료 · 설치 준비됨",100);ui(()->{refreshCachedControls();' in s,
     "refresh after invalid cache":'ui(this::refreshCachedControls)' in s,
+    "page owner captured":'owner=a.dialog;' in s,
+    "stale result blocked":'owner==a.dialog&&owner.isShowing()' in s,
 }
 for k,v in checks.items(): assert v,k
 print(f"PASS UX41 source guards: {len(checks)} checks")
