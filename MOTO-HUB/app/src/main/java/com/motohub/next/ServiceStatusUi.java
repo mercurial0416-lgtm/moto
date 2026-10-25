@@ -19,10 +19,10 @@ final class ServiceStatusUi {
    if(service.optDouble("nextKm")>0||!service.optString("nextDate").isEmpty())entries.add(service);
   }
   entries.sort((x,y)->Integer.compare(MaintenancePlanner.order(status(x,bike)),MaintenancePlanner.order(status(y,bike))));
-  LinearLayout heading=new LinearLayout(a);heading.setGravity(Gravity.CENTER_VERTICAL);
-  heading.addView(a.text("내 정비주기",18,a.fg,true),new LinearLayout.LayoutParams(0,-2,1));
+  LinearLayout heading=new LinearLayout(a);heading.setGravity(Gravity.CENTER_VERTICAL);boolean narrow=a.getResources().getConfiguration().fontScale>=1.35f||a.getResources().getConfiguration().screenWidthDp<360;if(narrow)heading.setOrientation(LinearLayout.VERTICAL);
+  heading.addView(a.text("내 정비주기",18,a.fg,true),narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
   Button odo=a.button("계기판 갱신",false,()->updateOdo(bike));odo.setTextSize(12);
-  odo.setMinHeight(a.dp(42));heading.addView(odo);target.addView(heading);
+  odo.setMinHeight(a.dp(48));heading.addView(odo);target.addView(heading);
   a.gap(target,9);
   if(entries.isEmpty()){
    TextView blank=a.text("등록된 정비주기가 없어요. 엔진오일·체인 등 필요한 항목부터 등록하세요.",13,a.muted,false);
@@ -33,7 +33,7 @@ final class ServiceStatusUi {
   for(JSONObject item:entries){
    if(shown++>=8)break;
    MaintenancePlanner.Status status=status(item,bike);
-   LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(a.dp(11),a.dp(10),a.dp(6),a.dp(10));
+   LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);if(narrow)row.setOrientation(LinearLayout.VERTICAL);row.setPadding(a.dp(11),a.dp(10),a.dp(6),a.dp(10));
    LinearLayout info=a.col();
    String state=status==MaintenancePlanner.Status.OVERDUE?"점검 필요":status==MaintenancePlanner.Status.SOON?"곧 정비":"정비 예정";
    int tone=status==MaintenancePlanner.Status.OVERDUE?0xFFE28370:status==MaintenancePlanner.Status.SOON?a.accent:a.fg;
@@ -41,9 +41,9 @@ final class ServiceStatusUi {
    String detail=MaintenanceNoticeText.detail(item.optString("nextDate"),item.optDouble("nextKm"),a.today(),bike.optDouble("odo"));
    TextView sub=a.text(detail.isEmpty()?"다음 주기 설정됨":detail,12,a.muted,false);
    LinearLayout.LayoutParams sl=new LinearLayout.LayoutParams(-1,-2);sl.topMargin=a.dp(5);info.addView(sub,sl);
-   row.addView(info,new LinearLayout.LayoutParams(0,-2,1));
+   row.addView(info,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
    Button complete=a.button("완료",false,()->complete(item));complete.setMinHeight(a.dp(44));
-   row.addView(complete);
+   row.addView(complete,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(-2,-2));
    target.addView(row);View divider=new View(a);divider.setBackgroundColor(a.line);
    target.addView(divider,new LinearLayout.LayoutParams(-1,a.dp(1)));
   }

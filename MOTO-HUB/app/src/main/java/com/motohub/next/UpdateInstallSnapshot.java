@@ -49,6 +49,12 @@ final class UpdateInstallSnapshot {
       .commit())throw new IOException("복구 지점 정보 저장에 실패했습니다.");
  }
 
+ /** A recovery point selected for update/last validated install is not subject to rotation. */
+ static boolean isPinned(Context context,String filename){
+  android.content.SharedPreferences prefs=context.getSharedPreferences(PREFS,0);
+  return UpdateRecoveryPolicy.isPinned(filename,
+   prefs.getString("recovery_file",""),prefs.getString("last_good_snapshot",""));
+ }
  /** Runs only after MainActivity has parsed the existing durable Store. */
  static String afterStartup(Context context,int installedVersion,boolean dataLoaded){
   android.content.SharedPreferences prefs=context.getSharedPreferences(PREFS,0);
@@ -58,8 +64,10 @@ final class UpdateInstallSnapshot {
   String filename=prefs.getString("recovery_file","");
   File source=new File(new File(new File(context.getFilesDir(),"local-safety-backup"),"updates"),filename);
   boolean snapshotExists=filename.matches("motohub-[0-9]{13}-[a-f0-9]{8}\\.json")&&LocalSafetyBackup.verified(source);
-  if(!prefs.edit().remove("pending_version").remove("recovery_file").commit())
-   return "데이터는 읽었지만 업데이트 완료 기록을 저장하지 못했습니다.";
+  android.content.SharedPreferences.Editor audit=prefs.edit()
+   .remove("pending_version").remove("recovery_file");
+  if(snapshotExists)audit.putString("last_good_snapshot",filename);
+  if(!audit.commit())return "데이터는 읽었지만 업데이트 완료 기록을 저장하지 못했습니다.";
   return snapshotExists?
    "앱 업데이트 후 저장 데이터 확인 완료 · 설치 전 복구 지점 보관 중":
    "앱 데이터는 읽었지만 설치 전 복구 지점을 찾지 못했습니다. 전체 백업을 권장합니다.";

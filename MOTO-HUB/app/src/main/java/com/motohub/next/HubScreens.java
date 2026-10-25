@@ -162,7 +162,7 @@ final class HubScreens {
  void listings(){
   a.gap(a.content,4);a.label(a.content,"저장한 매물을 검색하고 비교하세요.",12,a.muted,false);
   EditText search=new EditText(a);search.setSingleLine();search.setTextSize(16);search.setTextColor(a.fg);search.setHintTextColor(a.muted);search.setHint("모델명으로 빠르게 찾기");search.setText(a.query);search.setContentDescription("저장한 매물 검색");search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-  search.setPadding(a.dp(13),a.dp(10),a.dp(13),a.dp(10));search.setBackground(a.shape(a.panel,a.line,8));a.content.addView(search,new LinearLayout.LayoutParams(-1,a.dp(53)));
+  search.setPadding(a.dp(13),a.dp(10),a.dp(13),a.dp(10));search.setMinHeight(a.dp(53));search.setBackground(a.shape(a.panel,a.line,8));a.content.addView(search,new LinearLayout.LayoutParams(-1,-2));
   a.gap(a.content,13);tabs(new String[]{"전체","확인필요","판매중","예약중","판매완료"},a.filter,v->{a.filter=v;a.listingPageOffset=0;a.render();});
   LinearLayout toolbar=new LinearLayout(a);toolbar.setGravity(Gravity.CENTER_VERTICAL);TextView label=a.text("저장한 매물",17,a.fg,true);toolbar.addView(label,new LinearLayout.LayoutParams(0,-2,1));Button order=a.button(a.sort+"  ▾",false,()->a.choose("정렬",new String[]{"최신순","가격 낮은순","주행거리순"},v->{a.sort=v;a.listingPageOffset=0;a.render();}));order.setMinHeight(a.dp(42));order.setTextSize(13);toolbar.addView(order);a.content.addView(toolbar);
   LinearLayout results=a.col();a.content.addView(results);
