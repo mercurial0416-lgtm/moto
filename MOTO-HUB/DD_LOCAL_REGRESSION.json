@@ -1,0 +1,68 @@
+[
+  {
+    "test": "run-dd-quality-tests.sh",
+    "ok": true,
+    "seconds": 6.29,
+    "tail": "PASS GPS recovery: 20 checks\nPASS recovery rollback: 9 checks\nPASS ride moving metrics: 7 checks\nPASS 24h simulated GPS: 11 checks, 17281 points, 568197 bytes\nPASS 10k ride metadata: 8 checks, generate 2.92s, index/filter 0.75s, files=10000\nPASS DD safety/UI/version source wiring\n"
+  },
+  {
+    "test": "run-cy-history-async-tests.sh",
+    "ok": true,
+    "seconds": 1.87,
+    "tail": "PASS: 129 assertions, 121 ride files, bike/date/status and byte-for-byte preservation\nPASS: 16 async UI wiring, stale-screen guard, retry and opt-in sharing checks\n"
+  },
+  {
+    "test": "run-cz-history-scale-tests.sh",
+    "ok": true,
+    "seconds": 2.6,
+    "tail": "PASS: 1211 assertions across 1,200 local rides; source GPS bytes preserved\nPASS: date-scoped counts, indexed multi-term UI search and local-only safety checks\n"
+  },
+  {
+    "test": "run-da-history-quality-tests.sh",
+    "ok": true,
+    "seconds": 1.77,
+    "tail": "PASS: 24 ride date filter assertions\nPASS: 10 history pagination assertions\nPASS: 5 bike label integrity assertions\nPASS: local-only UI caption, date picker, no automatic sharing\n"
+  },
+  {
+    "test": "run-db-data-safety-tests.sh",
+    "ok": true,
+    "seconds": 2.26,
+    "tail": "PASS: 11 GPS timestamp guards\nPASS ZIP restore safety and rollback checks: 22\nPASS: GPS clock, restore commit order and no automatic sharing UI wiring\n"
+  },
+  {
+    "test": "run-ct-ride-bike-binding-tests.sh",
+    "ok": true,
+    "seconds": 1.92,
+    "tail": "Ride bike association assertions passed: 16\nPASS: GPS ride start carries chosen bike\nPASS: OBD auto ride carries chosen bike\nPASS: ride start stores local binding\nPASS: history shows bike label\nPASS: applied ODO verifies bike association\nPASS: ride deletion removes association\n"
+  },
+  {
+    "test": "run-cr-improvements-tests.sh",
+    "ok": true,
+    "seconds": 1.15,
+    "tail": "Ride merge tests passed: 13\nMerged ride backup/restore tests passed: 7\nOBD/GPS stop safety tests passed: 44\n"
+  },
+  {
+    "test": "run-cs-ride-management-tests.sh",
+    "ok": true,
+    "seconds": 1.92,
+    "tail": "CS ride categorization/undo/backup tests passed: 22\nPASS: ride merge action implemented\nPASS: merge undo action in insights\nPASS: category selector attached to insights\nPASS: stats exclude archived merge\nPASS: existing GPS records still opened\nPASS: privacy of rides in history\n"
+  },
+  {
+    "test": "run-cx-ride-bike-filter-tests.sh",
+    "ok": true,
+    "seconds": 1.65,
+    "tail": "PASS: 15 ride-bike filter assertions\nPASS: ride-bike filter UI, state persistence, reset and sharing guards\n"
+  },
+  {
+    "test": "run-cq-obd-diagnostics-tests.sh",
+    "ok": true,
+    "seconds": 1.34,
+    "tail": "PASS: ObdDiagnosticSummaryTest 21 assertions\nPASS: diagnostic callback remains on worker side\nPASS: speed samples still start rides\nPASS: read-only pid query retained\nPASS: obd sensor state only volatile in service\nPASS: sensor diagnosis published in developer-only UI\nPASS: rest countdown displayed in developer screen\nPASS: diagnosis displayed in developer dash\nPASS: location sharing remains disabled for auto ride\nPASS: notification shows rest countdown\n"
+  },
+  {
+    "test": "run-cy-java-syntax-tests.sh",
+    "ok": true,
+    "seconds": 1.23,
+    "tail": "PASS: parsed 110 Android Java source files (syntax only, no SDK or type resolution)\n"
+  }
+]

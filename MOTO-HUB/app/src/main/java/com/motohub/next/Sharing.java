@@ -1,0 +1,30 @@
+package com.motohub.next;
+import android.location.Location;import android.os.SystemClock;import org.json.*;import java.io.*;import java.util.concurrent.*;
+/** Latest-only transmitter. No persisted opt-in or retry queue. */
+final class Sharing {
+ static volatile boolean enabled=false;static int failedSends=0;static volatile String group="",state="moving",status="위치 공유 꺼짐";static String session="";static long generation=0;static Location latest;static ScheduledFuture<?> task;static SocialClient.Control control;
+ static final ScheduledExecutorService EXEC=Executors.newSingleThreadScheduledExecutor();
+ static void start(String groupId)throws Exception{long g;synchronized(Sharing.class){if(!RideService.running)throw new IOException("라이딩 탭에서 GPS 기록을 먼저 시작하세요.");if(enabled)throw new IOException("현재 위치 공유를 먼저 종료하세요.");g=++generation;status="공유 시작 요청 중";}String id;
+  try{
+   if(!SharingPrivacyPolicy.validUuid(groupId))throw new IOException("공유할 그룹 ID가 올바르지 않습니다.");
+   if(!RideService.shareAllowed())throw new IOException("GPS·알림 권한이 없어 위치 공유를 시작할 수 없습니다.");
+   JSONObject r=new JSONObject(SocialClient.INSTANCE.call("POST","/rest/v1/rpc/mh_share_start",new JSONObject().put("group_id",groupId),true));
+   id=r.getString("id");if(!SharingPrivacyPolicy.validUuid(id))throw new IOException("서버의 공유 세션 응답이 올바르지 않습니다.");
+  }catch(Exception failure){synchronized(Sharing.class){if(generation==g&&!enabled)status="공유 시작 실패 · 위치 미전송";}throw failure;}
+ synchronized(Sharing.class){if(!RideService.shareAllowed()||generation!=g){if(generation==g)status="공유 시작 취소 · 위치 미전송";EXEC.execute(()->{try{SocialClient.INSTANCE.call("POST","/rest/v1/rpc/mh_share_end",new JSONObject().put("session_id",id),true);}catch(Exception ignored){}});throw new IOException("시작 요청이 취소됐습니다.");}session=id;group=groupId;failedSends=0;state="moving";latest=null;enabled=true;status="공유 켜짐 · 새 GPS 좌표 대기";task=EXEC.scheduleWithFixedDelay(()->send(g),0,5,TimeUnit.SECONDS);}RideService.refreshNotification();}
+
+ static synchronized void offer(Location p){if(enabled)latest=new Location(p);}
+ static synchronized void stop(){generation++;if(!enabled&&session.isEmpty())return;enabled=false;latest=null;group="";failedSends=0;if(task!=null)task.cancel(false);task=null;if(control!=null)control.cancel();control=null;String ended=session;session="";status="전송 중단 · 서버 종료 확인 중";RideService.refreshNotification();EXEC.execute(()->{try{SocialClient.INSTANCE.call("POST","/rest/v1/rpc/mh_share_end",new JSONObject().put("session_id",ended),true);if(!enabled)status="위치 공유 종료";}catch(Exception e){if(!enabled)status="전송 중단 · 서버 확인 실패, 기존 좌표는 최대 30초 후 만료";}});}
+ static void send(long g){Location p;String id,s;SocialClient.Control c; synchronized(Sharing.class){if(!enabled||g!=generation||latest==null)return;if(!RideService.shareAllowed()){stop();return;}p=latest;latest=null;id=session;s=state;control=c=new SocialClient.Control();}if(SystemClock.elapsedRealtimeNanos()-p.getElapsedRealtimeNanos()>30_000_000_000L)return;
+  try{JSONObject body=new JSONObject().put("session_id",id).put("latitude",p.getLatitude()).put("longitude",p.getLongitude()).put("bearing",p.hasBearing()?p.getBearing():JSONObject.NULL).put("ride_state",s).put("captured_ms",p.getTime());String result=SocialClient.INSTANCE.call("POST","/rest/v1/rpc/mh_share_publish",body,true,c);synchronized(Sharing.class){if(enabled&&g==generation){if(!result.trim().equals("true")){stop();status="공유 권한이 없어 전송을 중단했습니다.";}else {failedSends=0;status="그룹에 위치 전송 · "+java.time.LocalTime.now().withNano(0);}}}}catch(Exception e){synchronized(Sharing.class){if(enabled&&g==generation){
+     failedSends++;
+     if(failedSends>=3){stop();status="연결 오류 3회 · 개인정보 보호를 위해 위치 공유 종료";}
+     else status="전송 실패 "+failedSends+"회 · 오래된 좌표는 재전송하지 않습니다.";
+    }}}
+ }
+ /** Wait only from a worker thread after stop(); never block the UI thread. */
+ static void awaitEnd(long timeoutMillis){
+  try{EXEC.submit(()->{}).get(timeoutMillis,TimeUnit.MILLISECONDS);}catch(Exception ignored){/* Server TTL still expires old positions. */}
+ }
+ static synchronized void state(String next){if(!java.util.Arrays.asList("moving","stopped","fuel","rest").contains(next))throw new IllegalArgumentException("상태 오류");state=next;}
+}

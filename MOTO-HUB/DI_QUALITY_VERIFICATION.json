@@ -1,0 +1,80 @@
+{
+  "project": "MOTO HUB",
+  "version_code": 518,
+  "checkpoint": "DI(518)-QUALITY-PREBUILD",
+  "android_compiled": false,
+  "apk_built": false,
+  "apk_signed": false,
+  "full_71_suite": "not_completed_timeout",
+  "selected_scripts": [
+    {
+      "script": "tests/run-di-quality-policy-tests.sh",
+      "success": true,
+      "tail": "PASS DI quality policy checks: 28 PASS DI quality source integration assertions: 9",
+      "error": ""
+    },
+    {
+      "script": "tests/run-di-prebuild-tests.sh",
+      "success": true,
+      "tail": "PASS DI prebuild source, update manifest and privacy wiring checks PASS DI future signed-update manifest generation: 7 checks",
+      "error": ""
+    },
+    {
+      "script": "tests/run-dh-quality-tests.sh",
+      "success": true,
+      "tail": "PASS authenticated full ZIP, 9 assertions PASS DH encrypted backup UI, no password persistence, privacy checks",
+      "error": ""
+    },
+    {
+      "script": "tests/run-dg-quality-tests.sh",
+      "success": true,
+      "tail": "PASS DF 10k archive capacity and safety: 14 checks PASS DG disk-space preflight, UI and privacy wiring",
+      "error": ""
+    },
+    {
+      "script": "tests/run-df-quality-tests.sh",
+      "success": true,
+      "tail": "PASS DF backup preview: 12 checks PASS DF archive, version and privacy wiring (7 checks)",
+      "error": ""
+    },
+    {
+      "script": "tests/run-de-quality-tests.sh",
+      "success": true,
+      "tail": "PASS DE GPS coverage: 5 checks PASS DE UI/privacy/version integration (8 checks)",
+      "error": ""
+    },
+    {
+      "script": "tests/run-db-data-safety-tests.sh",
+      "success": true,
+      "tail": "PASS ZIP restore safety and rollback checks: 22 PASS: GPS clock, restore commit order and no automatic sharing UI wiring",
+      "error": ""
+    },
+    {
+      "script": "tests/run-cn-ride-reliability-tests.sh",
+      "success": true,
+      "tail": "PASS: developer test checklist PASS: APK version",
+      "error": ""
+    },
+    {
+      "script": "tests/run-photo-view-tests.sh",
+      "success": true,
+      "tail": "PhotoViewPolicyTest PASS (4 checks) Photo view integration checks PASS (3 checks)",
+      "error": ""
+    },
+    {
+      "script": "tests/run-cy-java-syntax-tests.sh",
+      "success": true,
+      "tail": "PASS: parsed 125 Android Java source files (syntax only, no SDK or type resolution)",
+      "error": ""
+    }
+  ],
+  "supabase_security": "read-only project checks; 7 public RLS tables and invoker RPC confirmed; no live auth/GPS transaction",
+  "fixed_signing_secrets": "not_registered_on_GitHub",
+  "remaining_external_tests": [
+    "Android SDK compilation + lint",
+    "real phone GPS screen-off and force-stop",
+    "Duke OBD2 Bluetooth actual motorcycle",
+    "Supabase authenticated sharing end-to-end",
+    "GitHub fixed signing secrets setup"
+  ]
+}

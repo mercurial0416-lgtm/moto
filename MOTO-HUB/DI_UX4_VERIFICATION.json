@@ -1,0 +1,36 @@
+{
+  "project": "MOTO HUB",
+  "checkpoint": "Alpha6 DI(518) UX4 PREBUILD",
+  "prebuild": true,
+  "apk_built": false,
+  "signed": false,
+  "device_tested": false,
+  "new_functions": [
+    "full-resolution receipt capture via file provider",
+    "EXIF rotation for OCR and stored receipts",
+    "multiple ranked OCR total candidates",
+    "receipt capture cleanup",
+    "opt-in photo attachment immediately after save",
+    "batch service live summary and quick selection"
+  ],
+  "checks": {
+    "receipt_camera_file_assertions": 25,
+    "ranked_ocr_assertions": 13,
+    "existing_ocr_parser_assertions": 9,
+    "new_source_wiring_checks": 22,
+    "java_source_syntax_parsed": 141,
+    "selected_regression_scripts": 13,
+    "compile_debug_java_only": "PASS",
+    "no_apk_output": "PASS",
+    "initial_compile_error_fixed": "Store.find JSONException checked exception"
+  },
+  "limitations": [
+    "No new APK created",
+    "Camera and Korean OCR not tested on physical phone",
+    "Official manufacturer maintenance intervals and actual OBD odometer not verified",
+    "Existing fixed signing private key remains outside source archive"
+  ],
+  "android_compiled": true,
+  "compile_only_run_url": "https://github.com/mercurial0416-lgtm/moto/actions/runs/39411964902",
+  "compile_only_run_conclusion": "success"
+}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:background="#17212B" android:padding="12dp" android:layout_width="match_parent" android:layout_height="match_parent">
+ <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="MOTO HUB" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="18sp" android:paddingBottom="8dp"/>
+ <TextView android:id="@+id/widget_bike_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="내 바이크" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="15sp" android:maxLines="1" android:ellipsize="end"/>
+ <TextView android:id="@+id/widget_bike_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="차고 정보를 불러오는 중" android:textColor="#B9CDD8" android:textSize="12sp" android:paddingBottom="7dp" android:maxLines="1" android:ellipsize="end"/>
+ <TextView android:id="@+id/widget_cost" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="" android:textColor="#E9BD70" android:textSize="12sp" android:paddingBottom="6dp" android:visibility="gone"/>
+ <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+  <TextView android:id="@+id/widget_home" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center" android:text="⌂  홈" android:contentDescription="MOTO HUB 홈 열기" android:padding="8dp" android:textColor="#FFFFFF" android:background="#30414F"/>
+  <TextView android:id="@+id/widget_garage" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center" android:text="▣  차고" android:contentDescription="내 바이크 차고 열기" android:padding="8dp" android:textColor="#FFFFFF" android:background="#263844"/>
+  <TextView android:id="@+id/widget_ride" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center" android:text="➤  라이딩" android:contentDescription="라이딩 화면 열기" android:padding="8dp" android:textColor="#FFFFFF" android:background="#30414F"/>
+ </LinearLayout>
+ <LinearLayout android:id="@+id/widget_quick_row" android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="40dp" android:paddingTop="4dp" android:visibility="gone">
+  <TextView android:id="@+id/widget_fuel" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center" android:text="⛽  주유" android:textColor="#FFFFFF" android:contentDescription="주유 기록 입력 열기" android:background="#30414F"/>
+  <TextView android:id="@+id/widget_service" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center" android:text="⚒  정비" android:textColor="#FFFFFF" android:contentDescription="정비 기록 입력 열기" android:background="#263844"/>
+ </LinearLayout>
+</LinearLayout>

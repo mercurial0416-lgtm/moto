@@ -1,0 +1,133 @@
+name: MOTO HUB Alpha6-DE APK + source
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+permissions:
+  contents: read
+jobs:
+  checkpoint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK 36
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -1); fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Make scripts executable
+        run: chmod +x gradlew tests/*.sh
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Fast pure-JVM tests
+        run: |
+          ./tests/run-bw-improvements-tests.sh
+          ./tests/run-optional-disclosure-tests.sh
+          ./tests/run-bx-hardening-tests.sh
+          ./tests/run-bz-improvements-tests.sh
+          ./tests/run-ca-improvements-tests.sh
+          ./tests/run-cb-quality-tests.sh
+          ./tests/run-obd-readonly-tests.sh
+          ./tests/run-obd-auto-ride-tests.sh
+          ./tests/run-ce-telemetry-tests.sh
+          ./tests/run-cf-telemetry-tests.sh
+          ./tests/run-cg-vehicle-tests.sh
+          ./tests/run-ch-restore-gate-tests.sh
+          ./tests/run-ci-ride-hardening-tests.sh
+          ./tests/run-ck-data-safety-tests.sh
+          ./tests/run-cl-session-safety-tests.sh
+          ./tests/run-cm-ride-odo-tests.sh
+          ./tests/run-cn-ride-reliability-tests.sh
+          ./tests/run-co-riding-safety-tests.sh
+          ./tests/run-cp-obd-aux-tests.sh
+          ./tests/run-cq-obd-diagnostics-tests.sh
+          ./tests/run-cr-improvements-tests.sh
+          ./tests/run-cs-ride-management-tests.sh
+          ./tests/run-ct-ride-bike-binding-tests.sh
+          ./tests/run-cu-ride-report-tests.sh
+          ./tests/run-cv-history-page-tests.sh
+          ./tests/run-cw-ride-history-tests.sh
+          ./tests/run-cx-ride-bike-filter-tests.sh
+          ./tests/run-cy-history-async-tests.sh
+          ./tests/run-cz-history-scale-tests.sh
+          ./tests/run-da-history-quality-tests.sh
+          ./tests/run-db-data-safety-tests.sh
+          ./tests/run-cy-java-syntax-tests.sh
+          python3 tests/test_alpha6_co_integration.py
+          python3 tests/test_alpha6_ck_integration.py
+          python3 tests/test_alpha6_cl_integration.py
+          python3 tests/test_alpha6_cg_integration.py
+          python3 tests/test_alpha6_ce_integration.py
+          python3 tests/test_alpha6_cf_integration.py
+          python3 tests/test_alpha6_cd_integration.py
+          python3 tests/test_alpha6_cc_integration.py
+          python3 tests/test_alpha6_cb_integration.py
+          ./tests/run-restore-tests.sh
+          ./tests/run-offline-tests.sh
+          ./tests/run-server-settings-tests.sh
+          ./tests/run-quick-entry-tests.sh
+          ./tests/run-bike-visual-tests.sh
+          ./tests/run-photo-request-tests.sh
+          ./tests/run-photo-view-tests.sh
+          ./tests/run-photo-retry-tests.sh
+          ./tests/run-photo-title-tests.sh
+          ./tests/run-catalog-search-tests.sh
+          ./tests/run-catalog-year-tests.sh
+          ./tests/run-date-field-tests.sh
+          ./tests/run-draft-banner-tests.sh
+          ./tests/run-ride-readiness-tests.sh
+          ./tests/run-ride-consent-tests.sh
+          ./tests/run-home-ride-tests.sh
+          ./tests/run-ride-tests.sh
+          ./tests/run-ride-history-tests.sh
+          ./tests/run-ride-filter-tests.sh
+          ./tests/run-ride-sort-tests.sh
+          ./tests/run-ride-search-tests.sh
+          ./tests/run-track-recovery-tests.sh
+          ./tests/run-backup-tests.sh
+          ./tests/run-restore-tests.sh
+      - name: Verify motorcycle catalog data and BZ feature wiring
+        run: |
+          python3 tests/test_catalog.py
+          python3 tests/test_alpha6_bx_integration.py
+      - name: Verify repository build prerequisites
+        run: |
+          test -f gradlew && test -f settings.gradle && test -f app/build.gradle
+          test -f app/src/main/AndroidManifest.xml
+          grep -q 'versionCode 518' app/build.gradle
+      - name: Build APK first (early checkpoint)
+        run: ./gradlew :app:assembleDebug --no-daemon
+      - name: Preserve installable APK before long-running tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-hub-alpha6-di-apk-first
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Android lint and JVM tests
+        run: ./gradlew :app:lintDebug :app:testDebugUnitTest --no-daemon
+      - name: Save source checkpoint even if APK build or lint fails
+        if: always()
+        run: |
+          zip -q -r MOTO-HUB-4.0.0-alpha6-di-source.zip . \
+            -x '.git/*' '.gradle/*' '*/build/*' 'app/build/*' '*.apk' '*.jks' '*.keystore' 'local.properties' '.env' '.env.*' 'MOTO-HUB-4.0.0-alpha6-di-source.zip'
+          if test -f app/build/outputs/apk/debug/app-debug.apk; then
+            cp app/build/outputs/apk/debug/app-debug.apk MOTO-HUB-4.0.0-alpha6-di-debug.apk
+          fi
+          sha256sum MOTO-HUB-4.0.0-alpha6-di-source.zip > SHA256SUMS-alpha6-di.txt
+          if test -f MOTO-HUB-4.0.0-alpha6-di-debug.apk; then sha256sum MOTO-HUB-4.0.0-alpha6-di-debug.apk >> SHA256SUMS-alpha6-di.txt; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: moto-hub-alpha6-di-checkpoint
+          path: |
+            MOTO-HUB-4.0.0-alpha6-di-debug.apk
+            MOTO-HUB-4.0.0-alpha6-di-source.zip
+            SHA256SUMS-alpha6-di.txt
+          if-no-files-found: error
+          retention-days: 30

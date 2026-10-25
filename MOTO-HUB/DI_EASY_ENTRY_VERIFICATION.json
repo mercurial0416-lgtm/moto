@@ -1,0 +1,22 @@
+{
+  "name": "MOTO HUB Alpha6-DI(518) EASY ENTRY PREBUILD",
+  "source_branch_base": "build/di518-privacy-prebuild-20261020",
+  "versionCode": 518,
+  "source_level_validation": {
+    "new_math_record_and_monthly_assertions": 55,
+    "new_quick_form_UI_source_assertions": 18,
+    "selected_test_scripts_passed": 17,
+    "android_java_files_parsed_syntax_only": 131
+  },
+  "android_compilation_run": false,
+  "apk_built": false,
+  "apk_signed": false,
+  "device_tested": false,
+  "fixed_signing_certificate_SHA256": "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b",
+  "notes": [
+    "No build, signing, Android lint or device tests have been performed, by user instruction.",
+    "Full CI test suite not run; only 17 selected scripts plus JVM parser.",
+    "Data writes still use existing AtomicFile and backup routines; new duplicate check is advisory.",
+    "Actual Supabase account and OBD2 hardware tests require real endpoints/hardware."
+  ]
+}

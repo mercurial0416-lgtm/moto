@@ -26,9 +26,38 @@ jobs:
       - name: Checkout integrated Android source
         uses: actions/checkout@v4
         with:
-          ref: build/di518-ux4-prebuild-20261020
+          ref: ${{ github.sha }}
           path: source
           persist-credentials: false
+      # Check out the exact workflow_dispatch main revision; never build an old branch.
+      # Missing integrated UX files fail closed before any private signing key is loaded.
+      - name: Require integrated UX38–UX46 and verify all update and OBD regressions
+        run: |
+          set -euo pipefail
+          test "$(git -C source rev-parse HEAD)" = "$GITHUB_SHA" || { echo 'Source is not the triggering main commit'; exit 1; }
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateVersionPolicy.java || { echo 'UX40 not integrated; refuse stale fixed-signed release'; exit 1; }
+          test -s source/MOTO-HUB/tests/test_readable_ui.py || { echo 'UX39 not integrated'; exit 1; }
+          test -s source/MOTO-HUB/tests/test_workshop_ui.py || { echo 'UX38 not integrated'; exit 1; }
+          python3 source/MOTO-HUB/tests/test_workshop_ui.py
+          python3 source/MOTO-HUB/tests/test_readable_ui.py
+          bash source/MOTO-HUB/tests/run-ux40-update-policy-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateProgressPolicy.java || { echo 'UX41 not integrated'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux41-update-progress-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateResumePolicy.java || { echo 'UX42 resume missing'; exit 1; }
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateInstallSnapshot.java || { echo 'UX42 backup gate missing'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux42-update-integrity-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateRecoveryPolicy.java || { echo 'UX43 recovery pinning missing'; exit 1; }
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateErrorText.java || { echo 'UX43 safe error policy missing'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux43-stability-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/ObdFirstConnectionGuide.java || { echo 'UX44 OBD readiness missing'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux44-obd-connect-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/ObdSpeedSanityPolicy.java || { echo 'UX45 OBD speed sanity missing'; exit 1; }
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/ObdLocalDiagnosticLog.java || { echo 'UX45 private diagnostic log missing'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux45-obd-stability-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/RidePaceSegments.java || { echo 'UX46 GPS pace analysis missing'; exit 1; }
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/ObdRideAutoGate.java || { echo 'UX46 ride rest gate missing'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux46-ride-tuning-tests.sh
+          bash source/MOTO-HUB/tests/run-ux47-release-readiness-tests.sh
       - name: Select next version and test release policy
         id: release-version
         run: |

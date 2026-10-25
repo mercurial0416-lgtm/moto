@@ -1,0 +1,29 @@
+name: Verify MOTO HUB fixed-signature migration APK
+on:
+  push:
+    branches: ['build/fixedsign-20261020']
+    paths: ['MOTO-HUB/releases/**', '.github/workflows/verify-fixed-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-signed-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Android SDK 36
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0'
+      - name: Verify fixed-key signature, package name, and version
+        run: |
+          APK=MOTO-HUB/releases/MOTO-HUB-Alpha6-DH517-FIXED-SIGNED.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/moto-apk-signature.txt
+          ACTUAL=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/moto-apk-signature.txt | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          test "$ACTUAL" = '212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b' || exit 1
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | tee /tmp/moto-apk-badging.txt
+          grep "package: name='com.motohub.next'" /tmp/moto-apk-badging.txt
+          grep "versionCode='517'" /tmp/moto-apk-badging.txt
+          echo '93fe78dfe68faa62b8c8460b8ae2e22d2e8806961b247e4d5099e8586358a6dd  '"$APK" | sha256sum --check
+          echo 'PASS: fixed signed APK independently verified with Android apksigner.'

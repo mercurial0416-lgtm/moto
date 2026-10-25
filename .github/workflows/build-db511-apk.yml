@@ -1,0 +1,46 @@
+name: Build MOTO HUB DB511 installable APK
+on:
+  push:
+    branches:
+      - build/db511-20261019
+    paths:
+      - 'MOTO-HUB/**'
+      - '.github/workflows/build-db511-apk.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Android SDK 36
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Build APK
+        working-directory: MOTO-HUB
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug -PsupabaseUrl= -PsupabaseKey= --no-daemon
+      - name: Verify signed DB511 APK
+        working-directory: MOTO-HUB
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" > app/build/outputs/apk/debug/signature.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "versionCode='511'" > app/build/outputs/apk/debug/version-check.txt
+          sha256sum "$APK" > app/build/outputs/apk/debug/SHA256.txt
+          cat app/build/outputs/apk/debug/version-check.txt
+      - name: Upload verified APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MOTO-HUB-DB511-verified-debug-apk
+          path: MOTO-HUB/app/build/outputs/apk/debug/
+          if-no-files-found: error
+          retention-days: 30

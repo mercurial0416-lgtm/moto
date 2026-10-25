@@ -1,0 +1,47 @@
+{
+  "project": "MOTO HUB",
+  "checkpoint": "Alpha6 DI(518) UX3 PREBUILD",
+  "prebuild": true,
+  "android_compiled": false,
+  "apk_built": false,
+  "device_tested": false,
+  "github_secrets_registered": false,
+  "validation": {
+    "new_jvm_assertions": 39,
+    "new_ui_wiring_assertions": 17,
+    "android_java_sources_syntax_parsed": 138,
+    "passed_scripts": [
+      "run-dl-ux3-tests.sh",
+      "run-quick-log-tests.sh",
+      "run-dk-quality-tests.sh",
+      "run-df-quality-tests.sh",
+      "run-restore-tests.sh",
+      "run-dh-quality-tests.sh",
+      "run-di-prebuild-tests.sh",
+      "run-de-quality-tests.sh",
+      "run-cs-ride-management-tests.sh",
+      "run-ct-ride-bike-binding-tests.sh",
+      "run-dg-quality-tests.sh",
+      "run-cr-improvements-tests.sh",
+      "run-backup-tests.sh",
+      "run-cy-java-syntax-tests.sh"
+    ]
+  },
+  "implemented": [
+    "Vehicle-scoped batch maintenance draft and resume",
+    "Latest maintenance batch template (same bike only)",
+    "Up to four private receipt/work photos per record with legacy slot 1",
+    "Four-photo ZIP/encrypted-backup round trip and deletion cleanup",
+    "On-device Korean receipt OCR with manual approval before applying values",
+    "Conservative receipt field parser",
+    "Bike-specific full-tank interval fuel estimates",
+    "Record UI convenience shortcuts"
+  ],
+  "limitations": [
+    "No APK or Android compilation per user request",
+    "ML Kit dependency and OCR must be compiled and tested on device",
+    "OCR may misread receipts; manual review mandatory",
+    "OBD2 odometer and real server interactions are not tested"
+  ],
+  "source_baseline": "DI518 UX2"
+}

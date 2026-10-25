@@ -1,0 +1,71 @@
+name: MOTO HUB DB existing-key signed release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  existing-key-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Verify developer-only OBD diagnostics
+        run: |
+          cd MOTO-HUB
+          bash tests/run-cq-obd-diagnostics-tests.sh
+          bash tests/run-cr-improvements-tests.sh
+          bash tests/run-cs-ride-management-tests.sh
+          bash tests/run-ct-ride-bike-binding-tests.sh
+          bash tests/run-cx-ride-bike-filter-tests.sh
+          bash tests/run-cy-history-async-tests.sh
+          bash tests/run-cz-history-scale-tests.sh
+          bash tests/run-da-history-quality-tests.sh
+          bash tests/run-db-data-safety-tests.sh
+          bash tests/run-cy-java-syntax-tests.sh
+      - name: Install Android SDK 36
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Validate original signing credentials
+        env:
+          STORE_B64: ${{ secrets.MOTO_SIGNING_STORE_B64 }}
+          STORE_PASS: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
+          EXPECTED: ${{ secrets.MOTO_EXPECTED_CERT_SHA256 }}
+        run: |
+          test -n "$STORE_B64" && test -n "$STORE_PASS" && test -n "$KEY_ALIAS" && test -n "$KEY_PASS" && test -n "$EXPECTED" || { echo 'Missing original signing credentials'; exit 1; }
+          umask 077
+          printf '%s' "$STORE_B64" | base64 -d > "$RUNNER_TEMP/moto-existing.jks"
+          test -s "$RUNNER_TEMP/moto-existing.jks"
+      - name: Build and verify same-certificate release APK
+        env:
+          MOTO_SIGNING_STORE_FILE: ${{ runner.temp }}/moto-existing.jks
+          MOTO_SIGNING_STORE_PASSWORD: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
+          MOTO_SIGNING_KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
+          MOTO_SIGNING_KEY_PASSWORD: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
+          EXPECTED: ${{ secrets.MOTO_EXPECTED_CERT_SHA256 }}
+        run: |
+          cd MOTO-HUB
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
+          ACTUAL=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          EXPECTED=$(printf '%s' "$EXPECTED" | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          test "${#EXPECTED}" -eq 64 && test "$ACTUAL" = "$EXPECTED" || { echo 'Signing certificate mismatch'; exit 1; }
+      - name: Upload verified release
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-hub-alpha6-di-original-key-release
+          path: MOTO-HUB/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Erase local signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/moto-existing.jks"
