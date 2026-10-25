@@ -53,7 +53,7 @@ public final class RideService extends Service implements LocationListener {
  }
  final RideNotificationRate notificationRate=new RideNotificationRate();
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
- String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();LocationManager manager;FileOutputStream output;File track;long lastTime;volatile long lastFixElapsed;volatile Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
+ String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();final ObdSpeedSanityPolicy speedSanity=new ObdSpeedSanityPolicy();LocationManager manager;FileOutputStream output;File track;long lastTime;volatile long lastFixElapsed;volatile Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
  HandlerThread gpsIoThread;
  volatile boolean finishPending=false,autoFinishPending=false;
  final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
@@ -178,7 +178,7 @@ public final class RideService extends Service implements LocationListener {
    for(BluetoothDevice d:adapter.getBondedDevices())if(address.equals(d.getAddress())){paired=d;break;}
    if(paired==null)throw new SecurityException("이미 페어링된 OBD2 장치만 사용할 수 있습니다.");
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
-   prepareForeground(true);autoGate.reset();autoNotificationRate.reset();
+   prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.STOP_AFTER_MS));
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
@@ -189,7 +189,14 @@ public final class RideService extends Service implements LocationListener {
    final ObdAutoSpeedMonitor[] ref=new ObdAutoSpeedMonitor[1];
    ObdAutoSpeedMonitor reader=new ObdAutoSpeedMonitor(paired,new ObdAutoSpeedMonitor.Listener(){
     @Override public void speed(int kmh){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
-     obdSpeedKmh=kmh;obdSpeedSamples++;obdLastSampleElapsed=SystemClock.elapsedRealtime();handleAutoSpeed(kmh);
+     long elapsed=SystemClock.elapsedRealtime();
+      if(!speedSanity.accept(kmh,elapsed)){
+       autoGate.connectionLost();obdLastError="OBD2 속도 급변값 무시 · 자동 출발 보류";
+       return;
+      }
+      obdSpeedKmh=kmh;obdSpeedSamples++;obdLastSampleElapsed=elapsed;
+      if(obdSpeedSamples==1)ObdLocalDiagnosticLog.record(RideService.this,"SENSOR_OK");
+      handleAutoSpeed(kmh);
     }});}
     @Override public void telemetry(String pid,double value){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
      long now=SystemClock.elapsedRealtime();
@@ -198,18 +205,24 @@ public final class RideService extends Service implements LocationListener {
      else if("0142".equals(pid)){obdVoltage=value;obdVoltageAt=now;}
     }});}
     @Override public void capabilities(ObdPidCapabilities capability){handler.post(()->{
-     if(autoArmed&&obdMonitor==ref[0])obdPidSupport=capability.summary();
+     if(autoArmed&&obdMonitor==ref[0]){
+       obdPidSupport=capability.summary();
+       ObdLocalDiagnosticLog.capability(RideService.this,capability);
+       if(capability.forPid("010D")==ObdPidCapabilities.Support.NO)
+        ObdLocalDiagnosticLog.record(RideService.this,"NO_SPEED");
+      }
     });}
     @Override public void auxiliaryDiagnostics(String summary){handler.post(()->{
      if(autoArmed&&obdMonitor==ref[0])obdAuxDiagnostics=summary;
     });}
     @Override public void connected(){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
      obdLink="연결됨 · 차량 데이터 읽기 전용";
+      ObdLocalDiagnosticLog.record(RideService.this,"BT_OK");
      if(!running)status="OBD2 연결됨 · 출발 대기";
     }});}
     @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
      obdLink="연결 재시도 "+attempt+"/"+max;
-     obdReconnects=attempt;obdSpeedKmh=-1;obdLastSampleElapsed=0;
+     obdReconnects=attempt;speedSanity.reset();ObdLocalDiagnosticLog.record(RideService.this,"RECONNECT");obdSpeedKmh=-1;obdLastSampleElapsed=0;
      obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
      obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
      autoGate.connectionLost();obdStationaryRemainingMs=-1;liveSpeedKmh=0;
@@ -219,6 +232,7 @@ public final class RideService extends Service implements LocationListener {
     @Override public void disconnected(String reason){handler.post(()->{if(autoArmed&&obdMonitor==ref[0])onObdDisconnected(reason);});}
    });
    ref[0]=reader;obdMonitor=reader;
+   ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    reader.start();handler.postDelayed(permissionCheck,5000);
   }catch(Exception e){stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);}
  }
@@ -229,7 +243,7 @@ public final class RideService extends Service implements LocationListener {
   obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
   if(event==ObdRideAutoGate.Event.START){
    try{openRideTrack();requestGpsUpdatesChecked();
-    status="OBD2 출발 감지 · GPS 기록 중";}
+    status="OBD2 출발 감지 · GPS 기록 중";ObdLocalDiagnosticLog.record(this,"GPS_STARTED");}
    catch(Exception e){stopWith("GPS 자동 기록 시작 실패: "+e.getMessage(),false);return;}
   }else if(event==ObdRideAutoGate.Event.FINISH){finishAutoTrack();}
   // Speed samples arrive faster than the user needs notification updates. Avoid
@@ -321,7 +335,7 @@ public final class RideService extends Service implements LocationListener {
   // Keep an already-running GPS session in the same foreground service until its
   // user explicitly ends it. Never auto-arm again or enable group sharing.
   obdLastError="OBD2 · "+reason;
-  obdLink="연결 종료 · "+reason;obdSpeedKmh=-1;obdLastSampleElapsed=0;
+  obdLink="연결 종료 · "+reason;speedSanity.reset();ObdLocalDiagnosticLog.record(this,"AUTO_OFF");obdSpeedKmh=-1;obdLastSampleElapsed=0;
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
   obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
   autoArmed=false;autoGate.reset();obdStationaryRemainingMs=-1;obdMonitor=null;
