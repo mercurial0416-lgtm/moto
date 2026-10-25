@@ -2,7 +2,15 @@ package com.motohub.next;
 import android.app.*;import android.content.*;import android.content.pm.*;import android.net.Uri;import android.os.*;import android.provider.Settings;import android.widget.*;import java.io.*;import java.net.*;import java.nio.charset.StandardCharsets;import java.security.*;import java.util.*;import java.util.concurrent.*;import java.util.concurrent.atomic.AtomicBoolean;
 final class AppUpdater {
  static final ExecutorService WORKER=Executors.newSingleThreadExecutor();static final AtomicBoolean BUSY=new AtomicBoolean();
- final MainActivity a;Dialog owner;TextView progressLabel,cacheLabel;ProgressBar progressBar;Button cachedInstallButton;
+ final MainActivity a;Dialog owner;TextView progressLabel,cacheLabel;ProgressBar progressBar;
+ Button cachedInstallButton,cancelDownloadButton;
+ final AtomicBoolean cancelRequested=new AtomicBoolean(false);
+ static final class DownloadCancelledException extends IOException {
+  DownloadCancelledException(){super("다운로드가 중단됐습니다.");}
+ }
+ void checkCancelled()throws DownloadCancelledException {
+  if(cancelRequested.get())throw new DownloadCancelledException();
+ }
  AppUpdater(MainActivity a){this.a=a;}
 
  void show(){
@@ -31,6 +39,13 @@ final class AppUpdater {
   progressBar.setVisibility(android.view.View.GONE);
   LinearLayout.LayoutParams meterLp=new LinearLayout.LayoutParams(-1,a.dp(4));
   meterLp.topMargin=a.dp(7);meterLp.bottomMargin=a.dp(10);p.addView(progressBar,meterLp);
+  cancelDownloadButton=a.button("다운로드 중단",false,()->{
+   cancelRequested.set(true);
+   if(progressLabel!=null)progressLabel.setText("다운로드 중단 요청 중");
+   cancelDownloadButton.setEnabled(false);
+  });
+  cancelDownloadButton.setVisibility(android.view.View.GONE);
+  p.addView(cancelDownloadButton,new LinearLayout.LayoutParams(-1,-2));
   a.action(p,"배포 버전 확인",true,this::check);
   cacheLabel=a.text("",13,a.muted,false);
   LinearLayout.LayoutParams cacheLp=new LinearLayout.LayoutParams(-1,-2);cacheLp.bottomMargin=a.dp(8);
@@ -78,13 +93,22 @@ final class AppUpdater {
   updateProgress(action,-1);
   WORKER.execute(()->{
    try{job.run();}
+   catch(DownloadCancelledException cancelled){
+    ui(()->{if(progressLabel!=null)progressLabel.setText("다운로드 중단 · 다시 확인하면 이어받을 수 있습니다.");});
+   }
    catch(Exception e){
     updateProgress("오류 · 다시 시도해 주세요",-1);
     ui(()->a.error(e.getMessage()==null?"업데이트 작업 실패":e.getMessage()));
    }
    finally{
     BUSY.set(false);
-    ui(()->{if(progressBar!=null&&progressBar.isAttachedToWindow())progressBar.setVisibility(android.view.View.GONE);});
+    ui(()->{
+     if(progressBar!=null&&progressBar.isAttachedToWindow())progressBar.setVisibility(android.view.View.GONE);
+     if(cancelDownloadButton!=null){
+      cancelDownloadButton.setEnabled(true);
+      cancelDownloadButton.setVisibility(android.view.View.GONE);
+     }
+    });
    }
   });
  }
@@ -126,7 +150,13 @@ final class AppUpdater {
      .setMessage(UpdateVersionPolicy.currentMessage(m.versionCode,BuildConfig.VERSION_CODE))
      .setPositiveButton("확인",null).show();return;}new AlertDialog.Builder(a).setTitle(m.versionName+" 업데이트").setMessage(m.notes+"\n\n다운로드: "+String.format(Locale.KOREA,"%.1f MB",m.sizeBytes/1048576.0)).setNegativeButton("나중에",null).setPositiveButton("다운로드",(d,w)->download(m)).show();});});}
  void download(UpdateManifest m){
+  cancelRequested.set(false);
+  if(cancelDownloadButton!=null){
+   cancelDownloadButton.setEnabled(true);
+   cancelDownloadButton.setVisibility(android.view.View.VISIBLE);
+  }
   work("APK 다운로드 준비 중",()->{
+   checkCancelled();
    File dir=new File(a.getCacheDir(),"updates");
    if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("업데이트 폴더 생성 실패");
    if(!UpdateStoragePolicy.fits(m.sizeBytes,dir.getUsableSpace()))
@@ -153,6 +183,7 @@ final class AppUpdater {
     if(bytes<m.sizeBytes){
      long requestOffset=bytes;
      connection=connect(m.apkUrl,requestOffset);
+     checkCancelled();
      int code=connection.getResponseCode();
      if(code==416&&requestOffset>0){
       connection.disconnect();connection=null;
@@ -177,6 +208,7 @@ final class AppUpdater {
          FileOutputStream out=new FileOutputStream(part,requestOffset>0)){
       byte[] block=new byte[32768];int n;
       while((n=in.read(block))!=-1){
+       checkCancelled();
        if(SystemClock.elapsedRealtime()>deadline)
         throw new IOException("다운로드 시간이 초과됐습니다. 다시 시도해 주세요.");
        if(n>m.sizeBytes-bytes){
@@ -190,6 +222,7 @@ final class AppUpdater {
       out.getFD().sync();
      }
     }
+    checkCancelled();
     updateProgress("파일 무결성 확인 중",100);
     if(bytes!=m.sizeBytes||!hex(digest.digest()).equals(m.sha256)){
      part.delete();throw new IOException("APK 검사값 불일치. 다시 내려받아 주세요.");
