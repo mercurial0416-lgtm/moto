@@ -18,6 +18,6 @@ assert call.index('output.getFD().sync()') < call.index('RidePostCommit.afterWri
 assert call.index('catch(Exception e){') < call.index('RidePostCommit.afterWrite(')
 assert 'stopWith("저장 오류로 기록 중지: "+e.getMessage(),false);' in call
 assert '()->{Sharing.stop();status="그룹 공유 실패 · 로컬 GPS 기록 유지";}' in call
-assert 'if(notifications!=null)notifications.notify(' in call
+assert 'notifySafely(String.format(' in call and 'void notifySafely(String message)' in s, 'optional notifications cannot stop persisted GPS'
 print("PASS group sharing and notification are outside GPS write failure handling")
 PY
