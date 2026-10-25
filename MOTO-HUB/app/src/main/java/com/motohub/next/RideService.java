@@ -25,7 +25,21 @@ public final class RideService extends Service implements LocationListener {
  /** Read current service-owned finalization state without leaking it across service instances. */
  static boolean saving(){RideService s=instance;return s!=null&&(s.finishPending||s.autoFinishPending);}
  static boolean shareAllowed(){RideService s=instance;return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||s.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&s.getSystemService(NotificationManager.class).areNotificationsEnabled();}
- static void refreshNotification(){RideService s=instance;if(s!=null)s.handler.post(()->{if(running)s.getSystemService(NotificationManager.class).notify(404,s.notification(String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+(Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐")));});}
+ /** Noncritical notification failures must not stop a valid local GPS track. */
+ void notifySafely(String message){
+  try{
+   NotificationManager notifications=getSystemService(NotificationManager.class);
+   if(notifications!=null)notifications.notify(404,notification(message));
+  }catch(RuntimeException ignored){}
+ }
+ static void refreshNotification(){
+  RideService service=instance;
+  if(service!=null)service.handler.post(()->{
+   if(running)service.notifySafely(String.format(java.util.Locale.KOREA,
+    "%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+
+    (Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐"));
+  });
+ }
  final RideNotificationRate notificationRate=new RideNotificationRate();
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();LocationManager manager;FileOutputStream output;File track;long lastTime;volatile long lastFixElapsed;volatile Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
@@ -47,7 +61,7 @@ public final class RideService extends Service implements LocationListener {
       onObdDisconnected("GPS가 꺼져 자동 감지를 중지했습니다.");
       status="GPS 꺼짐 · 기존 라이딩 보존 · 다시 켜면 기록 재개";
       NotificationManager notifications=getSystemService(NotificationManager.class);
-      if(notifications!=null)notifications.notify(404,notification(status));
+      notifySafely(status);
      }else{stopWith("GPS가 꺼져 자동 출발 감지를 중지했습니다.",false);return;}
     }long now=SystemClock.elapsedRealtime();
    if(autoArmed){
@@ -66,7 +80,7 @@ public final class RideService extends Service implements LocationListener {
    if(gpsLost){
     if(Sharing.enabled)Sharing.stop();
     status="GPS 신호 대기 · 기록 유지 · 위치 공유 중지";
-    getSystemService(NotificationManager.class).notify(404,notification(status));
+    notifySafely(status);
    }
    if(Sharing.enabled&&((Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)||!getSystemService(NotificationManager.class).areNotificationsEnabled()))Sharing.stop();handler.postDelayed(this,5000);}};
  @Override public IBinder onBind(Intent i){return null;}
@@ -189,7 +203,7 @@ public final class RideService extends Service implements LocationListener {
      obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
      autoGate.connectionLost();obdStationaryRemainingMs=-1;liveSpeedKmh=0;
      status="OBD2 신호 손실 · "+obdLink+(running?" · GPS 기록 유지":"");
-     getSystemService(NotificationManager.class).notify(404,notification(status));
+     notifySafely(status);
     }});}
     @Override public void disconnected(String reason){handler.post(()->{if(autoArmed&&obdMonitor==ref[0])onObdDisconnected(reason);});}
    });
@@ -216,7 +230,7 @@ public final class RideService extends Service implements LocationListener {
     ?ObdRestStatus.label(true,true,obdStationaryRemainingMs)+" · GPS 기록 유지"
     :"자동 기록 중 · OBD2 "+speedKmh+" km/h · GPS "+String.format(java.util.Locale.KOREA,"%.2f km",liveDistanceKm))
     :"OBD2 연결됨 · 출발 대기 · 위치 공유 꺼짐";
-   getSystemService(NotificationManager.class).notify(404,notification(text));
+   notifySafely(text);
   }
  }
  /** A full-track readback can scan 25MB: keep STOP responsive on Android main.
@@ -286,7 +300,7 @@ public final class RideService extends Service implements LocationListener {
    new Thread(()->{try{RideInsights.Result summary=RideInsights.analyze(savedTrack);
     handler.post(()->{if(autoArmed&&!running){status=String.format(java.util.Locale.KOREA,
      "라이딩 저장 · %.1f km · %.0f km/h 최고 · 다시 출발 대기",summary.distanceKm,summary.peakKmh);
-     getSystemService(NotificationManager.class).notify(404,notification(status));}});
+     notifySafely(status);}});
    }catch(Exception ignored){}},"moto-auto-ride-summary").start();
   }
   if(verified)DailyMaintenanceJob.checkSoon(this);
@@ -310,7 +324,7 @@ public final class RideService extends Service implements LocationListener {
   if(running){
    gpsOnlyAfterObd=true;
    status="OBD2 연결 종료 · GPS 단독 기록 유지 · 알림에서 종료 가능";
-   getSystemService(NotificationManager.class).notify(404,notification(status));
+   notifySafely(status);
   }else stopWith("OBD2 자동 감지 종료 · "+reason,false);
  }
  Notification notification(String text){
@@ -374,10 +388,10 @@ public final class RideService extends Service implements LocationListener {
   Sharing.stop();
   handler.post(()->{if(!running)return;
    synchronized(RideService.this){liveSpeedKmh=0;lastGood=null;lastFixElapsed=0;}
-   status="GPS 일시 중단 · 켜면 기록 재개 (그룹 공유 중지)";getSystemService(NotificationManager.class).notify(404,notification(status));
+   status="GPS 일시 중단 · 켜면 기록 재개 (그룹 공유 중지)";notifySafely(status);
   });
  }}
- @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p))handler.post(()->{if(!running)return;status="GPS 복귀 · 좌표 대기";getSystemService(NotificationManager.class).notify(404,notification(status));});} @Override public void onStatusChanged(String p,int s,Bundle b){}
+ @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p))handler.post(()->{if(!running)return;status="GPS 복귀 · 좌표 대기";notifySafely(status);});} @Override public void onStatusChanged(String p,int s,Bundle b){}
  void stopWith(String message,boolean completed){status=message;cleanup(completed);stopSelf();}
  private synchronized boolean closeTrack(boolean completed){
   boolean verified=false;
