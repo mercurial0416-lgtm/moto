@@ -323,12 +323,13 @@ final class GarageHomeUi {
   catch(Exception ignored){}
   LinearLayout frame=a.col();frame.setPadding(a.dp(15),a.dp(15),a.dp(15),a.dp(12));frame.setBackground(a.shape(surface,stroke,15));
   LinearLayout cells=new LinearLayout(a);
+  if(a.getResources().getConfiguration().fontScale>=1.35f)cells.setOrientation(LinearLayout.VERTICAL);
   String[] title={"이번 달 유지비","실측 연비"};
   String[] values={a.won(spent),segments>0?String.format(Locale.KOREA,"%.1f km/L",efficiency):"기록 부족"};
   for(int i=0;i<2;i++){
    LinearLayout tile=a.col();tile.addView(a.text(title[i],12,soft,false));
    TextView value=MotoDesign.figure(a,values[i],i==0?19:18,light);value.setMaxLines(2);value.setAutoSizeTextTypeUniformWithConfiguration(14,i==0?19:18,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=a.dp(7);tile.addView(value,lp);
-   LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(0,-2,1);if(i==1)size.leftMargin=a.dp(11);cells.addView(tile,size);
+   LinearLayout.LayoutParams size=cells.getOrientation()==LinearLayout.VERTICAL?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1);if(i==1){if(cells.getOrientation()==LinearLayout.VERTICAL)size.topMargin=a.dp(12);else size.leftMargin=a.dp(11);}cells.addView(tile,size);
   }
   frame.addView(cells);a.gap(frame,12);
   TextView detail=a.text("유지비 "+expenseCount+"건 · 연비는 가득 주유→가득 주유 구간만 계산",11,soft,false);
