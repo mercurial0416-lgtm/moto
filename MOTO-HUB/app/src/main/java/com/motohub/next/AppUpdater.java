@@ -98,7 +98,7 @@ final class AppUpdater {
    }
    catch(Exception e){
     updateProgress("오류 · 다시 시도해 주세요",-1);
-    ui(()->a.error(e.getMessage()==null?"업데이트 작업 실패":e.getMessage()));
+    ui(()->a.error(UpdateErrorText.forError(e)));
    }
    finally{
     BUSY.set(false);
@@ -150,6 +150,7 @@ final class AppUpdater {
      .setMessage(UpdateVersionPolicy.currentMessage(m.versionCode,BuildConfig.VERSION_CODE))
      .setPositiveButton("확인",null).show();return;}new AlertDialog.Builder(a).setTitle(m.versionName+" 업데이트").setMessage(m.notes+"\n\n다운로드: "+String.format(Locale.KOREA,"%.1f MB",m.sizeBytes/1048576.0)).setNegativeButton("나중에",null).setPositiveButton("다운로드",(d,w)->download(m)).show();});});}
  void download(UpdateManifest m){
+  if(BUSY.get()){a.toast("다른 업데이트 작업이 진행 중입니다.");return;}
   cancelRequested.set(false);
   if(cancelDownloadButton!=null){
    cancelDownloadButton.setEnabled(true);
