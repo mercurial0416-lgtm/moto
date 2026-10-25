@@ -15,7 +15,10 @@ final class UpdateInstallSnapshot {
  private UpdateInstallSnapshot(){}
 
  static File create(Context context,AtomicFile active)throws Exception{
-  byte[] data=active.readFully();
+  // A brand-new empty installation may not have written its initial JSON yet.
+  File base=active.getBaseFile();
+  byte[] data=(base.isFile()||new File(base.getPath()+".bak").isFile())?
+   active.readFully():Store.empty().toString().getBytes(StandardCharsets.UTF_8);
   if(data.length<2||data.length>LIMIT)throw new IOException("현재 앱 데이터 크기 또는 저장 상태를 확인할 수 없습니다.");
   Store.parse(new String(data,StandardCharsets.UTF_8));
   File directory=new File(new File(context.getFilesDir(),"local-safety-backup"),"updates");
