@@ -1,0 +1,53 @@
+name: MOTO HUB UX integration validation
+on:
+  pull_request:
+    paths:
+      - 'MOTO-HUB/**'
+      - '.github/workflows/moto-ux-validation.yml'
+  push:
+    branches:
+      - 'fix/ux43-stability-forms-cancel-20261025'
+permissions:
+  contents: read
+jobs:
+  android-debug-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Android build prerequisites
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run all UX pure Java and source regressions
+        working-directory: MOTO-HUB
+        run: |
+          set -euo pipefail
+          python3 tests/test_workshop_ui.py
+          python3 tests/test_readable_ui.py
+          bash tests/run-ux40-update-policy-tests.sh
+          bash tests/run-ux41-update-progress-tests.sh
+          bash tests/run-ux42-update-integrity-tests.sh
+          bash tests/run-ux43-stability-tests.sh
+      - name: Compile Android application and run lint and unit tests
+        working-directory: MOTO-HUB
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest --no-daemon --stacktrace
+      - name: Archive build verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-ux43-test-reports
+          path: |
+            MOTO-HUB/app/build/reports/
+            MOTO-HUB/app/build/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+# Debug build verifies compilation only. It is NOT fixed-signed and MUST NOT
+# replace an installed user APK. Verified release workflow remains separate.
