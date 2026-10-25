@@ -51,10 +51,9 @@ final class UpdateInstallSnapshot {
 
  /** A recovery point selected for update/last validated install is not subject to rotation. */
  static boolean isPinned(Context context,String filename){
-  if(filename==null||!filename.matches("motohub-[0-9]{13}-[a-f0-9]{8}\\.json"))return false;
   android.content.SharedPreferences prefs=context.getSharedPreferences(PREFS,0);
-  return filename.equals(prefs.getString("recovery_file",""))||
-   filename.equals(prefs.getString("last_good_snapshot",""));
+  return UpdateRecoveryPolicy.isPinned(filename,
+   prefs.getString("recovery_file",""),prefs.getString("last_good_snapshot",""));
  }
  /** Runs only after MainActivity has parsed the existing durable Store. */
  static String afterStartup(Context context,int installedVersion,boolean dataLoaded){
