@@ -18,15 +18,17 @@ final class HubScreens {
  void line(LinearLayout target,String title,String detail,String value,Runnable click,Runnable favorite,boolean starred){
   LinearLayout block=a.col();block.setPadding(a.dp(4),a.dp(14),a.dp(4),a.dp(14));block.setMinimumHeight(a.dp(70));
   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);
+  boolean largeText=a.getResources().getConfiguration().fontScale>=1.35f;
+  if(largeText)head.setOrientation(LinearLayout.VERTICAL);
   TextView label=a.text(title,16,a.fg,true);label.setMaxLines(2);label.setEllipsize(android.text.TextUtils.TruncateAt.END);
-  head.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+  head.addView(label,largeText?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
   if(value!=null&&!value.isEmpty()){
    boolean monetary=value.endsWith("원");
    TextView hint=monetary?MotoDesign.figure(a,value,16,a.fg):a.text(value,13,a.muted,true);
    hint.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
    hint.setPadding(a.dp(10),0,0,0);hint.setMaxLines(2);
    hint.setEllipsize(android.text.TextUtils.TruncateAt.END);
-   head.addView(hint);
+   head.addView(hint,largeText?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(-2,-2));
   }
   if(favorite!=null){
    Button star=a.button(starred?"★":"☆",false,favorite);
@@ -184,7 +186,7 @@ final class HubScreens {
   if(list.isEmpty()){TextView none=a.text("표시할 매물이 없습니다. 필터를 변경하거나 매물을 추가하세요.",14,a.muted,false);none.setPadding(a.dp(16),a.dp(20),a.dp(16),a.dp(20));none.setBackground(a.shape(a.panel,a.line,8));into.addView(none);return;}
   for(int i=ListPageLimit.start(list.size(),a.listingPageOffset);i<ListPageLimit.end(list.size(),a.listingPageOffset);i++){JSONObject x=list.get(i);
    LinearLayout card=a.col();card.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(10));card.setBackground(a.shape(a.panel,a.line,8));
-   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);TextView model=a.text(x.optString("model"),18,a.fg,true);model.setMaxLines(2);model.setEllipsize(android.text.TextUtils.TruncateAt.END);head.addView(model,new LinearLayout.LayoutParams(0,-2,1));TextView status=a.text(x.optString("status","확인필요"),12,a.muted,true);status.setPadding(a.dp(8),a.dp(5),0,a.dp(5));status.setMaxLines(1);head.addView(status);card.addView(head);
+   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);boolean largeListingText=a.getResources().getConfiguration().fontScale>=1.35f;if(largeListingText)head.setOrientation(LinearLayout.VERTICAL);TextView model=a.text(x.optString("model"),18,a.fg,true);model.setMaxLines(2);model.setEllipsize(android.text.TextUtils.TruncateAt.END);head.addView(model,largeListingText?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));TextView status=a.text(x.optString("status","확인필요"),12,a.muted,true);status.setPadding(largeListingText?0:a.dp(8),a.dp(5),0,a.dp(5));status.setMaxLines(1);head.addView(status);card.addView(head);
    TextView price=MotoDesign.figure(a,a.won(x.optDouble("price")),23,a.fg);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(-1,-2);pp.topMargin=a.dp(11);card.addView(price,pp);
    String year=x.optInt("year")>0?x.optInt("year")+"년식  ·  ":"";TextView specs=a.text(year+a.num(x.optDouble("mileage"))+" km  ·  "+x.optString("region","지역 미입력"),13,a.muted,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(9);card.addView(specs,sp);
    card.setClickable(true);card.setFocusable(true);card.setContentDescription(x.optString("model")+", "+a.won(x.optDouble("price"))+". 자세히 보기");card.setOnClickListener(v->a.detail(x));

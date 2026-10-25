@@ -18,4 +18,21 @@ final class UpdateCacheRetention {
   }
   return removed;
  }
+ /** Preserve the active fragment but discard other stale hash-labelled fragments only. */
+ static int pruneStalePartials(File directory,String activeSha,long nowMillis){
+  if(directory==null||!directory.isDirectory()||Files.isSymbolicLink(directory.toPath())||
+    activeSha==null||!activeSha.matches("[a-f0-9]{64}"))return 0;
+  File[] files=directory.listFiles();if(files==null)return 0;int removed=0;
+  for(File file:files){
+   if(!file.getName().matches("[a-f0-9]{64}\\.part\\.apk")||
+      file.getName().equals(activeSha+".part.apk")||
+      !file.getParentFile().equals(directory)||
+      Files.isSymbolicLink(file.toPath())||
+      !Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
+   long modified=file.lastModified();
+   if(modified<=0||modified>nowMillis||nowMillis-modified<7L*24*60*60*1000)continue;
+   try{if(Files.deleteIfExists(file.toPath()))removed++;}catch(IOException ignored){}
+  }
+  return removed;
+ }
 }

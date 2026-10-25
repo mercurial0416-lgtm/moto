@@ -61,6 +61,14 @@ public class MainActivity extends Activity {
   if(crashedRestoreNeedsHelp)error("미완료 백업 복원의 원본 사본을 안전하게 되돌리지 못했어요. 추가 저장을 차단하고 복구용 파일을 보존했습니다. 앱을 삭제하지 말고 백업 상태를 확인해 주세요.");
   else if(readOnly)error("저장 파일을 읽지 못해 원본을 보존하고 새 저장을 차단했습니다. 더보기에서 백업을 복원해 주세요.");
   else if(crashedRestoreRecovered)toast("중단됐던 백업 복원을 이전 기록으로 안전하게 되돌렸어요.");
+  if(state==null){
+   // Main Store has already been parsed; audit the old restore point off the UI thread.
+   final boolean loaded=!readOnly;
+   new Thread(()->{
+    String audit=UpdateInstallSnapshot.afterStartup(this,BuildConfig.VERSION_CODE,loaded);
+    if(audit!=null)runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast(audit);});
+   },"moto-post-update-data-audit").start();
+  }
   if(state==null && !RideService.running && !RideService.autoArmed)showInterruptedRidePrompt();
  }
  /** Process death/reboot leaves a local .track without .done. Only offers a manual review. */
