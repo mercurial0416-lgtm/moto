@@ -512,11 +512,14 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      if(undoAvailable&&!appliedMerged)action(p,"통합 취소 · 원본 2건 복원",false,()->new AlertDialog.Builder(this)
       .setTitle("라이딩 통합을 취소할까요?")
       .setMessage("원본 2건을 월간 통계에 다시 포함하고 통합본은 보관합니다. GPS 좌표는 어느 쪽도 삭제하지 않습니다.")
-      .setNegativeButton("유지",null).setPositiveButton("통합 취소",(d,w)->new Thread(()->{
+      .setNegativeButton("유지",null).setPositiveButton("통합 취소",(d,w)->{
+       JSONObject liveLedger=settings().optJSONObject("appliedRides");
+       if(liveLedger!=null&&liveLedger.has(track.getName())){error("누적거리에 반영한 통합본은 취소할 수 없어요. 중복 계산을 방지합니다.");return;}
+       new Thread(()->{
        try{RideTrackMerge.undo(getFilesDir(),track);
         runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){close();render();toast("통합 취소 · 원본 2건 복원, 통합본 보관");}});
        }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 취소 실패: "+e.getMessage());});}
-      },"moto-unmerge").start()).show());
+      },"moto-unmerge").start();}).show());
      gap(p,16);
      action(p,"지도에서 경로 보기",true,()->{Intent i=new Intent(this,RideMapActivity.class);i.putExtra("track",track.getName());startActivity(i);});
      action(p,"GPX 파일로 내보내기",false,()->attempt(()->{
