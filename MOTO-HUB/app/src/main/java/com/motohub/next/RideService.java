@@ -24,7 +24,18 @@ public final class RideService extends Service implements LocationListener {
  }
  /** Read current service-owned finalization state without leaking it across service instances. */
  static boolean saving(){RideService s=instance;return s!=null&&(s.finishPending||s.autoFinishPending);}
- static boolean shareAllowed(){RideService s=instance;return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&(Build.VERSION.SDK_INT<33||s.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&s.getSystemService(NotificationManager.class).areNotificationsEnabled();}
+ static boolean shareAllowed(){
+  RideService s=instance;
+  return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&
+   (Build.VERSION.SDK_INT<33||s.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED)&&
+   s.notificationsAvailable();
+ }
+ boolean notificationsAvailable(){
+  try{
+   NotificationManager notifications=getSystemService(NotificationManager.class);
+   return notifications!=null&&notifications.areNotificationsEnabled();
+  }catch(RuntimeException unavailable){return false;}
+ }
  /** Noncritical notification failures must not stop a valid local GPS track. */
  void notifySafely(String message){
   try{
@@ -82,7 +93,7 @@ public final class RideService extends Service implements LocationListener {
     status="GPS 신호 대기 · 기록 유지 · 위치 공유 중지";
     notifySafely(status);
    }
-   if(Sharing.enabled&&((Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)||!getSystemService(NotificationManager.class).areNotificationsEnabled()))Sharing.stop();handler.postDelayed(this,5000);}};
+   if(Sharing.enabled&&((Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)||!notificationsAvailable()))Sharing.stop();handler.postDelayed(this,5000);}};
  @Override public IBinder onBind(Intent i){return null;}
  @Override public int onStartCommand(Intent intent,int flags,int id){
   if(intent==null){stopWith("GPS 서비스가 중단됐습니다.",false);return START_NOT_STICKY;}
