@@ -173,6 +173,9 @@ final class RideUi {
   a.gap(a.content,8);
   a.label(a.content,"GPX 가져오기: 다른 앱에서 저장한 코스 파일을 지도와 주행 기록으로 불러옵니다. 가져오기만으로 GPS 기록이나 길 안내가 시작되지는 않아요.",12,a.muted,false);
   a.gap(a.content,12);
+  if(!RideService.running&&!RideService.autoArmed){
+   a.action(a.content,"최근 완료 라이딩 · 주행거리·정비 확인",false,this::reviewLatestCompletedRide);
+  }
   a.action(a.content,"최근 30일 주행 통계 · 바이크별",false,this::chooseRideReport);
   a.action(a.content,"라이딩 2건 통합 · 원본 보존",false,this::chooseMerge);
   a.gap(a.content,8);a.label(a.content,"기록된 라이딩",20,a.fg,true);
@@ -507,6 +510,31 @@ final class RideUi {
   android.app.NotificationManager nm=a.getSystemService(android.app.NotificationManager.class);
   boolean notifyEnabled=nm!=null&&nm.areNotificationsEnabled();
   return RideReadiness.check(RideService.running,fine,gps,notifyPermission,notifyEnabled);
+ }
+ /** Finding saved rides and reading disk markers must not freeze tab navigation. */
+ void reviewLatestCompletedRide(){
+  a.toast("최근 완료된 주행 기록을 확인합니다.");
+  new Thread(()->{
+   File chosen=null;
+   try{
+    for(File track:TrackFile.tracks(a.getFilesDir())){
+     if(RideService.running&&track.getName().equals(RideService.active))continue;
+     if(!new File(track.getPath()+".done").isFile())continue;
+     if(new File(track.getPath()+".imported").exists())continue;
+     if(RideTrackMerge.archived(track)||RideTrackMerge.mergedSource(track))continue;
+     chosen=track;break;
+    }
+    final File latest=chosen;
+    a.runOnUiThread(()->{
+     if(a.isFinishing()||a.isDestroyed())return;
+     if(RideService.running){a.toast("진행 중인 라이딩은 종료 후 확인해 주세요.");return;}
+     if(latest==null){a.toast("확인할 완료된 GPS 라이딩이 없어요.");return;}
+     a.openRideInsights(latest);
+    });
+   }catch(Exception e){a.runOnUiThread(()->{
+    if(!a.isFinishing()&&!a.isDestroyed())a.error("최근 라이딩 확인 실패: "+e.getMessage());
+   });}
+  },"moto-last-ride-review").start();
  }
  void chooseRideReport(){
   String selectedBike=a.bike()==null?"":a.bike().optString("id","");
