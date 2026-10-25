@@ -104,6 +104,6 @@ public final class ObdDashboardActivity extends Activity {
   if(prefs.getBoolean("awake",false))getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
   Button close=new Button(this);close.setText("닫기");close.setOnClickListener(v->finish());base.addView(close);
  }
- @Override protected void onResume(){super.onResume();visible=true;handler.post(update);}
- @Override protected void onPause(){visible=false;handler.removeCallbacks(update);super.onPause();}
+ @Override protected void onResume(){super.onResume();visible=true;if(getSharedPreferences(PREFS,0).getBoolean("awake",false))getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);handler.post(update);}
+ @Override protected void onPause(){visible=false;handler.removeCallbacks(update);getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);super.onPause();}
 }
