@@ -2,7 +2,7 @@ package com.motohub.next;
 import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.content.pm.ServiceInfo;import android.location.*;import android.os.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.UUID;import android.bluetooth.*;
 /** User-started location FGS. Local recording with explicit group sharing. No boot restart, network or mock positions. */
 public final class RideService extends Service implements LocationListener {
- static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;
+ static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",AUTO_BREAK="com.motohub.next.AUTO_RIDE_BREAK",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;
  // Volatile display data only: neither ECU samples nor Bluetooth address are uploaded/stored.
  static volatile int obdSpeedKmh=-1,obdReconnects=0;
  static volatile long obdSpeedSamples=0; // only current, explicitly enabled connection session
@@ -100,6 +100,19 @@ public final class RideService extends Service implements LocationListener {
   String action=intent.getAction();
   if(STOP.equals(action)){
    finishUserRideAsync();return START_NOT_STICKY;
+  }
+  if(AUTO_BREAK.equals(action)){
+   long now=SystemClock.elapsedRealtime();
+   // Never extend an idle, disconnected or moving session.
+   if(autoArmed&&running&&!finishPending&&!autoFinishPending&&
+      obdSpeedKmh>=0&&obdSpeedKmh<=2&&
+      ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now)&&
+      autoGate.extendStopForBreak(600_000L)){
+    obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
+    status="주유·휴식 유지 · 정차 최대 10분 후 GPS 기록 종료";
+    notifySafely(status);
+   }
+   return START_NOT_STICKY;
   }
   if(AUTO_DISARM.equals(action)){
    // Disarming the experimental reader must NOT silently discard an active GPS ride.
