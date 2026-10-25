@@ -5,7 +5,7 @@ up=(s/'AppUpdater.java').read_text()
 hub=(s/'HubScreens.java').read_text()
 sharing=(s/'Sharing.java').read_text()
 assert 'UpdateReadiness.fixedIdentity' in up and up.index('UpdateReadiness.fixedIdentity',up.index('void check()')) < up.index('connect(BuildConfig.UPDATE_MANIFEST_URL)',up.index('void check()'))
-assert 'UpdateStoragePolicy.fits' in up and up.index('UpdateStoragePolicy.fits',up.index('void download(')) < up.index('connect(m.apkUrl)',up.index('void download('))
+assert 'UpdateStoragePolicy.fits' in up and up.index('UpdateStoragePolicy.fits',up.index('void download(')) < up.index('connect(m.apkUrl,requestOffset)',up.index('void download('))
 assert 'RideReadinessReport.summary' in hub and 'ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS' in hub
 assert 'AutoPhotoCache.trim' in main
 assert 'SharingPrivacyPolicy.validUuid(groupId)' in sharing

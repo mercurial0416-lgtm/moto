@@ -10,6 +10,7 @@ on:
       - 'feat/ux44-obd-first-connection-20261025'
       - 'feat/ux45-obd-reliability-diagnostics-20261025'
       - 'feat/ux46-ride-maintenance-reliability-20261026'
+      - 'release/ux47-apk-safe-update-20261026'
 permissions:
   contents: read
 jobs:
@@ -44,12 +45,29 @@ jobs:
         working-directory: MOTO-HUB
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest --no-daemon --stacktrace
+          ./gradlew :app:assembleDebug :app:assembleRelease :app:lintDebug :app:testDebugUnitTest -PmotoReleaseCode=519 --no-daemon --stacktrace
+      - name: Verify APK build outputs (signing happens outside CI)
+        working-directory: MOTO-HUB
+        run: |
+          set -euo pipefail
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/release/app-release-unsigned.apk | grep "versionCode='519'"
+          sha256sum app/build/outputs/apk/release/app-release-unsigned.apk > app/build/outputs/apk/release/SHA256-unsigned.txt
+      - name: Archive unsigned release for private offline fixed signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-ux47-unsigned-release-${{ github.sha }}
+          path: |
+            MOTO-HUB/app/build/outputs/apk/release/app-release-unsigned.apk
+            MOTO-HUB/app/build/outputs/apk/release/SHA256-unsigned.txt
+          if-no-files-found: error
+          retention-days: 7
       - name: Archive build verification reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: moto-ux43-test-reports
+          name: moto-ux47-test-reports
           path: |
             MOTO-HUB/app/build/reports/
             MOTO-HUB/app/build/test-results/
