@@ -77,7 +77,6 @@ final class QuickEntryUi {
    public void afterTextChanged(android.text.Editable text){}
   };
   unitPrice.addTextChangedListener(autoCalc);liters.addTextChangedListener(autoCalc);
-  a.label(body,"금액과 리터만 입력하면 바로 저장할 수 있어요.",13,a.muted,false);
   TextView costPerLiter=a.text("금액·주유량을 입력하면 리터당 가격을 표시합니다",12,a.muted,false);
   body.addView(costPerLiter);
   android.text.TextWatcher unitHint=new android.text.TextWatcher(){
@@ -167,13 +166,17 @@ final class QuickEntryUi {
   String[] periods={"날짜 주기 설정 안 함","1개월 뒤","3개월 뒤","6개월 뒤","12개월 뒤","날짜 직접 선택"};
   int[] months={0,1,3,6,12,-1};
   Spinner dateChoice=options(body,"또는 몇 개월 뒤에 정비할까요?",periods);
-  Spinner kmAlert=options(body,"몇 km 전에 알림을 받을까요?",
+  LinearLayout alertOptions=a.col();alertOptions.setVisibility(View.GONE);
+  Spinner kmAlert=options(alertOptions,"거리 알림 시점",
    new String[]{"100km 전","300km 전","500km 전"});
   kmAlert.setSelection(2);
-  Spinner dateAlert=options(body,"며칠 전에 알림을 받을까요?",
+  Spinner dateAlert=options(alertOptions,"날짜 알림 시점",
    new String[]{"7일 전","15일 전","30일 전"});
   dateAlert.setSelection(2);
   final int[] kmBeforeChoices={100,300,500},daysBeforeChoices={7,15,30};
+  Button alerts=a.button("알림 시점 상세 설정",false,
+   ()->alertOptions.setVisibility(alertOptions.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
+  body.addView(alerts);body.addView(alertOptions);
   LinearLayout advanced=a.col();advanced.setVisibility(View.GONE);
   EditText mileage=number(advanced,"현재 계기판 (km)",String.valueOf((long)bike.optDouble("odo")),"km");
   EditText nextKm=number(advanced,"직접 지정하는 다음 정비 거리 (km)","","예: 14000");
@@ -195,10 +198,12 @@ final class QuickEntryUi {
   };
   distanceChoice.setOnItemSelectedListener(revealCustom);
   dateChoice.setOnItemSelectedListener(revealCustom);
-  a.gap(body,13);a.label(body,"정비주기 끝에 가까워지면 알림을 보냅니다. 짧은 주기는 등록 즉시 울리지 않도록 알림 시점을 조정해요. 공식 정비주기는 제조사 매뉴얼을 확인해 주세요.",13,a.muted,false);
+  a.gap(body,12);a.label(body,"알림은 입력한 계기판과 날짜를 기준으로 계산합니다. 정비 주기는 제조사 매뉴얼을 확인하세요.",13,a.muted,false);
   a.action(body,"저장",true,()->a.attempt(()->{
    int kmInterval=intervals[distanceChoice.getSelectedItemPosition()];
    int monthsInterval=months[dateChoice.getSelectedItemPosition()];
+   if(kmInterval==0&&monthsInterval==0)
+    throw new IllegalArgumentException("거리나 날짜 중 하나 이상 정비주기를 선택해 주세요.");
    double odo=numeric(mileage,"현재 계기판",true);
    double dueKm=kmInterval<0?numeric(nextKm,"다음 정비 거리",true):QuickRecordDraft.nextOdometer(odo,kmInterval);
    String dueDate=monthsInterval<0?nextDate.getText().toString().trim():QuickRecordDraft.dueAfterMonths(a.today(),monthsInterval);
