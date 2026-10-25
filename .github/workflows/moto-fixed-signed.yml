@@ -43,6 +43,9 @@ jobs:
           bash source/MOTO-HUB/tests/run-ux40-update-policy-tests.sh
           test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateProgressPolicy.java || { echo 'UX41 not integrated'; exit 1; }
           bash source/MOTO-HUB/tests/run-ux41-update-progress-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateResumePolicy.java || { echo 'UX42 resume missing'; exit 1; }
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateInstallSnapshot.java || { echo 'UX42 backup gate missing'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux42-update-integrity-tests.sh
       - name: Select next version and test release policy
         id: release-version
         run: |
