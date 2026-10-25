@@ -324,7 +324,7 @@ public final class RideService extends Service implements LocationListener {
   if(verified&&savedTrack!=null&&savedTrack.isFile()&&count>=2){
    new Thread(()->{try{RideInsights.Result summary=RideInsights.analyze(savedTrack);
     handler.post(()->{if(autoArmed&&!running){status=String.format(java.util.Locale.KOREA,
-     "라이딩 저장 · %.1f km · %.0f km/h 최고 · 다시 출발 대기",summary.distanceKm,summary.peakKmh);
+     "라이딩 저장 · %.1f km · %.0f km/h 최고 · 다시 출발 대기\n%s",summary.distanceKm,summary.peakKmh,RideDistanceReviewPolicy.suggestion(summary.distanceKm,true));
      notifySafely(status);}});
    }catch(Exception ignored){}},"moto-auto-ride-summary").start();
   }

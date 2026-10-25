@@ -9,6 +9,9 @@ import android.widget.TextView;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
+import android.content.pm.ActivityInfo;
+import android.view.WindowManager;
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import java.util.Locale;
@@ -19,6 +22,7 @@ public final class ObdDashboardActivity extends Activity {
  private TextView speed,rpm,temperature,voltage,ride,status,advisory;
  private ProgressBar rpmMeter;
  private boolean visible;
+ private static final String PREFS="obd_dashboard_preferences";
  private final Runnable update=new Runnable(){@Override public void run(){
   if(!visible)return;
   if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){finish();return;}
@@ -78,8 +82,28 @@ public final class ObdDashboardActivity extends Activity {
   ride=value("GPS 라이딩 기록",18);
   status=new TextView(this);status.setTextColor(0xffb8c5d3);status.setTextSize(13);status.setGravity(Gravity.CENTER);base.addView(status);
   TextView warning=new TextView(this);warning.setText("실험용 읽기 전용 · ODO 및 연료소모량 미검증\nRPM 막대 최대값은 앱 표시 범위이며 레드라인이 아닙니다.\n순정 계기판 경고를 우선하고 주행 중 화면을 조작하지 마세요.");warning.setGravity(Gravity.CENTER);warning.setTextColor(0xffa3a9b0);warning.setTextSize(12);warning.setPadding(0,14,0,14);base.addView(warning);
+  SharedPreferences prefs=getSharedPreferences(PREFS,0);
+  Button landscape=new Button(this);
+  landscape.setText(prefs.getBoolean("landscape",false)?"세로 화면으로 전환":"가로 화면으로 전환");
+  landscape.setOnClickListener(v->{
+   boolean next=!prefs.getBoolean("landscape",false);
+   prefs.edit().putBoolean("landscape",next).apply();
+   setRequestedOrientation(next?ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE:ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+   landscape.setText(next?"세로 화면으로 전환":"가로 화면으로 전환");
+  });base.addView(landscape);
+  Button keepAwake=new Button(this);
+  keepAwake.setText(prefs.getBoolean("awake",false)?"화면 자동 꺼짐 허용":"이 화면에서만 켜짐 유지");
+  keepAwake.setOnClickListener(v->{
+   boolean next=!prefs.getBoolean("awake",false);
+   prefs.edit().putBoolean("awake",next).apply();
+   if(next)getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+   else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+   keepAwake.setText(next?"화면 자동 꺼짐 허용":"이 화면에서만 켜짐 유지");
+  });base.addView(keepAwake);
+  if(prefs.getBoolean("landscape",false))setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+  if(prefs.getBoolean("awake",false))getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
   Button close=new Button(this);close.setText("닫기");close.setOnClickListener(v->finish());base.addView(close);
  }
- @Override protected void onResume(){super.onResume();visible=true;handler.post(update);}
- @Override protected void onPause(){visible=false;handler.removeCallbacks(update);super.onPause();}
+ @Override protected void onResume(){super.onResume();visible=true;if(getSharedPreferences(PREFS,0).getBoolean("awake",false))getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);handler.post(update);}
+ @Override protected void onPause(){visible=false;handler.removeCallbacks(update);getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);super.onPause();}
 }
