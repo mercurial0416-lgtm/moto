@@ -131,6 +131,7 @@ final class AppUpdater {
    if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("업데이트 폴더 생성 실패");
    if(!UpdateStoragePolicy.fits(m.sizeBytes,dir.getUsableSpace()))
     throw new IOException("업데이트에 필요한 저장공간이 부족합니다.");
+   UpdateCacheRetention.pruneStalePartials(dir,m.sha256,System.currentTimeMillis());
    // The signed manifest's SHA-256 ties resumed bytes to one exact release.
    File part=new File(dir,m.sha256+".part.apk"),ready=new File(dir,m.sha256+".apk");
    if(part.exists()&&part.length()>m.sizeBytes&&!part.delete())
