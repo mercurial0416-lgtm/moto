@@ -25,6 +25,7 @@ checks={
     "ride safety":'UpdateSafety.canInstall(' in s,
     "corrupt cache pointer reset":'prefs.edit().remove("ready").commit()' in s,
     "manual retry message":'배포 버전 확인에서 다시 내려받으세요.' in s,
+    "android archive suffix":'File part=new File(dir,"download.part.apk")' in s,
 }
 for k,v in checks.items(): assert v,k
 print(f"PASS UX41 source guards: {len(checks)} checks")
