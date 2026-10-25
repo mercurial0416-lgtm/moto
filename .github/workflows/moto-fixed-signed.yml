@@ -29,6 +29,18 @@ jobs:
           ref: build/di518-ux4-prebuild-20261020
           path: source
           persist-credentials: false
+      # Never publish the old integrated source while UI/update changes still live
+      # only in feature PRs. This fails closed until UX38/39/40 are reviewed and merged
+      # into the exact integrated source branch checked out above.
+      - name: Require reviewed UX40 source and verify UI/update regressions
+        run: |
+          set -euo pipefail
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateVersionPolicy.java || { echo 'UX40 not integrated; refuse stale fixed-signed release'; exit 1; }
+          test -s source/MOTO-HUB/tests/test_readable_ui.py || { echo 'UX39 not integrated'; exit 1; }
+          test -s source/MOTO-HUB/tests/test_workshop_ui.py || { echo 'UX38 not integrated'; exit 1; }
+          python3 source/MOTO-HUB/tests/test_workshop_ui.py
+          python3 source/MOTO-HUB/tests/test_readable_ui.py
+          bash source/MOTO-HUB/tests/run-ux40-update-policy-tests.sh
       - name: Select next version and test release policy
         id: release-version
         run: |
