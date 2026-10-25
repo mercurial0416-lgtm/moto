@@ -573,7 +573,13 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     String latestRideBike=RideBikeBinding.readStrict(track);
     if(!latestRideBike.isEmpty()&&!latestRideBike.equals(bikeId))throw new Exception("라이딩 바이크가 변경됐어요. 다시 확인해 주세요.");
     JSONObject target=Store.find(next,"vehicles",bikeId);if(target==null)throw new Exception("바이크가 삭제됐어요.");
-    target.put("odo",Math.round((target.optDouble("odo")+info.distanceKm)*10)/10.0);
+    if(Double.compare(target.optDouble("odo"),old)!=0)
+     throw new Exception("주행거리 확인 중 계기판 값이 변경됐어요. 최신 값으로 다시 확인해 주세요.");
+    if(RideService.running&&track.getName().equals(RideService.active))
+     throw new Exception("기록 진행 중에는 누적 주행거리에 반영할 수 없어요.");
+    if(!new File(track.getPath()+".done").isFile())
+     throw new Exception("정상 저장이 완료된 라이딩만 주행거리에 반영할 수 있어요.");
+    target.put("odo",Math.round((old+info.distanceKm)*10)/10.0);
     ledger.put(track.getName(),new JSONObject().put("vehicleId",bikeId).put("km",info.distanceKm));
     write(next);DailyMaintenanceJob.checkSoon(this);close();render();toast("주행거리와 정비 예정 정보를 갱신했어요.");
    })).show();
