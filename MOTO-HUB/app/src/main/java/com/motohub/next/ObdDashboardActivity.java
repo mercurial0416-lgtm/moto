@@ -7,6 +7,8 @@ import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Button;
+import android.content.pm.ActivityInfo;
+import android.view.WindowManager;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.os.Handler;
@@ -19,8 +21,15 @@ public final class ObdDashboardActivity extends Activity {
  private TextView speed,rpm,temperature,voltage,ride,status,advisory;
  private ProgressBar rpmMeter;
  private boolean visible;
+ private boolean keepScreenPreference(){return getSharedPreferences("obd_dashboard_ui",0).getBoolean("keep_screen",false);}
+ private void syncScreenAwake(){
+  if(visible&&RideService.autoArmed&&keepScreenPreference())
+   getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+  else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+ }
  private final Runnable update=new Runnable(){@Override public void run(){
   if(!visible)return;
+  syncScreenAwake();
   if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){finish();return;}
   long now=android.os.SystemClock.elapsedRealtime();
   boolean speedFresh=RideService.autoArmed&&ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,now);
@@ -54,6 +63,8 @@ public final class ObdDashboardActivity extends Activity {
  }
  @Override public void onCreate(Bundle state){super.onCreate(state);
   if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){finish();return;}
+  if(getSharedPreferences("obd_dashboard_ui",0).getBoolean("landscape",false))
+   setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
   ScrollView scroll=new ScrollView(this);
   scroll.setFillViewport(true);
   base=new LinearLayout(this);base.setBackgroundColor(0xff0c131a);
@@ -78,8 +89,26 @@ public final class ObdDashboardActivity extends Activity {
   ride=value("GPS 라이딩 기록",18);
   status=new TextView(this);status.setTextColor(0xffb8c5d3);status.setTextSize(13);status.setGravity(Gravity.CENTER);base.addView(status);
   TextView warning=new TextView(this);warning.setText("실험용 읽기 전용 · ODO 및 연료소모량 미검증\nRPM 막대 최대값은 앱 표시 범위이며 레드라인이 아닙니다.\n순정 계기판 경고를 우선하고 주행 중 화면을 조작하지 마세요.");warning.setGravity(Gravity.CENTER);warning.setTextColor(0xffa3a9b0);warning.setTextSize(12);warning.setPadding(0,14,0,14);base.addView(warning);
+  Button orientation=new Button(this);
+  boolean isLandscape=getSharedPreferences("obd_dashboard_ui",0).getBoolean("landscape",false);
+  orientation.setText(isLandscape?"세로 화면으로 변경":"가로 화면으로 변경");
+  orientation.setOnClickListener(v->{
+   boolean desired=!getSharedPreferences("obd_dashboard_ui",0).getBoolean("landscape",false);
+   getSharedPreferences("obd_dashboard_ui",0).edit().putBoolean("landscape",desired).apply();
+   setRequestedOrientation(desired?ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE:ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+   orientation.setText(desired?"세로 화면으로 변경":"가로 화면으로 변경");
+  });base.addView(orientation);
+  android.widget.CheckBox awake=new android.widget.CheckBox(this);
+  awake.setText("화면 켜두기 (배터리 소모 증가 · 앱에서만 적용)");
+  awake.setTextColor(0xffced6de);
+  awake.setChecked(keepScreenPreference());
+  awake.setOnCheckedChangeListener((v,enabled)->{
+   getSharedPreferences("obd_dashboard_ui",0).edit().putBoolean("keep_screen",enabled).apply();
+   syncScreenAwake();
+  });
+  base.addView(awake);
   Button close=new Button(this);close.setText("닫기");close.setOnClickListener(v->finish());base.addView(close);
  }
- @Override protected void onResume(){super.onResume();visible=true;handler.post(update);}
- @Override protected void onPause(){visible=false;handler.removeCallbacks(update);super.onPause();}
+ @Override protected void onResume(){super.onResume();visible=true;syncScreenAwake();handler.post(update);}
+ @Override protected void onPause(){visible=false;handler.removeCallbacks(update);syncScreenAwake();super.onPause();}
 }
