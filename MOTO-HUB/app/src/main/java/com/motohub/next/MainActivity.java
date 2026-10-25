@@ -1566,9 +1566,9 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  @Override public void onBackPressed(){back();}
  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
   super.onRequestPermissionsResult(request,permissions,results);
-  if(request==DeveloperObdScreen.CONNECT_PERMISSION_REQUEST||request==DeveloperObdScreen.AUTO_CONNECT_PERMISSION_REQUEST){
+  if(request==DeveloperObdScreen.CONNECT_PERMISSION_REQUEST||request==DeveloperObdScreen.AUTO_CONNECT_PERMISSION_REQUEST||request==DeveloperObdScreen.ODO_CONNECT_PERMISSION_REQUEST){
    if(developerObd!=null){
-    if(Build.VERSION.SDK_INT<31||checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)==android.content.pm.PackageManager.PERMISSION_GRANTED) {if(request==DeveloperObdScreen.AUTO_CONNECT_PERMISSION_REQUEST)developerObd.loadPairedAuto();else developerObd.loadPaired();}
+    if(Build.VERSION.SDK_INT<31||checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)==android.content.pm.PackageManager.PERMISSION_GRANTED) {if(request==DeveloperObdScreen.AUTO_CONNECT_PERMISSION_REQUEST)developerObd.loadPairedAuto();else if(request==DeveloperObdScreen.ODO_CONNECT_PERMISSION_REQUEST)developerObd.loadPairedOdo();else developerObd.loadPaired();}
     else toast("Bluetooth 연결 권한이 없어 OBD2 장치를 조회하지 않았어요.");
    }
    return;
