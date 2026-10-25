@@ -46,6 +46,9 @@ jobs:
           test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateResumePolicy.java || { echo 'UX42 resume missing'; exit 1; }
           test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateInstallSnapshot.java || { echo 'UX42 backup gate missing'; exit 1; }
           bash source/MOTO-HUB/tests/run-ux42-update-integrity-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateRecoveryPolicy.java || { echo 'UX43 recovery pinning missing'; exit 1; }
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/UpdateErrorText.java || { echo 'UX43 safe error policy missing'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux43-stability-tests.sh
       - name: Select next version and test release policy
         id: release-version
         run: |
