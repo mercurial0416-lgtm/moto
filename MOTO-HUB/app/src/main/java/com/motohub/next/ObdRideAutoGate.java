@@ -7,14 +7,19 @@ final class ObdRideAutoGate {
  static final int REQUIRED_MOVING_SAMPLES=3;
  static final long STOP_AFTER_MS=180_000L;
  static final long IGNITION_OFF_GRACE_MS=15_000L;
- private long stopAfterMs=STOP_AFTER_MS;
+ private long stopAfterMs=STOP_AFTER_MS,configuredStopAfterMs=STOP_AFTER_MS;
  void setStopAfterMs(long value){
   if(value!=180_000L&&value!=300_000L&&value!=600_000L)
    throw new IllegalArgumentException("지원되지 않는 정차 간격");
   if(recording)throw new IllegalStateException("기록 중 변경 불가");
-  stopAfterMs=value;movingSamples=0;stationarySince=-1;
+  stopAfterMs=value;configuredStopAfterMs=value;movingSamples=0;stationarySince=-1;
  }
  long stopAfterMs(){return stopAfterMs;}
+ /** A manually requested fuel/rest grace period applies only to this ride. */
+ boolean extendStopForBreak(long minimumMs){
+  if(!recording||minimumMs!=600_000L)return false;
+  stopAfterMs=Math.max(stopAfterMs,minimumMs);return true;
+ }
  private int movingSamples;
  private boolean recording;
  private long stationarySince=-1;
@@ -33,7 +38,7 @@ final class ObdRideAutoGate {
   if(speedKmh>=KEEP_MOVING_KMH){stationarySince=-1;return Event.NONE;}
   if(speedKmh<=FINISH_KMH){
    if(stationarySince<0)stationarySince=elapsedMs;
-   if(elapsedMs-stationarySince>=stopAfterMs){recording=false;stationarySince=-1;return Event.FINISH;}
+   if(elapsedMs-stationarySince>=stopAfterMs){recording=false;stationarySince=-1;stopAfterMs=configuredStopAfterMs;return Event.FINISH;}
   }else stationarySince=-1;
   return Event.NONE;
  }
@@ -51,5 +56,5 @@ final class ObdRideAutoGate {
  /** Keep the active ride but reset idle detection when samples go stale. */
  void connectionLost(){movingSamples=0;stationarySince=-1;lastSample=-1;}
  boolean recording(){return recording;}
- void reset(){recording=false;movingSamples=0;stationarySince=-1;lastSample=-1;}
+ void reset(){recording=false;movingSamples=0;stationarySince=-1;lastSample=-1;stopAfterMs=configuredStopAfterMs;}
 }
