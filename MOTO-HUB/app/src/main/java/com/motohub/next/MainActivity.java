@@ -506,7 +506,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      });
      if(RideTrackMerge.archived(track))label(p,"통합 취소로 보관된 경로 · 월간 통계에서 제외",13,muted,false);
      if(RideTrackMerge.mergedSource(track))label(p,"통합에 포함된 원본 · 통합 취소 후 통계에 복원됩니다.",13,muted,false);
-     if(undoAvailable)action(p,"통합 취소 · 원본 2건 복원",false,()->new AlertDialog.Builder(this)
+     JSONObject appliedForUndo=settings().optJSONObject("appliedRides");
+     boolean appliedMerged=appliedForUndo!=null&&appliedForUndo.has(track.getName());
+     if(undoAvailable&&appliedMerged)label(p,"통합 라이딩 거리를 이미 차고에 반영했어요. 원본을 중복 반영하지 않도록 통합 취소는 제한됩니다.",13,muted,false);
+     if(undoAvailable&&!appliedMerged)action(p,"통합 취소 · 원본 2건 복원",false,()->new AlertDialog.Builder(this)
       .setTitle("라이딩 통합을 취소할까요?")
       .setMessage("원본 2건을 월간 통계에 다시 포함하고 통합본은 보관합니다. GPS 좌표는 어느 쪽도 삭제하지 않습니다.")
       .setNegativeButton("유지",null).setPositiveButton("통합 취소",(d,w)->new Thread(()->{
@@ -525,7 +528,9 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      boolean applied=ledger!=null&&ledger.has(track.getName());
      if(b!=null){
       if(applied)label(p,"✓ 이미 누적 주행거리에 반영한 기록",14,accent,true);
-      else action(p,"내 바이크 주행거리에 반영",false,()->confirmRideMileage(track,info));
+      else if(RideMileageIntegrity.validCompleted(track))
+       action(p,"주행거리 확인 후 정비주기 반영",false,()->confirmRideMileage(track,info));
+      else label(p,"통합 원본·보관본 또는 미완료 기록은 누적 주행거리에 반영할 수 없어요.",13,muted,false);
      }
      action(p,"기록 삭제",false,()->{
       if(!RideTrackMerge.canDelete(getFilesDir(),track)){
@@ -547,6 +552,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  void confirmRideMileage(File track,RideInsights.Result info){
   JSONObject b=bike();if(b==null){toast("바이크를 먼저 등록해 주세요.");return;}
   if(info.points<2||info.distanceKm<0.01||info.distanceKm>1000){error("이 기록의 GPS 거리가 정상 범위가 아니어서 적용할 수 없어요.");return;}
+  if(!RideMileageIntegrity.validCompleted(track)){error("미완료·통합 원본·보관된 라이딩은 반영할 수 없어요.");return;}
+  final long sourceBytes=track.length(),sourceModified=track.lastModified();
   String bikeId=b.optString("id");
   String rideBikeId;
   try{rideBikeId=RideBikeBinding.readStrict(track);}catch(IOException e){error(e.getMessage());return;}
@@ -558,11 +565,13 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    .setNegativeButton("취소",null).setPositiveButton("반영",(d,w)->attempt(()->{
     JSONObject next=new JSONObject(db.toString());JSONObject settings=next.getJSONObject("settings");
     JSONObject ledger=settings.optJSONObject("appliedRides");if(ledger==null){ledger=new JSONObject();settings.put("appliedRides",ledger);}
-    if(ledger.has(track.getName()))throw new Exception("이미 반영한 라이딩입니다.");
+    RideMileageIntegrity.requireApplyable(track,ledger.has(track.getName()),
+     TrackFile.directory(getFilesDir()),sourceBytes,sourceModified);
     String latestRideBike=RideBikeBinding.readStrict(track);
     if(!latestRideBike.isEmpty()&&!latestRideBike.equals(bikeId))throw new Exception("라이딩 바이크가 변경됐어요. 다시 확인해 주세요.");
     JSONObject target=Store.find(next,"vehicles",bikeId);if(target==null)throw new Exception("바이크가 삭제됐어요.");
-    target.put("odo",Math.round((target.optDouble("odo")+info.distanceKm)*10)/10.0);
+    if(Double.compare(target.optDouble("odo"),old)!=0)throw new IOException("계기판 주행거리가 변경됐어요. 다시 확인한 뒤 반영해 주세요.");
+    target.put("odo",Math.round((old+info.distanceKm)*10)/10.0);
     ledger.put(track.getName(),new JSONObject().put("vehicleId",bikeId).put("km",info.distanceKm));
     write(next);DailyMaintenanceJob.checkSoon(this);close();render();toast("주행거리와 정비 예정 정보를 갱신했어요.");
    })).show();
