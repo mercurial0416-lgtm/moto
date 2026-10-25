@@ -52,7 +52,14 @@ final class LocalSafetyBackup {
    File[] points=LocalBackupFilePolicy.eligible(folder,"motohub-[0-9]{13}-[a-f0-9]{8}\\.json",LocalSafetyBackup::verified);
    if(points!=null&&points.length>12){
     java.util.Arrays.sort(points,(a,b)->{int date=Long.compare(a.lastModified(),b.lastModified());return date!=0?date:a.getName().compareTo(b.getName());});
-    for(int i=0;i<points.length-12;i++)points[i].delete();
+    // Never rotate the snapshot named by a pending/successful app upgrade.
+    // Preserve the newest 12 ordinary checkpoints without counting that pinned copy.
+    int toDelete=points.length-12;
+    for(File candidate:points){
+     if(toDelete<=0)break;
+     if(UpdateInstallSnapshot.isPinned(context,candidate.getName()))continue;
+     if(candidate.delete())toDelete--;
+    }
    }
   }catch(Exception e){if(out!=null&&atomic!=null)atomic.failWrite(out);if(file!=null){LocalBackupValidationCache.invalidate(file);file.delete();}}
  }
