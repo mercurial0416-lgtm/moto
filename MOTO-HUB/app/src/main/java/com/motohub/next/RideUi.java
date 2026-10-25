@@ -60,13 +60,19 @@ final class RideUi {
   }
   if(RideService.running){
    LinearLayout live=new LinearLayout(a);
+   boolean stackLive=a.getResources().getConfiguration().fontScale>=1.35f||
+      a.getResources().getConfiguration().screenWidthDp<360;
+   if(stackLive)live.setOrientation(LinearLayout.VERTICAL);
    TextView[] values=new TextView[3];String[] names={"주행거리","경과시간","실시간 속도"};
    for(int i=0;i<3;i++){
     LinearLayout box=a.col();box.setPadding(a.dp(9),a.dp(12),a.dp(9),a.dp(12));box.setBackground(a.shape(a.bg,0,13));
     values[i]=a.text("—",19,a.fg,true);values[i].setGravity(Gravity.CENTER);box.addView(values[i]);
     TextView name=a.text(names[i],11,a.muted,false);name.setGravity(Gravity.CENTER);
     LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.topMargin=a.dp(7);box.addView(name,np);
-    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)lp.leftMargin=a.dp(7);live.addView(box,lp);
+    LinearLayout.LayoutParams lp=stackLive?new LinearLayout.LayoutParams(-1,-2):
+     new LinearLayout.LayoutParams(0,-2,1);
+    if(i>0){if(stackLive)lp.topMargin=a.dp(7);else lp.leftMargin=a.dp(7);}
+    live.addView(box,lp);
    }hero.addView(live);
    TextView average=a.text("평균속도 계산 중",13,a.muted,false);average.setPadding(a.dp(6),a.dp(10),0,a.dp(8));hero.addView(average);
    TextView peak=a.text("최고속도 계산 중",13,a.muted,false);peak.setPadding(a.dp(6),0,0,a.dp(9));hero.addView(peak);
@@ -123,6 +129,15 @@ final class RideUi {
      })).show();
    });
    rest.setMinHeight(a.dp(48));hero.addView(rest);
+   Runnable restVisibility=new Runnable(){@Override public void run(){
+    if(!hero.isAttachedToWindow()||a.isFinishing()||a.isDestroyed())return;
+    long now=android.os.SystemClock.elapsedRealtime();
+    boolean stopped=RideService.autoArmed&&RideService.running&&
+     ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,now)&&
+     RideService.obdSpeedKmh>=0&&RideService.obdSpeedKmh<=2;
+    rest.setVisibility(stopped?View.VISIBLE:View.GONE);
+    if(RideService.autoArmed&&RideService.running)hero.postDelayed(this,2500);
+   }};rest.setVisibility(View.GONE);hero.post(restVisibility);
   }
   a.content.addView(hero);a.gap(a.content,12);
   // The first-connection flow belongs near ride controls, not buried in Settings.
