@@ -26,6 +26,9 @@ checks={
     "corrupt cache pointer reset":'prefs.edit().remove("ready").commit()' in s,
     "manual retry message":'배포 버전 확인에서 다시 내려받으세요.' in s,
     "android archive suffix":'File part=new File(dir,"download.part.apk")' in s,
+    "dynamic cached installer":'cachedInstallButton.setVisibility(ready?' in s,
+    "refresh after download":'updateProgress("검사 완료 · 설치 준비됨",100);ui(()->{refreshCachedControls();' in s,
+    "refresh after invalid cache":'ui(this::refreshCachedControls)' in s,
 }
 for k,v in checks.items(): assert v,k
 print(f"PASS UX41 source guards: {len(checks)} checks")
