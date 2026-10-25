@@ -62,9 +62,12 @@ public class MainActivity extends Activity {
   else if(readOnly)error("저장 파일을 읽지 못해 원본을 보존하고 새 저장을 차단했습니다. 더보기에서 백업을 복원해 주세요.");
   else if(crashedRestoreRecovered)toast("중단됐던 백업 복원을 이전 기록으로 안전하게 되돌렸어요.");
   if(state==null){
-   // Confirm existing Store parsed after package install; never replace files automatically.
-   String updateAudit=UpdateInstallSnapshot.afterStartup(this,BuildConfig.VERSION_CODE,!readOnly);
-   if(updateAudit!=null)toast(updateAudit);
+   // Main Store has already been parsed; audit the old restore point off the UI thread.
+   final boolean loaded=!readOnly;
+   new Thread(()->{
+    String audit=UpdateInstallSnapshot.afterStartup(this,BuildConfig.VERSION_CODE,loaded);
+    if(audit!=null)runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast(audit);});
+   },"moto-post-update-data-audit").start();
   }
   if(state==null && !RideService.running && !RideService.autoArmed)showInterruptedRidePrompt();
  }
