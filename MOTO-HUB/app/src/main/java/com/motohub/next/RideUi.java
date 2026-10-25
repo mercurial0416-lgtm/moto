@@ -115,6 +115,21 @@ final class RideUi {
     if(a.developerObd!=null)a.developerObd.stop();
     a.developerObd=new DeveloperObdScreen(a);a.developerObd.show();
    });
+   TextView linkStatus=a.text(RideService.autoArmed?
+    "OBD 연결 상태 확인 중":"OBD2 자동 감지 꺼짐 · 필요할 때만 직접 켜기",13,a.muted,false);
+   linkStatus.setPadding(a.dp(8),a.dp(3),0,a.dp(10));
+   a.content.addView(linkStatus);
+   if(RideService.autoArmed){
+    Runnable updateLink=new Runnable(){@Override public void run(){
+     if(!linkStatus.isAttachedToWindow()||a.isFinishing()||a.isDestroyed())return;
+     long now=android.os.SystemClock.elapsedRealtime();
+     boolean fresh=ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,now);
+     linkStatus.setText("OBD2 · "+RideService.obdLink+
+      (fresh?" · 속도 정상 수신":" · 속도 미수신/지연")+
+      " · 재연결 "+RideService.obdReconnects+"회");
+     if(RideService.autoArmed)linkStatus.postDelayed(this,2500);
+    }};linkStatus.post(updateLink);
+   }
   }
   // External navigation remains separate: no Kakao app key or GPS upload is required.
   a.action(a.content,"카카오내비 열기",false,()->KakaoNaviLaunch.open(a));

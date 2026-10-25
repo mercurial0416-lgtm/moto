@@ -58,8 +58,21 @@ final class DeveloperObdScreen {
    fields[i]=activity.text(ObdReadOnlyProtocol.SENSOR_NAMES[i]+": —",17,activity.fg,false);
    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=activity.dp(10);p.addView(fields[i],lp);
   }
-  activity.gap(p,18);
+  activity.gap(p,12);
   activity.action(p,"페어링된 장치로 센서 연결 테스트",true,this::loadPaired);
+  activity.action(p,"지난 ECU 지원 항목 · 연결 테스트 기록",false,()->{
+   new AlertDialog.Builder(activity).setTitle("OBD2 로컬 점검 기록")
+    .setMessage(ObdLocalDiagnosticLog.summary(activity))
+    .setPositiveButton("닫기",null)
+    .setNeutralButton("기록 지우기",(dialog,which)->new AlertDialog.Builder(activity)
+     .setTitle("OBD 점검 기록 삭제")
+     .setMessage("연결 상태와 지원 항목 메모만 삭제합니다. 라이딩·GPS 기록은 유지됩니다.")
+     .setNegativeButton("취소",null)
+     .setPositiveButton("점검 기록 삭제",(d,w)->{
+      ObdLocalDiagnosticLog.clear(activity);
+      setStatus("OBD 점검 기록만 삭제했습니다.");
+     }).show()).show();
+  });
   activity.gap(p,15);
   activity.label(p,"자동 라이딩 기록 (개발자 모드 한정)",17,activity.accent,true);
   activity.label(p,"OBD2에서 속도 7km/h 이상을 연속 3회 확인하면 GPS 경로 기록을 자동 시작합니다. 설정한 연속 정차 시간(기본 3분) 후 완료하고 다음 출발을 기다립니다. 블루투스가 끊겨도 진행 중인 GPS 기록은 수동 종료까지 유지합니다. 최초 활성화에는 별도 동의가 필요합니다.",13,activity.muted,false);
@@ -90,6 +103,7 @@ final class DeveloperObdScreen {
      catch(Exception e){setStatus("이 기기에서는 배터리 제한 설정 화면을 열 수 없습니다.");}
     }).show();
   });
+  activity.label(p,"주차·배터리 주의: 일부 OBD 동글은 시동 OFF 후에도 전력을 사용할 수 있어요. 장기 주차 시 동글 분리 또는 대기전류 실측을 권장합니다. 시트 잠금장치와 배선이 눌리지 않는지도 확인하세요.",13,activity.muted,false);
   activity.label(p,"자동 감지를 켜는 동안 알림이 계속 표시됩니다. GPS 기록은 이 휴대폰에만 저장하고 친구·그룹 위치 공유는 시작하지 않습니다. 앱 종료/폰 재부팅 뒤 새로 자동 실행하지 않습니다. 같은 기록 세션 중에는 연결을 최대 8회 재시도합니다.",13,activity.muted,false);
   String remembered=activity.getSharedPreferences("developer_experiments",0).getString(PREFERRED_ADAPTER,"");
   if(!remembered.isEmpty()){
@@ -343,9 +357,11 @@ final class DeveloperObdScreen {
    try{supported00=request(in,out,ObdReadOnlyProtocol.query("0100"),2500);}catch(Exception ignored){}
    try{supported40=request(in,out,ObdReadOnlyProtocol.query("0140"),2500);}catch(Exception ignored){}
    ObdPidCapabilities capabilities=ObdPidCapabilities.fromResponses(supported00,supported40);
+   ObdLocalDiagnosticLog.record(activity,"BT_OK");
+   ObdLocalDiagnosticLog.capability(activity,capabilities);
    setStatus("Bluetooth 연결됨 · 차량 센서 응답 확인 중…");
    int noDataCycles=0,validSensors=0;
-   boolean gotSpeed=false;
+   boolean gotSpeed=false,loggedSensor=false;
    while(!stopped){
     int successThisCycle=0;
     for(int i=0;i<ObdReadOnlyProtocol.SENSOR_PIDS.length&&!stopped;i++){
@@ -353,18 +369,29 @@ final class DeveloperObdScreen {
      if(capabilities.forPid(pid)==ObdPidCapabilities.Support.NO){updateField(i,"미지원 (PID 목록)");continue;}
      try{
       String result=ObdReadOnlyProtocol.decode(pid,request(in,out,ObdReadOnlyProtocol.query(pid),2500));
-      if(!"지원 안 함".equals(result)){successThisCycle++;validSensors++;if("010D".equals(pid))gotSpeed=true;}
+      if(!"지원 안 함".equals(result)){
+       successThisCycle++;validSensors++;if("010D".equals(pid))gotSpeed=true;
+       if(!loggedSensor){ObdLocalDiagnosticLog.record(activity,"SENSOR_OK");loggedSensor=true;}
+      }
       updateField(i,result);
      }catch(InterruptedException interrupted){throw interrupted;}
      catch(Exception temporary){if(stopped)return;updateField(i,"응답 지연 · 다음 주기 재시도");}
     }
     if(stopped)break;
     setStatus(ObdFirstConnectionGuide.result(capabilities.forPid("010D"),gotSpeed,validSensors)+"\n"+capabilities.summary());
-    if(successThisCycle==0){if(++noDataCycles>=3)throw new java.io.IOException("ECU 응답을 확인하지 못했습니다. 시동 ON과 유로5 6핀 변환 케이블을 확인해 주세요.");}
+    if(successThisCycle==0){
+     if(++noDataCycles>=3){
+      ObdLocalDiagnosticLog.record(activity,"NO_ECU");
+      throw new java.io.IOException("ECU 응답을 확인하지 못했습니다. 시동 ON과 유로5 6핀 변환 케이블을 확인해 주세요.");
+     }
+    }
     else noDataCycles=0;
     Thread.sleep(750);
    }
-  }catch(Exception e){if(!stopped)setStatus(ObdFirstConnectionGuide.failure(e));}
+  }catch(Exception e){if(!stopped){
+   ObdLocalDiagnosticLog.record(activity,"ERROR");
+   setStatus(ObdFirstConnectionGuide.failure(e));
+  }}
   finally{closeSocket();stopped=true;}
  }
  private String request(InputStream in,OutputStream out,String command,long timeoutMs)throws Exception{
