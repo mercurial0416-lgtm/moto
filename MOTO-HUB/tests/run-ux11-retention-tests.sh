@@ -12,7 +12,7 @@ from pathlib import Path
 p=Path('app/src/main/java/com/motohub/next/LocalSafetyBackup.java').read_text()
 assert 'File[] points=LocalBackupFilePolicy.eligible(folder,' in p
 assert 'File[] snapshots=LocalBackupFilePolicy.eligible(folder,' in p
-assert 'for(int i=0;i<points.length-12;i++)points[i].delete();' in p
+assert 'int toDelete=points.length-12;' in p and 'if(UpdateInstallSnapshot.isPinned(context,candidate.getName()))continue;' in p and 'if(candidate.delete())toDelete--;' in p, 'never discard the pinned pre-update backup'
 assert 'for(int i=0;i<snapshots.length-7;i++)snapshots[i].delete();' in p
 assert 'read(file);' in p and 'read(destination);' in p, 'only rotate after newly written backup validates'
 print('PASS UX11 rotation is restricted to non-symlink, size-bounded backup candidates')
