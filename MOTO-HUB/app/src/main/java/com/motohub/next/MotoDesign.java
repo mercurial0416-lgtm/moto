@@ -36,6 +36,13 @@ final class MotoDesign {
  }
  static Typeface medium(){return Typeface.create("sans-serif-medium",Typeface.NORMAL);}
  static Typeface display(){return Typeface.create("sans-serif",Typeface.BOLD);}
+ /** Stable-width digits keep odometers, prices and service amounts easy to scan. */
+ static TextView figure(MainActivity a,String value,int size,int color){
+  TextView number=a.text(value,size,color,true);
+  number.setFontFeatureSettings("tnum");
+  number.setLetterSpacing(-0.01f);
+  return number;
+ }
  static void ripple(MainActivity a,View view,int fill,int stroke,int radius){
   GradientDrawable background=a.shape(fill,stroke,radius);
   view.setBackground(new RippleDrawable(ColorStateList.valueOf(a.dark?0x32FFFFFF:0x16000000),background,null));

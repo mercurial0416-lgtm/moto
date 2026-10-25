@@ -110,7 +110,7 @@ final class GarageHomeUi {
    }
   }
   TextView photo=a.text("사진 변경",12,Color.WHITE,true);photo.setGravity(Gravity.CENTER);photo.setPadding(a.dp(12),a.dp(9),a.dp(12),a.dp(9));photo.setBackground(a.shape(0xB51B1C1F,0,6));photo.setContentDescription("내 바이크 사진 선택");FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT);pp.setMargins(0,a.dp(15),a.dp(15),0);imageArea.addView(photo,pp);photo.setClickable(true);photo.setFocusable(true);photo.setOnClickListener(v->changeHeroPhoto(bike,own));
-  TextView example=a.text(BikeVisual.caption(bike.optString("name"),own),10,0xFFD0DCE3,false);FrameLayout.LayoutParams ep=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.RIGHT);ep.setMargins(0,0,a.dp(15),a.dp(9));imageArea.addView(example,ep);
+  TextView example=a.text(BikeVisual.caption(bike.optString("name"),own),11,0xFFF6F7F7,false);example.setPadding(a.dp(5),a.dp(3),a.dp(5),a.dp(3));example.setBackground(a.shape(0xB21B1E22,0,4));example.setMaxLines(2);FrameLayout.LayoutParams ep=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.RIGHT);ep.setMargins(0,0,a.dp(15),a.dp(9));imageArea.addView(example,ep);
   if(!own){
    JSONObject known=MotorcycleCatalog.search(a,bike.optString("name"));
    String brand=bike.optString("catalogBrand",known==null?"":known.optString("brand"));
@@ -140,7 +140,7 @@ final class GarageHomeUi {
   });
   box.addView(imageArea);
   LinearLayout meta=new LinearLayout(a);meta.setPadding(a.dp(15),a.dp(13),a.dp(13),a.dp(14));meta.setGravity(Gravity.CENTER_VERTICAL);
-  LinearLayout info=a.col();TextView name=a.text(bike.optString("name"),21,light,true);name.setMaxLines(2);info.addView(name);
+  LinearLayout info=a.col();TextView name=a.text(bike.optString("name"),21,light,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);info.addView(name);
   TextView sub=a.text(bike.optInt("year")>0?bike.optInt("year")+"년식":"모델 정보",12,soft,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(6);info.addView(sub,sp);meta.addView(info,new LinearLayout.LayoutParams(0,-2,1));
   if(GarageBikeStatus.sold(bike.optString("soldDate"))){
    TextView archived=a.text("판매 완료 · 기록 보관 중",13,0xFFFFD58A,true);archived.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));archived.setBackground(a.shape(0xFF503E20,0,10));box.addView(archived);
@@ -239,10 +239,10 @@ final class GarageHomeUi {
    final int index=i;
    LinearLayout group=a.col();group.setMinimumHeight(a.dp(49));
    TextView label=a.text(names[i],12,soft,false);group.addView(label);
-   TextView value=a.text(values[i],i==0?21:18,light,true);
-   value.setMaxLines(1);
-   value.setAutoSizeTextTypeUniformWithConfiguration(13,i==0?21:18,1,android.util.TypedValue.COMPLEX_UNIT_SP);
-   LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(-1,a.dp(29));vp.topMargin=a.dp(6);group.addView(value,vp);
+   TextView value=i==0?MotoDesign.figure(a,values[i],22,light):a.text(values[i],18,light,true);
+   value.setMaxLines(2);value.setMinHeight(a.dp(30));
+   value.setAutoSizeTextTypeUniformWithConfiguration(14,i==0?22:18,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+   LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(-1,-2);vp.topMargin=a.dp(6);group.addView(value,vp);
    if(index==1){group.setClickable(true);group.setFocusable(true);group.setContentDescription("다음 정비 "+values[i]+" · 정비 내역 보기");group.setOnClickListener(v->a.navigate("차고"));}
    row.addView(group,new LinearLayout.LayoutParams(0,-2,1));
    if(i==0){View separator=new View(a);separator.setBackgroundColor(stroke);
@@ -319,7 +319,7 @@ final class GarageHomeUi {
   String[] values={a.won(spent),segments>0?String.format(Locale.KOREA,"%.1f km/L",efficiency):"기록 부족"};
   for(int i=0;i<2;i++){
    LinearLayout tile=a.col();tile.addView(a.text(title[i],12,soft,false));
-   TextView value=a.text(values[i],i==0?17:19,light,true);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=a.dp(7);tile.addView(value,lp);
+   TextView value=MotoDesign.figure(a,values[i],i==0?19:18,light);value.setMaxLines(2);value.setAutoSizeTextTypeUniformWithConfiguration(14,i==0?19:18,1,android.util.TypedValue.COMPLEX_UNIT_SP);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.topMargin=a.dp(7);tile.addView(value,lp);
    LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(0,-2,1);if(i==1)size.leftMargin=a.dp(11);cells.addView(tile,size);
   }
   frame.addView(cells);a.gap(frame,12);
@@ -352,7 +352,7 @@ final class GarageHomeUi {
  void recent(JSONObject b){sectionTitle("최근 기록","전체 보기  ›",()->a.navigate("차고"));List<JSONObject> r=new HubScreens(a).records("전체",b);
   if(r.isEmpty()){a.label(a.content,"주유·정비 기록을 남기면 여기에 표시돼.",13,soft,false);return;}
   int count=0;for(JSONObject x:r){if(count++>=2)break;
-   LinearLayout row=new LinearLayout(a);row.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(12));row.setGravity(Gravity.CENTER_VERTICAL);row.setMinimumHeight(a.dp(58));LinearLayout details=a.col();details.addView(a.text(x.optString("type","기록"),13,light,true));TextView date=a.text(x.optString("date"),11,soft,false);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(3);details.addView(date,dp);row.addView(details,new LinearLayout.LayoutParams(0,-2,1));row.addView(a.text(a.won(x.optDouble(x.has("amount")?"amount":"cost")),13,light,true));row.setOnClickListener(v->a.edit(x.has("amount")?"expenses":"services",x));row.setClickable(true);a.content.addView(row);View rule=new View(a);rule.setBackgroundColor(stroke);a.content.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
+   LinearLayout row=new LinearLayout(a);row.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(12));row.setGravity(Gravity.CENTER_VERTICAL);row.setMinimumHeight(a.dp(58));LinearLayout details=a.col();details.addView(a.text(x.optString("type","기록"),15,light,true));TextView date=a.text(x.optString("date"),12,soft,false);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(3);details.addView(date,dp);row.addView(details,new LinearLayout.LayoutParams(0,-2,1));TextView money=MotoDesign.figure(a,a.won(x.optDouble(x.has("amount")?"amount":"cost")),16,light);money.setMaxLines(2);money.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);money.setPadding(a.dp(10),0,0,0);row.addView(money);row.setOnClickListener(v->a.edit(x.has("amount")?"expenses":"services",x));row.setClickable(true);a.content.addView(row);View rule=new View(a);rule.setBackgroundColor(stroke);a.content.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
   }
  }
 }
