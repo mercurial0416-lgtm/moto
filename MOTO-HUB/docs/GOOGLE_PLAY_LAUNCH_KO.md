@@ -1,4 +1,4 @@
-# MOTO HUB — Google Play 배포 준비 (UX49, v521)
+# MOTO HUB — Google Play 배포 준비 (UX50~UX52, v522)
 
 ## 현재 상태
 - 앱 패키지: `com.motohub.next`. 기존 기기에 저장된 GPS·정비·주유 데이터는 APK를 삭제하면 손실될 수 있으므로 **삭제하지 말 것**.
@@ -22,7 +22,7 @@
 Android SDK 36·JDK 17 설치, 저장소 루트 `MOTO-HUB/`에서:
 ```bash
 ./gradlew :app:bundlePlayRelease :app:assemblePlayRelease \
-  -PmotoReleaseCode=521 --no-daemon
+  -PmotoReleaseCode=522 --no-daemon
 ```
 - 산출물 `app/build/outputs/bundle/playRelease/app-play-release.aab`.
 - `MOTO_SIGNING_*` 환경변수가 없으면 AAB는 **서명되지 않은 업로드용 빌드**다. 이 상태로 스토어에 업로드하지 말 것.
@@ -32,7 +32,7 @@ Android SDK 36·JDK 17 설치, 저장소 루트 `MOTO-HUB/`에서:
 ## 앱 내부 테스트 전용 배포 자동화
 `.github/workflows/moto-play-internal.yml` 수동 워크플로:
 - `BUILD_ONLY`: 코드·AAB 검증만 수행하며 실제 업로드하지 않음.
-- `PUBLISH_INTERNAL_ONLY`: 명시적으로 선택, 모든 서명 시크릿·기대 인증서 지문·`MOTO_PLAY_SERVICE_ACCOUNT_JSON` 존재·내용 검증, 버전 521 AAB 생성, 인증서 확인 후 Play Developer Publishing API에 내부 테스트 트랙만 게시.
+- `PUBLISH_INTERNAL_ONLY`: 명시적으로 선택, 모든 서명 시크릿·기대 인증서 지문·`MOTO_PLAY_SERVICE_ACCOUNT_JSON` 존재·내용 검증, 버전 522 AAB 생성, 인증서 확인 후 Play Developer Publishing API에 내부 테스트 트랙만 게시.
 - 워크플로는 production/open/closed 게시를 **지원하지 않음**. `tools/publish_play_internal.py`를 통해 업로드 후 검증·편집사항 커밋하며, 오류시 편집을 취소한다.
 - 필요한 GitHub Actions 시크릿: `MOTO_SIGNING_STORE_B64`, `MOTO_SIGNING_STORE_PASSWORD`, `MOTO_SIGNING_KEY_ALIAS`, `MOTO_SIGNING_KEY_PASSWORD`, `MOTO_EXPECTED_CERT_SHA256`, `MOTO_PLAY_SERVICE_ACCOUNT_JSON`.
 - 서비스 계정의 권한은 이 앱의 필요한 릴리스 권한으로 최소화하고, 비밀키는 저장소나 아티팩트로 업로드하지 않는다.
@@ -50,3 +50,15 @@ GPS 주행기록은 사용자가 직접 시작하거나 실험적 OBD 자동 감
 친구 그룹에서의 실시간 위치 공유는 별도의 명시적 동의가 필요하며 언제든 중지할 수 있습니다. 기능에 따라 인터넷·위치·Bluetooth 권한이 필요합니다.
 
 **출시 전 검증 필요:** 실제 Play Store 등록정보, 개인정보처리방침과 그룹 서버 데이터 보존·삭제 정책, 고객지원 연락처, 라이딩 중 화면 조작 경고 및 스크린샷.
+
+## UX50~UX52 실기기 배포 점검표 (필수)
+- 설치본 상태: `com.motohub.next` 패키지와 **기존 앱 서명 인증서**가 Play App Signing 인증서와 일치하는지 기기에서 확인. 업로드 키만 같아서는 덮어쓰기 불가.
+- 사용자가 전체 암호화 백업(`.mhub`)을 외부 안전한 위치에 내보냈는지 확인. 앱 삭제·데이터 지우기 금지.
+- 내부 테스트: 카카오내비/네이버지도/티맵 앱 미설치/설치/설정 변경 후 홈/라이딩/라이딩 알림에서 실행 확인.
+- 실차: Duke 390 속도 PID를 연결한 상태에서 OBD 자동 출발 3회 연속, 10분 정차 기본값·3/5분 수동 변경, 블루투스 끊김시 GPS 기록 보존 확인.
+- GPS: 터널/위치 권한 변경/화면 꺼짐/절전/백업 도중 강제 종료 후 원본 불변성과 명시적 복구를 검증. 단순 자동 테스트는 실차 검증을 대신하지 않음.
+- 정비: 완료한 정비 검색 30건 표시, 지난 주유 단가 재사용, 정비 알림 계기판 수치와 실제 계기판 대조.
+- 실패 시: 원본 GPS·로컬 기록 보존, Play 롤아웃 중지, 계정 삭제/데이터 정책과 안전 담당자에게 문의. 원본 앱 삭제를 해결책으로 제안하지 않음.
+
+### 아직 충족되지 않은 배포 요건
+실제 Google Play Console 앱 소유권·개발자 등록·권한, 올바른 앱 서명키와 업로드 키 등록, 개인정보처리방침 공개 URL 및 운영자 연락처, 데이터 보안과 위치 접근 선언, 고객지원, 스토어 그래픽, 실기기 E2E 검증, 내부 테스트 실제 업로드 및 리뷰 결과 확인이 필요합니다. 소스 저장소의 AAB 생성만으로 앱 스토어에 게시되는 것은 아닙니다.
