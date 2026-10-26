@@ -75,15 +75,16 @@ jobs:
           fi
           chmod +x gradlew
           ./gradlew :app:assemblePlayRelease :app:bundlePlayRelease :app:lintPlayRelease -PmotoReleaseCode=521 --no-daemon
-          test -s app/build/outputs/bundle/playRelease/app-play-release.aab
-          test -s app/build/outputs/apk/playRelease/app-play-release-unsigned.apk || test -s app/build/outputs/apk/playRelease/app-play-release.apk
-          apk=app/build/outputs/apk/playRelease/app-play-release-unsigned.apk
-          if [[ ! -f "$apk" ]]; then apk=app/build/outputs/apk/playRelease/app-play-release.apk; fi
+          aab=$(find app/build/outputs/bundle/playRelease -maxdepth 1 -type f -name '*.aab' -print -quit)
+          apk=$(find app/build/outputs/apk/playRelease -maxdepth 1 -type f -name '*.apk' -print -quit)
+          test -n "$aab" && test -s "$aab"
+          test -n "$apk" && test -s "$apk"
+          cp "$aab" app/build/outputs/bundle/playRelease/MOTO-HUB-play-521.aab
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | grep -q "versionCode='521'"
           if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk" | grep -Fq 'android.permission.REQUEST_INSTALL_PACKAGES'; then
             echo "Play variant still includes forbidden sideload permission"; exit 1
           fi
-          sha256sum app/build/outputs/bundle/playRelease/app-play-release.aab > app/build/outputs/bundle/playRelease/SHA256-AAB.txt
+          sha256sum app/build/outputs/bundle/playRelease/MOTO-HUB-play-521.aab > app/build/outputs/bundle/playRelease/SHA256-AAB.txt
       - name: Validate signed bundle and pinned upload certificate
         if: ${{ inputs.confirm_publish == 'PUBLISH_INTERNAL_ONLY' }}
         working-directory: MOTO-HUB
@@ -93,7 +94,7 @@ jobs:
           MOTO_EXPECTED_CERT_SHA256: ${{ secrets.MOTO_EXPECTED_CERT_SHA256 }}
         run: |
           set -euo pipefail
-          aab=app/build/outputs/bundle/playRelease/app-play-release.aab
+          aab=app/build/outputs/bundle/playRelease/MOTO-HUB-play-521.aab
           jarsigner -verify "$aab" | grep -Fq 'jar verified.'
           actual=$(keytool -list -v -keystore "$RUNNER_TEMP/moto-upload-keystore.p12" \
             -storetype PKCS12 -storepass "$MOTO_SIGNING_STORE_PASSWORD" -alias "$MOTO_SIGNING_KEY_ALIAS" \
@@ -107,7 +108,7 @@ jobs:
         with:
           name: moto-play-internal-521-${{ github.sha }}
           path: |
-            MOTO-HUB/app/build/outputs/bundle/playRelease/app-play-release.aab
+            MOTO-HUB/app/build/outputs/bundle/playRelease/MOTO-HUB-play-521.aab
             MOTO-HUB/app/build/outputs/bundle/playRelease/SHA256-AAB.txt
           if-no-files-found: error
           retention-days: 14
@@ -118,7 +119,7 @@ jobs:
           set -euo pipefail
           python3 -m pip install --disable-pip-version-check google-auth requests
           python3 tools/publish_play_internal.py \
-            --bundle app/build/outputs/bundle/playRelease/app-play-release.aab \
+            --bundle app/build/outputs/bundle/playRelease/MOTO-HUB-play-521.aab \
             --service-account "$RUNNER_TEMP/play-publisher.json" \
             --confirm-internal PUBLISH_INTERNAL_ONLY
       - name: Erase temporary credentials
