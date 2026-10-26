@@ -46,9 +46,10 @@ public final class RideService extends Service implements LocationListener {
  static void refreshNotification(){
   RideService service=instance;
   if(service!=null)service.handler.post(()->{
-   if(running)service.notifySafely(String.format(java.util.Locale.KOREA,
-    "%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+
-    (Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐"));
+   if(running||autoArmed)service.notifySafely(running?
+    String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+
+     (Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐"):
+    "OBD2 출발 감지 대기 · GPS 기록 시작 전");
   });
  }
  final RideNotificationRate notificationRate=new RideNotificationRate();
