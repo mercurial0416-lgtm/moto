@@ -10,6 +10,8 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
+import android.view.View;
 import android.view.WindowManager;
 import android.content.SharedPreferences;
 import android.os.Handler;
@@ -19,7 +21,8 @@ import java.util.Locale;
 /** Experimental, local-only telemetry view. No interactive riding controls. */
 public final class ObdDashboardActivity extends Activity {
  private final Handler handler=new Handler(Looper.getMainLooper());
- private TextView speed,rpm,temperature,voltage,ride,status,advisory;
+ private TextView speed,rpm,temperature,voltage,ride,status,advisory,linkStatus;
+ private boolean compactMode;
  private ProgressBar rpmMeter;
  private boolean visible;
  private static final String PREFS="obd_dashboard_preferences";
@@ -29,6 +32,7 @@ public final class ObdDashboardActivity extends Activity {
   long now=android.os.SystemClock.elapsedRealtime();
   boolean speedFresh=RideService.autoArmed&&ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,now);
   speed.setText(speedFresh&&RideService.obdSpeedKmh>=0?RideService.obdSpeedKmh+"":"—");
+  linkStatus.setText(ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,speedFresh)+" · "+RideService.obdLink);
   boolean rpmFresh=RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdRpmAt,now);
   rpm.setText(rpmFresh?format(RideService.obdRpm,"%.0f"):"—");
   rpmMeter.setProgress(rpmFresh?ObdGaugeWarnings.rpmBar(RideService.obdRpm):0);
@@ -53,15 +57,18 @@ public final class ObdDashboardActivity extends Activity {
  private LinearLayout base;
  private TextView value(String caption,int size){
   TextView label=new TextView(this);label.setText(caption);label.setTextSize(14);label.setTextColor(0xffb8c5d3);label.setGravity(Gravity.CENTER);base.addView(label);
-  TextView v=new TextView(this);v.setText("—");v.setTextSize(size);v.setTypeface(null,android.graphics.Typeface.BOLD);v.setTextColor(Color.WHITE);v.setGravity(Gravity.CENTER);
-  v.setPadding(0,7,0,24);base.addView(v);return v;
+  TextView v=new TextView(this);v.setText("—");v.setTextSize(compactMode?Math.min(size,caption.startsWith("차량 속도")?44:24):size);v.setTypeface(null,android.graphics.Typeface.BOLD);v.setTextColor(Color.WHITE);v.setGravity(Gravity.CENTER);
+  v.setPadding(0,compactMode?2:7,0,compactMode?10:24);base.addView(v);return v;
  }
  @Override public void onCreate(Bundle state){super.onCreate(state);
   if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){finish();return;}
+  compactMode=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
   ScrollView scroll=new ScrollView(this);
   scroll.setFillViewport(true);
   base=new LinearLayout(this);base.setBackgroundColor(0xff0c131a);
-  base.setPadding(24,36,24,30);base.setOrientation(LinearLayout.VERTICAL);
+  int densityPad=(int)(getResources().getDisplayMetrics().density*(compactMode?10:18));
+  base.setPadding(densityPad,densityPad,densityPad,densityPad);
+  base.setOrientation(LinearLayout.VERTICAL);
   scroll.addView(base);
   setContentView(scroll);
   TextView title=new TextView(this);title.setText("MOTO HUB · DEV DASH");title.setTextColor(0xffff8641);title.setTextSize(20);title.setGravity(Gravity.CENTER);title.setPadding(0,0,0,18);base.addView(title);
@@ -79,8 +86,24 @@ public final class ObdDashboardActivity extends Activity {
   advisory.setText("센서 응답 대기 · 참고용 정보");
   advisory.setGravity(Gravity.CENTER);
   base.addView(advisory);
+  linkStatus=new TextView(this);linkStatus.setText("OBD2 연결 상태 확인 중");
+  linkStatus.setTextSize(14);linkStatus.setTextColor(0xffced8e2);
+  linkStatus.setPadding(0,4,0,compactMode?8:13);
+  linkStatus.setGravity(Gravity.CENTER);base.addView(linkStatus);
   ride=value("GPS 라이딩 기록",18);
   status=new TextView(this);status.setTextColor(0xffb8c5d3);status.setTextSize(13);status.setGravity(Gravity.CENTER);base.addView(status);
+  SharedPreferences statusPrefs=getSharedPreferences(PREFS,0);
+  status.setVisibility(statusPrefs.getBoolean("details",false)?View.VISIBLE:View.GONE);
+  Button toggleDetails=new Button(this);
+  toggleDetails.setText(status.getVisibility()==View.VISIBLE?"진단 상세 접기":"진단 상세 보기");
+  toggleDetails.setContentDescription("OBD2 지원 PID와 연결 오류 상세 보기 또는 접기");
+  toggleDetails.setOnClickListener(v->{
+   boolean show=status.getVisibility()!=View.VISIBLE;
+   status.setVisibility(show?View.VISIBLE:View.GONE);
+   statusPrefs.edit().putBoolean("details",show).apply();
+   toggleDetails.setText(show?"진단 상세 접기":"진단 상세 보기");
+  });
+  base.addView(toggleDetails);
   TextView warning=new TextView(this);warning.setText("실험용 읽기 전용 · ODO 및 연료소모량 미검증\nRPM 막대 최대값은 앱 표시 범위이며 레드라인이 아닙니다.\n순정 계기판 경고를 우선하고 주행 중 화면을 조작하지 마세요.");warning.setGravity(Gravity.CENTER);warning.setTextColor(0xffa3a9b0);warning.setTextSize(12);warning.setPadding(0,14,0,14);base.addView(warning);
   SharedPreferences prefs=getSharedPreferences(PREFS,0);
   Button landscape=new Button(this);

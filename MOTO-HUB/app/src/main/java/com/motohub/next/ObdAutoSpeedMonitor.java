@@ -78,8 +78,17 @@ final class ObdAutoSpeedMonitor {
   connectedAtNanos=System.nanoTime();listener.connected();
   int unsupported=0,samples=0;
   ObdAuxSensorPolicy auxiliary=new ObdAuxSensorPolicy();
+  ObdLatencyStats latency=new ObdLatencyStats();
   while(!stopped){
-   String response=query(in,out,ObdReadOnlyProtocol.query("010D"),2500);
+   long started=System.nanoTime();
+   String response;
+   try{
+    response=query(in,out,ObdReadOnlyProtocol.query("010D"),2500);
+    latency.success("010D",(System.nanoTime()-started)/1_000_000L);
+   }catch(Exception error){
+    latency.failure("010D");
+    throw error;
+   }
    int speed=ObdReadOnlyProtocol.speedKmh(response);
    if(speed<0){
     // A supported PID can still time out on a noisy adapter. Reconnect rather
@@ -93,8 +102,10 @@ final class ObdAutoSpeedMonitor {
    if(!stopped&&++samples%4==0){
     String pid=new String[]{"010C","0105","0142"}[(samples/4-1)%3];
     if(capabilities.forPid(pid)!=ObdPidCapabilities.Support.NO&&auxiliary.mayPoll(pid,System.nanoTime())){
+     long startedAt=System.nanoTime();
      try{
       double value=ObdSensorReading.number(pid,query(in,out,ObdReadOnlyProtocol.query(pid),2500));
+      latency.success(pid,(System.nanoTime()-startedAt)/1_000_000L);
       if(ObdSensorReading.valid(pid,value)){
        auxiliary.succeeded(pid,System.nanoTime());
        listener.telemetry(pid,value);
@@ -106,8 +117,10 @@ final class ObdAutoSpeedMonitor {
       // An optional sensor timing out must not disconnect speed monitoring or
       // split a GPS ride. After two failures, retry it after a quiet minute.
       auxiliary.failed(pid,System.nanoTime());
+      latency.failure(pid);
      }
-     listener.auxiliaryDiagnostics(auxiliary.summary(System.nanoTime()));
+     listener.auxiliaryDiagnostics(auxiliary.summary(System.nanoTime())+
+      "\\n응답시간(최근 8회): "+latency.summary());
     }
    }
    if(!stopped)Thread.sleep(ObdSpeedResponsePolicy.pollDelayMs(speed));

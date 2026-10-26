@@ -459,7 +459,12 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   if(RideService.running&&track.getName().equals(RideService.active)){toast("기록 종료 후 확인해 주세요.");return;}
   toast("주행 기록을 분석하고 있어요.");
   new Thread(()->{
-   try{RideInsights.Result info=RideInsights.analyze(track);
+   try{
+    long beforeBytes=track.length(),beforeModified=track.lastModified();
+    RideInsights.Result info=RideInsights.analyze(track);
+    final String sourceHash=RideMileageIntegrity.validCompleted(track)?RideMileageIntegrity.fingerprint(track):"";
+    if(track.length()!=beforeBytes||track.lastModified()!=beforeModified)
+     throw new IOException("분석 도중 GPS 원본이 바뀌었어요. 기록을 다시 열어 주세요.");
     boolean undoAvailable=RideTrackMerge.canUndo(getFilesDir(),track);
     runOnUiThread(()->{if(isFinishing()||isDestroyed())return;
      LinearLayout p=page("라이딩 분석");
@@ -532,7 +537,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      if(b!=null){
       if(applied)label(p,"✓ 이미 누적 주행거리에 반영한 기록",14,accent,true);
       else if(RideMileageIntegrity.validCompleted(track))
-       action(p,"주행거리 확인 후 정비주기 반영",false,()->confirmRideMileage(track,info));
+       action(p,"주행거리 확인 후 정비주기 반영",false,()->confirmRideMileage(track,info,sourceHash));
       else label(p,"통합 원본·보관본 또는 미완료 기록은 누적 주행거리에 반영할 수 없어요.",13,muted,false);
      }
      action(p,"기록 삭제",false,()->{
@@ -552,7 +557,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("분석에 실패했어요: "+e.getMessage());});}
   },"MOTO-ride-insights").start();
  }
- void confirmRideMileage(File track,RideInsights.Result info){
+ void confirmRideMileage(File track,RideInsights.Result info,String sourceHash){
   JSONObject b=bike();if(b==null){toast("바이크를 먼저 등록해 주세요.");return;}
   if(info.points<2||info.distanceKm<0.01||info.distanceKm>1000){error("이 기록의 GPS 거리가 정상 범위가 아니어서 적용할 수 없어요.");return;}
   if(!RideMileageIntegrity.validCompleted(track)){error("미완료·통합 원본·보관된 라이딩은 반영할 수 없어요.");return;}
@@ -565,7 +570,19 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   new AlertDialog.Builder(this).setTitle("주행거리 반영")
    .setMessage(b.optString("name")+"의 누적 주행거리에 GPS 계산 거리 "+String.format(Locale.KOREA,"%.1f km",info.distanceKm)+"를 추가할까요?\n\n"
     +num(old)+" km → "+num(old+info.distanceKm)+" km\n\nGPS 오차가 있으므로 실제 계기판을 먼저 확인하세요. 가져온 GPX도 포함해서 중복 반영하지 마세요.")
-   .setNegativeButton("취소",null).setPositiveButton("반영",(d,w)->attempt(()->{
+   .setNegativeButton("취소",null).setPositiveButton("반영",(d,w)->{
+    toast("GPS 기록의 내용과 저장 상태를 확인하고 있어요.");
+    new Thread(()->{
+     String errorText=null;
+     try{
+      RideMileageIntegrity.requireApplyable(track,false,TrackFile.directory(getFilesDir()),
+       sourceBytes,sourceModified,sourceHash);
+     }catch(Exception ex){errorText=ex.getMessage()==null?"GPS 기록 검증에 실패했어요.":ex.getMessage();}
+     final String failure=errorText;
+     runOnUiThread(()->{
+      if(isFinishing()||isDestroyed())return;
+      if(failure!=null){error(failure);return;}
+      attempt(()->{
     JSONObject next=new JSONObject(db.toString());JSONObject settings=next.getJSONObject("settings");
     JSONObject ledger=settings.optJSONObject("appliedRides");if(ledger==null){ledger=new JSONObject();settings.put("appliedRides",ledger);}
     RideMileageIntegrity.requireApplyable(track,ledger.has(track.getName()),
@@ -577,7 +594,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     target.put("odo",Math.round((old+info.distanceKm)*10)/10.0);
     ledger.put(track.getName(),new JSONObject().put("vehicleId",bikeId).put("km",info.distanceKm));
     write(next);DailyMaintenanceJob.checkSoon(this);close();render();toast("주행거리와 정비 예정 정보를 갱신했어요.");
-   })).show();
+      });
+     });
+    },"moto-ride-mileage-sha256").start();
+   }).show();
  }
  EditText costField(LinearLayout parent,String title,String starting){
   label(parent,title,15,fg,true);

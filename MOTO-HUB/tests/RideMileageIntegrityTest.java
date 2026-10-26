@@ -17,6 +17,10 @@ public final class RideMileageIntegrityTest {
   try{RideMileageIntegrity.requireApplyable(track,applied,parent,bytes,modified);return false;}
   catch(IOException expected){return true;}
  }
+ private static boolean failsDigest(File track,File parent,long bytes,long modified,String sha){
+  try{RideMileageIntegrity.requireApplyable(track,false,parent,bytes,modified,sha);return false;}
+  catch(IOException expected){return true;}
+ }
  public static void main(String[] args)throws Exception{
   File root=Files.createTempDirectory("moto-mileage-").toFile();
   File dir=new File(root,"rides");
@@ -38,6 +42,20 @@ public final class RideMileageIntegrityTest {
   check(fails(track,true,dir,length,lastModified),"already applied commit denied");
   ledger.clear();
   RideMileageIntegrity.requireApplyable(track,false,dir,length,lastModified);
+  String pinned=RideMileageIntegrity.fingerprint(track);
+  check(pinned.matches("[a-f0-9]{64}"),"source SHA-256 fingerprint");
+  RideMileageIntegrity.requireApplyable(track,false,dir,length,lastModified,pinned);
+  check(failsDigest(track,dir,length,lastModified,""),"missing fingerprint rejected");
+  byte[] original=Files.readAllBytes(track.toPath());
+  String altered=new String(original,StandardCharsets.UTF_8).replace("37.123","37.923");
+  check(altered.length()==original.length,"equal-length fixture");
+  Files.write(track.toPath(),altered.getBytes(StandardCharsets.UTF_8));
+  check(track.setLastModified(lastModified),"restore original timestamp");
+  check(track.length()==length&&track.lastModified()==lastModified,"metadata alone cannot spot content changes");
+  check(failsDigest(track,dir,length,lastModified,pinned),"same size and timestamp but different SHA rejected");
+  Files.write(track.toPath(),original);
+  check(track.setLastModified(lastModified),"restore original track timestamp");
+  RideMileageIntegrity.requireApplyable(track,false,dir,length,lastModified,pinned);
   check(fails(track,false,new File(root,"wrong"),length,lastModified),"different directory blocked");
   check(fails(track,false,dir,length+1,lastModified),"modified length blocked");
   check(fails(track,false,dir,length,lastModified+1),"modified time blocked");
