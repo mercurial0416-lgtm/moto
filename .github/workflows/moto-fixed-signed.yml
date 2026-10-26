@@ -56,6 +56,9 @@ jobs:
           bash source/MOTO-HUB/tests/run-ux45-obd-stability-tests.sh
           test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/RideMileageIntegrity.java || { echo 'UX46 mileage integrity missing'; exit 1; }
           bash source/MOTO-HUB/tests/run-ux46-ride-maintenance-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/RideHomeStatus.java || { echo 'UX48 large history scan missing'; exit 1; }
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/ObdLatencyStats.java || { echo 'UX48 read-only OBD timing missing'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux48-stability-tests.sh
       - name: Select next version and test release policy
         id: release-version
         run: |
