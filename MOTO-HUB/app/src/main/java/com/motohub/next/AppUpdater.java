@@ -12,10 +12,25 @@ final class AppUpdater {
   if(cancelRequested.get())throw new DownloadCancelledException();
  }
  AppUpdater(MainActivity a){this.a=a;}
+ void openGooglePlay(){
+  String appId=a.getPackageName();
+  try{
+   a.startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+appId)));
+  }catch(Exception noMarket){
+   try{a.startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id="+appId)));}
+   catch(Exception error){a.toast("Google Play를 열지 못했어요.");}
+  }
+ }
 
  void show(){
   LinearLayout p=a.page("앱 업데이트");owner=a.dialog;
   a.label(p,"현재 버전  "+BuildConfig.VERSION_NAME+" ("+BuildConfig.VERSION_CODE+")",20,a.fg,true);
+  if(BuildConfig.STORE_DISTRIBUTION){
+   a.label(p,"Google Play 설치 버전입니다. 업데이트는 Google Play에서 관리합니다.",15,a.fg,true);
+   a.label(p,"기존 GPS·정비 데이터를 보호하기 위해 이 버전에서는 별도 APK 다운로드와 알 수 없는 앱 설치를 사용하지 않습니다.",13,a.muted,false);
+   a.action(p,"Google Play에서 MOTO HUB 보기",true,this::openGooglePlay);
+   a.show();return;
+  }
   String current=SigningIdentity.current(a);
   boolean fixed=UpdateReadiness.fixedIdentity(current,UpdateManifest.PINNED_CERT_SHA256);
   a.label(p,fixed?"현재 설치본: 고정 서명 인증서 일치":"현재 설치본: 서명 불일치 또는 확인 불가",
@@ -145,11 +160,12 @@ final class AppUpdater {
   }
   throw new IOException("업데이트 다운로드 이동 횟수 초과");
  }
- void check(){if(!UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256)){a.error(UpdateReadiness.state(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256));return;}work("배포 버전 확인 중",()->{HttpURLConnection c=connect(BuildConfig.UPDATE_MANIFEST_URL);UpdateManifest m;try(InputStream in=c.getInputStream()){m=new UpdateManifest(new String(UpdateManifest.bounded(in,65536),StandardCharsets.UTF_8),a.getPackageName());}finally{c.disconnect();}if(m.minSdk>Build.VERSION.SDK_INT)throw new IOException("이 업데이트는 더 높은 Android 버전이 필요합니다.");updateProgress("배포 버전 확인 완료",-1);ui(()->{if(!UpdateVersionPolicy.isUpgrade(m.versionCode,BuildConfig.VERSION_CODE)){
+ void check(){if(BuildConfig.STORE_DISTRIBUTION){openGooglePlay();return;}if(!UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256)){a.error(UpdateReadiness.state(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256));return;}work("배포 버전 확인 중",()->{HttpURLConnection c=connect(BuildConfig.UPDATE_MANIFEST_URL);UpdateManifest m;try(InputStream in=c.getInputStream()){m=new UpdateManifest(new String(UpdateManifest.bounded(in,65536),StandardCharsets.UTF_8),a.getPackageName());}finally{c.disconnect();}if(m.minSdk>Build.VERSION.SDK_INT)throw new IOException("이 업데이트는 더 높은 Android 버전이 필요합니다.");updateProgress("배포 버전 확인 완료",-1);ui(()->{if(!UpdateVersionPolicy.isUpgrade(m.versionCode,BuildConfig.VERSION_CODE)){
     new AlertDialog.Builder(a).setTitle("업데이트 없음")
      .setMessage(UpdateVersionPolicy.currentMessage(m.versionCode,BuildConfig.VERSION_CODE))
      .setPositiveButton("확인",null).show();return;}new AlertDialog.Builder(a).setTitle(m.versionName+" 업데이트").setMessage(m.notes+"\n\n다운로드: "+String.format(Locale.KOREA,"%.1f MB",m.sizeBytes/1048576.0)).setNegativeButton("나중에",null).setPositiveButton("다운로드",(d,w)->download(m)).show();});});}
  void download(UpdateManifest m){
+  if(BuildConfig.STORE_DISTRIBUTION){openGooglePlay();return;}
   if(BUSY.get()){a.toast("다른 업데이트 작업이 진행 중입니다.");return;}
   cancelRequested.set(false);
   if(cancelDownloadButton!=null){
@@ -250,6 +266,7 @@ final class AppUpdater {
  static Set<String> signers(PackageInfo p){android.content.pm.Signature[] signatures=Build.VERSION.SDK_INT>=28?(p.signingInfo==null?null:p.signingInfo.getApkContentsSigners()):p.signatures;Set<String> set=new HashSet<>();if(signatures!=null)for(android.content.pm.Signature s:signatures)set.add(s.toCharsString());return set;}
  void validateArchive(File file,UpdateManifest m)throws Exception{PackageManager pm=a.getPackageManager();int flags=Build.VERSION.SDK_INT>=28?PackageManager.GET_SIGNING_CERTIFICATES:PackageManager.GET_SIGNATURES;PackageInfo candidate=pm.getPackageArchiveInfo(file.getPath(),flags),current=pm.getPackageInfo(a.getPackageName(),flags);if(candidate==null||!a.getPackageName().equals(candidate.packageName))throw new IOException("MOTO HUB APK가 아닙니다.");long version=Build.VERSION.SDK_INT>=28?candidate.getLongVersionCode():candidate.versionCode;if(version!=m.versionCode||version<=BuildConfig.VERSION_CODE)throw new IOException("APK 버전이 올바르지 않습니다.");Set<String> old=signers(current),next=signers(candidate);if(old.isEmpty()||!old.equals(next))throw new IOException("서명키가 다른 APK입니다. 데이터 보호를 위해 설치를 차단했습니다.");if(!UpdateManifest.PINNED_CERT_SHA256.equals(SigningIdentity.current(a)))throw new IOException("현재 설치된 앱은 고정 서명 버전이 아닙니다. 백업 후 고정 서명판으로 전환해야 합니다.");}
  void requestInstall(){
+  if(BuildConfig.STORE_DISTRIBUTION){openGooglePlay();return;}
   if(a.readOnly){a.error("데이터 보호 모드에서는 업데이트를 설치할 수 없습니다. 먼저 백업 상태를 확인해 주세요.");return;}
   if(!UpdateSafety.canInstall(RideService.running,RideService.autoArmed,
     RestoreRideGate.isExporting(),RestoreRideGate.isRestoring())){
@@ -262,7 +279,7 @@ final class AppUpdater {
    .setNeutralButton("암호화 전체 백업", (d,w)->a.exportEncryptedBundle())
    .setPositiveButton("복구 지점 만들고 설치",(d,w)->install()).show();
  }
- void install(){work("설치 전 APK 재검사 중",()->{
+ void install(){if(BuildConfig.STORE_DISTRIBUTION){openGooglePlay();return;}work("설치 전 APK 재검사 중",()->{
   if(a.readOnly)throw new IOException("저장 데이터 보호 상태에서는 설치를 진행하지 않습니다.");
   if(!UpdateSafety.canInstall(RideService.running,RideService.autoArmed,
      RestoreRideGate.isExporting(),RestoreRideGate.isRestoring()))
