@@ -17,6 +17,8 @@ android {
    }
  }
  defaultConfig { buildConfigField "String", "SUPABASE_URL", groovy.json.JsonOutput.toJson(providers.gradleProperty("supabaseUrl").getOrElse("https://paraeadvvdqyztqqhxpu.supabase.co")); buildConfigField "String", "SUPABASE_KEY", groovy.json.JsonOutput.toJson(providers.gradleProperty("supabaseKey").getOrElse("sb_publishable_fkKoDsRamzU0r1vt88opgw_GOUke5TY")) }
+ // Play-distributed builds delegate installation/updates exclusively to Google Play.
+ defaultConfig { buildConfigField "boolean", "STORE_DISTRIBUTION", "false" }
  buildFeatures { buildConfig = true }
  defaultConfig { buildConfigField "String", "UPDATE_MANIFEST_URL", groovy.json.JsonOutput.toJson(providers.gradleProperty("updateManifestUrl").getOrElse("https://raw.githubusercontent.com/mercurial0416-lgtm/moto/main/updates/manifest.json")) }
  compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
@@ -44,6 +46,11 @@ android {
    release {
      minifyEnabled false
      if (signingFields.every { it != null && !it.isEmpty() }) signingConfig signingConfigs.motoRelease
+   }
+   playRelease {
+     initWith release
+     matchingFallbacks = ['release']
+     buildConfigField "boolean", "STORE_DISTRIBUTION", "true"
    }
  }
 
