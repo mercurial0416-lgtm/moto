@@ -134,9 +134,10 @@ final class RideUi {
     }};linkStatus.post(updateLink);
    }
   }
-  // External navigation remains separate: no Kakao app key or GPS upload is required.
-  a.action(a.content,"카카오내비 열기",false,()->KakaoNaviLaunch.open(a));
-  a.label(a.content,"카카오내비는 길 안내, MOTO HUB는 로컬 라이딩 기록을 담당합니다. 경로·위치 정보는 자동 전달되지 않아요.",12,a.muted,false);
+  // Local-only choice: launch user-selected independent navigator, never transfer tracks.
+  a.action(a.content,"내비게이션 선택 · 카카오 / 네이버 / 티맵",false,()->NavigationApps.choose(a));
+  a.label(a.content,"현재 기본 내비: "+NavigationApps.preferred(a).label+
+   " · 라이딩 알림에서는 선택한 내비 앱을 열어요. 위치·GPX·OBD 기록은 전달하지 않으며, 이륜차 통행 제한 도로는 직접 확인하세요.",12,a.muted,false);
   if(RideService.autoArmed&&a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
    LinearLayout diagnostics=a.col();diagnostics.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(14));diagnostics.setBackground(a.shape(a.panel,a.line,14));
    TextView telem=a.text("OBD2 데이터를 읽는 중…",14,a.fg,false);diagnostics.addView(telem);
