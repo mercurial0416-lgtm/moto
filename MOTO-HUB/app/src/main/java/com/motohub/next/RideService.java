@@ -247,7 +247,7 @@ public final class RideService extends Service implements LocationListener {
    catch(Exception e){stopWith("GPS 자동 기록 시작 실패: "+e.getMessage(),false);return;}
   }else if(event==ObdRideAutoGate.Event.FINISH){finishAutoTrack();}
   // Speed samples arrive faster than the user needs notification updates. Avoid
-  // rebuilding the notification every second while KakaoNavi is in foreground.
+  // rebuilding the notification every second while an independent navigation app is in foreground.
   // START and FINISH remain immediate; GPS samples and files are never throttled.
   boolean notificationDue=autoNotificationRate.shouldNotify(SystemClock.elapsedRealtime());
   if(autoArmed&&(notificationDue||event!=ObdRideAutoGate.Event.NONE)){
@@ -363,10 +363,11 @@ public final class RideService extends Service implements LocationListener {
    PendingIntent disarm=PendingIntent.getService(this,3,new Intent(this,RideService.class).setAction(AUTO_DISARM),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
    builder.addAction(new Notification.Action.Builder(null,"OBD 감지만 중지",disarm).build());
   }
-  Intent navi=getPackageManager().getLaunchIntentForPackage(KakaoNaviLaunch.PACKAGE);
+  NavigationChoice choice=NavigationApps.preferred(this);
+  Intent navi=NavigationApps.installedLaunchIntent(this,choice);
   if(navi!=null){
    PendingIntent nav=PendingIntent.getActivity(this,2,navi,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-   builder.addAction(new Notification.Action.Builder(null,"카카오내비",nav).build());
+   builder.addAction(new Notification.Action.Builder(null,choice.label,nav).build());
   }
   return builder.build();
  }
