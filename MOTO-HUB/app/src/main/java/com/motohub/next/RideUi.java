@@ -80,7 +80,8 @@ final class RideUi {
     long seconds=Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.startedElapsed)/1000);
     values[0].setText(String.format(Locale.KOREA,"%.1f km",RideService.liveDistanceKm));
     values[1].setText(String.format(Locale.KOREA,"%02d:%02d",seconds/3600,seconds/60%60));
-    values[2].setText(Math.round(RideService.liveSpeedKmh)+" km/h");
+    values[2].setText(GpsSignalStatus.liveSpeedLabel(RideService.liveSpeedKmh,
+     RideService.gpsFixElapsed(),android.os.SystemClock.elapsedRealtime()));
     average.setText("평균속도 " + RideMetrics.averageText(RideService.liveDistanceKm,seconds));
     peak.setText(String.format(Locale.KOREA,"최고속도 %.0f km/h · GPS 추정값",RideService.livePeakKmh)+" · "+RideService.status);
     hero.postDelayed(this,1000);
