@@ -26,7 +26,7 @@ checks={
  "no implicit nav start from ride UI":"NavigationApps.choose(a)" in ride,
  "notification uses selected installed app":"NavigationApps.preferred(this)" in service and
    "NavigationApps.installedLaunchIntent(this,choice)" in service,
- "stores only selected app ID":'putString(KEY,app.id)' in navi,
+ "stores only selected app ID":'putString(KEY,selectedApp.id)' in navi,
  "store-specific build variant":'playRelease {' in gradle and '"STORE_DISTRIBUTION", "true"' in gradle,
  "store removes installer permission":'REQUEST_INSTALL_PACKAGES" tools:node="remove"' in play_manifest,
  "store updater is Play link only":'if(BuildConfig.STORE_DISTRIBUTION)' in updater and
