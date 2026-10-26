@@ -44,7 +44,9 @@ public final class ObdDashboardActivity extends Activity {
    rpmFresh?RideService.obdRpm:Double.NaN,
    tempFresh?RideService.obdCoolantC:Double.NaN,
    voltFresh?RideService.obdVoltage:Double.NaN));
-  ride.setText(RideService.running?String.format(Locale.KOREA,"GPS %.2f km · 최고 %.0f km/h",RideService.liveDistanceKm,RideService.livePeakKmh):
+  ride.setText(RideService.running?(RideService.gpsFresh()?
+    String.format(Locale.KOREA,"GPS %.2f km · 최고 %.0f km/h",RideService.liveDistanceKm,RideService.livePeakKmh):
+    "GPS 신호 대기 · 기존 기록 보존"):
     RideService.autoArmed?"자동 기록 대기 · GPS 기록 시작 전":"라이딩 미작동");
   status.setText("OBD2 · "+RideService.obdLink+" · 재연결 "+RideService.obdReconnects+"회\n"+
    ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,speedFresh)+
