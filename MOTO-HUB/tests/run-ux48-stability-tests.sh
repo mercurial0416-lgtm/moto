@@ -11,10 +11,14 @@ javac -encoding UTF-8 -d "$tmp" \
  app/src/main/java/com/motohub/next/RideMileageIntegrity.java \
  app/src/main/java/com/motohub/next/RideHomeStatus.java \
  app/src/main/java/com/motohub/next/ObdLatencyStats.java \
+ app/src/main/java/com/motohub/next/RideMotionGate.java \
+ app/src/main/java/com/motohub/next/RideInsights.java \
+ app/src/main/java/com/motohub/next/TrackRecovery.java \
  tests/RideMileageIntegrityTest.java \
  tests/RideHomeStatusTest.java \
- tests/ObdLatencyStatsTest.java
-for klass in RideMileageIntegrityTest RideHomeStatusTest ObdLatencyStatsTest;do
+ tests/ObdLatencyStatsTest.java \
+ tests/GpsLongRideResilienceTest.java
+for klass in RideMileageIntegrityTest RideHomeStatusTest ObdLatencyStatsTest GpsLongRideResilienceTest;do
  java -cp "$tmp" "com.motohub.next.$klass"
 done
 python3 - <<'PY'
@@ -35,7 +39,10 @@ checks={
  "session-only per PID latency":'ObdLatencyStats latency=new ObdLatencyStats()' in obd,
  "auxiliary errors do not interrupt speed":"auxiliary.failed(pid,System.nanoTime());" in obd,
  "no remote sharing on disconnected ECU":'gpsOnlyAfterObd=true;' in gps and "Sharing.stop();" in gps,
- "no unattended GPS restart":"return START_NOT_STICKY;" in gps
+ "no unattended GPS restart":"return START_NOT_STICKY;" in gps,
+ "GPS worker saves off UI":"new HandlerThread(\"moto-gps-disk\"" in gps,
+ "GPS provider loss stops remote sharing":"void onProviderDisabled(" in gps and "Sharing.stop();" in gps,
+ "crash never invents completion":"cleanup(false);" in gps
 }
 for label,ok in checks.items():assert ok,label
 print("PASS UX48 source safety checks:",len(checks))
