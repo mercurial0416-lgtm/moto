@@ -98,6 +98,19 @@ final class QuickEntryUi {
     liters.setText(String.valueOf(previous.optDouble("liters")));
    });
    body.addView(reuse);
+   double lastLiters=previous.optDouble("liters",Double.NaN);
+   double lastAmount=previous.optDouble("amount",Double.NaN);
+   if(Double.isFinite(lastLiters)&&lastLiters>0&&Double.isFinite(lastAmount)&&lastAmount>0){
+    long lastUnitPrice=Math.round(lastAmount/lastLiters);
+    if(lastUnitPrice>0&&lastUnitPrice<100_000){
+     Button reuseUnitPrice=a.button("지난 리터당 가격 "+a.won(lastUnitPrice)+" 활용",false,()->{
+      calculator.setVisibility(View.VISIBLE);
+      unitPrice.setText(String.valueOf(lastUnitPrice));
+      a.toast("지난 단가를 불러왔어요. 실제 주유소 단가를 확인해 주세요.");
+     });
+     reuseUnitPrice.setMinHeight(a.dp(45));body.addView(reuseUnitPrice);
+    }
+   }
   }
   CheckBox full=new CheckBox(a);full.setText("가득 주유했어요 (연비 계산용)");
   full.setTextColor(a.fg);full.setTextSize(14);full.setMinHeight(a.dp(50));body.addView(full);

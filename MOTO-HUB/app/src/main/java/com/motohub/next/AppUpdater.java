@@ -28,7 +28,19 @@ final class AppUpdater {
   if(BuildConfig.STORE_DISTRIBUTION){
    a.label(p,"Google Play 설치 버전입니다. 업데이트는 Google Play에서 관리합니다.",15,a.fg,true);
    a.label(p,"기존 GPS·정비 데이터를 보호하기 위해 이 버전에서는 별도 APK 다운로드와 알 수 없는 앱 설치를 사용하지 않습니다.",13,a.muted,false);
-   a.action(p,"Google Play에서 MOTO HUB 보기",true,this::openGooglePlay);
+   a.label(p,"같은 패키지와 앱 서명키로 배포된 업데이트만 기존 기록을 유지할 수 있어요. 최초 스토어 전환이라면 앱 삭제 없이 서명 호환성을 먼저 확인하세요.",13,a.muted,false);
+   a.action(p,"업데이트 전 암호화 전체 백업",false,a::exportEncryptedBundle);
+   a.action(p,"Google Play에서 MOTO HUB 보기",true,()->{
+    if(RideService.running||RideService.autoArmed||RestoreRideGate.isRestoring()){
+     a.error("주행 기록 또는 복원 중에는 앱 업데이트를 진행하지 마세요. 기록이 끝난 뒤 다시 시도하세요.");
+     return;
+    }
+    new AlertDialog.Builder(a).setTitle("Google Play 업데이트")
+     .setMessage("업데이트 전에 전체 백업을 보관했나요? 다른 서명으로 설치된 기존 앱은 덮어쓰기할 수 없어요. 앱을 삭제하면 로컬 기록이 사라질 수 있습니다.")
+     .setNegativeButton("취소",null)
+     .setNeutralButton("먼저 백업",(d,w)->a.exportEncryptedBundle())
+     .setPositiveButton("Google Play 열기",(d,w)->openGooglePlay()).show();
+   });
    a.show();return;
   }
   String current=SigningIdentity.current(a);

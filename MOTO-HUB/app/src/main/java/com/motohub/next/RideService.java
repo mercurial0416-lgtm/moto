@@ -24,6 +24,10 @@ public final class RideService extends Service implements LocationListener {
  }
  /** Read current service-owned finalization state without leaking it across service instances. */
  static boolean saving(){RideService s=instance;return s!=null&&(s.finishPending||s.autoFinishPending);}
+ static boolean gpsFresh(){RideService s=instance;
+  return s!=null&&running&&GpsSignalStatus.fresh(s.lastFixElapsed,SystemClock.elapsedRealtime());
+ }
+ static long gpsFixElapsed(){RideService s=instance;return s==null?0:s.lastFixElapsed;}
  static boolean shareAllowed(){
   RideService s=instance;
   return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&
@@ -46,9 +50,10 @@ public final class RideService extends Service implements LocationListener {
  static void refreshNotification(){
   RideService service=instance;
   if(service!=null)service.handler.post(()->{
-   if(running)service.notifySafely(String.format(java.util.Locale.KOREA,
-    "%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+
-    (Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐"));
+   if(running||autoArmed)service.notifySafely(running?
+    String.format(java.util.Locale.KOREA,"%.0f km/h · %.2f km · ",liveSpeedKmh,liveDistanceKm)+
+     (Sharing.enabled?"그룹 공유 켜짐":"공유 꺼짐"):
+    "OBD2 출발 감지 대기 · GPS 기록 시작 전");
   });
  }
  final RideNotificationRate notificationRate=new RideNotificationRate();
@@ -179,7 +184,7 @@ public final class RideService extends Service implements LocationListener {
    if(paired==null)throw new SecurityException("이미 페어링된 OBD2 장치만 사용할 수 있습니다.");
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
-   autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.STOP_AFTER_MS));
+   autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
    obdReconnects=0;obdSpeedSamples=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;

@@ -75,14 +75,14 @@ final class DeveloperObdScreen {
   });
   activity.gap(p,15);
   activity.label(p,"자동 라이딩 기록 (개발자 모드 한정)",17,activity.accent,true);
-  activity.label(p,"OBD2에서 속도 7km/h 이상을 연속 3회 확인하면 GPS 경로 기록을 자동 시작합니다. 설정한 연속 정차 시간(기본 3분) 후 완료하고 다음 출발을 기다립니다. 블루투스가 끊겨도 진행 중인 GPS 기록은 수동 종료까지 유지합니다. 최초 활성화에는 별도 동의가 필요합니다.",13,activity.muted,false);
+  activity.label(p,"OBD2에서 속도 7km/h 이상을 연속 3회 확인하면 GPS 경로 기록을 자동 시작합니다. 설정한 연속 정차 시간(기본 10분) 후 완료하고 다음 출발을 기다립니다. 블루투스가 끊겨도 진행 중인 GPS 기록은 수동 종료까지 유지합니다. 최초 활성화에는 별도 동의가 필요합니다.",13,activity.muted,false);
   activity.action(p,"정차 종료 시간 설정 (3·5·10분)",false,()->{
    if(RideService.autoArmed||RideService.running){setStatus("기록 중에는 정차 시간을 변경할 수 없습니다.");return;}
-   long value=activity.getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.STOP_AFTER_MS);
-   long[] values={180_000L,300_000L,600_000L};int selected=0;
+   long value=activity.getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS);
+   long[] values={180_000L,300_000L,600_000L};int selected=2;
    for(int i=0;i<values.length;i++)if(value==values[i])selected=i;
    new AlertDialog.Builder(activity).setTitle("연속 정차 후 기록 종료")
-    .setSingleChoiceItems(new String[]{"3분 (기본)","5분 (짧은 휴식 통합)","10분 (긴 정차 통합)"},selected,(d,i)->{
+    .setSingleChoiceItems(new String[]{"3분 (빠른 종료)","5분 (일반 휴식)","10분 (기본 · 신호대기/휴식 통합)"},selected,(d,i)->{
      activity.getSharedPreferences("developer_experiments",0).edit().putLong("obd_stop_after_ms",values[i]).apply();
      setStatus("정차 종료 시간: "+(values[i]/60_000L)+"분 · 다음 자동 감지부터 적용");d.dismiss();
     }).setNegativeButton("취소",null).show();
@@ -90,7 +90,7 @@ final class DeveloperObdScreen {
   activity.action(p,"카카오내비 열기 (라이딩 기록은 별도)",false,()->KakaoNaviLaunch.open(activity));
   activity.action(p,"듀크 실차 확인 체크리스트",false,()->new AlertDialog.Builder(activity)
    .setTitle("실차 확인 · 개발자 모드")
-   .setMessage("정차 상태에서만 OBD2 어댑터를 연결하세요.\n\n① OBD2 지원 PID와 연결 상태를 확인\n② 계기판 RPM·속도·수온과 표시값 비교\n③ 시동 OFF/ON 후 재연결·기록 보존 확인\n④ 카카오내비 실행, 화면 잠금·전화 수신 중 GPS 기록 확인\n⑤ 주행 종료 후 GPS·GPX 경로 확인\n⑥ 실제 계기판 ODO와 일치하지 않으면 반영 금지\n\n기기와 ECU 설정은 변경하지 않고, 주행 중 화면을 조작하지 마세요. 실차·장시간 배터리 시험이 완료되었다는 의미는 아닙니다.")
+   .setMessage("정차 상태에서만 OBD2 어댑터를 연결하세요.\n\n① OBD2 지원 PID와 연결 상태를 확인\n② 계기판 RPM·속도·수온과 표시값 비교\n③ 시동 OFF/ON 후 재연결·기록 보존 확인\n④ 선택한 내비 앱 실행, 화면 잠금·전화 수신 중 GPS 기록 확인\n⑤ 주행 종료 후 GPS·GPX 경로 확인\n⑥ 실제 계기판 ODO와 일치하지 않으면 반영 금지\n\n기기와 ECU 설정은 변경하지 않고, 주행 중 화면을 조작하지 마세요. 실차·장시간 배터리 시험이 완료되었다는 의미는 아닙니다.")
    .setPositiveButton("확인",null).show());
   android.os.PowerManager pm=(android.os.PowerManager)activity.getSystemService(Context.POWER_SERVICE);
   boolean unrestricted=pm!=null&&pm.isIgnoringBatteryOptimizations(activity.getPackageName());

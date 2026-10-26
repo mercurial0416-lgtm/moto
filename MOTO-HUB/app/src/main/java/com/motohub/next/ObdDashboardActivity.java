@@ -32,6 +32,8 @@ public final class ObdDashboardActivity extends Activity {
   long now=android.os.SystemClock.elapsedRealtime();
   boolean speedFresh=RideService.autoArmed&&ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,now);
   speed.setText(speedFresh&&RideService.obdSpeedKmh>=0?RideService.obdSpeedKmh+"":"—");
+  speed.setTextColor(speedFresh?Color.WHITE:0xffffc78d);
+  speed.setContentDescription(speedFresh?"차량 속도 "+RideService.obdSpeedKmh+"킬로미터 매시":"OBD2 속도 지연, 마지막 값 숨김");
   linkStatus.setText(ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,speedFresh)+" · "+RideService.obdLink);
   boolean rpmFresh=RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdRpmAt,now);
   rpm.setText(rpmFresh?format(RideService.obdRpm,"%.0f"):"—");
@@ -44,20 +46,22 @@ public final class ObdDashboardActivity extends Activity {
    rpmFresh?RideService.obdRpm:Double.NaN,
    tempFresh?RideService.obdCoolantC:Double.NaN,
    voltFresh?RideService.obdVoltage:Double.NaN));
-  ride.setText(RideService.running?String.format(Locale.KOREA,"GPS %.2f km · 최고 %.0f km/h",RideService.liveDistanceKm,RideService.livePeakKmh):
+  ride.setText(RideService.running?(RideService.gpsFresh()?
+    String.format(Locale.KOREA,"GPS %.2f km · 최고 %.0f km/h",RideService.liveDistanceKm,RideService.livePeakKmh):
+    "GPS 신호 대기 · 기존 기록 보존"):
     RideService.autoArmed?"자동 기록 대기 · GPS 기록 시작 전":"라이딩 미작동");
   status.setText("OBD2 · "+RideService.obdLink+" · 재연결 "+RideService.obdReconnects+"회\n"+
    ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,speedFresh)+
    "\n"+RideService.engineEstimate()+"\n지원 PID: "+RideService.obdPidSupport+
    "\n"+ObdRestStatus.label(RideService.autoArmed,RideService.running,RideService.obdStationaryRemainingMs)+
    "\n보조 센서 진단: "+RideService.obdAuxDiagnostics+"\n최근 OBD 오류: "+RideService.obdLastError);
-  handler.postDelayed(this,1300);
+  handler.postDelayed(this,RideService.autoArmed&&speedFresh?1300:3000);
  }};
  static String format(double x,String fmt){return Double.isFinite(x)?String.format(Locale.KOREA,fmt,x):"—";}
  private LinearLayout base;
  private TextView value(String caption,int size){
   TextView label=new TextView(this);label.setText(caption);label.setTextSize(14);label.setTextColor(0xffb8c5d3);label.setGravity(Gravity.CENTER);base.addView(label);
-  TextView v=new TextView(this);v.setText("—");v.setTextSize(compactMode?Math.min(size,caption.startsWith("차량 속도")?44:24):size);v.setTypeface(null,android.graphics.Typeface.BOLD);v.setTextColor(Color.WHITE);v.setGravity(Gravity.CENTER);
+  TextView v=new TextView(this);v.setText("—");v.setTextSize(compactMode?Math.min(size,caption.startsWith("차량 속도")?54:24):size);v.setTypeface(null,android.graphics.Typeface.BOLD);v.setTextColor(Color.WHITE);v.setGravity(Gravity.CENTER);
   v.setPadding(0,compactMode?2:7,0,compactMode?10:24);base.addView(v);return v;
  }
  @Override public void onCreate(Bundle state){super.onCreate(state);
@@ -72,7 +76,7 @@ public final class ObdDashboardActivity extends Activity {
   scroll.addView(base);
   setContentView(scroll);
   TextView title=new TextView(this);title.setText("MOTO HUB · DEV DASH");title.setTextColor(0xffff8641);title.setTextSize(20);title.setGravity(Gravity.CENTER);title.setPadding(0,0,0,18);base.addView(title);
-  speed=value("차량 속도  ·  km/h",52);
+  speed=value("차량 속도  ·  km/h",60);
   rpm=value("엔진 회전수  ·  RPM",29);
   rpmMeter=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
   rpmMeter.setMax(15000);rpmMeter.setProgress(0);
@@ -87,7 +91,7 @@ public final class ObdDashboardActivity extends Activity {
   advisory.setGravity(Gravity.CENTER);
   base.addView(advisory);
   linkStatus=new TextView(this);linkStatus.setText("OBD2 연결 상태 확인 중");
-  linkStatus.setTextSize(14);linkStatus.setTextColor(0xffced8e2);
+  linkStatus.setTextSize(15);linkStatus.setTextColor(0xffced8e2);
   linkStatus.setPadding(0,4,0,compactMode?8:13);
   linkStatus.setGravity(Gravity.CENTER);base.addView(linkStatus);
   ride=value("GPS 라이딩 기록",18);

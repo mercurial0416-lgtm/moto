@@ -55,7 +55,7 @@ final class GarageHomeUi {
  void render(){
   JSONObject b=a.bike();if(b==null){emptyGarage();return;}
   addHero(b);a.gap(a.content,8);stats(b);a.gap(a.content,18);
-  quickActions();a.gap(a.content,10);rideAction();a.gap(a.content,13);
+  quickActions();a.gap(a.content,10);quickNavigation();a.gap(a.content,10);rideAction();a.gap(a.content,13);
   String condition=condition(b);
   if("점검 필요".equals(condition)||"곧 점검".equals(condition)){
    TextView alert=a.text(condition+" · 정비 일정 확인",13,a.fg,true);
@@ -297,6 +297,24 @@ final class GarageHomeUi {
   btn.setBackground(a.shape(recording?(a.dark?0xFF372422:0xFFFCE8E6):surface,
    recording?(a.dark?0xFFAD615B:0xFFD99792):stroke,8));
   a.content.addView(btn,new LinearLayout.LayoutParams(-1,-2));
+ }
+ void quickNavigation(){
+  NavigationChoice preferred=NavigationApps.preferred(a);
+  LinearLayout row=new LinearLayout(a);
+  row.setGravity(Gravity.CENTER_VERTICAL);
+  boolean narrow=a.getResources().getConfiguration().fontScale>=1.35f||
+   a.getResources().getConfiguration().screenWidthDp<360;
+  if(narrow)row.setOrientation(LinearLayout.VERTICAL);
+  Button open=a.button("내비 실행 · "+preferred.label,false,()->NavigationApps.openPreferred(a));
+  open.setMinHeight(a.dp(52));
+  open.setContentDescription("기본 내비 "+preferred.label+" 실행, 라이딩 기록 유지");
+  row.addView(open,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
+  Button settings=a.button("내비 변경",false,()->NavigationApps.choose(a));
+  settings.setMinHeight(a.dp(52));
+  LinearLayout.LayoutParams lp=narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1);
+  if(narrow)lp.topMargin=a.dp(8);else lp.leftMargin=a.dp(8);
+  row.addView(settings,lp);
+  a.content.addView(row);
  }
  void quickActions(){
   sectionTitle("빠른 기록",null,null);
