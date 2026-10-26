@@ -6,6 +6,8 @@ final class ObdRideAutoGate {
  static final int START_KMH=7, KEEP_MOVING_KMH=4, FINISH_KMH=2;
  static final int REQUIRED_MOVING_SAMPLES=3;
  static final long STOP_AFTER_MS=180_000L;
+ /** Safer user-facing default groups traffic and longer short stops; user can select 3/5/10 min. */
+ static final long USER_DEFAULT_STOP_AFTER_MS=600_000L;
  static final long IGNITION_OFF_GRACE_MS=15_000L;
  private long stopAfterMs=STOP_AFTER_MS;
  void setStopAfterMs(long value){
