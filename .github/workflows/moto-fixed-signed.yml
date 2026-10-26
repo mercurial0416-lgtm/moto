@@ -59,6 +59,12 @@ jobs:
           test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/RideHomeStatus.java || { echo 'UX48 large history scan missing'; exit 1; }
           test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/ObdLatencyStats.java || { echo 'UX48 read-only OBD timing missing'; exit 1; }
           bash source/MOTO-HUB/tests/run-ux48-stability-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/NavigationChoice.java || { echo 'UX49 three navigation apps not integrated'; exit 1; }
+          test -s source/MOTO-HUB/app/src/playRelease/AndroidManifest.xml || { echo 'UX49 Play permission guard not integrated'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux49-navigation-play-tests.sh
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/GpsSignalStatus.java || { echo 'UX51 stale-GPS guard missing'; exit 1; }
+          test -s source/MOTO-HUB/app/src/main/java/com/motohub/next/MaintenanceHistorySearch.java || { echo 'UX50 maintenance search missing'; exit 1; }
+          bash source/MOTO-HUB/tests/run-ux50-52-navigation-ride-release-tests.sh
       - name: Select next version and test release policy
         id: release-version
         run: |
