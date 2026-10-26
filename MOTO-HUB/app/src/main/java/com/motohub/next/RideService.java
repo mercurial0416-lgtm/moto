@@ -24,6 +24,10 @@ public final class RideService extends Service implements LocationListener {
  }
  /** Read current service-owned finalization state without leaking it across service instances. */
  static boolean saving(){RideService s=instance;return s!=null&&(s.finishPending||s.autoFinishPending);}
+ static boolean gpsFresh(){RideService s=instance;
+  return s!=null&&running&&GpsSignalStatus.fresh(s.lastFixElapsed,SystemClock.elapsedRealtime());
+ }
+ static long gpsFixElapsed(){RideService s=instance;return s==null?0:s.lastFixElapsed;}
  static boolean shareAllowed(){
   RideService s=instance;
   return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&
