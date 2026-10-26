@@ -77,12 +77,11 @@ final class GarageHomeUi {
   final LinearLayout slot=a.col();
   requestContent.addView(slot);
   HOME_IO.execute(()->{
-   int broken=0;
+   int broken;
    try{
-    for(File track:TrackFile.tracks(a.getFilesDir())){
-     if(generation!=HOME_SCAN.get())return;
-     if(RideHistoryFilter.INTERRUPTED.equals(RideHistoryFilter.status(track,RideService.active,false)))broken++;
-    }
+    if(generation!=HOME_SCAN.get())return;
+    broken=RideHomeStatus.interrupted(a.getFilesDir()); // stream metadata; never sort 10k tracks
+    if(generation!=HOME_SCAN.get())return;
    }catch(Exception ignored){return;} // A storage error must not stop the home screen.
    final int total=broken;
    a.runOnUiThread(()->{
