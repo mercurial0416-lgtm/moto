@@ -1,0 +1,127 @@
+name: MOTO HUB Google Play internal testing
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_publish:
+        description: 'BUILD_ONLY or PUBLISH_INTERNAL_ONLY (never production)'
+        required: true
+        default: BUILD_ONLY
+        type: choice
+        options: [BUILD_ONLY, PUBLISH_INTERNAL_ONLY]
+permissions:
+  contents: read
+jobs:
+  play_internal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Android SDK
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Validate explicit internal-track preconditions
+        env:
+          STORE_B64: ${{ secrets.MOTO_SIGNING_STORE_B64 }}
+          STORE_PASS: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
+          EXPECTED_CERT: ${{ secrets.MOTO_EXPECTED_CERT_SHA256 }}
+          PLAY_CREDENTIALS: ${{ secrets.MOTO_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.confirm_publish }}" == "PUBLISH_INTERNAL_ONLY" ]]; then
+            test -n "$STORE_B64" && test -n "$STORE_PASS" && test -n "$KEY_ALIAS" && test -n "$KEY_PASS" || {
+              echo "Google Play publish requires securely stored upload keystore"; exit 1;
+            }
+            test -n "$EXPECTED_CERT" && test -n "$PLAY_CREDENTIALS" || {
+              echo "Play internal release requires expected certificate and authorized Play Console service account"; exit 1;
+            }
+          fi
+      - name: Decode private signing key only when explicitly publishing
+        if: ${{ inputs.confirm_publish == 'PUBLISH_INTERNAL_ONLY' }}
+        env:
+          STORE_B64: ${{ secrets.MOTO_SIGNING_STORE_B64 }}
+          PLAY_CREDENTIALS: ${{ secrets.MOTO_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$STORE_B64" | base64 -d > "$RUNNER_TEMP/moto-upload-keystore.p12"
+          printf '%s' "$PLAY_CREDENTIALS" > "$RUNNER_TEMP/play-publisher.json"
+          test -s "$RUNNER_TEMP/moto-upload-keystore.p12"
+          python3 -m json.tool "$RUNNER_TEMP/play-publisher.json" > /dev/null
+      - name: Validate 3-way navigator and GPS safety
+        working-directory: MOTO-HUB
+        run: |
+          set -euo pipefail
+          bash tests/run-ux49-navigation-play-tests.sh
+          bash tests/run-ux48-stability-tests.sh
+      - name: Generate Play App Bundle 521 (signed only with configured key)
+        working-directory: MOTO-HUB
+        env:
+          MOTO_SIGNING_STORE_FILE: ${{ runner.temp }}/moto-upload-keystore.p12
+          MOTO_SIGNING_STORE_PASSWORD: ${{ inputs.confirm_publish == 'PUBLISH_INTERNAL_ONLY' && secrets.MOTO_SIGNING_STORE_PASSWORD || '' }}
+          MOTO_SIGNING_KEY_ALIAS: ${{ inputs.confirm_publish == 'PUBLISH_INTERNAL_ONLY' && secrets.MOTO_SIGNING_KEY_ALIAS || '' }}
+          MOTO_SIGNING_KEY_PASSWORD: ${{ inputs.confirm_publish == 'PUBLISH_INTERNAL_ONLY' && secrets.MOTO_SIGNING_KEY_PASSWORD || '' }}
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.confirm_publish }}" != "PUBLISH_INTERNAL_ONLY" ]]; then
+            unset MOTO_SIGNING_STORE_FILE MOTO_SIGNING_STORE_PASSWORD MOTO_SIGNING_KEY_ALIAS MOTO_SIGNING_KEY_PASSWORD
+          fi
+          chmod +x gradlew
+          ./gradlew :app:assemblePlayRelease :app:bundlePlayRelease :app:lintPlayRelease -PmotoReleaseCode=521 --no-daemon
+          test -s app/build/outputs/bundle/playRelease/app-play-release.aab
+          test -s app/build/outputs/apk/playRelease/app-play-release-unsigned.apk || test -s app/build/outputs/apk/playRelease/app-play-release.apk
+          apk=app/build/outputs/apk/playRelease/app-play-release-unsigned.apk
+          if [[ ! -f "$apk" ]]; then apk=app/build/outputs/apk/playRelease/app-play-release.apk; fi
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | grep -q "versionCode='521'"
+          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk" | grep -Fq 'android.permission.REQUEST_INSTALL_PACKAGES'; then
+            echo "Play variant still includes forbidden sideload permission"; exit 1
+          fi
+          sha256sum app/build/outputs/bundle/playRelease/app-play-release.aab > app/build/outputs/bundle/playRelease/SHA256-AAB.txt
+      - name: Validate signed bundle and pinned upload certificate
+        if: ${{ inputs.confirm_publish == 'PUBLISH_INTERNAL_ONLY' }}
+        working-directory: MOTO-HUB
+        env:
+          MOTO_SIGNING_STORE_PASSWORD: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
+          MOTO_SIGNING_KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
+          MOTO_EXPECTED_CERT_SHA256: ${{ secrets.MOTO_EXPECTED_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          aab=app/build/outputs/bundle/playRelease/app-play-release.aab
+          jarsigner -verify "$aab" | grep -Fq 'jar verified.'
+          actual=$(keytool -list -v -keystore "$RUNNER_TEMP/moto-upload-keystore.p12" \
+            -storetype PKCS12 -storepass "$MOTO_SIGNING_STORE_PASSWORD" -alias "$MOTO_SIGNING_KEY_ALIAS" \
+            | sed -n 's/^[[:space:]]*SHA256: //p' | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          expected=$(printf '%s' "$MOTO_EXPECTED_CERT_SHA256" | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          test "${#expected}" -eq 64 && test "$actual" = "$expected" || {
+            echo "Configured upload certificate fingerprint mismatch"; exit 1
+          }
+      - name: Upload Play bundle to build artifacts for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-play-internal-521-${{ github.sha }}
+          path: |
+            MOTO-HUB/app/build/outputs/bundle/playRelease/app-play-release.aab
+            MOTO-HUB/app/build/outputs/bundle/playRelease/SHA256-AAB.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish to Google Play INTERNAL track only
+        if: ${{ inputs.confirm_publish == 'PUBLISH_INTERNAL_ONLY' }}
+        working-directory: MOTO-HUB
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check google-auth requests
+          python3 tools/publish_play_internal.py \
+            --bundle app/build/outputs/bundle/playRelease/app-play-release.aab \
+            --service-account "$RUNNER_TEMP/play-publisher.json" \
+            --confirm-internal PUBLISH_INTERNAL_ONLY
+      - name: Erase temporary credentials
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/moto-upload-keystore.p12" "$RUNNER_TEMP/play-publisher.json"
