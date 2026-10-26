@@ -12,7 +12,7 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -28,8 +28,23 @@ jobs:
         run: |
           curl --fail --location --retry 3 -o "$RUNNER_TEMP/json.jar" https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar
           export JSON_JAR="$RUNNER_TEMP/json.jar"
-          for test in tests/run-*.sh; do bash "$test"; done
-          python3 tests/test_alpha6_dc_integration.py
+          failures=0
+          for test in tests/run-*.sh; do
+            echo "::group::${test}"
+            if bash "$test"; then
+              echo "PASS ${test}"
+            else
+              echo "::error title=Regression failed::${test}"
+              failures=$((failures+1))
+            fi
+            echo "::endgroup::"
+          done
+          if ! python3 tests/test_alpha6_dc_integration.py; then
+            echo "::error title=Regression failed::tests/test_alpha6_dc_integration.py"
+            failures=$((failures+1))
+          fi
+          echo "Total failed suites: ${failures}"
+          test "$failures" -eq 0
       - name: Build, lint and unit tests (no backend requests)
         working-directory: MOTO-HUB
         run: |
