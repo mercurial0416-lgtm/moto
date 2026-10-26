@@ -57,10 +57,13 @@ jobs:
           test -s app/build/outputs/apk/debug/app-debug.apk
           test -s app/build/outputs/apk/release/app-release-unsigned.apk
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/release/app-release-unsigned.apk | grep "versionCode='521'"
-          test -s app/build/outputs/bundle/playRelease/app-play-release.aab
-          test -s app/build/outputs/apk/playRelease/app-play-release-unsigned.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/playRelease/app-play-release-unsigned.apk | grep "versionCode='521'"
-          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions app/build/outputs/apk/playRelease/app-play-release-unsigned.apk | grep -Fq 'android.permission.REQUEST_INSTALL_PACKAGES'; then
+          aab=$(find app/build/outputs/bundle/playRelease -maxdepth 1 -type f -name '*.aab' -print -quit)
+          apk=$(find app/build/outputs/apk/playRelease -maxdepth 1 -type f -name '*.apk' -print -quit)
+          test -n "$aab" && test -s "$aab"
+          test -n "$apk" && test -s "$apk"
+          cp "$aab" app/build/outputs/bundle/playRelease/MOTO-HUB-play-521.aab
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | grep "versionCode='521'"
+          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk" | grep -Fq 'android.permission.REQUEST_INSTALL_PACKAGES'; then
             echo "Google Play variant must not request APK installation permission"
             exit 1
           fi
@@ -75,7 +78,7 @@ jobs:
           path: |
             MOTO-HUB/app/build/outputs/apk/release/app-release-unsigned.apk
             MOTO-HUB/app/build/outputs/apk/release/SHA256-unsigned.txt
-            MOTO-HUB/app/build/outputs/bundle/playRelease/app-play-release.aab
+            MOTO-HUB/app/build/outputs/bundle/playRelease/MOTO-HUB-play-521.aab
           if-no-files-found: error
           retention-days: 7
       - name: Archive build verification reports
