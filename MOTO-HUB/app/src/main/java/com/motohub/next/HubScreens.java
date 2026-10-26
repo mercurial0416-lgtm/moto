@@ -74,6 +74,45 @@ final class HubScreens {
    return date!=0?date:Double.compare(y.optDouble("mileage"),x.optDouble("mileage"));});
   return result;
  }
+ void searchMaintenanceHistory(){
+  JSONObject bike=a.bike();
+  if(bike==null){a.toast("바이크를 먼저 등록해 주세요.");return;}
+  List<JSONObject> completed=new ArrayList<>();
+  for(JSONObject service:records("정비",bike))if(!service.optBoolean("scheduleOnly"))completed.add(service);
+  LinearLayout layout=a.col();layout.setPadding(a.dp(16),a.dp(6),a.dp(16),a.dp(8));
+  EditText query=new EditText(a);query.setSingleLine(true);
+  query.setHint("정비 항목 · 날짜 · 계기판 km 검색");
+  query.setTextColor(a.fg);query.setHintTextColor(a.muted);
+  query.setContentDescription("정비 이력 검색어 입력");
+  layout.addView(query,new LinearLayout.LayoutParams(-1,a.dp(52)));
+  TextView summary=a.text("검색 중",12,a.muted,false);layout.addView(summary);
+  ScrollView sc=new ScrollView(a);
+  LinearLayout results=a.col();sc.addView(results);
+  layout.addView(sc,new LinearLayout.LayoutParams(-1,a.dp(340)));
+  AlertDialog dialog=new AlertDialog.Builder(a).setTitle("완료한 정비 검색")
+   .setView(layout).setNegativeButton("닫기",null).create();
+  Runnable redraw=()->{
+   if(a.isFinishing()||a.isDestroyed())return;
+   String needle=query.getText().toString();
+   results.removeAllViews();int found=0,displayed=0;
+   for(JSONObject item:completed){
+    if(!MaintenanceHistorySearch.matches(needle,item.optString("type"),item.optString("date"),item.optDouble("mileage")))continue;
+    found++;
+    if(displayed++>=30)continue;
+    line(results,item.optString("type"),item.optString("date")+" · "+
+     a.num(item.optDouble("mileage"))+" km",
+     a.won(item.optDouble("cost")),()->{dialog.dismiss();a.edit("services",item);});
+   }
+   summary.setText("완료한 정비 "+found+"건"+(found>30?" · 최신 30건 표시":""));
+   if(found==0)results.addView(a.text("검색된 정비 기록이 없어요.",13,a.muted,false));
+  };
+  query.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence text,int start,int before,int count){redraw.run();}
+   public void afterTextChanged(android.text.Editable text){}
+  });
+  dialog.show();redraw.run();
+ }
  void records(){
   a.gap(a.content,4);
   if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}
@@ -91,6 +130,7 @@ final class HubScreens {
   });
   reveal.setContentDescription("추가 비용·영수증·일괄 정비 입력 도구 펼치기");
   actions.addView(reveal);actions.addView(details);
+  a.action(actions,"완료한 정비 이력 검색",false,this::searchMaintenanceHistory);
   a.content.addView(actions);a.gap(a.content,16);
   new ServiceStatusUi(a).render(a.content);a.gap(a.content,15);
   String bikeId=a.bike().optString("id");
