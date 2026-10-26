@@ -17,7 +17,7 @@ checks={
  'partial OBD response rejected': 'OBD2 응답 완료 신호 없음' in monitor,
  'user can still disarm manually': 'if(AUTO_DISARM.equals(action))' in service and '자동 출발 감지만 끕니다' in ui,
  'reconnect session bounded': 'MAX_RETRIES=8' in policy and 'while(!stopped&&System.nanoTime()<until)' in monitor,
- 'navigation remains separate': 'KakaoNaviLaunch.open(a)' in ui,
+ 'navigation remains separate': 'NavigationApps.choose(a)' in ui and 'NavigationApps.installedLaunchIntent(this,choice)' in service and 'Sharing.offer(' not in (src/'NavigationApps.java').read_text(),
  'developer only OBD': 'developer_experiments' in service,
  'no automatic sharing': 'Sharing.stop(); // Automatic local rides' in service,
 }
