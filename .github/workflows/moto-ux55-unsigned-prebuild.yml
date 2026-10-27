@@ -1,0 +1,43 @@
+name: MOTO HUB offline signer prebuild 524
+on:
+  push:
+    branches: ['release/moto-hub-apk']
+    paths:
+      - '.github/workflows/moto-ux55-unsigned-prebuild.yml'
+permissions:
+  contents: read
+jobs:
+  unsigned-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install SDK 36
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Compile lint and unit-test APK for offline existing-key signing
+        working-directory: MOTO-HUB
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease :app:lintDebug :app:testDebugUnitTest -PmotoReleaseCode=524 --no-daemon
+          APK=app/build/outputs/apk/release/app-release-unsigned.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" |
+            grep -F "package: name='com.motohub.next'" | grep -F "versionCode='524'"
+          sha256sum "$APK" > app/build/outputs/apk/release/unsigned.sha256
+      - name: Upload signed-ready unsigned APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-hub-ux55-code-524-unsigned
+          path: |
+            MOTO-HUB/app/build/outputs/apk/release/app-release-unsigned.apk
+            MOTO-HUB/app/build/outputs/apk/release/unsigned.sha256
+          retention-days: 14
+          if-no-files-found: error
