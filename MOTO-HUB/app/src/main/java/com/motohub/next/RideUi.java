@@ -109,7 +109,7 @@ final class RideUi {
        a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
       }).show();
     }
-    hero.postDelayed(this,1000);
+    hero.postDelayed(this,RideScreenRefreshPolicy.interval(RideService.gpsFresh(),RideService.liveSpeedKmh,focus));
    }};hero.post(refresh);
   }
 
@@ -137,7 +137,8 @@ final class RideUi {
    hero.addView(finishRide);
   }
   a.content.addView(hero);a.gap(a.content,12);
-  if(focus&&RideService.running)return; // Keep verified GPS stop button; hide nonessential forms while riding.
+  // Keep navigation controls accessible even in ride focus mode.
+  if(!focus){
   // The first-connection flow belongs near ride controls, not buried in Settings.
   // It is still explicitly gated by the opted-in experimental OBD mode.
   if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
@@ -161,18 +162,20 @@ final class RideUi {
     }};linkStatus.post(updateLink);
    }
   }
+  }
   // Safe launcher: changing the default does not unexpectedly open an external app.
   NavigationChoice chosen=NavigationApps.preferred(a);
   LinearLayout navigation=a.col();navigation.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(12));
   navigation.setBackground(a.shape(a.panel,a.line,12));
-  navigation.addView(a.text("외부 내비게이션",15,a.fg,true));a.gap(navigation,8);
+  navigation.addView(a.text("외부 내비게이션 · 선택: "+chosen.label,15,a.fg,true));a.gap(navigation,8);
   Button openNav=a.button(chosen.label+" 바로 실행",true,()->NavigationApps.openPreferred(a));
   openNav.setMinHeight(a.dp(54));openNav.setContentDescription(chosen.label+" 앱 실행");
   navigation.addView(openNav);
   Button changeNav=a.button("기본 내비 설정 · 카카오 / 네이버 / 티맵",false,()->NavigationApps.choose(a));
   changeNav.setMinHeight(a.dp(48));navigation.addView(changeNav);
-  navigation.addView(a.text("내비를 실행해도 GPS 기록은 계속됩니다. 경로·위치·OBD 값은 전송하지 않으며 이륜차 통행 제한은 직접 확인하세요.",12,a.muted,false));
+  if(!focus)navigation.addView(a.text("내비를 실행해도 GPS 기록은 계속됩니다. 경로·위치·OBD 값은 전송하지 않으며 이륜차 통행 제한은 직접 확인하세요.",12,a.muted,false));
   a.content.addView(navigation);a.gap(a.content,12);
+  if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
   if(RideService.autoArmed&&a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
    LinearLayout diagnostics=a.col();diagnostics.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(14));diagnostics.setBackground(a.shape(a.panel,a.line,14));
    TextView telem=a.text("OBD2 데이터를 읽는 중…",14,a.fg,false);diagnostics.addView(telem);
@@ -578,6 +581,7 @@ final class RideUi {
   a.toast("기기에 저장된 경로를 분석합니다.");
   new Thread(()->{
    RideMonthlyReport report=new RideMonthlyReport();
+   RideTypeComparison categoryComparison=new RideTypeComparison();
    int limited=0;
    try{
     long now=System.currentTimeMillis();
@@ -593,7 +597,7 @@ final class RideUi {
      if(inspected>=150){limited++;continue;}
      inspected++;
      if(track.length()>5_000_000){report.skipped++;continue;}
-     try{RideInsights.Result data=RideInsights.analyze(track);report.add(track,now,data.distanceKm,data.durationMillis);}
+     try{RideInsights.Result data=RideInsights.analyze(track);report.add(track,now,data.distanceKm,data.durationMillis);categoryComparison.add(track,now,data);}
      catch(Exception ignored){report.skipped++;}
     }
    }catch(Exception ignored){report.skipped++;}
@@ -606,7 +610,7 @@ final class RideUi {
      +"\n"+RideTrend.compare(report.current.km,report.previous.km)
      +"\n최근   "+RideReportBars.render(report.current.km,Math.max(report.current.km,report.previous.km))
      +"\n이전   "+RideReportBars.render(report.previous.km,Math.max(report.current.km,report.previous.km))
-     +"\n손상·크기 초과 등 제외 "+report.skipped+"건"
+     +"\n"+categoryComparison.report()+"\n손상·크기 초과 등 제외 "+report.skipped+"건"
      +(omitted>0?"\n분석 제한(최신 150건)으로 제외 "+omitted+"건 · 전체 통계 아님":"");
     new AlertDialog.Builder(a).setTitle("내 라이딩 통계").setMessage(text+"\n\nGPS 계산값이며 현재 기록 중인 라이딩은 제외합니다. GPX는 가져온 날짜가 아닌 실제 기록 날짜를 사용합니다.").setPositiveButton("확인",null).show();
    });

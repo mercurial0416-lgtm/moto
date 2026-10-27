@@ -17,7 +17,7 @@ import org.osmdroid.util.BoundingBox;
 public final class RideMapActivity extends Activity {
  private MapView map;private TextView caption;private volatile boolean alive=true;
  private final ArrayList<Polyline> speedLines=new ArrayList<>();
- private boolean speedVisible=false;private Polyline baseLine;
+ private boolean speedVisible=false;private final ArrayList<Polyline> baseLines=new ArrayList<>();
  private Button speedButton;
  private Button tileButton;private boolean onlineTiles=false,clearMapCacheOnExit=false;
  @Override public void onCreate(Bundle b){super.onCreate(b);
@@ -36,7 +36,7 @@ public final class RideMapActivity extends Activity {
   speedButton.setOnClickListener(v->{
    speedVisible=!speedVisible;
    for(Polyline line:speedLines)line.setVisible(speedVisible);
-   if(baseLine!=null)baseLine.getOutlinePaint().setColor(speedVisible?0xff596572:0xffff6b1b);
+   for(Polyline lineItem:baseLines)lineItem.getOutlinePaint().setColor(speedVisible?0xff596572:0xffff6b1b);
    speedButton.setText(speedVisible?"단색 경로 보기":"속도별 경로 보기");map.invalidate();
   });base.addView(speedButton);
   LinearLayout zoom=new LinearLayout(this);zoom.setOrientation(LinearLayout.HORIZONTAL);
@@ -83,15 +83,44 @@ public final class RideMapActivity extends Activity {
   TextView attribution=new TextView(this);attribution.setText("오프라인 경로 표시 · 배경지도는 캐시에 있을 때만 표시 · © OpenStreetMap contributors");attribution.setTextColor(0xff9caebd);attribution.setPadding(12,8,12,14);base.addView(attribution);
   new Thread(()->{
    try{File track=new File(TrackFile.directory(getFilesDir()),filename);
-    final int[] n={0};final ArrayList<GeoPoint> route=new ArrayList<>();
-    final int total=TrackFile.read(track,(lat,lon,accuracy,time)->n[0]++);
+    final int total=TrackFile.read(track,(lat,lon,accuracy,time)->{});
     if(total<2)throw new IllegalArgumentException("좌표가 부족합니다");
-    int step=Math.max(1,(total+1999)/2000);final int[] index={0};
-    final ArrayList<Long> times=new ArrayList<>();final ArrayList<Double> accuracies=new ArrayList<>();
-    TrackFile.read(track,(lat,lon,accuracy,time)->{int i=index[0]++;if(i%step==0||i==total-1){route.add(new GeoPoint(lat,lon));times.add(time);accuracies.add(accuracy);}});
+    int step=Math.max(1,(total+1999)/2000);
+    final int[] index={0},sectionId={-1};
+    final boolean[] hasLast={false},needNewSection={true};
+    final double[] prevLat={0},prevLon={0},prevAccuracy={0};
+    final long[] prevTime={0};
+    final ArrayList<ArrayList<GeoPoint>> sections=new ArrayList<>();
+    final ArrayList<GeoPoint> route=new ArrayList<>();
+    final ArrayList<Integer> sectionIndices=new ArrayList<>();
+    final ArrayList<Long> times=new ArrayList<>();
+    final ArrayList<Double> accuracies=new ArrayList<>();
+    // Test every raw GPS fix before decimation. A bad unselected point still
+    // breaks the drawn line. Route summaries remain unchanged.
+    TrackFile.read(track,(lat,lon,accuracy,time)->{
+     int i=index[0]++;
+     if(!MapPathContinuity.validFix(lat,lon,accuracy)){
+      hasLast[0]=false;needNewSection[0]=true;return;
+     }
+     if(hasLast[0]&&!MapPathContinuity.validLink(prevLat[0],prevLon[0],prevAccuracy[0],prevTime[0],
+                                                   lat,lon,accuracy,time))
+      needNewSection[0]=true;
+     prevLat[0]=lat;prevLon[0]=lon;prevAccuracy[0]=accuracy;prevTime[0]=time;hasLast[0]=true;
+     if(i%step!=0&&i!=total-1)return;
+     if(needNewSection[0]||sectionId[0]<0){
+      if(sections.size()>=350)return;
+      sections.add(new ArrayList<>());sectionId[0]++;needNewSection[0]=false;
+     }
+     GeoPoint point=new GeoPoint(lat,lon);
+     sections.get(sectionId[0]).add(point);
+     route.add(point);sectionIndices.add(sectionId[0]);
+     times.add(time);accuracies.add(accuracy);
+    });
+    if(route.isEmpty())throw new IllegalArgumentException("표시할 수 있는 정확한 GPS 좌표가 없습니다");
     final ArrayList<ArrayList<GeoPoint>> colored=new ArrayList<>();final ArrayList<Integer> grades=new ArrayList<>();
     ArrayList<GeoPoint> chunk=null;int lastGrade=RideSpeedSegments.UNKNOWN;
     for(int i=1;i<route.size();i++){
+     if(!sectionIndices.get(i-1).equals(sectionIndices.get(i))){chunk=null;lastGrade=RideSpeedSegments.UNKNOWN;continue;}
      GeoPoint previous=route.get(i-1),current=route.get(i);
      int grade=RideSpeedSegments.category(times.get(i)-times.get(i-1),
        RideInsights.meters(previous.getLatitude(),previous.getLongitude(),current.getLatitude(),current.getLongitude()),
@@ -105,7 +134,10 @@ public final class RideMapActivity extends Activity {
     }
     RideInsights.Result info=RideInsights.analyze(track);
     runOnUiThread(()->{if(!alive||map==null)return;
-     Polyline poly=new Polyline(map);poly.setPoints(route);poly.getOutlinePaint().setColor(0xffff6b1b);poly.getOutlinePaint().setStrokeWidth(9f);map.getOverlays().add(poly);baseLine=poly;
+     for(ArrayList<GeoPoint> section:sections)if(section.size()>=2){
+      Polyline poly=new Polyline(map);poly.setPoints(section);poly.getOutlinePaint().setColor(0xffff6b1b);
+      poly.getOutlinePaint().setStrokeWidth(9f);map.getOverlays().add(poly);baseLines.add(poly);
+     }
      for(int i=0;i<colored.size();i++){
       Polyline line=new Polyline(map);line.setPoints(colored.get(i));
       int grade=grades.get(i);

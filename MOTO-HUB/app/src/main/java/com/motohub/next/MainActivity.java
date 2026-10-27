@@ -1556,6 +1556,30 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    GARAGE_PHOTO_SAVER.execute(()->{try{saveGaragePhoto(uri,bikeId);}catch(Exception error){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())this.error("바이크 사진 저장 실패: "+error.getMessage());});}});return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
   if(request==54){scanReceiptOcr(uri,null);return;}
   if(request==57){scanQuickOdometerPhoto(uri);return;}
+  if(request==60){
+   if(RideService.running||RideService.autoArmed||RestoreRideGate.isRestoring()){error("라이딩 종료 후 검사해 주세요.");return;}
+   new Thread(()->{
+    try{
+     RestoreArchive.Prepared prepared;
+     try(InputStream in=getContentResolver().openInputStream(uri)){
+      if(in==null)throw new IOException("백업 파일을 열 수 없어요.");
+      // Stage into temporary private storage; never mutate live data.
+      prepared=RestoreArchive.prepare(in,getFilesDir());
+     }
+     try(prepared){
+      Store.parse(prepared.json);
+      final int rides=prepared.rides,photos=prepared.photos;
+      runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())
+       new AlertDialog.Builder(this).setTitle("ZIP 복구 사전 검증 통과")
+       .setMessage("백업 내용·데이터 JSON·GPS 및 사진 구조 검사 통과\\nGPS "+rides+"건 · 사진 "+photos+"장\\n검사 중 기존 기록은 변경하지 않았습니다. 실제 복원 시 여유공간과 기기 상태를 다시 확인합니다.")
+       .setPositiveButton("확인",null).show();
+      });
+     }
+    }catch(Exception failure){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())
+      error("ZIP 복구 사전 검증 실패: "+(failure.getMessage()==null?"파일/용량을 확인해 주세요.":failure.getMessage()));});}
+   },"moto-zip-dryrun").start();
+   return;
+  }
   if(request==46){prepareBundleRestore(uri);return;}
   if(request==48){char[] password=pendingSecurePassword;pendingSecurePassword=null;
    if(password==null){error("암호를 다시 입력해 주세요.");return;}

@@ -26,6 +26,15 @@ final class ObdLatencyStats {
  }
  int speedSamples(){return count[0];}
  int speedFailures(){return failures[0];}
+ String speedTrend(){
+  int n=Math.min(count[0],WINDOW);if(n<4)return "추세 데이터 부족";
+  int latest=(count[0]-1)%WINDOW;
+  int oldest=(count[0]-n)%WINDOW;
+  long current=values[0][latest],past=values[0][oldest];
+  if(current>past+250)return "응답 느려지는 중";
+  if(current+250<past)return "응답 개선 중";
+  return "응답 대체로 일정";
+ }
  String summary(){
   StringBuilder result=new StringBuilder();
   for(int i=0;i<PIDS.length;i++){

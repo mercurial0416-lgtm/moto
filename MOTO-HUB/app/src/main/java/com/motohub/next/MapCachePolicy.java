@@ -18,7 +18,9 @@ final class MapCachePolicy {
   if(folder==null||!folder.exists())return new Result(0,0);
   if(Files.isSymbolicLink(folder.toPath())||!folder.isDirectory())throw new IOException("안전하지 않은 지도 캐시 폴더");
   Deque<File> queue=new ArrayDeque<>();queue.add(folder);
-  ArrayList<File> dirs=new ArrayList<>();int files=0,checked=0;long bytes=0;
+  ArrayList<File> dirs=new ArrayList<>();
+  ArrayList<File> toDelete=delete?new ArrayList<>():null;
+  int files=0,checked=0;long bytes=0;
   while(!queue.isEmpty()){
    File dir=queue.removeFirst();
    if(++checked>MAX_ENTRIES)throw new IOException("지도 캐시 항목이 너무 많습니다");
@@ -32,11 +34,20 @@ final class MapCachePolicy {
      if(++checked>MAX_ENTRIES)throw new IOException("지도 캐시 항목이 너무 많습니다");
      files++;long size=file.length();
      bytes=size>Long.MAX_VALUE-bytes?Long.MAX_VALUE:bytes+size;
-     if(delete&&!file.delete())throw new IOException("지도 캐시 삭제 실패");
+     if(delete)toDelete.add(file);
     }else throw new IOException("안전하지 않은 캐시 파일");
    }
   }
-  if(delete)for(int i=dirs.size()-1;i>0;i--)dirs.get(i).delete();
+  // Collect and validate everything before deleting a single file; a malformed
+  // cache path or excessive entry count cannot partially erase validated tiles.
+  if(delete){
+   for(File file:toDelete){
+    if(Files.isSymbolicLink(file.toPath())||!Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS))
+     throw new IOException("캐시 파일이 검사 후 변경되었습니다. 삭제하지 않았습니다");
+   }
+   for(File file:toDelete)if(!file.delete())throw new IOException("일부 지도 캐시 삭제 실패 · 앱 데이터는 보존됨");
+   for(int i=dirs.size()-1;i>0;i--)dirs.get(i).delete();
+  }
   return new Result(files,bytes);
  }
 }

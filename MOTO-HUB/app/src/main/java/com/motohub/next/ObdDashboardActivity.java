@@ -59,6 +59,7 @@ public final class ObdDashboardActivity extends Activity {
     ObdLinkQuality.label(score,(int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples))+
     " · 응답 평균 "+(RideService.obdAverageLatencyMs<0?"대기":RideService.obdAverageLatencyMs+"ms")+
     " · 연결 성공 "+RideService.obdConnectionSuccesses+"/"+RideService.obdConnectionAttempts+"회\n"+
+    ObdQualityAdvice.explain(speedFresh,RideService.obdAverageLatencyMs,RideService.obdReconnects,RideService.obdQueryFailures)+"\n"+
    ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,speedFresh)+
    "\n"+RideService.engineEstimate()+"\n지원 PID: "+RideService.obdPidSupport+
    "\n"+ObdRestStatus.label(RideService.autoArmed,RideService.running,RideService.obdStationaryRemainingMs)+

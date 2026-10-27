@@ -16,17 +16,20 @@ final class NavigationApps {
  /** Change default without unexpectedly switching away from MOTO HUB. */
  static void choose(MainActivity activity){
   NavigationChoice selected=preferred(activity);
+  String[] options=NavigationChoice.labels();
+  for(int i=0;i<options.length;i++){
+   NavigationChoice option=NavigationChoice.at(i);
+   options[i]=(option==selected?"✓ ":"")+option.label;
+  }
   new AlertDialog.Builder(activity)
-   .setTitle("기본 내비 설정")
-   .setMessage("선택만 저장합니다. 내비는 '내비 실행'을 눌렀을 때 열립니다. GPS·GPX·OBD 데이터는 전달하지 않습니다.")
-   .setSingleChoiceItems(NavigationChoice.labels(),selected.ordinal(),(dialog,which)->{
+   .setTitle("내비 선택 · 현재 "+selected.label)
+   .setItems(options,(dialog,which)->{
     NavigationChoice selectedApp=NavigationChoice.at(which);
     boolean saved=activity.getSharedPreferences(PREF,Context.MODE_PRIVATE)
      .edit().putString(KEY,selectedApp.id).commit();
-    dialog.dismiss();
-    if(!saved){activity.toast("기본 내비 설정 저장에 실패했어요.");return;}
+    if(!saved){activity.toast("내비 선택을 저장하지 못했어요.");return;}
     RideService.refreshNotification();
-    activity.toast("기본 내비: "+selectedApp.label);
+    activity.toast("선택 완료: "+selectedApp.label+" · 내비 실행 버튼을 누르세요.");
     if(!activity.isFinishing()&&!activity.isDestroyed())activity.render();
    })
    .setNegativeButton("취소",null).show();
