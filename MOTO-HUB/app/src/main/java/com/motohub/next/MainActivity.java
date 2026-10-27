@@ -98,6 +98,8 @@ public class MainActivity extends Activity {
   // Device location/notification settings may have changed while the settings app was open.
   if(root!=null&&"라이딩".equals(tab)&&dialog==null)render();
   if(!readOnly)DailyMaintenanceJob.schedule(this);
+  MotoWidgetProvider.refresh(this);
+  AppUpdateNotice.checkOnResume(this);
  }
  @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);applyWidgetQuickActions(intent);receiveSharedListing(intent);}
  boolean applyWidgetTab(Intent intent){
