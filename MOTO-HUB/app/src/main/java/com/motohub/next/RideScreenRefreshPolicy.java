@@ -3,8 +3,10 @@ package com.motohub.next;
 final class RideScreenRefreshPolicy {
  private RideScreenRefreshPolicy(){}
  static long interval(boolean gpsFresh,double speedKmh,boolean focused){
-  if(!gpsFresh)return focused?4000:3000;
-  if(!Double.isFinite(speedKmh)||speedKmh<=3)return focused?2500:3000;
-  return focused?1500:1200;
+  // The focus view hides numeric gauges; only an occasional UI sanity refresh remains.
+  if(focused)return 5000;
+  if(!gpsFresh)return 3000;
+  if(!Double.isFinite(speedKmh)||speedKmh<=3)return 3000;
+  return 1200;
  }
 }
