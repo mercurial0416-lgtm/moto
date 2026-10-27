@@ -2,7 +2,7 @@ package com.motohub.next;
 import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.content.pm.ServiceInfo;import android.location.*;import android.os.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.UUID;import android.bluetooth.*;
 /** User-started location FGS. Local recording with explicit group sharing. No boot restart, network or mock positions. */
 public final class RideService extends Service implements LocationListener {
- static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;
+ static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;static volatile long liveMovingMillis=0,liveStationaryMillis=0,lastWidgetRefreshElapsed=0;
  // Volatile display data only: neither ECU samples nor Bluetooth address are uploaded/stored.
  static volatile int obdSpeedKmh=-1,obdReconnects=0;
  static volatile long obdSpeedSamples=0; // only current, explicitly enabled connection session
@@ -195,7 +195,7 @@ public final class RideService extends Service implements LocationListener {
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
   catch(IOException error){output.close();output=null;track.delete();throw error;}
   count=0;lastTime=0;lastFixElapsed=0;lastGood=null;
-  startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;gpsOnlyAfterObd=false;
+  startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;liveMovingMillis=0;liveStationaryMillis=0;lastWidgetRefreshElapsed=0;gpsOnlyAfterObd=false;
   active=track.getName();running=true;notificationRate.reset();status="GPS 신호 대기";
   MotoWidgetProvider.refresh(this);
  }
@@ -249,12 +249,12 @@ public final class RideService extends Service implements LocationListener {
      if(autoArmed&&obdMonitor==ref[0])obdAuxDiagnostics=summary;
     });}
     @Override public void connected(){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
-     obdLink="연결됨 · 차량 데이터 읽기 전용";
+     obdLink="연결됨 · 차량 데이터 읽기 전용";MotoWidgetProvider.refresh(RideService.this);
       ObdLocalDiagnosticLog.record(RideService.this,"BT_OK");
      if(!running)status="OBD2 연결됨 · 출발 대기";
     }});}
     @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
-     obdLink="연결 재시도 "+attempt+"/"+max;
+     obdLink="연결 재시도 "+attempt+"/"+max;MotoWidgetProvider.refresh(RideService.this);
      obdReconnects=attempt;speedSanity.reset();ObdLocalDiagnosticLog.record(RideService.this,"RECONNECT");obdSpeedKmh=-1;obdLastSampleElapsed=0;
      obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
      obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
@@ -368,7 +368,7 @@ public final class RideService extends Service implements LocationListener {
   // Keep an already-running GPS session in the same foreground service until its
   // user explicitly ends it. Never auto-arm again or enable group sharing.
   obdLastError="OBD2 · "+reason;
-  obdLink="연결 종료 · "+reason;speedSanity.reset();ObdLocalDiagnosticLog.record(this,"AUTO_OFF");obdSpeedKmh=-1;obdLastSampleElapsed=0;
+  obdLink="연결 종료 · "+reason;MotoWidgetProvider.refresh(this);speedSanity.reset();ObdLocalDiagnosticLog.record(this,"AUTO_OFF");obdSpeedKmh=-1;obdLastSampleElapsed=0;
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
   obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
   autoArmed=false;autoGate.reset();obdStationaryRemainingMs=-1;obdMonitor=null;
@@ -410,6 +410,12 @@ public final class RideService extends Service implements LocationListener {
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
   try{if(track.length()>TrackFile.MAX_BYTES-512)throw new IOException("경로 최대 크기에 도달했습니다.");output.write(TrackFile.point(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime()).getBytes(StandardCharsets.UTF_8));output.flush();output.getFD().sync();lastTime=location.getTime();lastFixElapsed=SystemClock.elapsedRealtime();count++;
    if(lastGood!=null){long dt=location.getTime()-lastGood.getTime();float metres=location.distanceTo(lastGood);
+    // Estimate only GPS-observed time; long gaps, poor accuracy and spikes
+    // are not silently counted as either moving or stopped.
+    if(RideTimePolicy.eligible(dt,metres,lastGood.getAccuracy(),location.getAccuracy())){
+     if(RideTimePolicy.moving(metres,dt))liveMovingMillis+=dt;
+     else liveStationaryMillis+=dt;
+    }
     if(RideMotionGate.countDistance(dt,metres,lastGood.getAccuracy(),location.getAccuracy())){
      double measuredKmh=metres*3600.0/dt;
      liveDistanceKm+=metres/1000.0;liveSpeedKmh=measuredKmh;
@@ -430,6 +436,12 @@ public final class RideService extends Service implements LocationListener {
   }
   // Neither optional group transmission nor the notification manager may
   // invalidate an already synced local track or stop this ride.
+  long nowForWidget=SystemClock.elapsedRealtime();
+  if(lastWidgetRefreshElapsed==0||nowForWidget<lastWidgetRefreshElapsed||
+     nowForWidget-lastWidgetRefreshElapsed>=30_000){
+   lastWidgetRefreshElapsed=nowForWidget;
+   MotoWidgetProvider.refresh(this);
+  }
   RidePostCommit.afterWrite(
    ()->{if(!autoArmed&&location.getAccuracy()<=40)Sharing.offer(location);},
    ()->{Sharing.stop();status="그룹 공유 실패 · 로컬 GPS 기록 유지";},
