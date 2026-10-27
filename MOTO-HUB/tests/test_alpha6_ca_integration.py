@@ -8,7 +8,7 @@ checks={
 'GPS signal stale resets estimated speed': 'now-lastFixElapsed>35_000' in java('RideService') and 'SystemClock.elapsedRealtime()' in java('RideService') and 'liveSpeedKmh=0;lastGood=null' in java('RideService'),
 'backup user review without overwriting': '지금 안전 백업 확인' in java('HubScreens') and 'if(destination.exists()||java.nio.file.Files.isSymbolicLink(destination.toPath()))return;' in java('LocalSafetyBackup'),
 'photo decode bounded': 'options.outWidth/options.inSampleSize>1024' in java('GarageHomeUi'),
-'widget IO off main': 'WIDGET_IO.execute(()->updateWidgets(' in java('MotoWidgetProvider') and 'goAsync()' in java('MotoWidgetProvider'),
+'widget does zero garage disk IO': 'getFilesDir()' not in java('MotoWidgetProvider') and 'R.layout.moto_widget' in java('MotoWidgetProvider'),
 'maintenance presets explicit': '정비 간격 선택 · 확인 후 적용' in java('MainActivity'),
 'ride moving duration': 'movingMillis' in java('RideInsights') and 'GPS 추정 이동 시간' in java('MainActivity'),
 'sold bikes retained and selectable': '판매 처리 (기록 보존)' in java('HubScreens') and 'GarageBikeStatus.label' in java('HubScreens'),
