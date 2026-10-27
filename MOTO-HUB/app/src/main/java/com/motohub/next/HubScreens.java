@@ -277,7 +277,7 @@ final class HubScreens {
   a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
- void settings(){title("설정과 도구","내 기록은 로그인 없이 기기에 보관됩니다");a.section("데이터 및 복구");line("백업 · 복원","JSON 내보내기와 기존 데이터 이전","열기",()->{LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·정비·주유·GPS 원본·사진을 백업하고 복원할 수 있어요. 복원은 현재 기록을 교체하므로 기존 기록이 필요하다면 먼저 내보내세요.",16,a.muted,false);a.action(p,"전체 ZIP 백업 복원",true,a::importBundle);a.action(p,"암호화 백업 복원 (.mhub)",false,a::importEncryptedBundle);
+ void settings(){title("설정","기록·내비·정비·백업만 간편하게 관리");a.section("데이터 및 복구");line("백업 · 복원","JSON 내보내기와 기존 데이터 이전","열기",()->{LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·정비·주유·GPS 원본·사진을 백업하고 복원할 수 있어요. 복원은 현재 기록을 교체하므로 기존 기록이 필요하다면 먼저 내보내세요.",16,a.muted,false);a.action(p,"전체 ZIP 백업 복원",true,a::importBundle);a.action(p,"암호화 백업 복원 (.mhub)",false,a::importEncryptedBundle);
   a.action(p,"지금 안전 백업 확인",false,()->{
    if(a.readOnly){a.toast("원본 보호 중에는 새 백업을 만들 수 없어요.");return;}
    // Snapshot a consistent DB state on the UI thread; schema validation and file IO run off-main.
@@ -352,15 +352,13 @@ final class HubScreens {
  i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,new String[]{"application/zip","application/x-zip-compressed","application/octet-stream"});
  a.startActivityForResult(i,60);
 });a.action(p,"JSON 백업만 내보내기",false,a::exportData);a.action(p,"JSON 백업 가져오기",false,()->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);a.startActivityForResult(i,42);});a.action(p,"이전 JSON 되돌리기 (사진·GPS 제외)",false,()->a.attempt(()->{android.util.AtomicFile f=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-import.json"));a.confirmImport(Store.parse(new String(f.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.show();});
-  a.section("표시 및 알림");
-  line("초소형 위젯 추가","2×1 · 기록 / 내비 두 버튼만 표시","홈에 추가",()->MotoWidgetPin.request(a,true));
-  line("기본 위젯 추가","4×1부터 · 기록 / 내비, 크기에 따라 바이크 정보 표시","홈에 추가",()->MotoWidgetPin.request(a,false));
+  line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":"최신 버전 확인 및 설치","열기",()->new AppUpdater(a).show());
+  a.section("내비 · 홈 위젯");
+  line("초소형 위젯 추가","2×1 · 출발 / 내비 · 가장 간단한 형태","홈에 추가",()->MotoWidgetPin.request(a,true));
+  line("기본 위젯 추가","4×1 · 기본 내비 변경 + 기록 실행","홈에 추가",()->MotoWidgetPin.request(a,false));
   line("기본 내비 선택","현재: "+NavigationApps.preferred(a).label+" · 카카오내비 / 네이버지도 / 티맵","변경",()->NavigationApps.choose(a));
   line("선택한 내비 실행","GPS 기록과 독립적으로 실행 · 목적지 미전송","열기",()->NavigationApps.openPreferred(a));
-  line("위젯 개인정보",a.getSharedPreferences("widget_privacy",0).getBoolean("hide_details",false)?"이름·주행거리·유지비 숨김":"이름·주행거리·유지비 표시","변경",()->{
-   boolean hide=a.getSharedPreferences("widget_privacy",0).getBoolean("hide_details",false);
-   a.getSharedPreferences("widget_privacy",0).edit().putBoolean("hide_details",!hide).apply();MotoWidgetProvider.refresh(a);a.render();
-  });
+  // Both widgets now show only shortcuts and never expose private garage data; no redundant privacy toggle.
   line("정비 알림",DailyMaintenanceJob.remindersEnabled(a)?"켜짐 · 날짜 기준 기기 알림":"꺼짐 · 동의 후 활성화","변경",()->{
    boolean enabled=DailyMaintenanceJob.remindersEnabled(a);
    new AlertDialog.Builder(a).setTitle("정비 알림")
@@ -378,21 +376,20 @@ final class HubScreens {
      }
     }).show();
   });
-  a.section("개인정보 및 라이딩");
-  line("라이딩 통합 자가진단","GPS·알림·배터리·OBD·백업 상태 한 번에 확인","실행",this::selfCheck);
-  // Single integrated diagnostics screen remains available on demand; no pre-ride checklist.
-  line("개인정보 없는 진단 보고서","권한·서명·GPS·연결 상태만 요약 · 좌표와 계정 정보 제외","열기",this::localDiagnostics);
-  line("친구·그룹 서버 연결",SocialClient.configured()?"서버 주소 설정됨 · 실제 로그인/접속 별도 확인":"서버 미설정 · 로컬 기록 사용 가능","진단",this::serverPreflight);
-  line("위치 공유 상태",Sharing.enabled?"그룹 위치 공유 중":"공유 꺼짐 · 명시적 동의 필요",Sharing.enabled?"중지":"확인",()->{
+  a.section("알림 · 안전");
+  line("라이딩 통합 자가진단","기록·권한·OBD·백업이 이상할 때만 확인","실행",this::selfCheck);
+  // Keep an accessible emergency stop ONLY if group location sharing is actually live.
+  if(Sharing.enabled)line("위치 공유 중지","현재 다른 사람에게 위치를 공유 중입니다.","즉시 중지",()->{
    if(Sharing.enabled)new AlertDialog.Builder(a).setTitle("위치 공유를 중지할까요?")
     .setNegativeButton("취소",null).setPositiveButton("즉시 중지",(d,w)->{Sharing.stop();a.render();}).show();
    else a.toast("위치 공유는 라이딩 화면에서 동의한 경우에만 시작됩니다.");
   });
-  a.section("내 바이크와 도구");
-  line("기변 계산기","구매·정비·등록 비용과 판매 예상액","열기",a::tradeIn);
+  a.section("기타 기본 설정");
   line("화면 테마","현재: "+a.settings().optString("theme","dark"),"변경",()->a.choose("화면 테마",new String[]{"system","light","dark"},v->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("theme",v);a.write(next);a.render();})));
   line("유지비 통계","바이크별 · 최근 6개월 주유/정비 비교","열기",this::costDashboard);
-  line("보호장구","장비와 교체 메모","열기",()->{LinearLayout p=a.page("보호장구");a.action(p,"장구 추가",true,()->a.edit("gear",null));for(JSONObject x:a.items("gear"))a.action(p,x.optString("name"),false,()->a.edit("gear",x));a.show();});line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":"최신 버전 확인과 설치","열기",()->new AppUpdater(a).show());a.section("앱 정보");
+  // The data structures for gear/trade-in and diagnostic reports stay untouched.
+  // Hidden extras can be opened in version-tap developer settings without cluttering normal UI.
+  a.section("앱 정보");
   // Deliberately hidden until the user taps the version label seven times.
   TextView version=a.text("MOTO HUB " + BuildConfig.VERSION_NAME + " · 기기별 독립 저장 · 계정 불필요",16,a.muted,false);
   LinearLayout.LayoutParams vl=new LinearLayout.LayoutParams(-1,-2);vl.bottomMargin=a.dp(8);a.content.addView(version,vl);
@@ -478,10 +475,20 @@ final class HubScreens {
   if(Sharing.enabled)a.action(p,"위치 공유 즉시 중지",false,()->{Sharing.stop();a.toast("이 기기에서 위치 전송을 중단했어요.");});
   a.show();
  }
+ void legacyGearManager(){
+  LinearLayout p=a.page("보관된 보호장구 기록");
+  a.action(p,"장구 추가",true,()->a.edit("gear",null));
+  for(JSONObject x:a.items("gear"))a.action(p,x.optString("name"),false,()->a.edit("gear",x));
+  a.show();
+ }
  void developerSettings(){
   if(!a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))return;
   LinearLayout p=a.page("개발자 모드");
-  a.label(p,"실험 기능은 일반 화면에 노출되지 않으며 자동 실행되지 않습니다.",15,a.muted,false);
+  a.label(p,"일반 화면에서 숨긴 기능입니다. 기존 데이터는 삭제하지 않았습니다. 필요할 때만 사용하세요.",15,a.muted,false);
+  a.action(p,"보관된 보호장구 기록",false,this::legacyGearManager);
+  a.action(p,"기변 계산기",false,a::tradeIn);
+  a.action(p,"개인정보 없는 진단 보고서",false,this::localDiagnostics);
+  a.action(p,"친구·그룹 서버 진단",false,this::serverPreflight);
   a.action(p,"듀크 390 · OBD2 읽기 전용 (실험)",true,()->{
    if(a.developerObd!=null)a.developerObd.stop();
    a.developerObd=new DeveloperObdScreen(a);a.developerObd.show();

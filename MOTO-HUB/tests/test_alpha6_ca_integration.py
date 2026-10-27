@@ -13,7 +13,7 @@ checks={
 'ride moving duration': 'movingMillis' in java('RideInsights') and 'GPS 추정 이동 시간' in java('MainActivity'),
 'sold bikes retained and selectable': '판매 처리 (기록 보존)' in java('HubScreens') and 'GarageBikeStatus.label' in java('HubScreens'),
 'group location sharing fail-closed': 'failedSends>=3' in java('Sharing') and 'Sharing.start(id)' in java('GroupUi'),
-'settings grouped': all(x in java('HubScreens') for x in ['데이터 및 복구','표시 및 알림','개인정보 및 라이딩','내 바이크와 도구']),
+'settings grouped': all(x in java('HubScreens') for x in ['데이터 및 복구','내비 · 홈 위젯','알림 · 안전','기타 기본 설정']),
 'version updated': version_declaration_ok(),
 'CI updated': debug_alignment_ok() and 'run-ca-improvements-tests.sh' in Path('.github/workflows/android-debug.yml').read_text(),
 'signed release only with secrets': 'MOTO_SIGNING_STORE_B64' in Path('.github/workflows/android-signed-release.yml').read_text(),

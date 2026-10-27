@@ -31,7 +31,7 @@ assert 'search.addTextChangedListener(' in ui and 'historyPanel.addView(results)
 merge=src.split(' void chooseMerge(){',1)[1].split(' void showMergeChoice(',1)[0]
 assert 'HISTORY_EXECUTOR.execute(()->{' in merge and 'TrackFile.tracks(a.getFilesDir())' in merge
 assert 'request!=MERGE_GENERATION.get()' in merge and 'showMergeChoice(candidates,names)' in merge
-assert '!hero.isAttachedToWindow()' in src and '!diagnostics.isAttachedToWindow()' in src
+assert '!hero.isAttachedToWindow()' in src and 'OBD2 데이터를 읽는 중' not in src
 assert 'if(results.isAttachedToWindow())' in ui
 assert 'Sharing.start(' not in src
 print('PASS: 16 async UI wiring, stale-screen guard, retry and opt-in sharing checks')
