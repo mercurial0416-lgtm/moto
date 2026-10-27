@@ -35,37 +35,50 @@ public final class RideInsights {
   return 6371000.0*2*Math.atan2(Math.sqrt(Math.min(1,h)),Math.sqrt(Math.max(0,1-h)));
  }
  public static Result analyze(File track)throws Exception{
-  final int[] count={0},bad={0},gaps={0},rests={0};final long[] start={0},end={0},last={0},lastObserved={0},observed={0};
-  final double[] lat={0},lon={0},previousAccuracy={0},km={0},max={0},peakLat={Double.NaN},peakLon={Double.NaN};
+  final int[] count={0},bad={0},gaps={0},rests={0};final long[] start={0},end={0},last={0},lastObserved={0},observed={0},stopLast={0},stopRun={0};
+  final double[] lat={0},lon={0},previousAccuracy={0},km={0},max={0},peakLat={Double.NaN},peakLon={Double.NaN},stopLat={0},stopLon={0},stopAccuracy={0};
   final long[] moving={0};final boolean[] have={false},restCounted={false};
   TrackFile.read(track,(x,y,accuracy,t)->{
    count[0]++;if(start[0]==0)start[0]=t;end[0]=t;
-   if(accuracy>40){bad[0]++;have[0]=false;lastObserved[0]=0;return;}
+   if(accuracy>40){bad[0]++;have[0]=false;lastObserved[0]=0;stopLast[0]=0;stopRun[0]=0;restCounted[0]=false;return;}
    if(lastObserved[0]>0){long gap=t-lastObserved[0];
     if(gap>RideMotionGate.MAX_CONTINUOUS_FIX_MS)gaps[0]++;
     else if(gap>0)observed[0]+=gap;
    }
    lastObserved[0]=t;
+   if(stopLast[0]>0){
+    long observedGap=t-stopLast[0];
+    double measured=meters(stopLat[0],stopLon[0],x,y);
+    boolean validGap=observedGap>0&&observedGap<=RideMotionGate.MAX_CONTINUOUS_FIX_MS;
+    // GPS jitter cannot be counted as actual travel: require two accurate readings.
+    boolean stationary=validGap&&accuracy<=25&&stopAccuracy[0]<=25&&
+       measured<Math.max(8.0,Math.min(18.0,Math.max(accuracy,stopAccuracy[0])))&&
+       measured*3600.0/observedGap<5;
+    if(stationary){
+     stopRun[0]+=observedGap;
+     if(stopRun[0]>=120_000&&!restCounted[0]){rests[0]++;restCounted[0]=true;}
+    }else{stopRun[0]=0;restCounted[0]=false;}
+   }
+   stopLast[0]=t;stopLat[0]=x;stopLon[0]=y;stopAccuracy[0]=accuracy;
    if(have[0]){
     long delta=t-last[0];double metres=meters(lat[0],lon[0],x,y);
     if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS &&
        metres<Math.max(Math.max(previousAccuracy[0],accuracy),5)){
-     // Stationary cluster: count each continuous two-minute rest only once.
-     if(delta>=120_000&&!restCounted[0]){rests[0]++;restCounted[0]=true;}
+     // The separate consecutive-fix rest detector above includes GPS jitter.
      return;
     }
     if(RideMotionGate.countDistance(delta,metres,previousAccuracy[0],accuracy)){
      double speed=metres*3600.0/delta;
      km[0]+=metres/1000.0;
      if(speed>max[0]){max[0]=speed;peakLat[0]=x;peakLon[0]=y;}
-     if(speed>=3){moving[0]+=delta;restCounted[0]=false;}
+     if(speed>=3)moving[0]+=delta;
     }else if(delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS){
      bad[0]++; // Discard impossible spikes without poisoning the last reliable location.
      return;
     }
     // On a long GPS outage, restart measurement here; never bridge the missing segment.
    }
-   if(have[0]&&t-last[0]>RideMotionGate.MAX_CONTINUOUS_FIX_MS)restCounted[0]=false;
+   // Rest streak is separately bounded to consecutive fixes, never across a GPS gap.
    lat[0]=x;lon[0]=y;last[0]=t;previousAccuracy[0]=accuracy;have[0]=true;
   });
   return new Result(count[0],bad[0],km[0],max[0],start[0],end[0],moving[0],observed[0],
