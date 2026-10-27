@@ -18,7 +18,7 @@ updater=read("AppUpdater.java")
 assert "gapPending[0]" in insights
 assert "if(gapPending[0]||gap>RideMotionGate.MAX_CONTINUOUS_FIX_MS)gaps[0]++" in insights
 assert "GPS 수신률" in insights and "stationaryConfidence" in insights
-assert 'views.setTextViewText(R.id.widget_ride,"라이딩 열기' in widget
+assert 'views.setTextViewText(R.id.widget_ride,"▶ 기록")' in widget
 assert 'getBoolean("hide_details",false)' in widget
 assert 'getSharedPreferences("ride_display",0)' in ride
 assert 'if(focus&&RideService.running)return;' in ride
