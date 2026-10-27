@@ -21,6 +21,27 @@ final class WidgetMaintenanceSummary {
    this.nextKm=nextKm;
   }
  }
+ /** Nearest outstanding mileage, based only on the latest valid record per service type. */
+ static String nextDistance(List<Service> history,double odometer){
+  if(history==null||!Double.isFinite(odometer)||odometer<0)return "";
+  Map<String,Service> latest=new LinkedHashMap<>();
+  for(Service item:history){
+   if(item==null||item.type.isBlank())continue;
+   try{if(!item.serviceDate.isBlank())LocalDate.parse(item.serviceDate.trim());}
+   catch(DateTimeParseException invalid){continue;}
+   String type=item.type.trim();
+   Service previous=latest.get(type);
+   if(previous==null||item.serviceDate.trim().compareTo(previous.serviceDate.trim())>=0)latest.put(type,item);
+  }
+  double best=Double.POSITIVE_INFINITY;
+  for(Service item:latest.values()){
+   if(!Double.isFinite(item.nextKm)||item.nextKm<=0)continue;
+   best=Math.min(best,item.nextKm-odometer);
+  }
+  if(!Double.isFinite(best))return "";
+  return best<=0?"거리 기준 점검 시기 지남":
+   "다음 점검 "+java.text.NumberFormat.getIntegerInstance(java.util.Locale.KOREA).format(Math.max(1,Math.round(best)))+"km 남음";
+ }
  static String label(List<Service> history, String today, double odometer) {
   Map<String,Service> latest=new LinkedHashMap<>();
   if(history==null)return "정비 일정 없음";
