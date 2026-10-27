@@ -5,6 +5,8 @@ public final class RideService extends Service implements LocationListener {
  static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;static volatile long liveMovingMillis=0,liveStationaryMillis=0,lastWidgetRefreshElapsed=0;
  // Volatile display data only: neither ECU samples nor Bluetooth address are uploaded/stored.
  static volatile int obdSpeedKmh=-1,obdReconnects=0;
+ static volatile long obdAverageLatencyMs=-1;
+ static volatile int obdQueryFailures=0,obdConnectionAttempts=0,obdConnectionSuccesses=0;
  static volatile long obdSpeedSamples=0; // only current, explicitly enabled connection session
  static volatile double obdRpm=Double.NaN,obdCoolantC=Double.NaN,obdVoltage=Double.NaN;
  static volatile String obdLink="연결 안 됨";
@@ -228,12 +230,17 @@ public final class RideService extends Service implements LocationListener {
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
-   obdReconnects=0;obdSpeedSamples=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
+   obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=1;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
    obdPidSupport="표준 지원 PID 확인 중 · ODO 미검증";
    obdAuxDiagnostics="센서 수신 기록 없음";obdStationaryRemainingMs=-1;
    obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdLastError="없음";
    final ObdAutoSpeedMonitor[] ref=new ObdAutoSpeedMonitor[1];
    ObdAutoSpeedMonitor reader=new ObdAutoSpeedMonitor(paired,new ObdAutoSpeedMonitor.Listener(){
+    @Override public void linkQuality(long averageMs,int samples,int failures){
+     handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
+      obdAverageLatencyMs=averageMs;obdQueryFailures=failures;
+     }});
+    }
     @Override public void speed(int kmh){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
      long elapsed=SystemClock.elapsedRealtime();
       if(!speedSanity.accept(kmh,elapsed)){
@@ -263,11 +270,11 @@ public final class RideService extends Service implements LocationListener {
     });}
     @Override public void connected(){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
      obdLink="연결됨 · 차량 데이터 읽기 전용";MotoWidgetProvider.refresh(RideService.this);
-      ObdLocalDiagnosticLog.record(RideService.this,"BT_OK");
+      ObdLocalDiagnosticLog.record(RideService.this,"BT_OK");obdConnectionSuccesses++;
      if(!running)status="OBD2 연결됨 · 출발 대기";
     }});}
     @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
-     obdLink="연결 재시도 "+attempt+"/"+max;MotoWidgetProvider.refresh(RideService.this);
+     obdLink="연결 재시도 "+attempt+"/"+max;obdConnectionAttempts++;MotoWidgetProvider.refresh(RideService.this);
      obdReconnects=attempt;speedSanity.reset();ObdLocalDiagnosticLog.record(RideService.this,"RECONNECT");obdSpeedKmh=-1;obdLastSampleElapsed=0;
      obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
      obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;

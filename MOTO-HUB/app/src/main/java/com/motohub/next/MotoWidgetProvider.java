@@ -73,6 +73,7 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
   String obd=RideService.autoArmed?(ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())?"OBD 수신 중":"OBD 연결 대기"):"OBD 꺼짐";
   views.setTextViewText(R.id.widget_connection_status,gps+"  ·  "+obd);
   if(context.getSharedPreferences("widget_privacy",Context.MODE_PRIVATE).getBoolean("hide_details",false)){
+   views.setTextViewText(R.id.widget_ride,"라이딩 열기  ›");
    views.setTextViewText(R.id.widget_bike_name,"MOTO HUB");
    views.setTextViewText(R.id.widget_bike_status,"개인 기록 숨김 · 앱에서 확인");
    views.setTextViewText(R.id.widget_connection_status,"상태 정보 숨김");

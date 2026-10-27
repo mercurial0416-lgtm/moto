@@ -19,6 +19,13 @@ final class ObdLatencyStats {
  void failure(String pid){
   int i=slot(pid);if(i>=0&&failures[i]<Integer.MAX_VALUE)failures[i]++;
  }
+ long speedAverageMs(){
+  int n=Math.min(count[0],WINDOW);if(n==0)return -1;
+  long total=0;for(int j=0;j<n;j++)total+=values[0][j];
+  return (total+n/2)/n;
+ }
+ int speedSamples(){return count[0];}
+ int speedFailures(){return failures[0];}
  String summary(){
   StringBuilder result=new StringBuilder();
   for(int i=0;i<PIDS.length;i++){

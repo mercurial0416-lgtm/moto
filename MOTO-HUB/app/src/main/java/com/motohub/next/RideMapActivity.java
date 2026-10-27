@@ -19,13 +19,14 @@ public final class RideMapActivity extends Activity {
  private final ArrayList<Polyline> speedLines=new ArrayList<>();
  private boolean speedVisible=false;private Polyline baseLine;
  private Button speedButton;
- private Button tileButton;private boolean onlineTiles=false;
+ private Button tileButton;private boolean onlineTiles=false,clearMapCacheOnExit=false;
  @Override public void onCreate(Bundle b){super.onCreate(b);
   String filename=getIntent().getStringExtra("track");
   if(filename==null||!filename.matches("[0-9]{10,15}-[0-9a-f-]{36}\\.track")){finish();return;}
   org.osmdroid.config.Configuration.getInstance().setUserAgentValue(getPackageName()+"/"+BuildConfig.VERSION_NAME);
   org.osmdroid.config.Configuration.getInstance().setOsmdroidBasePath(new File(getCacheDir(),"map"));
   org.osmdroid.config.Configuration.getInstance().setOsmdroidTileCache(new File(getCacheDir(),"map/tiles"));
+  org.osmdroid.config.Configuration.getInstance().setTileFileSystemCacheMaxBytes(MapCachePolicy.WARN_BYTES);
   LinearLayout base=new LinearLayout(this);base.setOrientation(LinearLayout.VERTICAL);base.setBackgroundColor(0xff090f14);setContentView(base);
   base.setOnApplyWindowInsetsListener((v,i)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets x=i.getInsets(WindowInsets.Type.systemBars());v.setPadding(x.left,x.top,x.right,x.bottom);}return i;});base.requestApplyInsets();
   LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);top.setPadding(12,8,12,8);
@@ -55,10 +56,28 @@ public final class RideMapActivity extends Activity {
     .setNegativeButton("오프라인 유지",null)
     .setPositiveButton("배경지도 켜기",(d,w)->setOnlineTiles(true)).show();
   });base.addView(tileButton);
+
   caption=new TextView(this);caption.setText("저장된 경로를 불러오는 중…");caption.setPadding(18,12,14,14);caption.setTextColor(0xff9caebd);caption.setTextSize(14);base.addView(caption);
   map=new MapView(this);map.setTileSource(TileSourceFactory.MAPNIK);map.setMultiTouchControls(true);
   // Saved routes stay available without automatically contacting any map tile server.
   map.setUseDataConnection(false);
+  Button cacheButton=new Button(this);cacheButton.setText("오프라인 지도 캐시 확인·정리");
+  cacheButton.setOnClickListener(v->new Thread(()->{
+   try{
+    MapCachePolicy.Result size=MapCachePolicy.scan(MapCachePolicy.target(getCacheDir()),false);
+    runOnUiThread(()->{if(!alive)return;
+     new AlertDialog.Builder(this).setTitle("배경지도 캐시")
+      .setMessage("현재 "+size.text()+"\nGPS 원본 및 바이크 데이터는 삭제하지 않습니다. 캐시 정리는 지도 화면을 닫은 뒤 진행해요.")
+      .setNegativeButton("유지",null)
+      .setPositiveButton("캐시 정리 후 닫기",(d,w)->{
+       setOnlineTiles(false);clearMapCacheOnExit=true;finish();
+      }).show();
+    });
+   }catch(Exception e){runOnUiThread(()->{if(alive)new AlertDialog.Builder(this)
+     .setTitle("지도 캐시 확인 불가").setMessage("안전하지 않은 경로 또는 너무 많은 파일이 감지됐습니다. 파일은 삭제하지 않았어요.")
+     .setPositiveButton("확인",null).show();});}
+  },"moto-map-cache-measure").start());
+  base.addView(cacheButton);
   map.getOverlayManager().getTilesOverlay().setColorFilter(org.osmdroid.views.overlay.TilesOverlay.INVERT_COLORS);
   map.getController().setZoom(10.0);base.addView(map,new LinearLayout.LayoutParams(-1,0,1));
   TextView attribution=new TextView(this);attribution.setText("오프라인 경로 표시 · 배경지도는 캐시에 있을 때만 표시 · © OpenStreetMap contributors");attribution.setTextColor(0xff9caebd);attribution.setPadding(12,8,12,14);base.addView(attribution);
@@ -104,7 +123,7 @@ public final class RideMapActivity extends Activity {
      double north=-90,south=90,east=-180,west=180;for(GeoPoint p:route){north=Math.max(north,p.getLatitude());south=Math.min(south,p.getLatitude());east=Math.max(east,p.getLongitude());west=Math.min(west,p.getLongitude());}
      if(north-south<.0005){north+=.002;south-=.002;}if(east-west<.0005){east+=.002;west-=.002;}
      map.zoomToBoundingBox(new BoundingBox(north,east,south,west),true,72);
-     caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\nGPS 공백 "+info.gpsGaps+"구간 · 추정 휴식 "+info.restStops+"곳 · 최고속도 마커 (GPS 추정)"+"\n초록 <30 · 노랑 30~69 · 빨강 ≥70km/h (GPS 추정)");
+     caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\nGPS 공백 "+info.gpsGaps+"구간 · 추정 휴식 "+info.restStops+"곳 · 최고속도 마커 (GPS 추정)"+"\nGPS 품질: "+info.gpsQuality()+" · 정차 추정: "+info.stationaryConfidence()+"\n초록 <30 · 노랑 30~69 · 빨강 ≥70km/h (GPS 추정)");
      map.invalidate();
     });
    }catch(Exception e){runOnUiThread(()->{if(alive&&caption!=null)caption.setText("경로를 열지 못했어요: "+e.getMessage());});}
@@ -117,5 +136,11 @@ public final class RideMapActivity extends Activity {
  }
  @Override protected void onResume(){super.onResume();if(map!=null)map.onResume();}
  @Override protected void onPause(){if(map!=null)map.onPause();super.onPause();}
- @Override protected void onDestroy(){alive=false;if(map!=null)map.onDetach();super.onDestroy();}
+ @Override protected void onDestroy(){
+  alive=false;if(map!=null)map.onDetach();super.onDestroy();
+  if(clearMapCacheOnExit)new Thread(()->{
+   try{MapCachePolicy.scan(MapCachePolicy.target(getCacheDir()),true);}
+   catch(Exception ignored){ /* Fail closed on links/large caches, never touch rides. */ }
+  },"moto-map-cache-clean").start();
+ }
 }

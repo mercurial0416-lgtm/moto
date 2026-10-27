@@ -18,6 +18,7 @@ final class ObdAutoSpeedMonitor {
   default void connected(){}
   default void capabilities(ObdPidCapabilities capability){}
   default void auxiliaryDiagnostics(String summary){}
+  default void linkQuality(long avgMs,int samples,int failures){}
  }
  private static final UUID SPP=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
  private final BluetoothDevice device;
@@ -85,6 +86,7 @@ final class ObdAutoSpeedMonitor {
    try{
     response=query(in,out,ObdReadOnlyProtocol.query("010D"),2500);
     latency.success("010D",(System.nanoTime()-started)/1_000_000L);
+    listener.linkQuality(latency.speedAverageMs(),latency.speedSamples(),latency.speedFailures());
    }catch(Exception error){
     latency.failure("010D");
     throw error;

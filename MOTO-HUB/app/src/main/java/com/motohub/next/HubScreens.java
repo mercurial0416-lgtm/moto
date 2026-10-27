@@ -306,6 +306,16 @@ final class HubScreens {
     }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("백업 점검 실패: "+e.getMessage());});}
    },"moto-backup-readiness").start();
   });
+  a.action(p,"GPS 원본·데이터 정밀 검사",false,()->{
+   a.toast("저장한 GPS 원본과 데이터 구조를 점검합니다.");
+   LOCAL_BACKUP_IO.execute(()->{
+    String report;
+    try{report=BackupDeepCheck.check(a.getFilesDir());}
+    catch(Exception ex){report="백업 원본 검사 실패 · 앱을 삭제하지 말고 ZIP 백업과 복구 상태를 확인해 주세요.";}
+    final String message=report;
+    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error(message);});
+   });
+  });
   a.action(p,"최근 자동 백업 복원",false,()->{
    a.toast("사용 가능한 복원 지점 확인 중…");
    LOCAL_BACKUP_IO.execute(()->{
