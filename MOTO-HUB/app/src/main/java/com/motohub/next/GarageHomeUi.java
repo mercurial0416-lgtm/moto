@@ -297,6 +297,16 @@ final class GarageHomeUi {
   btn.setBackground(a.shape(recording?(a.dark?0xFF372422:0xFFFCE8E6):surface,
    recording?(a.dark?0xFFAD615B:0xFFD99792):stroke,8));
   a.content.addView(btn,new LinearLayout.LayoutParams(-1,-2));
+  if(!recording&&!armed){
+   Button go=a.button("원터치 출발 · GPS + 기본 내비",true,()->{
+    a.navigate("라이딩");
+    new RideUi(a).requestStart(true);
+   });
+   go.setMinHeight(a.dp(54));
+   go.setContentDescription("GPS 기록에 동의한 뒤 시작하고, 기록이 시작되면 기본 내비 실행");
+   LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(-1,-2);gp.topMargin=a.dp(8);
+   a.content.addView(go,gp);
+  }
  }
  void quickNavigation(){
   NavigationChoice preferred=NavigationApps.preferred(a);
