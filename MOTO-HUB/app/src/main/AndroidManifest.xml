@@ -18,7 +18,7 @@
   <package android:name="com.nhn.android.nmap"/>
   <package android:name="com.skt.tmap.ku"/>
  </queries>
- <application android:theme="@style/AppTheme" android:label="MOTO HUB" android:icon="@drawable/ic_launcher" android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true" android:usesCleartextTraffic="false">
+ <application android:theme="@style/AppTheme" android:label="MOTO HUB" android:icon="@mipmap/ic_launcher" android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules" android:supportsRtl="true" android:usesCleartextTraffic="false">
   <provider android:name=".MotoCameraFileProvider" android:authorities="${applicationId}.receiptcamera"
    android:exported="false" android:grantUriPermissions="true">
    <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/receipt_camera_paths"/>
