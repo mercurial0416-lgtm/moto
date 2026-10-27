@@ -51,7 +51,14 @@ public final class ObdDashboardActivity extends Activity {
     String.format(Locale.KOREA,"GPS %.2f km · 최고 %.0f km/h",RideService.liveDistanceKm,RideService.livePeakKmh):
     "GPS 신호 대기 · 기존 기록 보존"):
     RideService.autoArmed?"자동 기록 대기 · GPS 기록 시작 전":"라이딩 미작동");
-  status.setText("OBD2 · "+RideService.obdLink+" · 재연결 "+RideService.obdReconnects+"회\n"+
+  int score=ObdLinkQuality.score(RideService.obdLastSampleElapsed,now,
+    RideService.obdAverageLatencyMs,(int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples),
+    RideService.obdQueryFailures,RideService.obdReconnects,
+    RideService.obdConnectionAttempts,RideService.obdConnectionSuccesses);
+   status.setText("OBD2 · "+RideService.obdLink+" · 재연결 "+RideService.obdReconnects+"회\n"+
+    ObdLinkQuality.label(score,(int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples))+
+    " · 응답 평균 "+(RideService.obdAverageLatencyMs<0?"대기":RideService.obdAverageLatencyMs+"ms")+
+    " · 연결 성공 "+RideService.obdConnectionSuccesses+"/"+RideService.obdConnectionAttempts+"회\n"+
    ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,speedFresh)+
    "\n"+RideService.engineEstimate()+"\n지원 PID: "+RideService.obdPidSupport+
    "\n"+ObdRestStatus.label(RideService.autoArmed,RideService.running,RideService.obdStationaryRemainingMs)+
