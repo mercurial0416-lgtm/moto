@@ -1,0 +1,92 @@
+name: MOTO HUB 524 preauthorized offline-signature release
+on:
+  push:
+    branches: ['release/moto-hub-apk']
+    paths:
+      - 'signed-artifacts/ux55-524-signing-block.json'
+permissions:
+  contents: write
+concurrency:
+  group: moto-hub-offline-524-publish
+  cancel-in-progress: false
+jobs:
+  validate-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install verification tooling
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Download the specific validated unsigned 524 build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # No signing key or password ever enters GitHub.
+          gh run download 40454482886 --repo "$GITHUB_REPOSITORY" \
+            --name moto-hub-ux55-code-524-unsigned --dir "$RUNNER_TEMP/unsigned"
+          test -s "$RUNNER_TEMP/unsigned/app-release-unsigned.apk"
+          test -s "$RUNNER_TEMP/unsigned/unsigned.sha256"
+          ( cd "$RUNNER_TEMP/unsigned" && sha256sum -c unsigned.sha256 )
+      - name: Reconstitute only the offline-signed, checksum-pinned APK
+        run: |
+          set -euo pipefail
+          python3 MOTO-HUB/tools/reassemble_preauthorized_signed_apk.py \
+            --unsigned "$RUNNER_TEMP/unsigned/app-release-unsigned.apk" \
+            --signature-patch signed-artifacts/ux55-524-signing-block.json \
+            --output "$RUNNER_TEMP/MOTO-HUB.apk"
+          APK="$RUNNER_TEMP/MOTO-HUB.apk"
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$SIGNER" verify --verbose "$APK"
+          CERT=$("$SIGNER" verify --print-certs "$APK" |
+            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 |
+            tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          test "$CERT" = "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='com.motohub.next'" | grep -F "versionCode='524'"
+          python3 MOTO-HUB/tools/make_update_manifest.py \
+            --apk "$APK" \
+            --apk-url "https://github.com/$GITHUB_REPOSITORY/releases/download/moto-hub-v524-offline/MOTO-HUB.apk" \
+            --aapt "$AAPT" --apksigner "$SIGNER" \
+            --output "$RUNNER_TEMP/manifest.json"
+      - name: Publish release asset before updating the public in-app manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=moto-hub-v524-offline
+          test ! -z "$TAG"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Existing release tag; refusing to overwrite published binary"
+            exit 1
+          fi
+          gh release create "$TAG" "$RUNNER_TEMP/MOTO-HUB.apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "MOTO HUB 524 - UX54 in-app update" \
+            --notes "Verified fixed signing certificate. Update inside MOTO HUB; retains compatible installed data." \
+            --target "$GITHUB_SHA"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name' | grep -Fx "MOTO-HUB.apk"
+          CURRENT_SHA=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .sha)
+          CURRENT_CODE=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content |
+            tr -d '\n' | base64 --decode |
+            python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
+          if (( CURRENT_CODE >= 524 )); then
+            echo "Main already reports version $CURRENT_CODE, refusing downgrade"
+            exit 1
+          fi
+          CONTENT=$(base64 --wrap=0 "$RUNNER_TEMP/manifest.json")
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json" \
+            -f branch=main -f sha="$CURRENT_SHA" -f content="$CONTENT" \
+            -f message="Publish UX54 524 verified in-app update [skip ci]"
+          CODE=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content |
+            tr -d '\n' | base64 --decode |
+            python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
+          test "$CODE" = 524
+          echo "MOTO HUB 524 LIVE via the existing in-app updater"
