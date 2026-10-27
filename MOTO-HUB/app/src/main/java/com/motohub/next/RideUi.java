@@ -137,7 +137,8 @@ final class RideUi {
    hero.addView(finishRide);
   }
   a.content.addView(hero);a.gap(a.content,12);
-  if(focus&&RideService.running)return; // Keep verified GPS stop button; hide nonessential forms while riding.
+  // Keep navigation controls accessible even in ride focus mode.
+  if(!focus){
   // The first-connection flow belongs near ride controls, not buried in Settings.
   // It is still explicitly gated by the opted-in experimental OBD mode.
   if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
@@ -161,18 +162,20 @@ final class RideUi {
     }};linkStatus.post(updateLink);
    }
   }
+  }
   // Safe launcher: changing the default does not unexpectedly open an external app.
   NavigationChoice chosen=NavigationApps.preferred(a);
   LinearLayout navigation=a.col();navigation.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(12));
   navigation.setBackground(a.shape(a.panel,a.line,12));
-  navigation.addView(a.text("외부 내비게이션",15,a.fg,true));a.gap(navigation,8);
+  navigation.addView(a.text("외부 내비게이션 · 선택: "+chosen.label,15,a.fg,true));a.gap(navigation,8);
   Button openNav=a.button(chosen.label+" 바로 실행",true,()->NavigationApps.openPreferred(a));
   openNav.setMinHeight(a.dp(54));openNav.setContentDescription(chosen.label+" 앱 실행");
   navigation.addView(openNav);
   Button changeNav=a.button("기본 내비 설정 · 카카오 / 네이버 / 티맵",false,()->NavigationApps.choose(a));
   changeNav.setMinHeight(a.dp(48));navigation.addView(changeNav);
-  navigation.addView(a.text("내비를 실행해도 GPS 기록은 계속됩니다. 경로·위치·OBD 값은 전송하지 않으며 이륜차 통행 제한은 직접 확인하세요.",12,a.muted,false));
+  if(!focus)navigation.addView(a.text("내비를 실행해도 GPS 기록은 계속됩니다. 경로·위치·OBD 값은 전송하지 않으며 이륜차 통행 제한은 직접 확인하세요.",12,a.muted,false));
   a.content.addView(navigation);a.gap(a.content,12);
+  if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
   if(RideService.autoArmed&&a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
    LinearLayout diagnostics=a.col();diagnostics.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(14));diagnostics.setBackground(a.shape(a.panel,a.line,14));
    TextView telem=a.text("OBD2 데이터를 읽는 중…",14,a.fg,false);diagnostics.addView(telem);
