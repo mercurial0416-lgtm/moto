@@ -445,7 +445,7 @@ final class HubScreens {
     detail=backup?"파일 수·크기 사전 점검 통과 · 전체 ZIP 복구 가능 여부는 내보내기 후 확인":"파일 수·용량에 주의 필요 · 백업/복원 화면에서 확인";
    }catch(Exception err){detail="백업 사전 점검 실패 · 원본 삭제 금지";}
    final String report=RideDiagnostics.summarize(fineReady,gpsReady,notifyReady,batteryReady,
-    RideService.autoArmed,ObdFailureGuide.classify(RideService.obdLastError),backup)+"\n"+detail;
+    RideService.autoArmed,"없음".equals(RideService.obdLastError)?"오류 없음":ObdFailureGuide.classify(RideService.obdLastError),backup)+"\n"+detail;
    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()&&a.dialog==opened&&opened.isShowing())result.setText(report);});
   },"moto-ondevice-health-check").start();
  }
