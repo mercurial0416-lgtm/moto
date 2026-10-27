@@ -360,7 +360,7 @@ public final class RideService extends Service implements LocationListener {
  Notification notification(String text){
   PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,RideService.class).setAction(STOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-  Notification.Builder builder=new Notification.Builder(this,"ride").setSmallIcon(R.drawable.ic_launcher)
+  Notification.Builder builder=new Notification.Builder(this,"ride").setSmallIcon(R.drawable.ic_notification)
     .setContentTitle(autoArmed?"MOTO HUB · OBD2 자동 라이딩":"MOTO HUB · GPS 기록 중")
     .setContentText(text).setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PRIVATE)
     .addAction(new Notification.Action.Builder(null,"기록 종료",stop).build());
