@@ -353,6 +353,8 @@ final class HubScreens {
  a.startActivityForResult(i,60);
 });a.action(p,"JSON 백업만 내보내기",false,a::exportData);a.action(p,"JSON 백업 가져오기",false,()->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);a.startActivityForResult(i,42);});a.action(p,"이전 JSON 되돌리기 (사진·GPS 제외)",false,()->a.attempt(()->{android.util.AtomicFile f=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-import.json"));a.confirmImport(Store.parse(new String(f.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.show();});
   a.section("표시 및 알림");
+  line("초소형 위젯 추가","2×1 · 기록 / 내비 두 버튼만 표시","홈에 추가",()->MotoWidgetPin.request(a,true));
+  line("기본 위젯 추가","4×1부터 · 기록 / 내비, 크기에 따라 바이크 정보 표시","홈에 추가",()->MotoWidgetPin.request(a,false));
   line("기본 내비 선택","현재: "+NavigationApps.preferred(a).label+" · 카카오내비 / 네이버지도 / 티맵","변경",()->NavigationApps.choose(a));
   line("선택한 내비 실행","GPS 기록과 독립적으로 실행 · 목적지 미전송","열기",()->NavigationApps.openPreferred(a));
   line("위젯 개인정보",a.getSharedPreferences("widget_privacy",0).getBoolean("hide_details",false)?"이름·주행거리·유지비 숨김":"이름·주행거리·유지비 표시","변경",()->{
