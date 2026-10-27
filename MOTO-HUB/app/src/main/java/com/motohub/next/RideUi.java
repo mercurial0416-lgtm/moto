@@ -47,21 +47,8 @@ final class RideUi {
   TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?0xff48d99a:a.accent,true);hero.addView(eyebrow);
   TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?RideService.count+"개 위치 기록":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",24,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
   TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?"화면을 꺼도 기기에 GPS 경로를 기록해요":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
-  RideReadiness.State readiness=readiness();
-  if(!RideService.running){
-   if(readiness!=RideReadiness.State.READY){
-    LinearLayout warning=a.col();warning.setPadding(a.dp(13),a.dp(13),a.dp(13),a.dp(13));warning.setBackground(a.shape(a.bg,a.line,12));
-    warning.addView(a.text(RideReadiness.title(readiness),15,a.fg,true));a.gap(warning,6);
-    warning.addView(a.text(RideReadiness.guidance(readiness),13,a.muted,false));a.gap(warning,10);
-    String action=RideReadiness.action(readiness);
-    if(!action.isEmpty())warning.addView(a.button(action,false,()->handleReadiness(readiness)));
-    hero.addView(warning);a.gap(hero,12);
-   }
-   if(!RideService.status.equals("기록 꺼짐")&&!RideService.status.equals("기록 종료")){
-    TextView last=a.text("최근 GPS 상태 · "+RideService.status,12,a.muted,false);
-    last.setPadding(0,0,0,a.dp(12));hero.addView(last);
-   }
-  }
+  // No redundant pre-ride checklist. Explicit permission/consent handling stays
+  // inside requestStart/start; foreground GPS never starts silently.
   if(RideService.running){
    Button focusToggle=a.button(focus?"집중 모드 종료":"주행 집중 모드",false,()->{
     a.getSharedPreferences("ride_display",0).edit().putBoolean("focus",!focus).apply();
