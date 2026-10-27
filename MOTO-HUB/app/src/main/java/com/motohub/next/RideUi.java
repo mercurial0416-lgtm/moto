@@ -109,7 +109,7 @@ final class RideUi {
        a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
       }).show();
     }
-    hero.postDelayed(this,1000);
+    hero.postDelayed(this,RideScreenRefreshPolicy.interval(RideService.gpsFresh(),RideService.liveSpeedKmh,focus));
    }};hero.post(refresh);
   }
 
