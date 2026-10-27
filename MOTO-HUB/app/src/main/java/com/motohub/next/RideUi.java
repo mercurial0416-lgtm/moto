@@ -581,6 +581,7 @@ final class RideUi {
   a.toast("기기에 저장된 경로를 분석합니다.");
   new Thread(()->{
    RideMonthlyReport report=new RideMonthlyReport();
+   RideTypeComparison categoryComparison=new RideTypeComparison();
    int limited=0;
    try{
     long now=System.currentTimeMillis();
@@ -596,7 +597,7 @@ final class RideUi {
      if(inspected>=150){limited++;continue;}
      inspected++;
      if(track.length()>5_000_000){report.skipped++;continue;}
-     try{RideInsights.Result data=RideInsights.analyze(track);report.add(track,now,data.distanceKm,data.durationMillis);}
+     try{RideInsights.Result data=RideInsights.analyze(track);report.add(track,now,data.distanceKm,data.durationMillis);categoryComparison.add(track,now,data);}
      catch(Exception ignored){report.skipped++;}
     }
    }catch(Exception ignored){report.skipped++;}
@@ -609,7 +610,7 @@ final class RideUi {
      +"\n"+RideTrend.compare(report.current.km,report.previous.km)
      +"\n최근   "+RideReportBars.render(report.current.km,Math.max(report.current.km,report.previous.km))
      +"\n이전   "+RideReportBars.render(report.previous.km,Math.max(report.current.km,report.previous.km))
-     +"\n손상·크기 초과 등 제외 "+report.skipped+"건"
+     +"\n"+categoryComparison.report()+"\n손상·크기 초과 등 제외 "+report.skipped+"건"
      +(omitted>0?"\n분석 제한(최신 150건)으로 제외 "+omitted+"건 · 전체 통계 아님":"");
     new AlertDialog.Builder(a).setTitle("내 라이딩 통계").setMessage(text+"\n\nGPS 계산값이며 현재 기록 중인 라이딩은 제외합니다. GPX는 가져온 날짜가 아닌 실제 기록 날짜를 사용합니다.").setPositiveButton("확인",null).show();
    });
