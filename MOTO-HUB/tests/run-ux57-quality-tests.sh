@@ -31,7 +31,7 @@ assert "BackupReadiness.inspect(" in settings
 assert "MapCachePolicy.scan(" in mapui
 assert "setUseDataConnection(false)" in mapui
 assert "setTileFileSystemCacheMaxBytes" in mapui
-assert "getCacheDir()" in mapui and "getFilesDir()" not in mapui
+assert "MapCachePolicy.target(getCacheDir())" in mapui and "MapCachePolicy.target(getFilesDir())" not in mapui
 assert "중단된 다운로드 재시도" in updater
 assert "12*60_000L" in updater
 ElementTree.parse("app/src/main/AndroidManifest.xml")
