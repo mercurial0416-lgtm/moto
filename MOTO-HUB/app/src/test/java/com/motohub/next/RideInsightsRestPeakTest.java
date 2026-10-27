@@ -17,7 +17,7 @@ public final class RideInsightsRestPeakTest {
    }
    gps.append(TrackFile.point(37.001,127.0,4,at+190_000)); // valid 40km/h segment
    gps.append(TrackFile.point(37.001,127.0,4,at+260_000)); // 70s outage
-   Files.writeString(f.toPath(),gps.toString());
+   Files.write(f.toPath(),gps.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
    RideInsights.Result result=RideInsights.analyze(f);
    assertEquals(1,result.restStops);
    assertEquals(1,result.gpsGaps);
