@@ -4,7 +4,7 @@ import java.util.Locale;
 
 /** Compares explicitly labelled ride types only. No home/work inference from coordinates. */
 final class RideTypeComparison {
- private RideTypeComparison(){}
+ RideTypeComparison(){}
  static final class Totals {
   int count;double km;long movingMs;
   void add(RideInsights.Result ride){count++;km+=ride.distanceKm;movingMs+=ride.movingMillis;}
