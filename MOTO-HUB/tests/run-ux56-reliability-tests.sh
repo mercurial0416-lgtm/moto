@@ -16,7 +16,7 @@ insights=src("RideInsights.java")
 updater=src("AppUpdater.java")
 settings=src("HubScreens.java")
 assert 'GpsSyncPolicy gpsSync=new GpsSyncPolicy()' in service
-assert 'gpsSync.shouldSync(SystemClock.elapsedRealtime())' in service
+assert 'gpsSync.shouldSync(writeAt)' in service and 'postDelayed(syncPendingGps' in service
 assert 'output.getFD().sync();output.close()' in service
 assert '"com.motohub.next.CONFIRM_RIDE_STOP"' in service
 assert 'PendingIntent.getActivity(this,1,confirmStop' in service
