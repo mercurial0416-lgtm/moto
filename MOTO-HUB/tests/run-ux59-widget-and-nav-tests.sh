@@ -30,8 +30,8 @@ assert "EXTRA_ONE_TAP_RIDE,true" in quickSrc
 assert "EXTRA_NAVIGATION,true" in quickSrc
 assert "PendingIntent.FLAG_IMMUTABLE" in quickSrc
 widgetSrc=(src/"MotoWidgetProvider.java").read_text()
-assert 'views.setViewVisibility(R.id.widget_nav,View.VISIBLE)' in widgetSrc
-assert 'widget_header' in widgetSrc
+assert 'R.id.widget_nav,pending(context' in widgetSrc
+assert 'R.id.widget_nav_choice' in widgetSrc
 assert "ride_display" in (src/"RideUi.java").read_text()
 assert "live.setVisibility(focus?android.view.View.GONE" in (src/"RideUi.java").read_text()
 assert "NavigationApps.choose(a)" in (src/"RideUi.java").read_text()
