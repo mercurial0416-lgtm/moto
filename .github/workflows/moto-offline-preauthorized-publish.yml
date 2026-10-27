@@ -33,7 +33,9 @@ jobs:
             --name moto-hub-ux55-code-524-unsigned --dir "$RUNNER_TEMP/unsigned"
           test -s "$RUNNER_TEMP/unsigned/app-release-unsigned.apk"
           test -s "$RUNNER_TEMP/unsigned/unsigned.sha256"
-          ( cd "$RUNNER_TEMP/unsigned" && sha256sum -c unsigned.sha256 )
+          EXPECTED=$(cut -d' ' -f1 "$RUNNER_TEMP/unsigned/unsigned.sha256")
+          ACTUAL=$(sha256sum "$RUNNER_TEMP/unsigned/app-release-unsigned.apk" | cut -d' ' -f1)
+          test "$ACTUAL" = "$EXPECTED" || { echo "::error::Unsigned APK artifact checksum mismatch"; exit 1; }
       - name: Reconstitute only the offline-signed, checksum-pinned APK
         run: |
           set -euo pipefail
