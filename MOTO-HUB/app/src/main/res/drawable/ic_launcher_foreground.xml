@@ -2,19 +2,18 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
  android:width="108dp" android:height="108dp"
  android:viewportWidth="108" android:viewportHeight="108">
- <!-- Only the center safe zone contains important content: Android masks the outer 18dp. -->
- <path android:fillColor="#FF7414" android:pathData="M54,18 C41,18 32,28 32,41 C32,55 54,77 54,77 C54,77 76,55 76,41 C76,28 67,18 54,18 Z"/>
- <path android:fillColor="#13171D" android:pathData="M54,28 a13,13 0,1 0,0.01 0"/>
- <path android:fillColor="#111419" android:strokeColor="#0E1116" android:strokeWidth="2"
-  android:pathData="M17,73 C36,69 45,63 56,63 C73,63 84,72 91,80 L89,91 L19,91 Z"/>
- <!-- Wheels / motorcycle silhouette. -->
- <path android:fillColor="#111419" android:strokeColor="#F6F7F9" android:strokeWidth="3.2"
-  android:pathData="M35,78 m-9,0 a9,9 0,1 0,18 0 a9,9 0,1 0,-18 0"/>
- <path android:fillColor="#111419" android:strokeColor="#F6F7F9" android:strokeWidth="3.2"
-  android:pathData="M77,78 m-9,0 a9,9 0,1 0,18 0 a9,9 0,1 0,-18 0"/>
- <path android:fillColor="@android:color/transparent" android:strokeColor="#FF7414" android:strokeWidth="4.2"
+ <!-- Black/orange angular naked-bike silhouette; all functional strokes within adaptive-icon safe zone. -->
+ <path android:fillColor="#00000000" android:strokeColor="#FF762B" android:strokeWidth="5.1"
+  android:strokeLineCap="round" android:pathData="M29,69 m-10,0 a10,10 0,1 0,20 0 a10,10 0,1 0,-20 0"/>
+ <path android:fillColor="#00000000" android:strokeColor="#FF762B" android:strokeWidth="5.1"
+  android:strokeLineCap="round" android:pathData="M78,69 m-10,0 a10,10 0,1 0,20 0 a10,10 0,1 0,-20 0"/>
+ <path android:fillColor="#FF762B" android:pathData="M42,40 L63,37 L73,46 L59,48 L51,57 L38,53 Z"/>
+ <path android:fillColor="#FF8E35" android:pathData="M43,35 L70,33 L77,38 L63,40 L47,41 Z"/>
+ <path android:fillColor="#FF762B" android:pathData="M33,47 L47,45 L40,54 L34,61 L22,61 L27,55 Z"/>
+ <path android:fillColor="#FF762B" android:pathData="M66,42 L80,36 L88,39 L75,44 L83,68 L77,70 Z"/>
+ <path android:fillColor="#00000000" android:strokeColor="#FF8E35" android:strokeWidth="4"
   android:strokeLineCap="round" android:strokeLineJoin="round"
-  android:pathData="M35,78 L46,61 L62,78 L77,78 L66,60 L52,60 L46,61 M45,61 L41,54 L48,54 M66,60 L74,55 L80,56"/>
- <path android:fillColor="@android:color/transparent" android:strokeColor="#FCFCFC"
-  android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M49,57 L62,57 L65,60"/>
+  android:pathData="M29,69 L43,49 L56,69 L78,69 L64,48 M45,49 L69,48"/>
+ <path android:fillColor="#FF762B" android:pathData="M55,44 L69,22 L62,37 L74,34 L57,57 L61,45 Z"/>
+ <path android:fillColor="#D2D7DB" android:pathData="M66,27 L76,29 L82,35 L73,33 Z"/>
 </vector>
