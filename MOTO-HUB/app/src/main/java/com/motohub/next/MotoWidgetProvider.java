@@ -19,6 +19,8 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
  public static final String EXTRA_ONE_TAP_RIDE="com.motohub.next.WIDGET_ONE_TAP_RIDE";
  public static final String EXTRA_NAVIGATION="com.motohub.next.WIDGET_NAVIGATION";
  public static final String EXTRA_SELECT_NAV="com.motohub.next.WIDGET_SELECT_NAV";
+ private static String lastNavigationChoice=null;
+ private static int[] lastWidgetIds=null;
  @Override public void onUpdate(Context context,AppWidgetManager manager,int[] ids){
   for(int id:ids)manager.updateAppWidget(id,build(context));
  }
@@ -44,9 +46,16 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
   return PendingIntent.getActivity(context,request,i,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
  }
  /** Called after changing default navigator or upgrading; must remain light even during GPS recording. */
- public static void refresh(Context context){
+ public static synchronized void refresh(Context context){
   AppWidgetManager manager=AppWidgetManager.getInstance(context);
   int[] ids=manager.getAppWidgetIds(new ComponentName(context,MotoWidgetProvider.class));
+  java.util.Arrays.sort(ids);
+  String navigator=NavigationApps.preferred(context).id;
+  if(java.util.Arrays.equals(ids,lastWidgetIds)&&navigator.equals(lastNavigationChoice))return;
+  // Widgets contain shortcuts and navigator name only. GPS fixes and fuel/ride
+  // database writes must not trigger repeated expensive launcher RemoteViews.
   if(ids.length>0)for(int id:ids)manager.updateAppWidget(id,build(context));
+  lastWidgetIds=ids.clone();
+  lastNavigationChoice=navigator;
  }
 }

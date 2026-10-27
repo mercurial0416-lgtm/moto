@@ -142,6 +142,15 @@ final class RideUi {
   // Live OBD sensor dashboard intentionally hidden here: the KTM's TFT already
   // displays RPM, speed and coolant. The Bluetooth adapter and recorded data
   // remain supported via the opt-in advanced tools.
+  // Advanced GPX import, manual merging and statistics are intentionally
+  // collapsed; the normal ride view focuses on record, navigation and history.
+  final boolean extras=a.getSharedPreferences("ride_ui",0).getBoolean("extras",false);
+  Button extrasToggle=a.button(extras?"추가 기능 접기":"GPX · 통계 등 추가 기능",false,()->{
+   a.getSharedPreferences("ride_ui",0).edit().putBoolean("extras",!extras).apply();
+   a.renderPreservingPosition();
+  });
+  extrasToggle.setMinHeight(a.dp(42));a.content.addView(extrasToggle);
+  if(extras){
   a.gap(a.content,4);
   LinearLayout tools=new LinearLayout(a);
   Button importButton=a.button("GPX 가져오기",false,a::pickGpx);Button refresh=a.button("새로고침",false,a::render);
@@ -151,6 +160,7 @@ final class RideUi {
   a.gap(a.content,12);
   a.action(a.content,"최근 30일 주행 통계 · 바이크별",false,this::chooseRideReport);
   a.action(a.content,"라이딩 2건 통합 · 원본 보존",false,this::chooseMerge);
+  }
   a.gap(a.content,8);a.label(a.content,"기록된 라이딩",20,a.fg,true);
   // Render controls immediately and read track/sidecar metadata on one background worker.
   // A new render invalidates the previous snapshot; no GPS file is modified here.
@@ -597,7 +607,22 @@ final class RideUi {
   a.attempt(()->{
    a.startForegroundService(new Intent(a,RideService.class).putExtra(RideService.EXTRA_BIKE_ID,a.bike()==null?"":a.bike().optString("id")));
    boolean nav=a.launchNavigationAfterRide;a.launchNavigationAfterRide=false;
-   a.toast("GPS 시작을 요청했어요.");
+   a.toast("GPS 기록을 시작하는 중…");
+   if(!nav){
+    final android.os.Handler statusCheck=new android.os.Handler(android.os.Looper.getMainLooper());
+    final long started=android.os.SystemClock.elapsedRealtime();
+    statusCheck.postDelayed(new Runnable(){@Override public void run(){
+     if(a.isFinishing()||a.isDestroyed())return;
+     if(RideService.running){
+      a.toast(RideService.gpsFresh()?"GPS 기록 시작됨 · 위치 수신 정상":
+       "GPS 기록 시작됨 · 첫 위치 수신 대기");
+      return;
+     }
+     if(android.os.SystemClock.elapsedRealtime()-started<12_000L)
+      statusCheck.postDelayed(this,650);
+     else a.toast("GPS 기록 시작을 확인하지 못했어요. 라이딩 상태를 확인해 주세요.");
+    }},700);
+   }
    a.root.postDelayed(()->{if(!a.isFinishing())a.render();},800);
    if(nav){
     final android.os.Handler starter=new android.os.Handler(android.os.Looper.getMainLooper());
@@ -605,6 +630,7 @@ final class RideUi {
     starter.postDelayed(new Runnable(){@Override public void run(){
      if(a.isFinishing()||a.isDestroyed())return;
      if(RideService.running){
+      a.toast("GPS 기록 시작됨 · 선택한 내비를 엽니다.");
       NavigationApps.openPreferred(a);
       return;
      }

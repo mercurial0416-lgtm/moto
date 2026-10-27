@@ -36,7 +36,7 @@ public class MainActivity extends Activity {
  final Set<String> compare=new LinkedHashSet<>();
  int recordPageOffset=0, listingPageOffset=0;
  String garageMode="전체", previousTab="홈", rideHistoryFilter=RideHistoryFilter.ALL, rideHistorySort=RideHistorySort.NEWEST, rideHistoryPeriod=RideHistoryPeriod.ALL, rideHistoryBike=RideHistoryBikeFilter.ALL, rideHistoryQuery="";
- final String[] tabs={"홈","차고","매물","라이딩","더보기"};
+ final String[] tabs={"홈","라이딩","차고","더보기"};
  interface Work{void run()throws Exception;}
  interface Choice{void pick(String value);}
  @Override public void onCreate(Bundle state){super.onCreate(state);PrivateCacheCleanup.atProcessStart(getCacheDir(),getFilesDir(),System.currentTimeMillis());ReceiptCameraFiles.cleanOld(getCacheDir(),System.currentTimeMillis());new Thread(()->{synchronized(MotorcyclePhoto.class){AutoPhotoCache.trim(new File(getFilesDir(),"moto-year-photos"),System.currentTimeMillis());}},"moto-photo-cache-maintenance").start();if(!RideService.running)Sharing.stop();disk=new AtomicFile(new File(getFilesDir(),"motohub-v3.json"));
@@ -97,7 +97,7 @@ public class MainActivity extends Activity {
  }
  @Override protected void onResume(){super.onResume();
   // Device location/notification settings may have changed while the settings app was open.
-  if(root!=null&&"라이딩".equals(tab)&&dialog==null)render();
+  if(root!=null&&"라이딩".equals(tab)&&dialog==null)renderPreservingPosition();
   if(!readOnly)DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
   AppUpdateNotice.checkOnResume(this);
@@ -405,6 +405,23 @@ public class MainActivity extends Activity {
    break;
   }
  }
+ void renderPreservingPosition(){
+  if(root==null){render();return;}
+  int savedY=0;
+  for(int i=0;i<root.getChildCount();i++)if(root.getChildAt(i) instanceof ScrollView){
+   savedY=((ScrollView)root.getChildAt(i)).getScrollY();break;
+  }
+  final String sourceTab=tab;final int restoreY=savedY;
+  render();
+  if(root==null)return;
+  for(int i=0;i<root.getChildCount();i++)if(root.getChildAt(i) instanceof ScrollView){
+   final ScrollView target=(ScrollView)root.getChildAt(i);
+   target.post(()->{
+    if(!isFinishing()&&!isDestroyed()&&root!=null&&target.getParent()==root&&sourceTab.equals(tab))
+      target.scrollTo(0,restoreY);
+   });break;
+  }
+ }
  void render(){String theme=settings().optString("theme","dark");dark=theme.equals("dark")||(theme.equals("system")&&(getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);
   int[] palette=MotoDesign.colors(dark);bg=palette[0];fg=palette[1];muted=palette[2];line=palette[3];accent=palette[4];panel=palette[5];highlight=palette[6];
 getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(panel);
@@ -478,15 +495,21 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  }
  void garage(){new HubScreens(this).records();}
  void friendsMap(){more();}
- void ride(){heading("라이딩","GPS · GPX · 주행 분석");new RideUi(this).render();section("출발 전 점검");String rideKey=today()+"|"+(bike()==null?"no-bike":bike().optString("id"));
-  String[] checks={"타이어·브레이크·등화 확인","헬멧·장갑·보호장구 착용","연료와 목적지 경로 확인"};
-  android.content.SharedPreferences ridePrefs=getSharedPreferences("ride_checks",MODE_PRIVATE);
-  for(int ix=0;ix<checks.length;ix++){
-   String checkId=rideKey+"|"+ix;CheckBox check=new CheckBox(this);check.setText(checks[ix]);check.setTextSize(16);check.setTextColor(fg);
-   check.setMinHeight(dp(52));check.setChecked(ridePrefs.getBoolean(checkId,false));
-   check.setOnCheckedChangeListener((v,value)->ridePrefs.edit().putBoolean(checkId,value).apply());content.addView(check);
+ void ride(){
+  heading("라이딩","기록 · 내비 · 주행 이력");
+  new RideUi(this).render();
+ }
+ // Saved manual routes are preserved under advanced tools; data is never deleted.
+ void savedRoutes(){
+  LinearLayout p=page("저장한 코스");
+  action(p,"＋ 코스 저장",true,()->edit("routes",null));
+  for(JSONObject x:items("routes")){
+   action(p,x.optString("name","이름 없는 코스")+" · "+x.optString("end","도착지 미지정"),false,()->edit("routes",x));
+   if(!x.optString("end").isEmpty())action(p,"지도에서 목적지 검색 ↗",false,()->open("https://map.naver.com/p/search/"+Uri.encode(x.optString("end"))));
   }
-  label(content,"오늘의 점검 상태는 앱을 다시 열어도 유지되고 다음 날 새로 시작돼요.",13,muted,false);section("저장한 코스");action(content,"＋ 코스 저장",true,()->edit("routes",null));for(JSONObject x:items("routes")){row(x.optString("name"),x.optString("start")+" → "+x.optString("end")+"\n"+num(x.optDouble("distance"))+" km · 수동 기록","수정",()->edit("routes",x));if(!x.optString("end").isEmpty())action(content,"목적지 지도 열기 ↗",false,()->open("https://map.naver.com/p/search/"+Uri.encode(x.optString("end"))));}note("지도에서 이륜차 통행 가능한 도로인지 확인하세요. GPS 경로는 위에서 기록하고 GPX로 내보낼 수 있습니다. GPX 가져오기는 위의 버튼을 이용하세요.");}
+  label(p,"저장된 수동 코스는 유지됩니다. GPX 주행 기록과는 별개입니다.",12,muted,false);
+  show();
+ }
 
  void pickGpx(){
   Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);

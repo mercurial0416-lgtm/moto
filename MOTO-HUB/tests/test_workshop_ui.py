@@ -61,7 +61,7 @@ check('new RideUi(a).requestStart()' in home, "GPS consent request missing")
 check('RideService.STOP' in home and 'setPositiveButton("종료"' in home, "GPS stop confirmation missing")
 check("changeHeroPhoto(bike,own)" in home and "switchBike(direction)" in home,
       "hero photo management or bike switching lost")
-check('String[] labels={"홈","차고","매물","주행","설정"}' in design,
+check('String[] labels={"홈","라이딩","정비","설정"}' in design,
       "navigation labels inconsistent")
 check('setContentDescription(labels[i]+(selected?", 선택됨":""))' in design,
       "navigation accessibility label missing")
