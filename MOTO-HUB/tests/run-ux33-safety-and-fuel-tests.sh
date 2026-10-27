@@ -17,9 +17,9 @@ widget=(root/'MotoWidgetProvider.java').read_text()
 restore=(root/'RestoreArchive.java').read_text()
 assert 'fuelAuto.noteAmountEdited(value.toString())' in quick
 assert 'fuelAuto.update(' in quick and 'amount.setText(nextAmount)' in quick
-assert 'new android.util.AtomicFile(file).readFully()' in widget
-assert 'java.io.File rollback=new java.io.File(file.getPath()+".bak");' in widget
+assert 'getFilesDir()' not in widget
+assert 'R.id.widget_nav_choice' in widget
 assert 'Files.isDirectory(path.toPath(),LinkOption.NOFOLLOW_LINKS)' in restore
 assert '!Files.isSymbolicLink(path.toPath())' in restore
-print('PASS UX33 quick fuel override, atomic widget reads, symlink-safe restore cleanup')
+print('PASS UX33 quick fuel override, privacy-safe diskless widget, symlink-safe restore cleanup')
 PY
