@@ -19,5 +19,7 @@ final class GpsSyncPolicy {
   }
   return false;
  }
+ boolean hasDirty(){return dirty>0;}
+ void synced(long now){dirty=0;lastSyncElapsed=now;}
  void reset(){dirty=0;lastSyncElapsed=-1;}
 }
