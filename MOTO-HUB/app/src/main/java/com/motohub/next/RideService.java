@@ -47,6 +47,31 @@ public final class RideService extends Service implements LocationListener {
    if(notifications!=null)notifications.notify(404,notification(message));
   }catch(RuntimeException ignored){}
  }
+ /** All long-idle checks also run while TMAP or NAVER is foregrounded. */
+ void maybeNotifyStationary(long now){
+  if(!running||stopSuggestionShown||!notificationsAvailable())return;
+  if(!RideStopSuggestion.shouldSuggest(now,startedElapsed,lastMotionElapsed,gpsFresh(),
+      liveDistanceKm,liveSpeedKmh,stopSuggestionShown))return;
+  NotificationManager manager=getSystemService(NotificationManager.class);
+  if(manager==null)return;
+  try{
+   manager.createNotificationChannel(new NotificationChannel("ride_hints","라이딩 종료 확인",NotificationManager.IMPORTANCE_DEFAULT));
+   Intent viewRide=new Intent(this,MainActivity.class);
+   viewRide.setAction("com.motohub.next.STATIONARY_REVIEW");
+   viewRide.putExtra(MotoWidgetProvider.EXTRA_TAB,"라이딩");
+   viewRide.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+   PendingIntent open=PendingIntent.getActivity(this,405,viewRide,
+        PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+   Notification note=new Notification.Builder(this,"ride_hints")
+    .setSmallIcon(R.drawable.ic_notification)
+    .setContentTitle("라이딩이 잠시 멈춘 것 같아요")
+    .setContentText("12분 이상 정차 중 · 기록을 계속할지 확인해 주세요.")
+    .setContentIntent(open).setAutoCancel(true)
+    .setVisibility(Notification.VISIBILITY_PRIVATE).build();
+   manager.notify(405,note);
+   stopSuggestionShown=true; // Offer only once per ride, never silently stop.
+  }catch(RuntimeException ignored){ /* A notification failure must not stop GPS. */ }
+ }
  static void refreshNotification(){
   RideService service=instance;
   if(service!=null)service.handler.post(()->{
@@ -98,7 +123,9 @@ public final class RideService extends Service implements LocationListener {
     status="GPS 신호 대기 · 기록 유지 · 위치 공유 중지";
     notifySafely(status);
    }
-   if(Sharing.enabled&&((Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)||!notificationsAvailable()))Sharing.stop();handler.postDelayed(this,5000);}};
+   if(Sharing.enabled&&((Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)||!notificationsAvailable()))Sharing.stop();
+   maybeNotifyStationary(now);
+   handler.postDelayed(this,5000);}};
  @Override public IBinder onBind(Intent i){return null;}
  @Override public int onStartCommand(Intent intent,int flags,int id){
   if(intent==null){stopWith("GPS 서비스가 중단됐습니다.",false);return START_NOT_STICKY;}
@@ -170,6 +197,7 @@ public final class RideService extends Service implements LocationListener {
   count=0;lastTime=0;lastFixElapsed=0;lastGood=null;
   startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;gpsOnlyAfterObd=false;
   active=track.getName();running=true;notificationRate.reset();status="GPS 신호 대기";
+  MotoWidgetProvider.refresh(this);
  }
  private void armAutomaticRide(String address){
   try{
@@ -360,7 +388,7 @@ public final class RideService extends Service implements LocationListener {
  Notification notification(String text){
   PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,RideService.class).setAction(STOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-  Notification.Builder builder=new Notification.Builder(this,"ride").setSmallIcon(R.drawable.ic_launcher)
+  Notification.Builder builder=new Notification.Builder(this,"ride").setSmallIcon(R.drawable.ic_notification)
     .setContentTitle(autoArmed?"MOTO HUB · OBD2 자동 라이딩":"MOTO HUB · GPS 기록 중")
     .setContentText(text).setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PRIVATE)
     .addAction(new Notification.Action.Builder(null,"기록 종료",stop).build());
@@ -454,6 +482,8 @@ public final class RideService extends Service implements LocationListener {
   boolean verified=closeTrack(completed);
   if(completed&&!verified&&count>0)status="GPS 기록 검증 실패 · 복구 화면에서 원본 기록을 확인해 주세요";
   stopForeground(STOP_FOREGROUND_REMOVE);
+  try{NotificationManager nm=getSystemService(NotificationManager.class);if(nm!=null)nm.cancel(405);}catch(Exception ignored){}
+  MotoWidgetProvider.refresh(this);
   if(completed&&verified)DailyMaintenanceJob.checkSoon(this);
  }
  @Override public void onDestroy(){if(running||autoArmed)status="라이딩 서비스가 중단됐습니다. 저장된 GPS 좌표는 복구할 수 있어요.";

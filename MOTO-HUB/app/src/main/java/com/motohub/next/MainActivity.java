@@ -56,6 +56,7 @@ public class MainActivity extends Activity {
   applyWidgetTab(getIntent());
   render();
   applyWidgetForm(getIntent());
+  boolean widgetActionTaken=applyWidgetQuickActions(getIntent());
   DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
   if(state==null)receiveSharedListing(getIntent());
@@ -70,7 +71,7 @@ public class MainActivity extends Activity {
     if(audit!=null)runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast(audit);});
    },"moto-post-update-data-audit").start();
   }
-  if(state==null && !RideService.running && !RideService.autoArmed)showInterruptedRidePrompt();
+  if(state==null && !RideService.running && !RideService.autoArmed && !widgetActionTaken)showInterruptedRidePrompt();
  }
  /** Process death/reboot leaves a local .track without .done. Only offers a manual review. */
  void showInterruptedRidePrompt(){
@@ -97,14 +98,32 @@ public class MainActivity extends Activity {
   // Device location/notification settings may have changed while the settings app was open.
   if(root!=null&&"라이딩".equals(tab)&&dialog==null)render();
   if(!readOnly)DailyMaintenanceJob.schedule(this);
+  MotoWidgetProvider.refresh(this);
+  AppUpdateNotice.checkOnResume(this);
  }
- @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);receiveSharedListing(intent);}
+ @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);applyWidgetQuickActions(intent);receiveSharedListing(intent);}
  boolean applyWidgetTab(Intent intent){
   if(intent==null)return false;
   String requested=intent.getStringExtra(MotoWidgetProvider.EXTRA_TAB);
   intent.removeExtra(MotoWidgetProvider.EXTRA_TAB);
   if("홈".equals(requested)||"차고".equals(requested)||"라이딩".equals(requested)){tab=requested;return true;}
   return false;
+ }
+ /** A widget opens an explicit consent dialog; it never starts GPS or remote sharing by itself. */
+ boolean applyWidgetQuickActions(Intent intent){
+  if(intent==null)return false;
+  boolean ride=intent.getBooleanExtra(MotoWidgetProvider.EXTRA_ONE_TAP_RIDE,false);
+  boolean nav=intent.getBooleanExtra(MotoWidgetProvider.EXTRA_NAVIGATION,false);
+  intent.removeExtra(MotoWidgetProvider.EXTRA_ONE_TAP_RIDE);
+  intent.removeExtra(MotoWidgetProvider.EXTRA_NAVIGATION);
+  if(!ride&&!nav)return false;
+  if(dialog!=null&&dialog.isShowing()){toast("입력 중인 화면을 먼저 닫아 주세요.");return true;}
+  if(ride){
+   if(!"라이딩".equals(tab)){tab="라이딩";render();}
+   if(!RideService.running&&!RideService.autoArmed)
+    new RideUi(this).requestStart(true);
+  }else if(nav)NavigationApps.openPreferred(this);
+  return true;
  }
  void applyWidgetForm(Intent intent){
   if(intent==null)return;

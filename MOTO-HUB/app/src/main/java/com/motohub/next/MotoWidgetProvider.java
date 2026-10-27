@@ -23,6 +23,8 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
  });
  public static final String EXTRA_TAB="com.motohub.next.WIDGET_TAB";
  public static final String EXTRA_FORM="com.motohub.next.WIDGET_FORM";
+ public static final String EXTRA_ONE_TAP_RIDE="com.motohub.next.WIDGET_ONE_TAP_RIDE";
+ public static final String EXTRA_NAVIGATION="com.motohub.next.WIDGET_NAVIGATION";
  @Override public void onUpdate(Context context,AppWidgetManager manager,int[] ids){
   final PendingResult pending=goAsync();
   final Context app=context.getApplicationContext();
@@ -35,7 +37,8 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
    applySize(manager,id,views);
    shortcut(context,views,R.id.widget_home,"홈",0);
    shortcut(context,views,R.id.widget_garage,"차고",1);
-   shortcut(context,views,R.id.widget_ride,"라이딩",2);
+   oneTapShortcut(context,views);
+   navShortcut(context,views);
    formShortcut(context,views,R.id.widget_fuel,"expenses",3);
    formShortcut(context,views,R.id.widget_service,"services",4);
    manager.updateAppWidget(id,views);
@@ -49,10 +52,12 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
   Bundle options=manager.getAppWidgetOptions(id);
   int width=options==null?250:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,250);
   int height=options==null?110:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,110);
-  views.setViewVisibility(R.id.widget_bike_status,height>=95?View.VISIBLE:View.GONE);
-  views.setViewVisibility(R.id.widget_cost,height>=155&&width>=180?View.VISIBLE:View.GONE);
-  views.setViewVisibility(R.id.widget_quick_row,height>=205?View.VISIBLE:View.GONE);
+  views.setViewVisibility(R.id.widget_bike_status,height>=105?View.VISIBLE:View.GONE);
+  views.setViewVisibility(R.id.widget_connection_status,height>=130?View.VISIBLE:View.GONE);
+  views.setViewVisibility(R.id.widget_cost,height>=225&&width>=180?View.VISIBLE:View.GONE);
+  views.setViewVisibility(R.id.widget_quick_row,height>=190?View.VISIBLE:View.GONE);
   views.setViewVisibility(R.id.widget_home,width>=180?View.VISIBLE:View.GONE);
+  views.setViewVisibility(R.id.widget_nav,width>=205?View.VISIBLE:View.GONE);
  }
  /** Refresh on a successful local save, never on an uncommitted draft. */
  public static void refresh(Context context){
@@ -62,9 +67,15 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
   if(ids.length>0){Context app=context.getApplicationContext();WIDGET_IO.execute(()->updateWidgets(app,manager,ids));}
  }
  private static void renderGarage(Context context,RemoteViews views){
+  boolean ride=RideService.running;
+  views.setTextViewText(R.id.widget_ride,ride?"라이딩 확인  ›":"라이딩 시작  ›");
+  String gps=ride?(RideService.gpsFresh()?"GPS 기록 중":"GPS 신호 대기"):"GPS 확인 필요";
+  String obd=RideService.autoArmed?(ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())?"OBD 수신 중":"OBD 연결 대기"):"OBD 꺼짐";
+  views.setTextViewText(R.id.widget_connection_status,gps+"  ·  "+obd);
   if(context.getSharedPreferences("widget_privacy",Context.MODE_PRIVATE).getBoolean("hide_details",false)){
    views.setTextViewText(R.id.widget_bike_name,"MOTO HUB");
    views.setTextViewText(R.id.widget_bike_status,"개인 기록 숨김 · 앱에서 확인");
+   views.setTextViewText(R.id.widget_connection_status,"상태 정보 숨김");
    views.setTextViewText(R.id.widget_cost,"");return;
   }
   String headline="바이크를 등록해 주세요",detail="차고에서 차량을 추가할 수 있어요",cost="";
@@ -123,6 +134,23 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
   views.setTextViewText(R.id.widget_bike_name,headline);
   views.setTextViewText(R.id.widget_bike_status,detail);
   views.setTextViewText(R.id.widget_cost,cost);
+ }
+ private static void oneTapShortcut(Context context,RemoteViews views){
+  Intent intent=new Intent(context,MainActivity.class);
+  intent.setAction("com.motohub.next.WIDGET_ONE_TAP");
+  intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+  intent.putExtra(EXTRA_TAB,"라이딩");
+  intent.putExtra(EXTRA_ONE_TAP_RIDE,true);
+  PendingIntent pending=PendingIntent.getActivity(context,12,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+  views.setOnClickPendingIntent(R.id.widget_ride,pending);
+ }
+ private static void navShortcut(Context context,RemoteViews views){
+  Intent intent=new Intent(context,MainActivity.class);
+  intent.setAction("com.motohub.next.WIDGET_NAVIGATION");
+  intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+  intent.putExtra(EXTRA_NAVIGATION,true);
+  PendingIntent pending=PendingIntent.getActivity(context,13,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+  views.setOnClickPendingIntent(R.id.widget_nav,pending);
  }
  private static void formShortcut(Context context,RemoteViews views,int viewId,String form,int code){
   Intent intent=new Intent(context,MainActivity.class);

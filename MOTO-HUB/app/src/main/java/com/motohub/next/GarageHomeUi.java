@@ -55,7 +55,7 @@ final class GarageHomeUi {
  void render(){
   JSONObject b=a.bike();if(b==null){emptyGarage();return;}
   addHero(b);a.gap(a.content,8);stats(b);a.gap(a.content,18);
-  quickActions();a.gap(a.content,10);quickNavigation();a.gap(a.content,10);rideAction();a.gap(a.content,13);
+  rideAction();a.gap(a.content,10);quickNavigation();a.gap(a.content,13);quickActions();a.gap(a.content,13);
   String condition=condition(b);
   if("점검 필요".equals(condition)||"곧 점검".equals(condition)){
    TextView alert=a.text(condition+" · 정비 일정 확인",13,a.fg,true);

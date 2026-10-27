@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+ <color name="moto_launcher_background">#111419</color>
+ <color name="moto_accent_orange">#FF7414</color>
+</resources>
