@@ -2,7 +2,7 @@ package com.motohub.next;
 import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.content.pm.ServiceInfo;import android.location.*;import android.os.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.UUID;import android.bluetooth.*;
 /** User-started location FGS. Local recording with explicit group sharing. No boot restart, network or mock positions. */
 public final class RideService extends Service implements LocationListener {
- static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;
+ static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;
  // Volatile display data only: neither ECU samples nor Bluetooth address are uploaded/stored.
  static volatile int obdSpeedKmh=-1,obdReconnects=0;
  static volatile long obdSpeedSamples=0; // only current, explicitly enabled connection session
@@ -168,7 +168,7 @@ public final class RideService extends Service implements LocationListener {
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
   catch(IOException error){output.close();output=null;track.delete();throw error;}
   count=0;lastTime=0;lastFixElapsed=0;lastGood=null;
-  startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;gpsOnlyAfterObd=false;
+  startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;gpsOnlyAfterObd=false;
   active=track.getName();running=true;notificationRate.reset();status="GPS 신호 대기";
  }
  private void armAutomaticRide(String address){
@@ -385,6 +385,7 @@ public final class RideService extends Service implements LocationListener {
     if(RideMotionGate.countDistance(dt,metres,lastGood.getAccuracy(),location.getAccuracy())){
      double measuredKmh=metres*3600.0/dt;
      liveDistanceKm+=metres/1000.0;liveSpeedKmh=measuredKmh;
+     if(location.getAccuracy()<=25&&RideStopSuggestion.moving(measuredKmh))lastMotionElapsed=SystemClock.elapsedRealtime();
      if(autoArmed&&location.getAccuracy()<=20){final double speedForGate=measuredKmh;
       // OBD connection callbacks own the autoGate on the main looper. Serialize GPS hints there.
       handler.post(()->{if(autoArmed&&running){autoGate.gpsMovement(speedForGate,SystemClock.elapsedRealtime());obdStationaryRemainingMs=autoGate.stationaryRemainingMs(SystemClock.elapsedRealtime());}});

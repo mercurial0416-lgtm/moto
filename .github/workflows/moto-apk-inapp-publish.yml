@@ -1,0 +1,149 @@
+name: MOTO HUB - in-app direct APK publishing
+on:
+  push:
+    branches:
+      - release/moto-hub-apk
+    paths:
+      - 'MOTO-HUB/**'
+      - '.github/workflows/moto-apk-inapp-publish.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: moto-hub-fixed-apk-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/release/moto-hub-apk'
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Android SDK 36
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Require previous signing identity (never use debug credentials)
+        shell: bash
+        env:
+          STORE_B64: ${{ secrets.MOTO_SIGNING_STORE_B64 }}
+          STORE_PASS: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$STORE_B64" || -z "$STORE_PASS" || -z "$KEY_ALIAS" || -z "$KEY_PASS" ]]; then
+            echo "::error::Required existing-key GitHub Actions secrets are not configured. Refusing any new APK publication."
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$STORE_B64" | base64 --decode > "$RUNNER_TEMP/moto-original.p12"
+          test -s "$RUNNER_TEMP/moto-original.p12"
+      - name: Set a strictly increasing build number from the live in-app manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content |
+            tr -d '\n' | base64 --decode |
+            python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
+          CODE=$(( CURRENT + 1 ))
+          if (( CODE < 523 )); then CODE=523; fi
+          if (( CODE > 999999999 )); then exit 1; fi
+          printf 'RELEASE_CODE=%s\n' "$CODE" >> "$GITHUB_ENV"
+          echo "Validated next releaseCode $CODE (published: $CURRENT)"
+      - name: Full pure-Java and source regression suite
+        working-directory: MOTO-HUB
+        run: |
+          set -euo pipefail
+          failures=0
+          for script in tests/run-*.sh; do
+            if bash "$script"; then echo "PASS $script"
+            else echo "::error::FAILED $script"; failures=$((failures+1)); fi
+          done
+          python3 tests/test_alpha6_dc_integration.py || failures=$((failures+1))
+          python3 tests/test_workshop_ui.py || failures=$((failures+1))
+          python3 tests/test_readable_ui.py || failures=$((failures+1))
+          test "$failures" -eq 0
+      - name: Android release build, lint and unit tests
+        working-directory: MOTO-HUB
+        env:
+          MOTO_SIGNING_STORE_FILE: ${{ runner.temp }}/moto-original.p12
+          MOTO_SIGNING_STORE_PASSWORD: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
+          MOTO_SIGNING_KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
+          MOTO_SIGNING_KEY_PASSWORD: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease :app:lintDebug :app:testDebugUnitTest \
+            -PmotoReleaseCode="$RELEASE_CODE" --no-daemon
+      - name: Verify package, release identity, Android signature, and file digest
+        working-directory: MOTO-HUB
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          "$SIGNER" verify --verbose "$APK"
+          CERT=$("$SIGNER" verify --print-certs "$APK" |
+            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' |
+            head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          EXPECTED=212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b
+          test "$CERT" = "$EXPECTED" || { echo "::error::Wrong APK signer: release blocked"; exit 1; }
+          "$AAPT" dump badging "$APK" | grep -F "package: name='com.motohub.next'" | grep -F "versionCode='$RELEASE_CODE'"
+          sha256sum "$APK"
+      - name: Upload a verified signed release and update the existing in-app manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK=MOTO-HUB/app/build/outputs/apk/release/app-release.apk
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          # Re-read the public manifest before publication: never downgrade it.
+          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content |
+            tr -d '\n' | base64 --decode |
+            python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
+          test "$RELEASE_CODE" -gt "$CURRENT" || { echo "::error::Manifest version advanced; refusing downgrade"; exit 1; }
+          TAG="moto-hub-apk-$RELEASE_CODE-$GITHUB_RUN_ID"
+          # A release artifact must be published and addressable before pointing any phone at it.
+          gh release create "$TAG" "$APK#MOTO-HUB.apk" \
+            --title "MOTO HUB $RELEASE_CODE · 앱 내 업데이트" \
+            --notes "기존 인증서 유지. 앱 내 업데이트 메뉴에서 다운로드 및 설치를 승인하세요." \
+            --draft --target "$GITHUB_SHA"
+          ASSET="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
+          python3 MOTO-HUB/tools/make_update_manifest.py \
+            --apk "$APK" --apk-url "$ASSET" --aapt "$AAPT" --apksigner "$SIGNER" \
+            --output "$RUNNER_TEMP/manifest.json"
+          # This must occur before updating main's manifest; broken/absent assets stay invisible to phones.
+          gh release edit "$TAG" --draft=false
+          gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fx 'MOTO-HUB.apk'
+          SHA=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .sha)
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content |
+            tr -d '\n' | base64 --decode |
+            python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
+          test "$RELEASE_CODE" -gt "$LATEST" || { echo "::error::Concurrent newer manifest detected"; exit 1; }
+          B64=$(base64 --wrap=0 "$RUNNER_TEMP/manifest.json")
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json" \
+            -f branch=main -f sha="$SHA" -f content="$B64" \
+            -f message="Publish checked in-app APK $RELEASE_CODE [skip ci]"
+          echo "Published APK $RELEASE_CODE to public manifest. App can now discover it."
+      - name: Retain verification logs (not keystore)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-apk-inapp-verification-${{ github.run_id }}
+          path: |
+            MOTO-HUB/app/build/reports/
+            MOTO-HUB/app/build/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Delete temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/moto-original.p12"

@@ -23,6 +23,7 @@ public class MainActivity extends Activity {
  String tab="홈",selected="",query="",filter="전체",sort="최신순",pendingExport="";
  String pendingTrack="";String pendingBundleJson="";char[] pendingSecurePassword;
  final RideStartConsent rideStartConsent=new RideStartConsent();
+  boolean launchNavigationAfterRide=false;
  DeveloperObdScreen developerObd;
  String draftKey="",draftId="",draftVehicle="";Map<String,EditText> draftFields;Map<String,Spinner> draftSelectors;CheckBox fullTankBox;boolean formDirty=false;
  LinearLayout formOptionalSection;Button formOptionalToggle;Set<String> formOptionalKeys=new HashSet<>();
@@ -50,7 +51,7 @@ public class MainActivity extends Activity {
   rideHistoryPeriod=RideHistoryPeriod.restore(getSharedPreferences("ride_history_ui",MODE_PRIVATE).getString("period",RideHistoryPeriod.ALL),state==null?null:state.getString("rideHistoryPeriod"));
   rideHistoryBike=RideHistoryBikeFilter.restore(getSharedPreferences("ride_history_ui",MODE_PRIVATE).getString("bike",RideHistoryBikeFilter.ALL),state==null?null:state.getString("rideHistoryBike"));
   if(state==null)selected=getSharedPreferences("garage_ui",MODE_PRIVATE).getString("selected_bike","");
-  if(state!=null){rideHistoryQuery=RideHistorySearch.limit(state.getString("rideHistoryQuery",""));pendingTrack=state.getString("pendingTrack","");tab=state.getString("tab","홈");selected=state.getString("selected","");garagePhotoTarget=state.getString("garagePhotoTarget","");receiptPhotoTarget=state.getString("receiptPhotoTarget","");receiptPhotoKey=state.getString("receiptPhotoKey","");receiptPhotoSlot=state.getInt("receiptPhotoSlot",1);cameraCaptureName=state.getString("cameraCaptureName","");if(state.getBoolean("rideStartConsent",false))rideStartConsent.approve();}
+  if(state!=null){rideHistoryQuery=RideHistorySearch.limit(state.getString("rideHistoryQuery",""));pendingTrack=state.getString("pendingTrack","");tab=state.getString("tab","홈");selected=state.getString("selected","");garagePhotoTarget=state.getString("garagePhotoTarget","");receiptPhotoTarget=state.getString("receiptPhotoTarget","");receiptPhotoKey=state.getString("receiptPhotoKey","");receiptPhotoSlot=state.getInt("receiptPhotoSlot",1);cameraCaptureName=state.getString("cameraCaptureName","");if(state.getBoolean("rideStartConsent",false))rideStartConsent.approve();launchNavigationAfterRide=state.getBoolean("launchNavigationAfterRide",false);}
   if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::back);
   applyWidgetTab(getIntent());
   render();
@@ -128,7 +129,7 @@ public class MainActivity extends Activity {
   }
   toast("공유한 매물 링크를 가져왔어요.");
  }
- @Override public void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("pendingTrack",pendingTrack);out.putString("tab",tab);out.putString("selected",selected);out.putString("garagePhotoTarget",garagePhotoTarget);out.putString("receiptPhotoTarget",receiptPhotoTarget);out.putString("receiptPhotoKey",receiptPhotoKey);out.putInt("receiptPhotoSlot",receiptPhotoSlot);out.putString("cameraCaptureName",cameraCaptureName);out.putString("rideHistoryFilter",rideHistoryFilter);out.putString("rideHistorySort",rideHistorySort);out.putString("rideHistoryPeriod",rideHistoryPeriod);out.putString("rideHistoryBike",rideHistoryBike);out.putString("rideHistoryQuery",rideHistoryQuery);out.putBoolean("rideStartConsent",rideStartConsent.pending());}
+ @Override public void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("pendingTrack",pendingTrack);out.putString("tab",tab);out.putString("selected",selected);out.putString("garagePhotoTarget",garagePhotoTarget);out.putString("receiptPhotoTarget",receiptPhotoTarget);out.putString("receiptPhotoKey",receiptPhotoKey);out.putInt("receiptPhotoSlot",receiptPhotoSlot);out.putString("cameraCaptureName",cameraCaptureName);out.putString("rideHistoryFilter",rideHistoryFilter);out.putString("rideHistorySort",rideHistorySort);out.putString("rideHistoryPeriod",rideHistoryPeriod);out.putString("rideHistoryBike",rideHistoryBike);out.putString("rideHistoryQuery",rideHistoryQuery);out.putBoolean("rideStartConsent",rideStartConsent.pending());out.putBoolean("launchNavigationAfterRide",launchNavigationAfterRide);}
  void attempt(Work w){try{w.run();}catch(Exception e){error(e instanceof NumberFormatException?"숫자를 확인해 주세요.":e instanceof java.time.format.DateTimeParseException?"날짜는 YYYY-MM-DD 형식으로 입력해 주세요.":e.getMessage()==null?"작업을 완료하지 못했습니다.":e.getMessage());}}
  void error(String s){new AlertDialog.Builder(this).setTitle("확인해 주세요").setMessage(s).setPositiveButton("확인",null).show();}
  void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
@@ -1612,12 +1613,12 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    return;
   }
   if(request!=70&&request!=71)return;
-  if(isFinishing()||isDestroyed()){rideStartConsent.cancel();return;}
+  if(isFinishing()||isDestroyed()){rideStartConsent.cancel();launchNavigationAfterRide=false;return;}
   boolean granted=request==70
    ?checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED
    :Build.VERSION.SDK_INT<33||checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED;
   if(!rideStartConsent.mayContinue("라이딩".equals(tab),granted)){
-   if(!granted)toast("권한이 허용되지 않아 GPS 기록을 시작하지 않았어요.");
+   if(!granted){launchNavigationAfterRide=false;toast("권한이 허용되지 않아 GPS 기록을 시작하지 않았어요.");}
    render();return;
   }
   // The user already accepted the recording dialog. Continue without asking twice.
