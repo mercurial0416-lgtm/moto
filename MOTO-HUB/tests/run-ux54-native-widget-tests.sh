@@ -21,14 +21,14 @@ ids=set()
 for el in layout.iter():
  ident=el.attrib.get(android+'id','')
  if ident: ids.add(ident.split('/')[-1])
-required={'widget_home','widget_garage','widget_ride','widget_nav','widget_fuel','widget_service','widget_bike_name','widget_bike_status','widget_connection_status','widget_quick_row','widget_cost'}
+required={'widget_home','widget_nav_choice','widget_ride','widget_nav'}
 assert required<=ids,required-ids
 provider=read('java/com/motohub/next/MotoWidgetProvider.java')
 main=read('java/com/motohub/next/MainActivity.java')
 service=read('java/com/motohub/next/RideService.java')
 notice=read('java/com/motohub/next/AppUpdateNotice.java')
-assert 'oneTapShortcut(context,views);' in provider
-assert 'navShortcut(context,views);' in provider
+assert 'EXTRA_ONE_TAP_RIDE,true' in provider
+assert 'EXTRA_NAVIGATION,true' in provider
 assert 'applyWidgetQuickActions(Intent intent)' in main
 assert 'new RideUi(this).requestStart(true)' in main
 assert 'new RideUi(this).requestStart(true)' not in provider
@@ -39,7 +39,7 @@ assert 'stopSuggestionShown=true' in service
 assert 'AppUpdateNotice.checkOnResume(this)' in main
 assert 'new AppUpdater(a).show()' in notice
 assert 'setPositiveButton("앱 업데이트"' in notice
-assert 'if(!RideService.running&&!RideService.autoArmed)' in main
+assert 'if(RideService.running||RideService.autoArmed)NavigationApps.openPreferred(this)' in main
 assert 'private static final long CHECK_INTERVAL=6L*60*60*1000' in notice
 assert 'STORE_DISTRIBUTION' in notice
 assert 'MotoWidgetProvider.refresh(this)' in service
