@@ -84,6 +84,21 @@ final class RideUi {
      RideService.gpsFixElapsed(),android.os.SystemClock.elapsedRealtime()));
     average.setText("평균속도 " + RideMetrics.averageText(RideService.liveDistanceKm,seconds));
     peak.setText(String.format(Locale.KOREA,"최고속도 %.0f km/h · GPS 추정값",RideService.livePeakKmh)+" · "+RideService.status);
+    // Suggest, never silently stop a manually recorded ride. A fresh GPS fix,
+    // real prior travel and uninterrupted stationary time are all mandatory.
+    if(RideStopSuggestion.shouldSuggest(
+        android.os.SystemClock.elapsedRealtime(),RideService.startedElapsed,
+        RideService.lastMotionElapsed,RideService.gpsFresh(),
+        RideService.liveDistanceKm,RideService.liveSpeedKmh,RideService.stopSuggestionShown)){
+     RideService.stopSuggestionShown=true;
+     new AlertDialog.Builder(a).setTitle("라이딩을 종료할까요?")
+      .setMessage("약 12분 동안 움직임이 확인되지 않았어요. 신호대기나 휴식일 수도 있으므로 기록을 자동 종료하지 않습니다.")
+      .setNegativeButton("계속 기록",null)
+      .setPositiveButton("저장하고 종료",(d,w)->{
+       if(RideService.running)a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));
+       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
+      }).show();
+    }
     hero.postDelayed(this,1000);
    }};hero.post(refresh);
   }
@@ -595,10 +610,16 @@ final class RideUi {
   }
   if(state==RideReadiness.State.LOCATION_PERMISSION||state==RideReadiness.State.NOTIFICATION_PERMISSION)requestStart();
  }
- void requestStart(){
+ void requestStart(){requestStart(false);}
+ void requestStart(boolean openNavigatorAfterStart){
   RideReadiness.State state=readiness();
   if(state==RideReadiness.State.GPS_DISABLED||state==RideReadiness.State.NOTIFICATIONS_DISABLED){handleReadiness(state);return;}
-  new AlertDialog.Builder(a).setTitle("GPS 경로를 기록할까요?").setMessage("정확한 위치를 라이딩 중 기기에 저장합니다. 화면이 꺼져도 알림과 함께 기록하며 종료하면 위치 수집을 중단합니다. 친구에게 전송하지 않습니다.").setNegativeButton("취소",null).setPositiveButton("동의하고 시작",(d,w)->{a.rideStartConsent.approve();start();}).show();}
+  new AlertDialog.Builder(a).setTitle(openNavigatorAfterStart?"GPS 기록 + 내비 실행":"GPS 경로를 기록할까요?")
+   .setMessage("정확한 위치를 라이딩 중 이 휴대폰에 저장합니다. 화면이 꺼져도 지속 알림으로 기록하며, 서버나 친구에게 자동 전송하지 않습니다."+
+    (openNavigatorAfterStart?"\\n\\nGPS 기록이 실제 시작된 뒤 선택한 외부 내비를 실행합니다. OBD2는 자동 연결하지 않습니다.":""))
+   .setNegativeButton("취소",(d,w)->a.launchNavigationAfterRide=false)
+   .setPositiveButton("동의하고 시작",(d,w)->{a.launchNavigationAfterRide=openNavigatorAfterStart;a.rideStartConsent.approve();start();}).show();
+ }
  void start(){
   if(!a.rideStartConsent.pending()||!"라이딩".equals(a.tab))return;
   RideReadiness.State state=readiness();
@@ -607,6 +628,16 @@ final class RideUi {
   if(Build.VERSION.SDK_INT>=33&&a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){a.requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},71);return;}
   if(readiness()!=RideReadiness.State.READY){a.rideStartConsent.cancel();a.toast("GPS 준비 상태가 변경됐어요. 확인 후 다시 시작해 주세요.");return;}
   if(!a.rideStartConsent.consume("라이딩".equals(a.tab),true))return;
-  a.attempt(()->{a.startForegroundService(new Intent(a,RideService.class).putExtra(RideService.EXTRA_BIKE_ID,a.bike()==null?"":a.bike().optString("id")));a.toast("GPS 시작을 요청했어요.");a.root.postDelayed(()->{if(!a.isFinishing())a.render();},800);});
+  a.attempt(()->{
+   a.startForegroundService(new Intent(a,RideService.class).putExtra(RideService.EXTRA_BIKE_ID,a.bike()==null?"":a.bike().optString("id")));
+   boolean nav=a.launchNavigationAfterRide;a.launchNavigationAfterRide=false;
+   a.toast("GPS 시작을 요청했어요.");
+   a.root.postDelayed(()->{if(!a.isFinishing())a.render();},800);
+   if(nav)a.root.postDelayed(()->{
+    if(a.isFinishing()||a.isDestroyed())return;
+    if(RideService.running&&RideService.gpsFixElapsed()>=0)NavigationApps.openPreferred(a);
+    else a.toast("GPS가 시작되지 않아 내비를 자동 실행하지 않았어요.");
+   },1800);
+  });
  }
 }
