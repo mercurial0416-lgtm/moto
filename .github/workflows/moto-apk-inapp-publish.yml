@@ -53,7 +53,7 @@ jobs:
             tr -d '\n' | base64 --decode |
             python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
           CODE=$(( CURRENT + 1 ))
-          if (( CODE < 523 )); then CODE=523; fi
+          if (( CODE < 524 )); then CODE=524; fi
           if (( CODE > 999999999 )); then exit 1; fi
           printf 'RELEASE_CODE=%s\n' "$CODE" >> "$GITHUB_ENV"
           echo "Validated next releaseCode $CODE (published: $CURRENT)"
