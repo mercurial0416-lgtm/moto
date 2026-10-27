@@ -9,7 +9,7 @@ final class MotoWidgetPin {
  static void request(MainActivity a,boolean quick){
   AppWidgetManager widgets=AppWidgetManager.getInstance(a);
   if(!widgets.isRequestPinAppWidgetSupported()){
-   a.toast("홈 화면 빈 곳 길게 누르기 → 위젯 → MOTO HUB에서 직접 추가해 주세요.");
+   a.toast("기존 위젯은 홈에서 길게 눌러 제거하고, 빈 곳 길게 누르기 → 위젯 → MOTO HUB에서 새 위젯을 추가하세요.");
    return;
   }
   Class<?> provider=quick?MotoQuickWidgetProvider.class:MotoWidgetProvider.class;
