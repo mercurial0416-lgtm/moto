@@ -36,7 +36,7 @@ public final class RideMapActivity extends Activity {
   speedButton.setOnClickListener(v->{
    speedVisible=!speedVisible;
    for(Polyline line:speedLines)line.setVisible(speedVisible);
-   for(Polyline base:baseLines)base.getOutlinePaint().setColor(speedVisible?0xff596572:0xffff6b1b);
+   for(Polyline lineItem:baseLines)lineItem.getOutlinePaint().setColor(speedVisible?0xff596572:0xffff6b1b);
    speedButton.setText(speedVisible?"단색 경로 보기":"속도별 경로 보기");map.invalidate();
   });base.addView(speedButton);
   LinearLayout zoom=new LinearLayout(this);zoom.setOrientation(LinearLayout.HORIZONTAL);
