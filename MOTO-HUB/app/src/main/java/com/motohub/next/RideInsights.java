@@ -26,6 +26,18 @@ public final class RideInsights {
    movingAverageKmh=movingMillis>0?Math.min(250,distance/(movingMillis/3600000.0)):0;
   }
   public int gpsCoveragePercent(){return durationMillis<=0?0:(int)Math.round(gpsObservedMillis*100.0/durationMillis);}
+  public String gpsQuality(){
+   if(points<5||durationMillis<=0)return "판정 불가 · 좌표 부족";
+   int coverage=gpsCoveragePercent();
+   int good=(int)Math.round(100.0*Math.max(0,points-discarded)/Math.max(1,points));
+   return (coverage>=85&&good>=90&&gpsGaps==0?"높음":
+     coverage>=60&&good>=75?"보통":"낮음")+
+     " · GPS 수신률 "+coverage+"% · 유효 좌표 약 "+good+"%";
+  }
+  public String stationaryConfidence(){return gpsCoveragePercent()>=85&&gpsGaps==0?
+    "GPS 관측 기반 정차 추정 · 신호대기와 휴식 구분 불가":
+    "GPS 일부 미수신 · 정차/휴식 추정 정확도 제한";}
+
   public String distanceLabel(){return String.format(Locale.KOREA,"%.1f km",distanceKm);}
  }
  /** Great-circle distance in metres. */
@@ -35,17 +47,17 @@ public final class RideInsights {
   return 6371000.0*2*Math.atan2(Math.sqrt(Math.min(1,h)),Math.sqrt(Math.max(0,1-h)));
  }
  public static Result analyze(File track)throws Exception{
-  final int[] count={0},bad={0},gaps={0},rests={0};final long[] start={0},end={0},last={0},lastObserved={0},observed={0},stopLast={0},stopRun={0};
+  final int[] count={0},bad={0},gaps={0},rests={0};final long[] start={0},end={0},last={0},lastObserved={0},observed={0},stopLast={0},stopRun={0};final boolean[] gapPending={false};
   final double[] lat={0},lon={0},previousAccuracy={0},km={0},max={0},peakLat={Double.NaN},peakLon={Double.NaN},stopLat={0},stopLon={0},stopAccuracy={0};
   final long[] moving={0};final boolean[] have={false},restCounted={false};
   TrackFile.read(track,(x,y,accuracy,t)->{
    count[0]++;if(start[0]==0)start[0]=t;end[0]=t;
-   if(accuracy>40){bad[0]++;have[0]=false;lastObserved[0]=0;stopLast[0]=0;stopRun[0]=0;restCounted[0]=false;return;}
+   if(accuracy>40){bad[0]++;have[0]=false;gapPending[0]=lastObserved[0]>0;stopLast[0]=0;stopRun[0]=0;restCounted[0]=false;return;}
    if(lastObserved[0]>0){long gap=t-lastObserved[0];
-    if(gap>RideMotionGate.MAX_CONTINUOUS_FIX_MS)gaps[0]++;
+    if(gapPending[0]||gap>RideMotionGate.MAX_CONTINUOUS_FIX_MS)gaps[0]++;
     else if(gap>0)observed[0]+=gap;
    }
-   lastObserved[0]=t;
+   gapPending[0]=false;lastObserved[0]=t;
    if(stopLast[0]>0){
     long observedGap=t-stopLast[0];
     double measured=meters(stopLat[0],stopLon[0],x,y);
