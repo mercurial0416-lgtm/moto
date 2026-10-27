@@ -616,7 +616,7 @@ final class RideUi {
   if(state==RideReadiness.State.GPS_DISABLED||state==RideReadiness.State.NOTIFICATIONS_DISABLED){handleReadiness(state);return;}
   new AlertDialog.Builder(a).setTitle(openNavigatorAfterStart?"GPS 기록 + 내비 실행":"GPS 경로를 기록할까요?")
    .setMessage("정확한 위치를 라이딩 중 이 휴대폰에 저장합니다. 화면이 꺼져도 지속 알림으로 기록하며, 서버나 친구에게 자동 전송하지 않습니다."+
-    (openNavigatorAfterStart?"\\n\\nGPS 기록이 실제 시작된 뒤 선택한 외부 내비를 실행합니다. OBD2는 자동 연결하지 않습니다.":""))
+    (openNavigatorAfterStart?"\n\nGPS 기록이 실제 시작된 뒤 선택한 외부 내비를 실행합니다. OBD2는 자동 연결하지 않습니다.":""))
    .setNegativeButton("취소",(d,w)->a.launchNavigationAfterRide=false)
    .setPositiveButton("동의하고 시작",(d,w)->{a.launchNavigationAfterRide=openNavigatorAfterStart;a.rideStartConsent.approve();start();}).show();
  }
