@@ -70,7 +70,7 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
   boolean ride=RideService.running;
   views.setTextViewText(R.id.widget_ride,ride?"라이딩 확인  ›":"라이딩 시작  ›");
   String gps=ride?(RideService.gpsFresh()?"GPS 기록 중":"GPS 신호 대기"):"GPS 확인 필요";
-  String obd=RideService.autoArmed?(RideService.obdSpeedKmh>=0?"OBD 수신 중":"OBD 연결 대기"):"OBD 꺼짐";
+  String obd=RideService.autoArmed?(ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())?"OBD 수신 중":"OBD 연결 대기"):"OBD 꺼짐";
   views.setTextViewText(R.id.widget_connection_status,gps+"  ·  "+obd);
   if(context.getSharedPreferences("widget_privacy",Context.MODE_PRIVATE).getBoolean("hide_details",false)){
    views.setTextViewText(R.id.widget_bike_name,"MOTO HUB");
