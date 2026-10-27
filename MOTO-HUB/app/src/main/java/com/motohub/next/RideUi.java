@@ -633,11 +633,20 @@ final class RideUi {
    boolean nav=a.launchNavigationAfterRide;a.launchNavigationAfterRide=false;
    a.toast("GPS 시작을 요청했어요.");
    a.root.postDelayed(()->{if(!a.isFinishing())a.render();},800);
-   if(nav)a.root.postDelayed(()->{
-    if(a.isFinishing()||a.isDestroyed())return;
-    if(RideService.running&&RideService.gpsFixElapsed()>=0)NavigationApps.openPreferred(a);
-    else a.toast("GPS가 시작되지 않아 내비를 자동 실행하지 않았어요.");
-   },1800);
+   if(nav){
+    final android.os.Handler starter=new android.os.Handler(android.os.Looper.getMainLooper());
+    final long deadline=android.os.SystemClock.elapsedRealtime()+15_000L;
+    starter.postDelayed(new Runnable(){@Override public void run(){
+     if(a.isFinishing()||a.isDestroyed())return;
+     if(RideService.running){
+      NavigationApps.openPreferred(a);
+      return;
+     }
+     if(android.os.SystemClock.elapsedRealtime()<deadline)
+      starter.postDelayed(this,600);
+     else a.toast("GPS 기록을 시작하지 못해 내비를 자동으로 열지 않았어요.");
+    }},600);
+   }
   });
  }
 }
