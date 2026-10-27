@@ -115,14 +115,17 @@ public class MainActivity extends Activity {
   if(intent==null)return false;
   boolean ride=intent.getBooleanExtra(MotoWidgetProvider.EXTRA_ONE_TAP_RIDE,false);
   boolean nav=intent.getBooleanExtra(MotoWidgetProvider.EXTRA_NAVIGATION,false);
+  boolean chooseNav=intent.getBooleanExtra(MotoWidgetProvider.EXTRA_SELECT_NAV,false);
   intent.removeExtra(MotoWidgetProvider.EXTRA_ONE_TAP_RIDE);
   intent.removeExtra(MotoWidgetProvider.EXTRA_NAVIGATION);
-  if(!ride&&!nav)return false;
+  intent.removeExtra(MotoWidgetProvider.EXTRA_SELECT_NAV);
+  if(!ride&&!nav&&!chooseNav)return false;
   if(dialog!=null&&dialog.isShowing()){toast("입력 중인 화면을 먼저 닫아 주세요.");return true;}
-  if(ride){
+  if(chooseNav)NavigationApps.choose(this);
+  else if(ride){
    if(!"라이딩".equals(tab)){tab="라이딩";render();}
-   if(!RideService.running&&!RideService.autoArmed)
-    new RideUi(this).requestStart(true);
+   if(RideService.running||RideService.autoArmed)NavigationApps.openPreferred(this);
+   else new RideUi(this).requestStart(true); // Still requires explicit consent before GPS starts.
   }else if(nav)NavigationApps.openPreferred(this);
   return true;
  }

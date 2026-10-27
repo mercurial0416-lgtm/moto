@@ -9,7 +9,7 @@ assert 'setOnlineTiles(allowed)' not in map or 'map.setUseDataConnection(allowed
 h=(p/'HubScreens.java').read_text()
 assert 'this::localDiagnostics' in h and 'LocalDiagnosticReport.create' in h
 assert 'ClipData.newPlainText("MOTO HUB 로컬 진단",report)' in h
-assert 'SocialClient.INSTANCE.access' not in h[h.index('void localDiagnostics()'):h.index('void ridePreflight()')]
+assert 'SocialClient.INSTANCE.access' not in h[h.index('void localDiagnostics()'):h.index('void serverPreflight()')]
 net=(p/'OfflineStatus.java').read_text()
 assert 'NET_CAPABILITY_VALIDATED' in net
 assert 'catch(Exception ignored){return false;}' in net
