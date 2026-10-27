@@ -76,7 +76,7 @@ final class RideUi {
     TextView name=a.text(names[i],12,a.muted,false);name.setGravity(Gravity.CENTER);
     LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.topMargin=a.dp(7);box.addView(name,np);
     LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)lp.leftMargin=a.dp(7);live.addView(box,lp);
-   }hero.addView(live);
+   }hero.addView(live);live.setVisibility(focus?android.view.View.GONE:android.view.View.VISIBLE); // Phone navigation is primary; never duplicate a dashboard in focus mode.
    TextView average=a.text("평균속도 계산 중",13,a.muted,false);average.setPadding(a.dp(6),a.dp(10),0,a.dp(8));if(!focus)hero.addView(average);
    TextView peak=a.text("최고속도 계산 중",13,a.muted,false);peak.setPadding(a.dp(6),0,0,a.dp(9));if(!focus)hero.addView(peak);
    TextView motion=a.text("이동·정차 분석 중",13,a.muted,false);motion.setPadding(a.dp(6),0,0,a.dp(9));if(!focus)hero.addView(motion);

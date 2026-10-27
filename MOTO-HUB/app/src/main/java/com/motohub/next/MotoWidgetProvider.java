@@ -52,12 +52,15 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
   Bundle options=manager.getAppWidgetOptions(id);
   int width=options==null?250:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,250);
   int height=options==null?110:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,110);
-  views.setViewVisibility(R.id.widget_bike_status,height>=105?View.VISIBLE:View.GONE);
-  views.setViewVisibility(R.id.widget_connection_status,height>=130?View.VISIBLE:View.GONE);
-  views.setViewVisibility(R.id.widget_cost,height>=225&&width>=180?View.VISIBLE:View.GONE);
-  views.setViewVisibility(R.id.widget_quick_row,height>=190?View.VISIBLE:View.GONE);
-  views.setViewVisibility(R.id.widget_home,width>=180?View.VISIBLE:View.GONE);
-  views.setViewVisibility(R.id.widget_nav,width>=205?View.VISIBLE:View.GONE);
+  // Real 4x1 (and resized smaller) mode: show 2 usable shortcuts and optional title.
+  views.setViewVisibility(R.id.widget_header,height>=66&&width>=175?View.VISIBLE:View.GONE);
+  views.setViewVisibility(R.id.widget_bike_name,height>=115?View.VISIBLE:View.GONE);
+  views.setViewVisibility(R.id.widget_bike_status,height>=142?View.VISIBLE:View.GONE);
+  views.setViewVisibility(R.id.widget_connection_status,height>=167?View.VISIBLE:View.GONE);
+  views.setViewVisibility(R.id.widget_cost,height>=233&&width>=220?View.VISIBLE:View.GONE);
+  views.setViewVisibility(R.id.widget_quick_row,height>=193&&width>=185?View.VISIBLE:View.GONE);
+  // Never hide navigation due to small screen width: the user requested two buttons.
+  views.setViewVisibility(R.id.widget_nav,View.VISIBLE);
  }
  /** Refresh on a successful local save, never on an uncommitted draft. */
  public static void refresh(Context context){
@@ -68,12 +71,12 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
  }
  private static void renderGarage(Context context,RemoteViews views){
   boolean ride=RideService.running;
-  views.setTextViewText(R.id.widget_ride,ride?"라이딩 확인  ›":"라이딩 시작  ›");
+  views.setTextViewText(R.id.widget_ride,ride?"▶ 확인":"▶ 기록");
   String gps=ride?(RideService.gpsFresh()?String.format(java.util.Locale.KOREA,"GPS %.1f km",RideService.liveDistanceKm):"GPS 신호 대기"):"GPS 미기록";
   String obd=RideService.autoArmed?(ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())?"OBD 수신 중":"OBD 연결 대기"):"OBD 꺼짐";
   views.setTextViewText(R.id.widget_connection_status,gps+"  ·  "+obd);
   if(context.getSharedPreferences("widget_privacy",Context.MODE_PRIVATE).getBoolean("hide_details",false)){
-   views.setTextViewText(R.id.widget_ride,"라이딩 열기  ›");
+   views.setTextViewText(R.id.widget_ride,"▶ 기록");
    views.setTextViewText(R.id.widget_bike_name,"MOTO HUB");
    views.setTextViewText(R.id.widget_bike_status,"개인 기록 숨김 · 앱에서 확인");
    views.setTextViewText(R.id.widget_connection_status,"상태 정보 숨김");
