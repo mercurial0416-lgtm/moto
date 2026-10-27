@@ -42,6 +42,7 @@ final class RideUi {
  final MainActivity a;RideUi(MainActivity a){this.a=a;}
  void render(){
   final boolean saving=RideService.saving();
+  final boolean focus=RideService.running&&a.getSharedPreferences("ride_display",0).getBoolean("focus",false);
   LinearLayout hero=a.col();hero.setPadding(a.dp(18),a.dp(20),a.dp(18),a.dp(18));hero.setBackground(a.shape(a.panel,a.line,13));
   TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?0xff48d99a:a.accent,true);hero.addView(eyebrow);
   TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?RideService.count+"개 위치 기록":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",24,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
@@ -62,18 +63,23 @@ final class RideUi {
    }
   }
   if(RideService.running){
+   Button focusToggle=a.button(focus?"집중 모드 종료":"주행 집중 모드",false,()->{
+    a.getSharedPreferences("ride_display",0).edit().putBoolean("focus",!focus).apply();
+    a.render();
+   });
+   focusToggle.setMinHeight(a.dp(48));hero.addView(focusToggle);a.gap(hero,10);
    LinearLayout live=new LinearLayout(a);
    TextView[] values=new TextView[3];String[] names={"주행거리","경과시간","실시간 속도"};
    for(int i=0;i<3;i++){
     LinearLayout box=a.col();box.setPadding(a.dp(9),a.dp(12),a.dp(9),a.dp(12));box.setBackground(a.shape(a.bg,0,13));
-    values[i]=a.text("—",24,a.fg,true);values[i].setGravity(Gravity.CENTER);box.addView(values[i]);
+    values[i]=a.text("—",focus?32:24,a.fg,true);values[i].setGravity(Gravity.CENTER);box.addView(values[i]);
     TextView name=a.text(names[i],12,a.muted,false);name.setGravity(Gravity.CENTER);
     LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.topMargin=a.dp(7);box.addView(name,np);
     LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)lp.leftMargin=a.dp(7);live.addView(box,lp);
    }hero.addView(live);
-   TextView average=a.text("평균속도 계산 중",13,a.muted,false);average.setPadding(a.dp(6),a.dp(10),0,a.dp(8));hero.addView(average);
-   TextView peak=a.text("최고속도 계산 중",13,a.muted,false);peak.setPadding(a.dp(6),0,0,a.dp(9));hero.addView(peak);
-   TextView motion=a.text("이동·정차 분석 중",13,a.muted,false);motion.setPadding(a.dp(6),0,0,a.dp(9));hero.addView(motion);
+   TextView average=a.text("평균속도 계산 중",13,a.muted,false);average.setPadding(a.dp(6),a.dp(10),0,a.dp(8));if(!focus)hero.addView(average);
+   TextView peak=a.text("최고속도 계산 중",13,a.muted,false);peak.setPadding(a.dp(6),0,0,a.dp(9));if(!focus)hero.addView(peak);
+   TextView motion=a.text("이동·정차 분석 중",13,a.muted,false);motion.setPadding(a.dp(6),0,0,a.dp(9));if(!focus)hero.addView(motion);
    a.gap(hero,12);
    Runnable refresh=new Runnable(){@Override public void run(){
     if(!hero.isAttachedToWindow()||a.isFinishing()||a.isDestroyed())return;
@@ -131,6 +137,7 @@ final class RideUi {
    hero.addView(finishRide);
   }
   a.content.addView(hero);a.gap(a.content,12);
+  if(focus&&RideService.running)return; // Keep verified GPS stop button; hide nonessential forms while riding.
   // The first-connection flow belongs near ride controls, not buried in Settings.
   // It is still explicitly gated by the opted-in experimental OBD mode.
   if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
