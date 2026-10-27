@@ -112,7 +112,9 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
        history.add(new WidgetMaintenanceSummary.Service(service.optString("type"),service.optString("date"),
         service.optString("nextDate"),service.optDouble("nextKm")));
      }
-     detail=km+" km  ·  "+WidgetMaintenanceSummary.label(history,LocalDate.now().toString(),odometer);
+     detail=km+" km · "+WidgetMaintenanceSummary.label(history,LocalDate.now().toString(),odometer);
+     String dueDistance=WidgetMaintenanceSummary.nextDistance(history,odometer);
+     if(!dueDistance.isEmpty())detail+=" · "+dueDistance;
      String month=LocalDate.now().toString().substring(0,7);
      double monthly=0;
      for(String collection:new String[]{"expenses","services"}){
