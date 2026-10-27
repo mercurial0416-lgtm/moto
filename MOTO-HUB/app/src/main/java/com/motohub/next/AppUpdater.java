@@ -56,7 +56,9 @@ final class AppUpdater {
    a.label(p,"업데이트 서버가 설정되지 않았습니다.",14,a.muted,false);
    a.show();return;
   }
-  a.label(p,"배포된 APK가 현재 버전보다 높을 때만 내려받습니다. 파일 검사와 서명 비교 후 Android 설치 화면에서 직접 승인합니다.",14,a.muted,false);
+  a.label(p,"구글플레이 없이 APK 직접 설치로 업데이트합니다. 동일 패키지와 원래 서명키로 제작한 새 버전만 덮어쓸 수 있습니다.",14,a.fg,true);
+  a.label(p,"설치 전 전체 암호화 백업을 권장합니다. 앱 삭제는 하지 마세요. APK 해시·서명·버전을 확인한 뒤 Android 설치 화면에서 직접 승인합니다.",14,a.muted,false);
+  a.action(p,"업데이트 전 암호화 전체 백업",false,a::exportEncryptedBundle);
   progressLabel=a.text("업데이트 대기 중",13,a.muted,false);
   LinearLayout.LayoutParams statusLp=new LinearLayout.LayoutParams(-1,-2);statusLp.topMargin=a.dp(12);
   p.addView(progressLabel,statusLp);
