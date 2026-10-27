@@ -89,10 +89,18 @@ final class AppUpdater {
  void refreshCachedControls(){
   boolean ready=cachedUpdateReady();
   if(cacheLabel!=null)cacheLabel.setText(ready?
-   "다운로드한 파일 있음 · 설치 전에 해시와 APK 서명을 다시 확인합니다.":
-   "설치할 파일이 없습니다. 배포 버전 확인에서 내려받으세요.");
+   "설치 준비 완료 · 설치 취소 시에도 보관 · 서명/파일 검사 후 재시도 가능":
+   partialStatus());
   if(cachedInstallButton!=null)cachedInstallButton.setVisibility(ready?
    android.view.View.VISIBLE:android.view.View.GONE);
+ }
+ /** UI-only state: verified installers are immutable, partials are never shown as installable. */
+ String partialStatus(){
+  File dir=new File(a.getCacheDir(),"updates");
+  File[] pieces=dir.listFiles((parent,name)->name.matches("[a-f0-9]{64}\\.part\\.apk"));
+  if(pieces!=null)for(File part:pieces)if(part.length()>0)
+   return "중단된 다운로드 있음 · 배포 버전 확인 → 다운로드로 검증 후 이어받기";
+  return "설치할 파일 없음 · 배포 버전 확인 후 다운로드";
  }
  /** Cheap display-only test; install() always repeats SHA-256, package and signer checks. */
  boolean cachedUpdateReady(){
@@ -123,7 +131,7 @@ final class AppUpdater {
   WORKER.execute(()->{
    try{job.run();}
    catch(DownloadCancelledException cancelled){
-    ui(()->{if(progressLabel!=null)progressLabel.setText("다운로드 중단 · 다시 확인하면 이어받을 수 있습니다.");});
+    ui(()->{if(progressLabel!=null)progressLabel.setText("다운로드 중단 · 배포 버전 확인에서 다운로드를 다시 누르면 이어받습니다.");refreshCachedControls();});
    }
    catch(Exception e){
     updateProgress("오류 · 다시 시도해 주세요",-1);
