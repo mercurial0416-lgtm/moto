@@ -76,6 +76,7 @@ final class AppUpdater {
   cancelDownloadButton.setVisibility(android.view.View.GONE);
   p.addView(cancelDownloadButton,new LinearLayout.LayoutParams(-1,-2));
   a.action(p,"배포 버전 확인",true,this::check);
+  a.action(p,"중단된 다운로드 재시도 · 이어받기",false,this::check);
   cacheLabel=a.text("",13,a.muted,false);
   LinearLayout.LayoutParams cacheLp=new LinearLayout.LayoutParams(-1,-2);cacheLp.bottomMargin=a.dp(8);
   p.addView(cacheLabel,cacheLp);
@@ -241,7 +242,7 @@ final class AppUpdater {
       requestOffset=0;bytes=0;digest=MessageDigest.getInstance("SHA-256");
      }else throw new IOException("지원하지 않는 업데이트 서버 응답입니다.");
      if(requestOffset>0)updateProgress("중단된 다운로드 이어받기",UpdateProgressPolicy.percentage(bytes,m.sizeBytes));
-     long deadline=SystemClock.elapsedRealtime()+180000;
+     long deadline=SystemClock.elapsedRealtime()+12*60_000L; // Read timeout still bounds network stalls.
      int nextProgress=(UpdateProgressPolicy.percentage(bytes,m.sizeBytes)/25+1)*25;
      try(InputStream in=connection.getInputStream();
          FileOutputStream out=new FileOutputStream(part,requestOffset>0)){
