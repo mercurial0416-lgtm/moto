@@ -56,6 +56,11 @@ public final class RideMapActivity extends Activity {
     .setNegativeButton("오프라인 유지",null)
     .setPositiveButton("배경지도 켜기",(d,w)->setOnlineTiles(true)).show();
   });base.addView(tileButton);
+
+  caption=new TextView(this);caption.setText("저장된 경로를 불러오는 중…");caption.setPadding(18,12,14,14);caption.setTextColor(0xff9caebd);caption.setTextSize(14);base.addView(caption);
+  map=new MapView(this);map.setTileSource(TileSourceFactory.MAPNIK);map.setMultiTouchControls(true);
+  // Saved routes stay available without automatically contacting any map tile server.
+  map.setUseDataConnection(false);
   Button cacheButton=new Button(this);cacheButton.setText("오프라인 지도 캐시 확인·정리");
   cacheButton.setOnClickListener(v->new Thread(()->{
    try{
@@ -73,10 +78,6 @@ public final class RideMapActivity extends Activity {
      .setPositiveButton("확인",null).show();});}
   },"moto-map-cache-measure").start());
   base.addView(cacheButton);
-  caption=new TextView(this);caption.setText("저장된 경로를 불러오는 중…");caption.setPadding(18,12,14,14);caption.setTextColor(0xff9caebd);caption.setTextSize(14);base.addView(caption);
-  map=new MapView(this);map.setTileSource(TileSourceFactory.MAPNIK);map.setMultiTouchControls(true);
-  // Saved routes stay available without automatically contacting any map tile server.
-  map.setUseDataConnection(false);
   map.getOverlayManager().getTilesOverlay().setColorFilter(org.osmdroid.views.overlay.TilesOverlay.INVERT_COLORS);
   map.getController().setZoom(10.0);base.addView(map,new LinearLayout.LayoutParams(-1,0,1));
   TextView attribution=new TextView(this);attribution.setText("오프라인 경로 표시 · 배경지도는 캐시에 있을 때만 표시 · © OpenStreetMap contributors");attribution.setTextColor(0xff9caebd);attribution.setPadding(12,8,12,14);base.addView(attribution);
