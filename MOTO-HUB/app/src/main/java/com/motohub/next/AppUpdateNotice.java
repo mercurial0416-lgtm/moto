@@ -41,12 +41,19 @@ final class AppUpdateNotice {
      if(a.isFinishing()||a.isDestroyed()||a.dialog!=null||
         RideService.running||RideService.autoArmed||
         RestoreRideGate.isExporting()||RestoreRideGate.isRestoring())return;
-     if(prefs.getLong("last_seen",0)>=newest)return;
-     prefs.edit().putLong("last_seen",newest).apply();
+     if(!UpdatePromptPolicy.shouldPrompt(newest,BuildConfig.VERSION_CODE,
+          prefs.getLong("snoozed_version",0),prefs.getLong("snoozed_at",0),
+          System.currentTimeMillis()))return;
      new AlertDialog.Builder(a).setTitle("MOTO HUB 새 버전")
       .setMessage("새 버전 "+manifest.versionName+"을(를) 앱 안에서 설치할 수 있습니다. 기존 데이터 유지를 위해 서명과 파일 무결성을 확인합니다.")
-      .setNegativeButton("나중에",null)
-      .setPositiveButton("앱 업데이트",(d,w)->new AppUpdater(a).show()).show();
+      .setNegativeButton("내일 다시 알림",(d,w)->prefs.edit()
+       .putLong("snoozed_version",newest)
+       .putLong("snoozed_at",System.currentTimeMillis()).apply())
+      .setPositiveButton("앱 업데이트",(d,w)->{
+       prefs.edit().putLong("snoozed_version",newest)
+        .putLong("snoozed_at",System.currentTimeMillis()).apply();
+       new AppUpdater(a).show();
+      }).show();
     });
    }catch(Exception ignored){ /* Offline or bad manifest: current app keeps working. */ }
    finally{if(connection!=null)connection.disconnect();ACTIVE.set(false);}
