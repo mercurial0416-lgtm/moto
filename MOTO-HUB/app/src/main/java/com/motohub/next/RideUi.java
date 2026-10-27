@@ -124,32 +124,8 @@ final class RideUi {
    hero.addView(finishRide);
   }
   a.content.addView(hero);a.gap(a.content,12);
-  // Keep navigation controls accessible even in ride focus mode.
-  if(!focus){
-  // The first-connection flow belongs near ride controls, not buried in Settings.
-  // It is still explicitly gated by the opted-in experimental OBD mode.
-  if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
-   a.action(a.content,"OBD2 동글 연결 · ECU 센서 테스트",false,()->{
-    if(a.developerObd!=null)a.developerObd.stop();
-    a.developerObd=new DeveloperObdScreen(a);a.developerObd.show();
-   });
-   TextView linkStatus=a.text(RideService.autoArmed?
-    "OBD 연결 상태 확인 중":"OBD2 자동 감지 꺼짐 · 필요할 때만 직접 켜기",13,a.muted,false);
-   linkStatus.setPadding(a.dp(8),a.dp(3),0,a.dp(10));
-   a.content.addView(linkStatus);
-   if(RideService.autoArmed){
-    Runnable updateLink=new Runnable(){@Override public void run(){
-     if(!linkStatus.isAttachedToWindow()||a.isFinishing()||a.isDestroyed())return;
-     long now=android.os.SystemClock.elapsedRealtime();
-     boolean fresh=ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,now);
-     linkStatus.setText("OBD2 · "+RideService.obdLink+
-      (fresh?" · 속도 정상 수신":" · 속도 미수신/지연")+
-      " · 재연결 "+RideService.obdReconnects+"회");
-     if(RideService.autoArmed)linkStatus.postDelayed(this,2500);
-    }};linkStatus.post(updateLink);
-   }
-  }
-  }
+  // Riding view prioritizes the phone's selected navigation; OBD diagnostics
+  // are tucked into opt-in advanced settings instead of duplicating the TFT.
   // Safe launcher: changing the default does not unexpectedly open an external app.
   NavigationChoice chosen=NavigationApps.preferred(a);
   LinearLayout navigation=a.col();navigation.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(12));
@@ -163,21 +139,9 @@ final class RideUi {
   if(!focus)navigation.addView(a.text("내비를 실행해도 GPS 기록은 계속됩니다. 경로·위치·OBD 값은 전송하지 않으며 이륜차 통행 제한은 직접 확인하세요.",12,a.muted,false));
   a.content.addView(navigation);a.gap(a.content,12);
   if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
-  if(RideService.autoArmed&&a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
-   LinearLayout diagnostics=a.col();diagnostics.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(14));diagnostics.setBackground(a.shape(a.panel,a.line,14));
-   TextView telem=a.text("OBD2 데이터를 읽는 중…",14,a.fg,false);diagnostics.addView(telem);
-   a.content.addView(diagnostics);a.gap(a.content,12);
-   Runnable statusUpdate=new Runnable(){@Override public void run(){
-    if(!diagnostics.isAttachedToWindow()||!RideService.autoArmed||a.isFinishing()||a.isDestroyed())return;
-    telem.setText("OBD2 · "+RideService.obdLink+"\n"+
-     "차량 속도 "+ObdTelemetryFreshness.speedLabel(RideService.obdSpeedKmh,RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())+
-     "  · RPM "+(Double.isFinite(RideService.obdRpm)?String.format(Locale.KOREA,"%.0f",RideService.obdRpm):"—")+
-     "\n수온 "+(Double.isFinite(RideService.obdCoolantC)?String.format(Locale.KOREA,"%.0f°C",RideService.obdCoolantC):"—")+
-     "  · ECU 전압 "+(Double.isFinite(RideService.obdVoltage)?String.format(Locale.KOREA,"%.1fV",RideService.obdVoltage):"—")+
-     "\n계기판 누적거리(ODO)는 별도 확인 필요 · 읽기 전용");
-    diagnostics.postDelayed(this,2500);
-   }};diagnostics.post(statusUpdate);
-  }
+  // Live OBD sensor dashboard intentionally hidden here: the KTM's TFT already
+  // displays RPM, speed and coolant. The Bluetooth adapter and recorded data
+  // remain supported via the opt-in advanced tools.
   a.gap(a.content,4);
   LinearLayout tools=new LinearLayout(a);
   Button importButton=a.button("GPX 가져오기",false,a::pickGpx);Button refresh=a.button("새로고침",false,a::render);
