@@ -51,7 +51,7 @@ render = home[home.index(" void render(){"):home.index(" void interruptedRideSho
 for marker in ["addHero(b)", "stats(b)", "quickActions()", "rideAction()", "recent(b)", "insights(b)"]:
     check(marker in render, "missing home section " + marker)
 order = [render.index(marker) for marker in
-         ["addHero(b)", "stats(b)", "quickActions()", "rideAction()", "recent(b)", "insights(b)"]]
+         ["addHero(b)", "stats(b)", "rideAction()", "quickNavigation()", "quickActions()", "recent(b)", "insights(b)"]]
 check(order == sorted(order), "home order regressed")
 check("int photoHeight=displayWidth<a.dp(390)?190:211;" in home, "hero doesn't adapt")
 check(home.count("void quickActions(){") == 1, "duplicated shortcut area")
