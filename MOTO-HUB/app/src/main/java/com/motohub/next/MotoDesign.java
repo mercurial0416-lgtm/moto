@@ -96,8 +96,8 @@ final class MotoDesign {
   LinearLayout bar=new LinearLayout(a);
   bar.setPadding(a.dp(8),a.dp(4),a.dp(8),a.dp(3));
   bar.setBackgroundColor(a.panel);
-  String[] labels={"홈","차고","매물","주행","설정"};
-  final int[] icons={0,2,1,3,4};
+  String[] labels={"홈","라이딩","정비","설정"};
+  final int[] icons={0,3,2,4};
   for(int i=0;i<a.tabs.length;i++){
    final String destination=a.tabs[i];
    final boolean selected=destination.equals(a.tab);
