@@ -10,13 +10,13 @@
   <TextView android:id="@+id/quick_ride" android:layout_width="0dp"
    android:layout_height="37dp" android:layout_weight="1.25"
    android:background="@drawable/widget_primary" android:gravity="center"
-   android:text="▶ 기록+내비" android:textSize="11sp" android:textStyle="bold"
+   android:text="▶ 출발" android:textSize="11sp" android:textStyle="bold"
    android:textColor="#121417" android:maxLines="1"
    android:contentDescription="동의 후 주행 기록 시작 및 내비 실행"/>
   <TextView android:id="@+id/quick_nav" android:layout_width="0dp"
    android:layout_height="37dp" android:layout_weight="1"
    android:layout_marginStart="5dp" android:background="@drawable/widget_secondary"
-   android:gravity="center" android:text="↗ 내비만" android:textSize="11sp"
+   android:gravity="center" android:text="↗ 내비" android:textSize="11sp"
    android:textStyle="bold" android:textColor="#FFFFFF" android:maxLines="1"
    android:contentDescription="기본 내비만 실행"/>
  </LinearLayout>
