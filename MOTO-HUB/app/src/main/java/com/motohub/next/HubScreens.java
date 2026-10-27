@@ -380,7 +380,7 @@ final class HubScreens {
   });
   a.section("개인정보 및 라이딩");
   line("라이딩 통합 자가진단","GPS·알림·배터리·OBD·백업 상태 한 번에 확인","실행",this::selfCheck);
-  line("라이딩·OBD2 사전 점검","GPS·알림·배터리 제한·Bluetooth 상태 확인","열기",this::ridePreflight);
+  // Single integrated diagnostics screen remains available on demand; no pre-ride checklist.
   line("개인정보 없는 진단 보고서","권한·서명·GPS·연결 상태만 요약 · 좌표와 계정 정보 제외","열기",this::localDiagnostics);
   line("친구·그룹 서버 연결",SocialClient.configured()?"서버 주소 설정됨 · 실제 로그인/접속 별도 확인":"서버 미설정 · 로컬 기록 사용 가능","진단",this::serverPreflight);
   line("위치 공유 상태",Sharing.enabled?"그룹 위치 공유 중":"공유 꺼짐 · 명시적 동의 필요",Sharing.enabled?"중지":"확인",()->{
@@ -468,31 +468,6 @@ final class HubScreens {
     RideService.autoArmed,"없음".equals(RideService.obdLastError)?"오류 없음":ObdFailureGuide.classify(RideService.obdLastError),backup)+"\n"+detail;
    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()&&a.dialog==opened&&opened.isShowing())result.setText(report);});
   },"moto-ondevice-health-check").start();
- }
- void ridePreflight(){
-  LinearLayout p=a.page("라이딩 사전 점검");
-  android.location.LocationManager gps=(android.location.LocationManager)a.getSystemService(android.content.Context.LOCATION_SERVICE);
-  android.app.NotificationManager nm=(android.app.NotificationManager)a.getSystemService(android.content.Context.NOTIFICATION_SERVICE);
-  android.os.PowerManager pm=(android.os.PowerManager)a.getSystemService(android.content.Context.POWER_SERVICE);
-  android.bluetooth.BluetoothManager bt=(android.bluetooth.BluetoothManager)a.getSystemService(android.content.Context.BLUETOOTH_SERVICE);
-  boolean fine=a.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED;
-  boolean enabled=false;try{enabled=gps!=null&&gps.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);}catch(Exception ignored){}
-  boolean notify=nm!=null&&nm.areNotificationsEnabled()&&(android.os.Build.VERSION.SDK_INT<33||a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED);
-  boolean battery=pm!=null&&pm.isIgnoringBatteryOptimizations(a.getPackageName());
-  boolean bluetooth=bt!=null&&bt.getAdapter()!=null&&bt.getAdapter().isEnabled();
-  for(String detail:RideReadinessReport.summary(fine,enabled,notify,battery,bluetooth))a.label(p,detail,15,a.muted,false);
-  if(RideService.running){
-   RideService service=RideService.instance;
-   long age=service==null||service.lastFixElapsed<=0?-1:android.os.SystemClock.elapsedRealtime()-service.lastFixElapsed;
-   a.label(p,"라이딩 기록: 실행 중 · 마지막 GPS 수신 "+(age<0?"대기 중":(age/1000)+"초 전")+" · 좌표 "+RideService.count+"개",15,a.fg,false);
-  }else if(RideService.autoArmed)a.label(p,"OBD2 연결 대기 중 · GPS 기록은 출발 조건 후 시작됩니다.",15,a.muted,false);
-  else a.label(p,"라이딩 기록: 중지됨 · 마지막 주행 내용은 기록 탭에서 확인하세요.",15,a.muted,false);
-
-  a.action(p,"위치 권한 확인",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+a.getPackageName()))));
-  a.action(p,"GPS 켜기 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)));
-  a.action(p,"배터리 최적화 설정 확인",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
-  a.label(p,"이 점검은 설정 상태만 표시하며 위치를 기록하거나 외부에 전송하지 않습니다. OBD2 실제 차량 지원 여부는 별도로 확인해야 합니다.",13,a.muted,false);
-  a.show();
  }
  void serverPreflight(){
   LinearLayout p=a.page("친구·그룹 서버 진단");
