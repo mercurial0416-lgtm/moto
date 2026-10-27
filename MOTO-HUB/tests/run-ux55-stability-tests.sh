@@ -24,7 +24,7 @@ assert "last_seen" not in prompt
 assert "RideTimePolicy.eligible(" in ride and "RideTimePolicy.moving(" in ride
 assert "liveMovingMillis=0,liveStationaryMillis=0" in ride
 assert "GPS 관측 구간" in ui and "RideTimePolicy.movingAverage(" in ui
-assert 'values[i]=a.text("—",24,a.fg,true)' in ui
+assert 'values[i]=a.text("—",focus?32:24,a.fg,true)' in ui
 assert 'MotoWidgetProvider.refresh(this)' in ride
 assert 'nowForWidget-lastWidgetRefreshElapsed>=30_000' in ride
 assert 'RideService.liveDistanceKm' in widget and 'WidgetMaintenanceSummary.nextDistance(' in widget
