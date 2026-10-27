@@ -42,7 +42,7 @@ final class ObdAutoSpeedMonitor {
     }catch(UnsupportedSpeed e){reason=e.getMessage();break;}
      catch(Exception e){
       if(stopped)break;
-      reason="OBD2 통신 오류: "+e.getClass().getSimpleName();
+      reason=ObdFailureGuide.classify(e.getClass().getSimpleName()+": "+(e.getMessage()==null?"":e.getMessage()));
       // A healthy long session gets a fresh, bounded retry budget.
       failures=ObdConnectionPolicy.nextFailureCount(failures,connectedAtNanos,System.nanoTime());
       // Consume the healthy-session credit. Otherwise every subsequent failed

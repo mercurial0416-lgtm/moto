@@ -359,6 +359,7 @@ final class HubScreens {
     }).show();
   });
   a.section("개인정보 및 라이딩");
+  line("라이딩 통합 자가진단","GPS·알림·배터리·OBD·백업 상태 한 번에 확인","실행",this::selfCheck);
   line("라이딩·OBD2 사전 점검","GPS·알림·배터리 제한·Bluetooth 상태 확인","열기",this::ridePreflight);
   line("개인정보 없는 진단 보고서","권한·서명·GPS·연결 상태만 요약 · 좌표와 계정 정보 제외","열기",this::localDiagnostics);
   line("친구·그룹 서버 연결",SocialClient.configured()?"서버 주소 설정됨 · 실제 로그인/접속 별도 확인":"서버 미설정 · 로컬 기록 사용 가능","진단",this::serverPreflight);
@@ -414,6 +415,39 @@ final class HubScreens {
    cb.setPrimaryClip(android.content.ClipData.newPlainText("MOTO HUB 로컬 진단",report));
    a.toast("좌표·계정 정보 없는 진단 보고서를 복사했어요.");
   });a.show();
+ }
+ /** One screen, asynchronous backup preflight. The app never tests vehicle controls or uploads a log. */
+ void selfCheck(){
+  android.location.LocationManager gps=(android.location.LocationManager)a.getSystemService(android.content.Context.LOCATION_SERVICE);
+  android.app.NotificationManager nm=(android.app.NotificationManager)a.getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+  android.os.PowerManager pm=(android.os.PowerManager)a.getSystemService(android.content.Context.POWER_SERVICE);
+  boolean fine=a.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED;
+  boolean gpsOn=false;try{gpsOn=gps!=null&&gps.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);}catch(Exception ignored){}
+  boolean notify=nm!=null&&nm.areNotificationsEnabled()&&
+   (android.os.Build.VERSION.SDK_INT<33||a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED);
+  boolean battery=pm!=null&&pm.isIgnoringBatteryOptimizations(a.getPackageName());
+  final boolean fineReady=fine,gpsReady=gpsOn,notifyReady=notify,batteryReady=battery;
+  LinearLayout p=a.page("MOTO HUB 통합 자가진단");
+  a.label(p,"기기 상태와 로컬 백업 파일만 점검합니다. 블루투스 페어링/ECU 쓰기, 위치 전송은 하지 않습니다.",14,a.muted,false);
+  TextView result=a.text("저장된 GPS 및 백업 상태 점검 중…",15,a.fg,false);
+  p.addView(result);
+  a.action(p,"위치·알림 권한 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+   android.net.Uri.parse("package:"+a.getPackageName()))));
+  a.action(p,"배터리 최적화 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
+  a.show();
+  final android.app.Dialog opened=a.dialog;
+  new Thread(()->{
+   boolean backup=false;
+   String detail;
+   try{
+    BackupReadiness.Summary summary=BackupReadiness.inspect(a.getFilesDir());
+    backup=summary.withinBasicLimits();
+    detail=backup?"파일 수·크기 사전 점검 통과 · 전체 ZIP 복구 가능 여부는 내보내기 후 확인":"파일 수·용량에 주의 필요 · 백업/복원 화면에서 확인";
+   }catch(Exception err){detail="백업 사전 점검 실패 · 원본 삭제 금지";}
+   final String report=RideDiagnostics.summarize(fineReady,gpsReady,notifyReady,batteryReady,
+    RideService.autoArmed,ObdFailureGuide.classify(RideService.obdLastError),backup)+"\n"+detail;
+   a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()&&a.dialog==opened&&opened.isShowing())result.setText(report);});
+  },"moto-ondevice-health-check").start();
  }
  void ridePreflight(){
   LinearLayout p=a.page("라이딩 사전 점검");

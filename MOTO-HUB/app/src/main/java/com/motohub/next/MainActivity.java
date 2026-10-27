@@ -57,6 +57,7 @@ public class MainActivity extends Activity {
   render();
   applyWidgetForm(getIntent());
   boolean widgetActionTaken=applyWidgetQuickActions(getIntent());
+  boolean notificationActionTaken=confirmStopFromNotification(getIntent());
   DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
   if(state==null)receiveSharedListing(getIntent());
@@ -71,7 +72,7 @@ public class MainActivity extends Activity {
     if(audit!=null)runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast(audit);});
    },"moto-post-update-data-audit").start();
   }
-  if(state==null && !RideService.running && !RideService.autoArmed && !widgetActionTaken)showInterruptedRidePrompt();
+  if(state==null && !RideService.running && !RideService.autoArmed && !widgetActionTaken&&!notificationActionTaken)showInterruptedRidePrompt();
  }
  /** Process death/reboot leaves a local .track without .done. Only offers a manual review. */
  void showInterruptedRidePrompt(){
@@ -101,7 +102,7 @@ public class MainActivity extends Activity {
   MotoWidgetProvider.refresh(this);
   AppUpdateNotice.checkOnResume(this);
  }
- @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);applyWidgetQuickActions(intent);receiveSharedListing(intent);}
+ @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);applyWidgetQuickActions(intent);confirmStopFromNotification(intent);receiveSharedListing(intent);}
  boolean applyWidgetTab(Intent intent){
   if(intent==null)return false;
   String requested=intent.getStringExtra(MotoWidgetProvider.EXTRA_TAB);
@@ -123,6 +124,20 @@ public class MainActivity extends Activity {
    if(!RideService.running&&!RideService.autoArmed)
     new RideUi(this).requestStart(true);
   }else if(nav)NavigationApps.openPreferred(this);
+  return true;
+ }
+ /** Android notification is intentionally confirmation-only: never stop a track on a single accidental touch. */
+ boolean confirmStopFromNotification(Intent intent){
+  if(intent==null||!"com.motohub.next.CONFIRM_RIDE_STOP".equals(intent.getAction()))return false;
+  intent.setAction("com.motohub.next.RIDE_REVIEW_OPENED");
+  if(!RideService.running){toast("현재 진행 중인 GPS 기록은 없습니다.");return true;}
+  if(dialog!=null&&dialog.isShowing()){toast("작성 중인 화면을 닫고 라이딩 종료를 눌러 주세요.");return true;}
+  new AlertDialog.Builder(this).setTitle("라이딩 기록을 종료할까요?")
+   .setMessage("잘못 눌렀다면 계속 기록을 선택하세요. GPS 경로는 사용자가 확인해야만 종료합니다.")
+   .setNegativeButton("계속 기록",null)
+   .setPositiveButton("저장하고 종료",(d,w)->{
+    if(RideService.running)startService(new Intent(this,RideService.class).setAction(RideService.STOP));
+   }).show();
   return true;
  }
  void applyWidgetForm(Intent intent){
@@ -496,7 +511,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      label(row,String.format(Locale.KOREA,"이동 중 평균 %.1f km/h · GPS 추정 이동 시간 %d분",info.movingAverageKmh,info.movingMillis/60000),13,muted,false);
      label(row,"GPS 관측 구간 "+(info.gpsObservedMillis/60000)+"분 · 시간 관측률 "+info.gpsCoveragePercent()+"% (정확도 40m 이하 기준)",13,muted,false);
      label(row,"GPS 관측 정차 추정 "+(Math.max(0,info.gpsObservedMillis-info.movingMillis)/60000)+"분 · 미관측 "+(Math.max(0,info.durationMillis-info.gpsObservedMillis)/60000)+"분 (터널·신호 소실 포함)",13,muted,false);
-     label(row,"평균속도는 총 경과시간 기준 · 오차 좌표 "+info.discarded+"개 제외",12,muted,false);p.addView(row);
+     label(row,"평균속도는 총 경과시간 기준 · 오차 좌표 "+info.discarded+"개 제외",12,muted,false);
+      label(row,"GPS 신호 공백 "+info.gpsGaps+"구간 · 2분 이상 추정 휴식 "+info.restStops+"곳 · 최고속도 위치는 경로 지도에 표시",13,muted,false);p.addView(row);
      if(new File(track.getPath()+".imported").exists())label(p,"GPX에서 가져온 기록 · 실제 주행 여부는 직접 확인해 주세요.",13,muted,false);
      if(new File(track.getPath()+".recovered").exists())label(p,"중단 후 복구한 GPS 기록 · 마지막 좌표 일부가 누락됐을 수 있어요.",13,muted,false);
      String associatedBike=RideBikeBinding.read(track);
@@ -1535,7 +1551,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     toast("입력칸에만 적용했어요. 확인 후 저장해 주세요.");
    }).show();
  }
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치가 취소되었거나 완료되지 않았습니다. 기존 기록은 삭제하지 않았습니다.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
    GARAGE_PHOTO_SAVER.execute(()->{try{saveGaragePhoto(uri,bikeId);}catch(Exception error){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())this.error("바이크 사진 저장 실패: "+error.getMessage());});}});return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
   if(request==54){scanReceiptOcr(uri,null);return;}
   if(request==57){scanQuickOdometerPhoto(uri);return;}

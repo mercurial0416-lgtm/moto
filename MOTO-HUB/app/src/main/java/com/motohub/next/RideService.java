@@ -21,6 +21,7 @@ public final class RideService extends Service implements LocationListener {
   // GPS disk sync and callbacks live off the UI looper, preserving location callback order.
   gpsIoThread=new HandlerThread("moto-gps-disk",android.os.Process.THREAD_PRIORITY_BACKGROUND);
   gpsIoThread.start();
+  gpsWriteHandler=new Handler(gpsIoThread.getLooper());
  }
  /** Read current service-owned finalization state without leaking it across service instances. */
  static boolean saving(){RideService s=instance;return s!=null&&(s.finishPending||s.autoFinishPending);}
@@ -85,6 +86,17 @@ public final class RideService extends Service implements LocationListener {
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();final ObdSpeedSanityPolicy speedSanity=new ObdSpeedSanityPolicy();LocationManager manager;FileOutputStream output;File track;long lastTime;volatile long lastFixElapsed;volatile Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
  HandlerThread gpsIoThread;
+ Handler gpsWriteHandler;
+ boolean gpsSyncScheduled=false;
+ final GpsSyncPolicy gpsSync=new GpsSyncPolicy();
+ final Runnable syncPendingGps=new Runnable(){@Override public void run(){
+  synchronized(RideService.this){
+   gpsSyncScheduled=false;
+   if(output==null||!running||!gpsSync.hasDirty())return;
+   try{output.getFD().sync();gpsSync.synced(SystemClock.elapsedRealtime());}
+   catch(IOException e){stopWith("GPS 저장 오류 · 경로를 복구 화면에서 확인하세요.",false);}
+  }
+ }};
  volatile boolean finishPending=false,autoFinishPending=false;
  final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
     // Turning off developer experiments revokes OBD permission, not consent to a
@@ -194,7 +206,8 @@ public final class RideService extends Service implements LocationListener {
   output=new FileOutputStream(track);
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
   catch(IOException error){output.close();output=null;track.delete();throw error;}
-  count=0;lastTime=0;lastFixElapsed=0;lastGood=null;
+  count=0;lastTime=0;lastFixElapsed=0;lastGood=null;gpsSync.reset();
+  if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);gpsSyncScheduled=false;
   startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;liveMovingMillis=0;liveStationaryMillis=0;lastWidgetRefreshElapsed=0;gpsOnlyAfterObd=false;
   active=track.getName();running=true;notificationRate.reset();status="GPS 신호 대기";
   MotoWidgetProvider.refresh(this);
@@ -368,7 +381,7 @@ public final class RideService extends Service implements LocationListener {
   // Keep an already-running GPS session in the same foreground service until its
   // user explicitly ends it. Never auto-arm again or enable group sharing.
   obdLastError="OBD2 · "+reason;
-  obdLink="연결 종료 · "+reason;MotoWidgetProvider.refresh(this);speedSanity.reset();ObdLocalDiagnosticLog.record(this,"AUTO_OFF");obdSpeedKmh=-1;obdLastSampleElapsed=0;
+  obdLink="연결 종료 · "+ObdFailureGuide.classify(reason);MotoWidgetProvider.refresh(this);speedSanity.reset();ObdLocalDiagnosticLog.record(this,"AUTO_OFF");obdSpeedKmh=-1;obdLastSampleElapsed=0;
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
   obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
   autoArmed=false;autoGate.reset();obdStationaryRemainingMs=-1;obdMonitor=null;
@@ -387,7 +400,10 @@ public final class RideService extends Service implements LocationListener {
  }
  Notification notification(String text){
   PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
-  PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,RideService.class).setAction(STOP),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+  Intent confirmStop=new Intent(this,MainActivity.class).setAction("com.motohub.next.CONFIRM_RIDE_STOP")
+    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+  confirmStop.putExtra(MotoWidgetProvider.EXTRA_TAB,"라이딩");
+  PendingIntent stop=PendingIntent.getActivity(this,1,confirmStop,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   Notification.Builder builder=new Notification.Builder(this,"ride").setSmallIcon(R.drawable.ic_notification)
     .setContentTitle(autoArmed?"MOTO HUB · OBD2 자동 라이딩":"MOTO HUB · GPS 기록 중")
     .setContentText(text).setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PRIVATE)
@@ -408,7 +424,17 @@ public final class RideService extends Service implements LocationListener {
   if(!running||output==null)return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
   if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
-  try{if(track.length()>TrackFile.MAX_BYTES-512)throw new IOException("경로 최대 크기에 도달했습니다.");output.write(TrackFile.point(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime()).getBytes(StandardCharsets.UTF_8));output.flush();output.getFD().sync();lastTime=location.getTime();lastFixElapsed=SystemClock.elapsedRealtime();count++;
+  try{if(track.length()>TrackFile.MAX_BYTES-512)throw new IOException("경로 최대 크기에 도달했습니다.");output.write(TrackFile.point(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime()).getBytes(StandardCharsets.UTF_8));output.flush();
+   long writeAt=SystemClock.elapsedRealtime();
+   if(gpsSync.shouldSync(writeAt)){
+    output.getFD().sync();
+    if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);
+    gpsSyncScheduled=false;
+   }else if(!gpsSyncScheduled&&gpsWriteHandler!=null){
+    gpsSyncScheduled=true;
+    gpsWriteHandler.postDelayed(syncPendingGps,GpsSyncPolicy.MAX_DIRTY_MS);
+   }
+   lastTime=location.getTime();lastFixElapsed=SystemClock.elapsedRealtime();count++;
    if(lastGood!=null){long dt=location.getTime()-lastGood.getTime();float metres=location.distanceTo(lastGood);
     // Estimate only GPS-observed time; long gaps, poor accuracy and spikes
     // are not silently counted as either moving or stopped.
@@ -465,6 +491,8 @@ public final class RideService extends Service implements LocationListener {
  @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p))handler.post(()->{if(!running)return;status="GPS 복귀 · 좌표 대기";notifySafely(status);});} @Override public void onStatusChanged(String p,int s,Bundle b){}
  void stopWith(String message,boolean completed){status=message;cleanup(completed);stopSelf();}
  private synchronized boolean closeTrack(boolean completed){
+  if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);
+  gpsSyncScheduled=false;gpsSync.reset();
   boolean verified=false;
   if(output!=null){
    try{

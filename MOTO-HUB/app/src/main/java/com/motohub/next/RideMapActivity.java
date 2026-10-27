@@ -38,6 +38,15 @@ public final class RideMapActivity extends Activity {
    if(baseLine!=null)baseLine.getOutlinePaint().setColor(speedVisible?0xff596572:0xffff6b1b);
    speedButton.setText(speedVisible?"단색 경로 보기":"속도별 경로 보기");map.invalidate();
   });base.addView(speedButton);
+  LinearLayout zoom=new LinearLayout(this);zoom.setOrientation(LinearLayout.HORIZONTAL);
+  Button zoomIn=new Button(this);zoomIn.setText("＋ 확대");zoomIn.setContentDescription("지도 확대");
+  zoomIn.setOnClickListener(v->{if(map!=null)map.getController().zoomIn();});
+  Button zoomOut=new Button(this);zoomOut.setText("－ 축소");zoomOut.setContentDescription("지도 축소");
+  zoomOut.setOnClickListener(v->{if(map!=null)map.getController().zoomOut();});
+  zoom.addView(zoomIn,new LinearLayout.LayoutParams(0,48,1));zoom.addView(zoomOut,new LinearLayout.LayoutParams(0,48,1));
+  base.addView(zoom);
+  TextView legend=new TextView(this);legend.setText("속도 범례  ● 느림(초록)  ● 보통(노랑)  ● 빠름(빨강)");legend.setTextSize(12);legend.setTextColor(0xffe8c985);
+  legend.setPadding(12,6,12,6);base.addView(legend);
   tileButton=new Button(this);tileButton.setText("온라인 배경지도 켜기 (선택)");
   tileButton.setOnClickListener(v->{
    if(onlineTiles){setOnlineTiles(false);return;}
@@ -85,12 +94,17 @@ public final class RideMapActivity extends Activity {
       line.getOutlinePaint().setStrokeWidth(11f);line.setVisible(false);map.getOverlays().add(line);speedLines.add(line);
      }
      speedButton.setEnabled(!speedLines.isEmpty());
-     Marker start=new Marker(map);start.setPosition(route.get(0));start.setTitle("출발");map.getOverlays().add(start);
-     Marker finish=new Marker(map);finish.setPosition(route.get(route.size()-1));finish.setTitle("도착");map.getOverlays().add(finish);
+     Marker start=new Marker(map);start.setPosition(route.get(0));start.setTitle("① 출발 지점");map.getOverlays().add(start);
+     Marker finish=new Marker(map);finish.setPosition(route.get(route.size()-1));finish.setTitle("② 도착 지점");map.getOverlays().add(finish);
+     if(RideMapOverlayPolicy.validPeak(info.peakKmh,info.peakLatitude,info.peakLongitude)){
+      Marker peak=new Marker(map);peak.setPosition(new GeoPoint(info.peakLatitude,info.peakLongitude));
+      peak.setTitle(String.format(java.util.Locale.KOREA,"최고속도 위치 · %.0f km/h (GPS 추정)",info.peakKmh));
+      map.getOverlays().add(peak);
+     }
      double north=-90,south=90,east=-180,west=180;for(GeoPoint p:route){north=Math.max(north,p.getLatitude());south=Math.min(south,p.getLatitude());east=Math.max(east,p.getLongitude());west=Math.min(west,p.getLongitude());}
      if(north-south<.0005){north+=.002;south-=.002;}if(east-west<.0005){east+=.002;west-=.002;}
      map.zoomToBoundingBox(new BoundingBox(north,east,south,west),true,72);
-     caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\n속도 색상: 초록 <30 · 노랑 30~69 · 빨강 ≥70km/h (GPS 추정, 끊긴 구간 제외)");
+     caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\nGPS 공백 "+info.gpsGaps+"구간 · 추정 휴식 "+info.restStops+"곳 · 최고속도 마커 (GPS 추정)"+"\n초록 <30 · 노랑 30~69 · 빨강 ≥70km/h (GPS 추정)");
      map.invalidate();
     });
    }catch(Exception e){runOnUiThread(()->{if(alive&&caption!=null)caption.setText("경로를 열지 못했어요: "+e.getMessage());});}
