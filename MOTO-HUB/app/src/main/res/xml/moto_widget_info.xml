@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android" android:minWidth="250dp" android:minHeight="110dp" android:initialLayout="@layout/moto_widget" android:resizeMode="horizontal|vertical" android:widgetCategory="home_screen" android:updatePeriodMillis="1800000" />
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android" android:minWidth="265dp" android:minHeight="155dp" android:initialLayout="@layout/moto_widget" android:resizeMode="horizontal|vertical" android:widgetCategory="home_screen" android:updatePeriodMillis="1800000" />
