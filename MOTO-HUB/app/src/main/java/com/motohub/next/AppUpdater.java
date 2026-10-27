@@ -296,7 +296,7 @@ final class AppUpdater {
    a.error(UpdateSafety.MESSAGE);return;
   }
   new AlertDialog.Builder(a).setTitle("업데이트 전 데이터 보호")
-   .setMessage("설치 전에 주유·정비 등 현재 앱 데이터를 검증된 내부 복구 지점으로 저장합니다. "
+   .setMessage("실패하거나 설치를 취소해도 다운로드한 검증 APK는 남습니다. 더보기 → 앱 업데이트 → 다운로드한 업데이트 설치에서 다시 시도하세요.\n\n설치 전에 주유·정비 등 현재 앱 데이터를 검증된 내부 복구 지점으로 저장합니다. "
     +"GPS 경로와 사진은 이 복구 지점에 포함되지 않습니다. 별도로 전체 ZIP 또는 암호화 백업을 권장합니다.")
    .setNegativeButton("취소",null)
    .setNeutralButton("암호화 전체 백업", (d,w)->a.exportEncryptedBundle())
