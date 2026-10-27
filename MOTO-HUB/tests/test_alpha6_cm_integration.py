@@ -9,7 +9,7 @@ receiver=load('app/src/main/java/com/motohub/next/BootRideReminder.java')
 manifest=load('app/src/main/AndroidManifest.xml')
 checks={
  'metadata':current_version() is not None and debug_alignment_ok() and signed_alignment_ok(),
- 'boot receiver only after reboot': 'Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())' in receiver and 'BootRidePolicy.hasRecoverable' in receiver,
+ 'boot receiver recovery only on boot, widget refresh after upgrade': 'Intent.ACTION_BOOT_COMPLETED.equals(action)' in receiver and 'BootRidePolicy.hasRecoverable' in receiver and 'Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)' in receiver and 'MotoWidgetProvider.refresh(context)' in receiver,
  'boot does not auto start GPS': 'startForegroundService' not in receiver and 'startService(' not in receiver and 'Sharing.' not in receiver,
  'boot uses notification permission': 'POST_NOTIFICATIONS' in receiver and 'areNotificationsEnabled' in receiver,
  'boot notification private': 'VISIBILITY_PRIVATE' in receiver and 'PendingIntent.getActivity' in receiver,
