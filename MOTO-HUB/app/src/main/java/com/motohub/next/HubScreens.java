@@ -345,7 +345,13 @@ final class HubScreens {
      });
     });
    });
-  });a.label(p,"편집 전 일일 백업 7개 + 변경 후 최근 복원 지점 12개를 기기에 보관합니다. 앱 삭제 시 모두 사라지므로 전체 ZIP을 별도로 내보내세요.",14,a.muted,false);a.action(p,"암호화 전체 백업 만들기 (.mhub)",true,a::exportEncryptedBundle);a.action(p,"암호 없는 ZIP으로 내보내기",false,a::exportBundle);a.action(p,"JSON 백업만 내보내기",false,a::exportData);a.action(p,"JSON 백업 가져오기",false,()->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);a.startActivityForResult(i,42);});a.action(p,"이전 JSON 되돌리기 (사진·GPS 제외)",false,()->a.attempt(()->{android.util.AtomicFile f=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-import.json"));a.confirmImport(Store.parse(new String(f.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.show();});
+  });a.label(p,"편집 전 일일 백업 7개 + 변경 후 최근 복원 지점 12개를 기기에 보관합니다. 앱 삭제 시 모두 사라지므로 전체 ZIP을 별도로 내보내세요.",14,a.muted,false);a.action(p,"암호화 전체 백업 만들기 (.mhub)",true,a::exportEncryptedBundle);a.action(p,"암호 없는 ZIP으로 내보내기",false,a::exportBundle);a.action(p,"기존 ZIP 복구 가능 여부 검사",false,()->{
+ if(RideService.running||RideService.autoArmed||RestoreRideGate.isRestoring()){a.toast("라이딩이 끝난 뒤 검사해 주세요.");return;}
+ android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);
+ i.setType("application/zip");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+ i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,new String[]{"application/zip","application/x-zip-compressed","application/octet-stream"});
+ a.startActivityForResult(i,60);
+});a.action(p,"JSON 백업만 내보내기",false,a::exportData);a.action(p,"JSON 백업 가져오기",false,()->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);a.startActivityForResult(i,42);});a.action(p,"이전 JSON 되돌리기 (사진·GPS 제외)",false,()->a.attempt(()->{android.util.AtomicFile f=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-import.json"));a.confirmImport(Store.parse(new String(f.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.show();});
   a.section("표시 및 알림");
   line("기본 내비 선택","현재: "+NavigationApps.preferred(a).label+" · 카카오내비 / 네이버지도 / 티맵","변경",()->NavigationApps.choose(a));
   line("선택한 내비 실행","GPS 기록과 독립적으로 실행 · 목적지 미전송","열기",()->NavigationApps.openPreferred(a));
