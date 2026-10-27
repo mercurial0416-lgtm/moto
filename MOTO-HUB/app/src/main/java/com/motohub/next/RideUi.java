@@ -66,13 +66,14 @@ final class RideUi {
    TextView[] values=new TextView[3];String[] names={"주행거리","경과시간","실시간 속도"};
    for(int i=0;i<3;i++){
     LinearLayout box=a.col();box.setPadding(a.dp(9),a.dp(12),a.dp(9),a.dp(12));box.setBackground(a.shape(a.bg,0,13));
-    values[i]=a.text("—",19,a.fg,true);values[i].setGravity(Gravity.CENTER);box.addView(values[i]);
-    TextView name=a.text(names[i],11,a.muted,false);name.setGravity(Gravity.CENTER);
+    values[i]=a.text("—",24,a.fg,true);values[i].setGravity(Gravity.CENTER);box.addView(values[i]);
+    TextView name=a.text(names[i],12,a.muted,false);name.setGravity(Gravity.CENTER);
     LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.topMargin=a.dp(7);box.addView(name,np);
     LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)lp.leftMargin=a.dp(7);live.addView(box,lp);
    }hero.addView(live);
    TextView average=a.text("평균속도 계산 중",13,a.muted,false);average.setPadding(a.dp(6),a.dp(10),0,a.dp(8));hero.addView(average);
    TextView peak=a.text("최고속도 계산 중",13,a.muted,false);peak.setPadding(a.dp(6),0,0,a.dp(9));hero.addView(peak);
+   TextView motion=a.text("이동·정차 분석 중",13,a.muted,false);motion.setPadding(a.dp(6),0,0,a.dp(9));hero.addView(motion);
    a.gap(hero,12);
    Runnable refresh=new Runnable(){@Override public void run(){
     if(!hero.isAttachedToWindow()||a.isFinishing()||a.isDestroyed())return;
@@ -84,6 +85,9 @@ final class RideUi {
      RideService.gpsFixElapsed(),android.os.SystemClock.elapsedRealtime()));
     average.setText("평균속도 " + RideMetrics.averageText(RideService.liveDistanceKm,seconds));
     peak.setText(String.format(Locale.KOREA,"최고속도 %.0f km/h · GPS 추정값",RideService.livePeakKmh)+" · "+RideService.status);
+    motion.setText(String.format(Locale.KOREA,"이동 %d분 · 정차 %d분 · 이동평균 %.1f km/h (GPS 관측 구간)",
+      RideService.liveMovingMillis/60000,RideService.liveStationaryMillis/60000,
+      RideTimePolicy.movingAverage(RideService.liveDistanceKm,RideService.liveMovingMillis)));
     // Suggest, never silently stop a manually recorded ride. A fresh GPS fix,
     // real prior travel and uninterrupted stationary time are all mandatory.
     if(RideStopSuggestion.shouldSuggest(

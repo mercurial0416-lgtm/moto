@@ -1,0 +1,72 @@
+name: MOTO HUB verified unsigned update candidate
+on:
+  push:
+    branches: ['release/moto-hub-apk']
+    paths:
+      - 'MOTO-HUB/**'
+      - '.github/workflows/moto-verified-unsigned-prebuild.yml'
+permissions:
+  contents: read
+jobs:
+  prebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Android SDK 36
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Choose strictly higher version than public manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content |
+            tr -d '\n' | base64 --decode |
+            python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
+          CODE=$((CURRENT+1))
+          if (( CODE < 525 )); then CODE=525; fi
+          test "$CODE" -gt "$CURRENT"
+          echo "RELEASE_CODE=$CODE" >> "$GITHUB_ENV"
+      - name: Full offline-source regressions
+        working-directory: MOTO-HUB
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 -o "$RUNNER_TEMP/json.jar" https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar
+          export JSON_JAR="$RUNNER_TEMP/json.jar"
+          failures=0
+          for suite in tests/run-*.sh; do
+            if bash "$suite"; then echo "PASS $suite"
+            else echo "::error::FAILED $suite"; failures=$((failures+1)); fi
+          done
+          python3 tests/test_alpha6_dc_integration.py || failures=$((failures+1))
+          python3 tests/test_workshop_ui.py || failures=$((failures+1))
+          python3 tests/test_readable_ui.py || failures=$((failures+1))
+          test "$failures" -eq 0
+      - name: Compile, lint, test and produce unsigned APK
+        working-directory: MOTO-HUB
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease :app:lintDebug :app:testDebugUnitTest \
+            -PmotoReleaseCode="$RELEASE_CODE" --no-daemon
+          APK=app/build/outputs/apk/release/app-release-unsigned.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" |
+            grep -F "package: name='com.motohub.next'" | grep -F "versionCode='$RELEASE_CODE'"
+          sha256sum "$APK" > app/build/outputs/apk/release/unsigned.sha256
+      - name: Publish source-pinned unsigned candidate (NOT installable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-hub-unsigned-${{ github.sha }}
+          path: |
+            MOTO-HUB/app/build/outputs/apk/release/app-release-unsigned.apk
+            MOTO-HUB/app/build/outputs/apk/release/unsigned.sha256
+          if-no-files-found: error
+          retention-days: 14

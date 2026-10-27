@@ -41,7 +41,7 @@ public final class DailyMaintenanceJob extends JobService {
   context.getSharedPreferences("notifications",Context.MODE_PRIVATE).edit()
    .remove("last_maintenance_notice").remove("last_maintenance_notice_at").apply();
   NotificationManager manager=context.getSystemService(NotificationManager.class);
-  if(manager!=null)manager.cancel(405);
+  if(manager!=null)manager.cancel(407);
  }
  static void schedule(Context context){
   try{JobScheduler scheduler=context.getSystemService(JobScheduler.class);
@@ -83,7 +83,7 @@ public final class DailyMaintenanceJob extends JobService {
      if(cancelled(job))return;
      if(enabled&&!RideService.running)sendMaintenanceReminder(db);
      else if(!enabled)clearReminderState(this);
-     else {NotificationManager notificationManager=getSystemService(NotificationManager.class);if(notificationManager!=null)notificationManager.cancel(405);}
+     else {NotificationManager notificationManager=getSystemService(NotificationManager.class);if(notificationManager!=null)notificationManager.cancel(407);}
     }
    }catch(Exception ignored){}finally{
     runningJobs.remove(params.getJobId(),job);
@@ -113,7 +113,7 @@ public final class DailyMaintenanceJob extends JobService {
   String today=LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
   MaintenanceNotificationSummary reminder=MaintenanceNotificationSummary.from(db,today);
   if(!reminder.hasNotice()){
-   manager.cancel(405);
+   manager.cancel(407);
    getSharedPreferences("notifications",MODE_PRIVATE).edit().remove("last_maintenance_notice").remove("last_maintenance_notice_at").apply();
    return;
   }
@@ -133,13 +133,13 @@ public final class DailyMaintenanceJob extends JobService {
   Intent intent=new Intent(this,MainActivity.class);intent.putExtra(MotoWidgetProvider.EXTRA_TAB,"차고");
   PendingIntent open=PendingIntent.getActivity(this,103,intent,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   Notification notification=new Notification.Builder(this,"maintenance")
-   .setSmallIcon(R.drawable.ic_launcher)
+   .setSmallIcon(R.drawable.ic_notification)
    .setContentTitle(reminder.title())
    .setContentText(reminder.detail)
    .setStyle(new Notification.BigTextStyle().bigText(reminder.detail))
    .setVisibility(Notification.VISIBILITY_PRIVATE)
    .setContentIntent(open).setAutoCancel(true).build();
-  manager.notify(405,notification);
+  manager.notify(407,notification);
   prefs.edit().putString("last_maintenance_notice",stamp)
    .putLong("last_maintenance_notice_at",now).apply();
  }

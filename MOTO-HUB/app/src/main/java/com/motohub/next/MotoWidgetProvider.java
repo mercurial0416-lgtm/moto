@@ -69,7 +69,7 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
  private static void renderGarage(Context context,RemoteViews views){
   boolean ride=RideService.running;
   views.setTextViewText(R.id.widget_ride,ride?"라이딩 확인  ›":"라이딩 시작  ›");
-  String gps=ride?(RideService.gpsFresh()?"GPS 기록 중":"GPS 신호 대기"):"GPS 확인 필요";
+  String gps=ride?(RideService.gpsFresh()?String.format(java.util.Locale.KOREA,"GPS %.1f km",RideService.liveDistanceKm):"GPS 신호 대기"):"GPS 미기록";
   String obd=RideService.autoArmed?(ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())?"OBD 수신 중":"OBD 연결 대기"):"OBD 꺼짐";
   views.setTextViewText(R.id.widget_connection_status,gps+"  ·  "+obd);
   if(context.getSharedPreferences("widget_privacy",Context.MODE_PRIVATE).getBoolean("hide_details",false)){
@@ -112,7 +112,9 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
        history.add(new WidgetMaintenanceSummary.Service(service.optString("type"),service.optString("date"),
         service.optString("nextDate"),service.optDouble("nextKm")));
      }
-     detail=km+" km  ·  "+WidgetMaintenanceSummary.label(history,LocalDate.now().toString(),odometer);
+     detail=km+" km · "+WidgetMaintenanceSummary.label(history,LocalDate.now().toString(),odometer);
+     String dueDistance=WidgetMaintenanceSummary.nextDistance(history,odometer);
+     if(!dueDistance.isEmpty())detail+=" · "+dueDistance;
      String month=LocalDate.now().toString().substring(0,7);
      double monthly=0;
      for(String collection:new String[]{"expenses","services"}){

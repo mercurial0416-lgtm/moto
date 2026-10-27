@@ -1,11 +1,5 @@
 name: MOTO HUB - in-app direct APK publishing
 on:
-  push:
-    branches:
-      - release/moto-hub-apk
-    paths:
-      - 'MOTO-HUB/**'
-      - '.github/workflows/moto-apk-inapp-publish.yml'
   workflow_dispatch:
 permissions:
   contents: write

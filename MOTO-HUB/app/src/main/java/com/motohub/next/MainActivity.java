@@ -495,7 +495,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      label(row,String.format(Locale.KOREA,"평균 %.1f km/h · 최고 %.0f km/h",info.averageKmh,info.peakKmh),18,fg,true);
      label(row,String.format(Locale.KOREA,"이동 중 평균 %.1f km/h · GPS 추정 이동 시간 %d분",info.movingAverageKmh,info.movingMillis/60000),13,muted,false);
      label(row,"GPS 관측 구간 "+(info.gpsObservedMillis/60000)+"분 · 시간 관측률 "+info.gpsCoveragePercent()+"% (정확도 40m 이하 기준)",13,muted,false);
-     label(row,"총 경과 "+(info.durationMillis/60000)+"분 · 이동 외 시간 "+(Math.max(0,info.durationMillis-info.movingMillis)/60000)+"분 (정차·GPS 누락 구분 불가)",13,muted,false);
+     label(row,"GPS 관측 정차 추정 "+(Math.max(0,info.gpsObservedMillis-info.movingMillis)/60000)+"분 · 미관측 "+(Math.max(0,info.durationMillis-info.gpsObservedMillis)/60000)+"분 (터널·신호 소실 포함)",13,muted,false);
      label(row,"평균속도는 총 경과시간 기준 · 오차 좌표 "+info.discarded+"개 제외",12,muted,false);p.addView(row);
      if(new File(track.getPath()+".imported").exists())label(p,"GPX에서 가져온 기록 · 실제 주행 여부는 직접 확인해 주세요.",13,muted,false);
      if(new File(track.getPath()+".recovered").exists())label(p,"중단 후 복구한 GPS 기록 · 마지막 좌표 일부가 누락됐을 수 있어요.",13,muted,false);
