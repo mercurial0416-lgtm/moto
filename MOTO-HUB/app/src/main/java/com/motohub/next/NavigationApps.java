@@ -29,6 +29,7 @@ final class NavigationApps {
      .edit().putString(KEY,selectedApp.id).commit();
     if(!saved){activity.toast("내비 선택을 저장하지 못했어요.");return;}
     RideService.refreshNotification();
+    MotoWidgetProvider.refresh(activity);
     activity.toast("선택 완료: "+selectedApp.label+" · 내비 실행 버튼을 누르세요.");
     if(!activity.isFinishing()&&!activity.isDestroyed())activity.render();
    })
