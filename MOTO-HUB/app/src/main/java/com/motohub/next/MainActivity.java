@@ -57,6 +57,7 @@ public class MainActivity extends Activity {
   render();
   applyWidgetForm(getIntent());
   boolean widgetActionTaken=applyWidgetQuickActions(getIntent());
+  boolean notificationActionTaken=confirmStopFromNotification(getIntent());
   DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
   if(state==null)receiveSharedListing(getIntent());
@@ -71,7 +72,7 @@ public class MainActivity extends Activity {
     if(audit!=null)runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast(audit);});
    },"moto-post-update-data-audit").start();
   }
-  if(state==null && !RideService.running && !RideService.autoArmed && !widgetActionTaken)showInterruptedRidePrompt();
+  if(state==null && !RideService.running && !RideService.autoArmed && !widgetActionTaken&&!notificationActionTaken)showInterruptedRidePrompt();
  }
  /** Process death/reboot leaves a local .track without .done. Only offers a manual review. */
  void showInterruptedRidePrompt(){
@@ -101,7 +102,7 @@ public class MainActivity extends Activity {
   MotoWidgetProvider.refresh(this);
   AppUpdateNotice.checkOnResume(this);
  }
- @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);applyWidgetQuickActions(intent);receiveSharedListing(intent);}
+ @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);applyWidgetQuickActions(intent);confirmStopFromNotification(intent);receiveSharedListing(intent);}
  boolean applyWidgetTab(Intent intent){
   if(intent==null)return false;
   String requested=intent.getStringExtra(MotoWidgetProvider.EXTRA_TAB);
@@ -123,6 +124,20 @@ public class MainActivity extends Activity {
    if(!RideService.running&&!RideService.autoArmed)
     new RideUi(this).requestStart(true);
   }else if(nav)NavigationApps.openPreferred(this);
+  return true;
+ }
+ /** Android notification is intentionally confirmation-only: never stop a track on a single accidental touch. */
+ boolean confirmStopFromNotification(Intent intent){
+  if(intent==null||!"com.motohub.next.CONFIRM_RIDE_STOP".equals(intent.getAction()))return false;
+  intent.setAction("com.motohub.next.RIDE_REVIEW_OPENED");
+  if(!RideService.running){toast("현재 진행 중인 GPS 기록은 없습니다.");return true;}
+  if(dialog!=null&&dialog.isShowing()){toast("작성 중인 화면을 닫고 라이딩 종료를 눌러 주세요.");return true;}
+  new AlertDialog.Builder(this).setTitle("라이딩 기록을 종료할까요?")
+   .setMessage("잘못 눌렀다면 계속 기록을 선택하세요. GPS 경로는 사용자가 확인해야만 종료합니다.")
+   .setNegativeButton("계속 기록",null)
+   .setPositiveButton("저장하고 종료",(d,w)->{
+    if(RideService.running)startService(new Intent(this,RideService.class).setAction(RideService.STOP));
+   }).show();
   return true;
  }
  void applyWidgetForm(Intent intent){
