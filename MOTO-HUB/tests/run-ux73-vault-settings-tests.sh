@@ -16,7 +16,7 @@ assert "recoverInterrupted(File files)" in trash
 assert 'RideTrash.recoverInterrupted(getFilesDir())' in activity
 assert 'RideTrash.entries(internal)' in archive
 assert 'isTrashTrack' in format and 'isTrashSidecar' in format
-assert '"rides-trash/"+id+"/"' in archive
+assert 'String prefix="rides-trash/"+name+"/";' in archive
 assert 'public final String preferences' in restorer
 assert 'MOTO-HUB-preferences.json' in archive and 'MOTO-HUB-preferences.json' in format
 assert "UiSettingsArchive.restore(this,ready.preferences)" in activity
