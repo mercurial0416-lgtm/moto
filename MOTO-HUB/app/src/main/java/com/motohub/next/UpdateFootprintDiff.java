@@ -15,6 +15,7 @@ final class UpdateFootprintDiff {
   List<String> changed=new ArrayList<>();
   for(String key:a.keySet())if(!Objects.equals(a.get(key),b.get(key))){
    if("contentSha256".equals(key))changed.add("GPS·사진 파일 내용");
+   else if("dataSha256".equals(key))changed.add("바이크·주유·정비·설정 내용");
    else if("tracks".equals(key)||"trackBytes".equals(key)||"complete".equals(key))changed.add("GPS 파일");
    else if(key.startsWith("garagePhoto"))changed.add("바이크 사진");
    else changed.add("저장 기록 "+key);

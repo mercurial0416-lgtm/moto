@@ -23,7 +23,7 @@ final class UpdateDataFootprint {
  private UpdateDataFootprint(){}
  static String capture(Context context,JSONObject data)throws Exception{
   JSONObject checked=Store.parse(data.toString());
-  StringBuilder value=new StringBuilder("schema3");
+  StringBuilder value=new StringBuilder("schema4;dataSha256=").append(JsonCanonicalDigest.hash(checked));
   for(String collection:Store.COLLECTIONS){
    JSONArray records=checked.getJSONArray(collection);
    value.append(';').append(collection).append('=').append(records.length());
