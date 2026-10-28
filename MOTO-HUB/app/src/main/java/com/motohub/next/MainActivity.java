@@ -221,18 +221,11 @@ public class MainActivity extends Activity {
    tab="차고";render();if(readOnly){toast("저장 파일 보호 중이에요.");return;}edit(form,null);
   }
  }
+ /** Legacy text-share entry point: listing discovery was retired, never save new listings. */
  void receiveSharedListing(Intent intent){
-  if(intent==null||!Intent.ACTION_SEND.equals(intent.getAction())||!"text/plain".equals(intent.getType()))return;
-  String shared=intent.getStringExtra(Intent.EXTRA_TEXT);intent.removeExtra(Intent.EXTRA_TEXT); // avoid replay after configuration change
-  String url=QuickEntry.extractUrl(shared);
-  if(url.isEmpty()){toast("웹 링크를 찾지 못했어요.");return;}
-  if(readOnly){toast("저장 파일 보호 중에는 매물을 추가할 수 없어요.");return;}
-  toast("매물 기능은 일반 화면에서 제외했어요. 기존 매물 기록은 백업 데이터에 보존됩니다.");
-  if(draftFields!=null){EditText u=draftFields.get("url");if(u!=null)u.setText(url);
-   String title=QuickEntry.sharedTitle(shared,url);EditText model=draftFields.get("model");
-   if(model!=null&&!title.isEmpty())model.setText(title);
-  }
-  toast("공유한 매물 링크를 가져왔어요.");
+  if(intent==null||!Intent.ACTION_SEND.equals(intent.getAction()))return;
+  intent.removeExtra(Intent.EXTRA_TEXT);
+  toast("매물 관리 기능을 숨겼습니다. 기존 기록은 전체 백업에 보존돼요.");
  }
  @Override public void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("pendingTrack",pendingTrack);out.putString("tab",tab);out.putString("selected",selected);out.putString("garagePhotoTarget",garagePhotoTarget);out.putString("receiptPhotoTarget",receiptPhotoTarget);out.putString("receiptPhotoKey",receiptPhotoKey);out.putInt("receiptPhotoSlot",receiptPhotoSlot);out.putString("cameraCaptureName",cameraCaptureName);out.putString("rideHistoryFilter",rideHistoryFilter);out.putString("rideHistorySort",rideHistorySort);out.putString("rideHistoryPeriod",rideHistoryPeriod);out.putString("rideHistoryBike",rideHistoryBike);out.putString("rideHistoryQuery",rideHistoryQuery);out.putBoolean("rideStartConsent",rideStartConsent.pending());out.putBoolean("launchNavigationAfterRide",launchNavigationAfterRide);}
  void attempt(Work w){try{w.run();}catch(Exception e){error(e instanceof NumberFormatException?"숫자를 확인해 주세요.":e instanceof java.time.format.DateTimeParseException?"날짜는 YYYY-MM-DD 형식으로 입력해 주세요.":e.getMessage()==null?"작업을 완료하지 못했습니다.":e.getMessage());}}
