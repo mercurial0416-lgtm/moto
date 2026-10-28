@@ -41,6 +41,13 @@ public class MainActivity extends Activity {
  boolean suppressUpdatePrompt(){return android.os.SystemClock.elapsedRealtime()<suppressUpdatePromptUntilElapsed||interruptedRecoveryPromptVisible||recoveryReminderChecking.get()||rideStartConsent.pending();}
  String garageMode="전체", previousTab="홈", rideHistoryFilter=RideHistoryFilter.ALL, rideHistorySort=RideHistorySort.NEWEST, rideHistoryPeriod=RideHistoryPeriod.ALL, rideHistoryBike=RideHistoryBikeFilter.ALL, rideHistoryQuery="";
  final String[] tabs={"홈","라이딩","차고","더보기"};
+ int lastRenderedRideState=-1;
+ int rideStateSignature(){
+  // Back from phone navigation: skip expensive full layout+ride-history reload if
+  // GPS/OBD and permission state are unchanged. Existing live label updater remains.
+  return (RideService.running?1:0)|(RideService.autoArmed?2:0)|
+   (new RideUi(this).readiness().ordinal()<<2);
+ }
  interface Work{void run()throws Exception;}
  interface Choice{void pick(String value);}
  @Override public void onCreate(Bundle state){super.onCreate(state);PrivateCacheCleanup.atProcessStart(getCacheDir(),getFilesDir(),System.currentTimeMillis());ReceiptCameraFiles.cleanOld(getCacheDir(),System.currentTimeMillis());new Thread(()->{synchronized(MotorcyclePhoto.class){AutoPhotoCache.trim(new File(getFilesDir(),"moto-year-photos"),System.currentTimeMillis());}},"moto-photo-cache-maintenance").start();if(!RideService.running)Sharing.stop();disk=new AtomicFile(new File(getFilesDir(),"motohub-v3.json"));
@@ -117,7 +124,7 @@ public class MainActivity extends Activity {
  }
  @Override protected void onResume(){super.onResume();
   // Device location/notification settings may have changed while the settings app was open.
-  if(root!=null&&"라이딩".equals(tab)&&dialog==null)renderPreservingPosition();
+  if(root!=null&&"라이딩".equals(tab)&&dialog==null&&rideStateSignature()!=lastRenderedRideState)renderPreservingPosition();
   if(!readOnly)DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
   if(!RideService.running&&!RideService.autoArmed&&!readOnly&&!"라이딩".equals(tab))showInterruptedRidePrompt();
@@ -486,6 +493,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    content.addView(draftCard);gap(content,10);
   }
   switch(tab){case"홈":home();break;case"매물":listings();break;case"라이딩":ride();break;case"차고":garage();break;case"지도":more();break;default:more();}
+  if("라이딩".equals(tab))lastRenderedRideState=rideStateSignature();
  }
  String dueText(JSONObject s){return(s.optDouble("nextKm")>0?num(s.optDouble("nextKm"))+" km":"")+(!s.optString("nextDate").isEmpty()?" · "+s.optString("nextDate"):"");}
  void renderMaintenance(JSONObject b){
