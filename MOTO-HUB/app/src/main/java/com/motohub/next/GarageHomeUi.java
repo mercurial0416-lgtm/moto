@@ -55,10 +55,17 @@ final class GarageHomeUi {
  void render(){
   JSONObject b=a.bike();if(b==null){emptyGarage();return;}
   addHero(b);a.gap(a.content,8);stats(b);a.gap(a.content,18);
-  if(shortcut("ride"))rideAction();a.gap(a.content,10);
-  if(shortcut("nav"))quickNavigation();a.gap(a.content,13);
-  if(shortcut("fuel")||shortcut("service"))quickActions();a.gap(a.content,10);
-  a.action(a.content,"홈 버튼 편집",false,this::editHomeShortcuts);a.gap(a.content,10);
+  for(String key:HomeShortcutOrder.parse(a.getSharedPreferences("home_shortcuts",0).getString("order",""))){
+   if(!shortcut(key))continue;
+   switch(key){
+    case "ride":rideAction();break;
+    case "nav":quickNavigation();break;
+    case "fuel":quickAction("fuel");break;
+    case "service":quickAction("service");break;
+   }
+   a.gap(a.content,10);
+  }
+  a.action(a.content,"홈 버튼 편집 · 순서",false,this::editHomeShortcuts);a.gap(a.content,10);
   String condition=condition(b);
   if("점검 필요".equals(condition)||"곧 점검".equals(condition)){
    TextView alert=a.text(condition+" · 정비 일정 확인",13,a.fg,true);
@@ -353,6 +360,7 @@ final class GarageHomeUi {
   new AlertDialog.Builder(a).setTitle("홈에서 보여줄 빠른 버튼")
    .setMultiChoiceItems(labels,visible,(d,i,checked)->visible[i]=checked)
    .setNegativeButton("취소",null)
+   .setNeutralButton("버튼 순서 변경",(d,w)->changeHomeShortcutOrder())
    .setPositiveButton("저장",(d,w)->{
     int shown=0;for(boolean selected:visible)if(selected)shown++;
     if(shown==0){a.toast("버튼은 하나 이상 선택해 주세요.");return;}
@@ -361,35 +369,30 @@ final class GarageHomeUi {
     if(edit.commit())a.renderPreservingPosition();else a.toast("버튼 설정 저장 실패");
    }).show();
  }
- void quickActions(){
-  sectionTitle("빠른 기록",null,null);
-  LinearLayout entries=new LinearLayout(a);entries.setGravity(Gravity.CENTER_VERTICAL);boolean narrow=a.getResources().getConfiguration().fontScale>=1.35f||a.getResources().getConfiguration().screenWidthDp<360;if(narrow)entries.setOrientation(LinearLayout.VERTICAL);
-  Button fuel=a.button("주유 기록",true,()->new QuickEntryUi(a).fuel());
-  fuel.setMinHeight(a.dp(49));fuel.setBackground(a.shape(orange,0,8));
-  Button maintenance=a.button("정비주기",false,()->new QuickEntryUi(a).maintenance());
-  maintenance.setMinHeight(a.dp(49));maintenance.setBackground(a.shape(surface,stroke,8));
-  boolean showFuel=shortcut("fuel"),showService=shortcut("service");
-  if(showFuel){
-   LinearLayout.LayoutParams first=narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1);
-   if(showService){if(narrow)first.bottomMargin=a.dp(8);else first.rightMargin=a.dp(8);}
-   entries.addView(fuel,first);
-  }
-  if(showService)entries.addView(maintenance,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
-  a.content.addView(entries);
-  LinearLayout links=new LinearLayout(a);links.setGravity(Gravity.CENTER_VERTICAL);if(narrow)links.setOrientation(LinearLayout.VERTICAL);
-  TextView history=a.text("주행 내역  ›",13,soft,true);
-  history.setGravity(Gravity.CENTER_VERTICAL);history.setMinHeight(a.dp(46));
-  history.setClickable(true);history.setFocusable(true);
-  history.setContentDescription("라이딩 기록 보기");
-  history.setOnClickListener(v->a.navigate("라이딩"));
-  TextView edit=a.text("바이크 정보  ›",13,soft,true);
-  edit.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);edit.setMinHeight(a.dp(46));
-  edit.setClickable(true);edit.setFocusable(true);
-  edit.setContentDescription("바이크 정보 수정");
-  edit.setOnClickListener(v->new HubScreens(a).manageBike());
-  links.addView(history,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
-  links.addView(edit,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
-  a.content.addView(links);
+ void changeHomeShortcutOrder(){
+  android.content.SharedPreferences prefs=a.getSharedPreferences("home_shortcuts",0);
+  String order=prefs.getString("order","");
+  String[] keys=HomeShortcutOrder.parse(order);
+  String[] labels=new String[keys.length];
+  for(int i=0;i<keys.length;i++)labels[i]=HomeShortcutOrder.label(keys[i]);
+  new AlertDialog.Builder(a).setTitle("홈 버튼 순서 · 옮길 버튼 선택")
+   .setItems(labels,(d,index)->new AlertDialog.Builder(a)
+    .setTitle(labels[index]+" 이동")
+    .setItems(new String[]{"한 칸 위로","한 칸 아래로"},(choice,step)->{
+     String updated=HomeShortcutOrder.move(order,keys[index],step==0?-1:1);
+     if(prefs.edit().putString("order",updated).commit()){
+      a.renderPreservingPosition();changeHomeShortcutOrder();
+     }else a.toast("순서를 저장하지 못했어요.");
+    }).show())
+   .setNegativeButton("닫기",null).show();
+ }
+ void quickAction(String key){
+  boolean fuel="fuel".equals(key);
+  String title=fuel?"주유 기록":"정비주기";
+  Button button=a.button(title,fuel,()->{if(fuel)new QuickEntryUi(a).fuel();else new QuickEntryUi(a).maintenance();});
+  button.setMinHeight(a.dp(50));
+  button.setBackground(a.shape(fuel?orange:surface,fuel?0:stroke,8));
+  a.content.addView(button,new LinearLayout.LayoutParams(-1,-2));
  }
  void sectionTitle(String title,String action,Runnable click){LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
   TextView t=a.text(title,17,light,true);row.addView(t,new LinearLayout.LayoutParams(0,-2,1));if(action!=null){TextView more=a.text(action,12,soft,true);more.setPadding(a.dp(8),a.dp(9),a.dp(3),a.dp(9));more.setOnClickListener(v->click.run());row.addView(more);}a.content.addView(row);a.gap(a.content,10);
