@@ -81,16 +81,22 @@ public class MainActivity extends Activity {
     File file=InterruptedRideNotice.latest(getFilesDir(),RideService.active,RideService.running);
     if(file==null)return;
     String filename=file.getName();
-    if(filename.equals(getSharedPreferences("ride_recovery_notice",MODE_PRIVATE).getString("seen","")))return;
+    android.content.SharedPreferences recover=getSharedPreferences("ride_recovery_notice",MODE_PRIVATE);
+    if(!RideRecoveryPromptPolicy.shouldOffer(filename,recover.getString("reviewed",""),
+       recover.getString("snoozed",""),recover.getLong("snoozed_at",0),System.currentTimeMillis()))return;
     runOnUiThread(()->{
      if(isFinishing()||isDestroyed()||RideService.running||RideService.autoArmed||dialog!=null)return;
-     // Never automatically resume GPS, Bluetooth or any group location sharing.
-     getSharedPreferences("ride_recovery_notice",MODE_PRIVATE).edit().putString("seen",filename).apply();
+     // Never auto-resume GPS, Bluetooth or location sharing; leave original GPS files unchanged.
+     if(!RideRecoveryPromptPolicy.shouldOffer(filename,recover.getString("reviewed",""),
+       recover.getString("snoozed",""),recover.getLong("snoozed_at",0),System.currentTimeMillis()))return;
      new AlertDialog.Builder(this).setTitle("중단된 라이딩 기록 발견")
-      .setMessage("이전에 정상 종료되지 않은 GPS 경로가 있어요. 저장된 좌표를 확인하고 복구할 수 있습니다. 위치 기록이나 공유를 자동 시작하지 않습니다.")
-      .setNegativeButton("나중에",null)
-      .setPositiveButton("기록 확인",(d,w)->{tab="라이딩";rideHistoryFilter=RideHistoryFilter.INTERRUPTED;render();})
-      .show();
+      .setMessage("정상 종료되지 않은 GPS 경로가 있어요. 지금 확인하거나 내일 다시 알림을 받을 수 있습니다. 기록·위치 공유는 자동 시작하지 않습니다.")
+      .setNegativeButton("내일 다시 알림",(d,w)->recover.edit()
+       .putString("snoozed",filename).putLong("snoozed_at",System.currentTimeMillis()).apply())
+      .setPositiveButton("기록 확인",(d,w)->{
+       recover.edit().putString("reviewed",filename).apply();
+       tab="라이딩";rideHistoryFilter=RideHistoryFilter.INTERRUPTED;render();
+      }).show();
     });
    }catch(Exception ignored){ /* Never block startup or overwrite the track. */ }
   },"moto-interrupted-ride-check").start();
