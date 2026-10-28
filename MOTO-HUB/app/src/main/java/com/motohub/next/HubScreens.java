@@ -414,10 +414,13 @@ final class HubScreens {
  }
  void basicBackup(){
   LinearLayout p=a.page("백업 · 복원");
-  a.label(p,"데이터를 보존하려면 먼저 ZIP 파일을 휴대폰 외부에 내보내세요. 기존 앱을 삭제하지 않으면 업데이트할 때 기록이 유지됩니다.",15,a.muted,false);
+  a.label(p,"데이터는 전체 ZIP으로 백업하는 것이 가장 안전합니다. 250MB 제한으로 실패하면 GPS ZIP과 사진 ZIP을 각각 저장하고, 둘 다 검증하세요. 분할 복원은 기존 자료를 덮어쓰지 않습니다.",15,a.muted,false);
   a.action(p,"전체 ZIP 백업 만들기",true,a::exportBundle);
   a.action(p,"전체 ZIP 백업 복원",false,a::importBundle);
-  a.action(p,"GPS 저장공간 · 원본 관리",false,()->RideStorageManager.show(a));
+  a.action(p,"분할 백업 · GPS만 ZIP",false,()->a.exportSplitBundle("GPS"));
+  a.action(p,"분할 백업 · 사진·영수증만 ZIP",false,()->a.exportSplitBundle("MEDIA"));
+  a.action(p,"분할 ZIP 추가 복원",false,a::importSplitBundle);
+  a.action(p,"GPS 저장공간 · 복구함",false,()->RideStorageManager.show(a));
   a.action(p,"다른 백업 방식 · 검사",false,this::backupMore);
   a.show();
  }
