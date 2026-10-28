@@ -73,15 +73,56 @@ final class RideTrash {
    throw failure;
   }
  }
+ /** Complete interrupted GPS moves based on which directory contains the committed .track.
+   * Never guess when both originals exist or an orphan has no track. */
+ static synchronized int recoverInterrupted(File files)throws IOException{
+  File active=TrackFile.directory(files),vault=root(files);
+  File[] folders=vault.listFiles();
+  if(folders==null)throw new IOException("GPS 복구함을 읽을 수 없습니다.");
+  int count=0;
+  for(File folder:folders){
+   if(!folder.getName().matches(BackupFormat.TRACK)||
+       Files.isSymbolicLink(folder.toPath())||
+       !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS))
+    throw new IOException("복구함에 알 수 없는 폴더가 있습니다. 원본을 보존합니다.");
+   String id=folder.getName();
+   File saved=new File(folder,id),original=new File(active,id);
+   boolean hasSaved=regular(saved),hasOriginal=regular(original);
+   if(Files.exists(saved.toPath(),LinkOption.NOFOLLOW_LINKS)&&!hasSaved||
+      Files.exists(original.toPath(),LinkOption.NOFOLLOW_LINKS)&&!hasOriginal)
+    throw new IOException("GPS 경로가 안전하지 않아 복구를 중단했습니다.");
+   if(hasSaved&&hasOriginal)throw new IOException("동일 GPS가 원본과 복구함 양쪽에 있습니다.");
+   if(!hasSaved&&!hasOriginal){
+    File[] orphan=folder.listFiles();
+    if(orphan==null)throw new IOException("복구함 목록 확인 실패");
+    if(orphan.length>0)throw new IOException("원본 없는 GPS 부가 파일을 보존했습니다.");
+    if(!folder.delete())throw new IOException("비어 있는 복구함을 정리할 수 없습니다.");
+    continue;
+   }
+   File from=hasSaved?active:folder,to=hasSaved?folder:active;
+   for(String ext:SIDECARS){
+    File sidecar=new File(from,id+ext),destination=new File(to,id+ext);
+    if(!Files.exists(sidecar.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
+    if(!regular(sidecar)||Files.exists(destination.toPath(),LinkOption.NOFOLLOW_LINKS))
+     throw new IOException("GPS 중단 복구 시 부가 파일 충돌: "+id);
+    Files.move(sidecar.toPath(),destination.toPath(),StandardCopyOption.ATOMIC_MOVE);
+    count++;
+   }
+   if(!hasSaved&&!folder.delete())throw new IOException("GPS 복원 후 빈 복구함 정리 실패");
+  }
+  return count;
+ }
  static synchronized List<File> entries(File files)throws IOException{
   File[] folders=root(files).listFiles();
   List<File> tracks=new ArrayList<>();
   if(folders!=null)for(File folder:folders){
    if(!folder.getName().matches(BackupFormat.TRACK)||
        Files.isSymbolicLink(folder.toPath())||
-       !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
+       !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS))
+    throw new IOException("잘못된 GPS 복구함 경로입니다.");
    File track=new File(folder,folder.getName());
-   if(regular(track))tracks.add(track);
+   if(!regular(track))throw new IOException("복구함 GPS 원본이 누락되거나 안전하지 않습니다.");
+   tracks.add(track);
   }
   tracks.sort((a,b)->b.getName().compareTo(a.getName()));
   return tracks;

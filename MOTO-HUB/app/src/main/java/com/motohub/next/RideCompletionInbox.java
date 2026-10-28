@@ -58,7 +58,9 @@ final class RideCompletionInbox {
   return found&&prefs(c).edit().putString(KEY,arr.toString()).commit();
  }
  /** Called only after GPS .done commit; one entry per track, at most ten recent items. */
- static synchronized void record(Context context,File track){
+ static synchronized void record(Context context,File track){recordInternal(context,track,false);}
+ static synchronized void restored(Context context,File track){recordInternal(context,track,true);}
+ private static synchronized void recordInternal(Context context,File track,boolean fromTrash){
   if(context==null||track==null||!RideMileageIntegrity.validCompleted(track))return;
   try{
    RideInsights.Result result=RideInsights.analyze(track);
@@ -76,9 +78,10 @@ final class RideCompletionInbox {
    JSONObject row=new JSONObject();
    row.put("id",id).put("summary",recap).put("seen",false)
     .put("time",System.currentTimeMillis());
+   if(fromTrash)row.put("seen",true);
    next.put(row);
    for(int i=0;i<current.length()&&next.length()<LIMIT;i++)next.put(current.getJSONObject(i));
-   if(p.edit().putString(KEY,next.toString()).commit())RideSavedNotification.post(context);
+   if(p.edit().putString(KEY,next.toString()).commit()&&!fromTrash)RideSavedNotification.post(context);
   }catch(Exception ignored){/* Leave original completed GPS and .done untouched. */}
  }
 }

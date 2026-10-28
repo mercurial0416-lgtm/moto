@@ -44,6 +44,34 @@ public final class BackupBundle {
     throw new IOException("백업 이미지가 손상됐습니다: "+file.getName());
   }
  }
+ private static final String[] VAULT_SIDECARS={".done",".imported",".recovered",".unmerged",".category",".bike",".favorite",".mergedinto"};
+ /** Fail closed on every GPS trash entry, but keep the ZIP writer pure Java for offline tests. */
+ private static List<File> archivedGps(File internal)throws IOException{
+  List<File> result=new ArrayList<>();
+  File vault=new File(internal,"rides-trash");
+  if(!Files.exists(vault.toPath(),LinkOption.NOFOLLOW_LINKS))return result;
+  if(Files.isSymbolicLink(vault.toPath())||!regularDirectory(vault))
+   throw new IOException("GPS 복구함 폴더가 안전하지 않습니다.");
+  File[] folders=vault.listFiles();
+  if(folders==null)throw new IOException("GPS 복구함 폴더를 읽을 수 없습니다.");
+  for(File folder:folders){
+   String id=folder.getName();
+   if(!id.matches(BackupFormat.TRACK)||Files.isSymbolicLink(folder.toPath())||
+       !regularDirectory(folder))throw new IOException("잘못된 GPS 복구함 폴더입니다.");
+   File track=new File(folder,id);requireRegular(track);
+   File[] contents=folder.listFiles();
+   if(contents==null)throw new IOException("GPS 복구함 내부 파일을 읽을 수 없습니다.");
+   for(File file:contents){
+    String member="rides-trash/"+id+"/"+file.getName();
+    if(!BackupFormat.isTrashTrack(member)&&!BackupFormat.isTrashSidecar(member))
+     throw new IOException("GPS 복구함에 알 수 없는 파일이 있습니다.");
+    requireRegular(file);
+   }
+   result.add(track);
+  }
+  result.sort(Comparator.comparing(File::getName));
+  return result;
+ }
  private static long writeFile(ZipOutputStream zip,File file,String name,long total)throws IOException{
   requireRegular(file);
   if(BackupFormat.isPhoto(name)||BackupFormat.isReceipt(name)||BackupFormat.isModelPhoto(name))
@@ -76,6 +104,14 @@ public final class BackupBundle {
  }
  /** Archive-only GPS or media partitions. Each has a full JSON snapshot for manual recovery. */
  static int export(String json,File internal,OutputStream target,String part)throws Exception{
+  return export(json,internal,target,part,null);
+ }
+ static int export(String json,File internal,OutputStream target,String part,String preferences)throws Exception{
+  return export(json,internal,target,part,preferences,null);
+ }
+ /** Restrict one batch to an explicit, checked set of source asset paths. */
+ static int export(String json,File internal,OutputStream target,String part,String preferences,
+                   Set<String> included)throws Exception{
   if(!Arrays.asList("FULL","GPS","MEDIA").contains(part))throw new IOException("알 수 없는 백업 분할");
   boolean gps=!"MEDIA".equals(part),media=!"GPS".equals(part);
   if(internal==null||!regularDirectory(internal))throw new IOException("앱 백업 폴더를 확인하지 못했어요.");
@@ -84,6 +120,13 @@ public final class BackupBundle {
   long total=data.length;int count=0;
   ZipOutputStream zip=new ZipOutputStream(new BufferedOutputStream(target),StandardCharsets.UTF_8);
   zip.putNextEntry(new ZipEntry("MOTO-HUB-data.json"));zip.write(data);zip.closeEntry();count++;
+  if(preferences!=null){
+   if(preferences.length()>8192||!preferences.startsWith("{"))
+    throw new IOException("화면 설정 백업 크기·형식 오류");
+   byte[] ui=preferences.getBytes(StandardCharsets.UTF_8);
+   total+=ui.length;
+   zip.putNextEntry(new ZipEntry("MOTO-HUB-preferences.json"));zip.write(ui);zip.closeEntry();count++;
+  }
   String readme=("FULL".equals(part)?"MOTO HUB 전체 백업 - 개인 위치정보 포함 가능\n":"MOTO-HUB-PART:"+part+"\n분할 복구 파일: 전체 복원으로 다른 자료를 덮어쓰지 마세요. 분할 ZIP 추가 복원 메뉴를 사용하세요.\n")+
    "MOTO-HUB-data.json은 앱 설정 > JSON 백업 가져오기로 복원합니다.\n"+
    "rides 폴더는 원본 기록, gpx 폴더는 가져오기로 복원 가능한 GPX 경로입니다.\n"+
@@ -96,13 +139,19 @@ public final class BackupBundle {
   if(media&&files!=null){
    if(files.length>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 백업 한도(1,000장)를 초과했습니다.");
    Arrays.sort(files,Comparator.comparing(File::getName));
-   for(File f:files){total=writeFile(zip,f,"photos/"+f.getName(),total);count++;}
+   for(File f:files){
+    if(included!=null&&!included.contains("photos/"+f.getName()))continue;
+    total=writeFile(zip,f,"photos/"+f.getName(),total);count++;
+   }
   }
   File[] receipts=internal.listFiles((dir,name)->name.matches(BackupFormat.RECEIPT));
   if(media&&receipts!=null){
    if(receipts.length>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증·작업 사진이 4,000장을 초과했습니다.");
    Arrays.sort(receipts,Comparator.comparing(File::getName));
-   for(File file:receipts){total=writeFile(zip,file,"receipts/"+file.getName(),total);count++;}
+   for(File file:receipts){
+    if(included!=null&&!included.contains("receipts/"+file.getName()))continue;
+    total=writeFile(zip,file,"receipts/"+file.getName(),total);count++;
+   }
   }
   // Save user-selected online gallery images, not auto-recoverable downloaded thumbnails.
   File modelFolder=new File(internal,"moto-year-photos");
@@ -112,6 +161,7 @@ public final class BackupBundle {
    Arrays.sort(selectedModels,Comparator.comparing(File::getName));
    int selectedCount=0;
    for(File image:selectedModels){
+    if(included!=null&&!included.contains("model-photos/"+image.getName()))continue;
     requireRegular(image);
     File metadata=new File(modelFolder,image.getName()+".json");
     if(!metadata.exists()&&!Files.isSymbolicLink(metadata.toPath()))continue; // no manual selection
@@ -126,6 +176,7 @@ public final class BackupBundle {
   if(gps&&tracks!=null){if(tracks.length>BackupFormat.MAX_TRACKS)throw new IOException("주행 기록 10,000건 백업 한도를 초과했습니다.");
    Arrays.sort(tracks,Comparator.comparing(File::getName));
    for(File file:tracks){
+    if(included!=null&&!included.contains("rides/"+file.getName()))continue;
     // A completely empty crashed session has no location bytes worth archiving.
     // Preserve non-empty interrupted tracks, including their unfinished final row.
     requireRegular(file);
@@ -145,7 +196,7 @@ public final class BackupBundle {
       // The original track is always included; damaged/interrupted tracks
       // cannot be represented as a trustworthy GPX route.
      }
-     if(estimatedGpx>0&&total<=MAX_TOTAL-estimatedGpx){
+     if(included==null&&estimatedGpx>0&&total<=MAX_TOTAL-estimatedGpx){
       zip.putNextEntry(new ZipEntry("gpx/"+file.getName().replace(".track",".gpx")));
       TrackFile.gpx(file,zip); // Any mid-write error aborts the full export.
       zip.closeEntry();total+=estimatedGpx;
@@ -182,6 +233,31 @@ public final class BackupBundle {
       if(marker.length()!=0)throw new IOException("라이딩 상태 표시가 손상됐습니다: "+marker.getName());
       zip.putNextEntry(new ZipEntry("rides/"+marker.getName()));zip.closeEntry();
      }
+    }
+   }
+  }
+  if(gps){
+   for(File file:archivedGps(internal)){
+    String name=file.getName();
+    if(included!=null&&!included.contains("rides-trash/"+name+"/"+name))continue;
+    File folder=file.getParentFile();
+    String prefix="rides-trash/"+name+"/";
+    total=writeFile(zip,file,prefix+name,total);count++;
+    for(String suffix:VAULT_SIDECARS){
+     File sidecar=new File(folder,name+suffix);
+     if(!sidecar.exists()&&!Files.isSymbolicLink(sidecar.toPath()))continue;
+     requireRegular(sidecar);
+     if(sidecar.length()!=0&&
+        !suffix.equals(".bike")&&!suffix.equals(".category")&&!suffix.equals(".mergedinto"))
+      throw new IOException("GPS 복구함 부가 파일 크기가 올바르지 않습니다: "+sidecar.getName());
+     if(suffix.equals(".bike")&&!new String(readSidecar(sidecar,64),StandardCharsets.US_ASCII)
+        .matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))
+      throw new IOException("GPS 복구함 바이크 연결 정보 오류");
+     if(suffix.equals(".category")&&!Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어")
+        .contains(new String(readSidecar(sidecar,64),StandardCharsets.UTF_8)))
+      throw new IOException("GPS 복구함 분류 정보 오류");
+     if(suffix.equals(".mergedinto"))throw new IOException("복구함에 통합 연결 원본이 있습니다. 점검이 필요합니다.");
+     total=writeFile(zip,sidecar,prefix+sidecar.getName(),total);
     }
    }
   }
