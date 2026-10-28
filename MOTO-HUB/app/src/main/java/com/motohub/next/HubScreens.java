@@ -417,6 +417,7 @@ final class HubScreens {
   a.label(p,"데이터를 보존하려면 먼저 ZIP 파일을 휴대폰 외부에 내보내세요. 기존 앱을 삭제하지 않으면 업데이트할 때 기록이 유지됩니다.",15,a.muted,false);
   a.action(p,"전체 ZIP 백업 만들기",true,a::exportBundle);
   a.action(p,"전체 ZIP 백업 복원",false,a::importBundle);
+  a.action(p,"GPS 저장공간 · 원본 관리",false,()->RideStorageManager.show(a));
   a.action(p,"다른 백업 방식 · 검사",false,this::backupMore);
   a.show();
  }
