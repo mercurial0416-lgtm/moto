@@ -70,6 +70,6 @@ check('setContentDescription(labels[i]+(selected?", 선택됨":""))' in design,
 check('getWindow().setStatusBarColor(dark?bg:panel)' in main,
       "system chrome doesn't track theme")
 check("new GarageHomeUi(a).render()" in hub, "home delegated UI missing")
-check('card.setBackground(a.shape(a.panel,a.line,8))' in hub,
-      "listing cards have lost separators")
+check('void listings(){' not in hub and 'void compare(){' not in hub,
+      "retired listing rendering should not reappear")
 print("PASS UX38 visual invariants:", checks, "checks")
