@@ -60,8 +60,9 @@ public final class JsonDataMergerTest {
   JSONObject imported=Store.empty();
   imported.getJSONArray("vehicles").put(bike("same-id","Honda Super Cub"));
   imported.getJSONArray("services").put(service("new-foreign-service","same-id"));
-  try{JsonDataMerger.merge(existing,imported);fail("Different bikes with same ID must not merge");}
-  catch(org.json.JSONException expected){assertTrue(expected.getMessage().contains("ID"));}
+  JsonDataMerger.Result r=JsonDataMerger.merge(existing,imported);
+  assertEquals(1,r.blocked);
+  assertEquals(0,r.data.getJSONArray("services").length());
   assertEquals(0,existing.getJSONArray("services").length());
  }
  @Test public void yearMismatchAlsoFailsClosed()throws Exception{
@@ -69,8 +70,23 @@ public final class JsonDataMergerTest {
   current.getJSONArray("vehicles").put(bike("x","KTM").put("year",2024));
   JSONObject incoming=Store.empty();
   incoming.getJSONArray("vehicles").put(bike("x","KTM").put("year",2022));
-  try{JsonDataMerger.merge(current,incoming);fail("Mismatched bike year");}
-  catch(org.json.JSONException expected){}
+  assertEquals(1,JsonDataMerger.conflicts(current,incoming).size());
+  assertEquals(0,JsonDataMerger.merge(current,incoming).blocked);
+ }
+ @Test public void explicitBikeMappingOnlyImportsAcknowledgedRecords()throws Exception{
+  JSONObject current=Store.empty();
+  current.getJSONArray("vehicles").put(bike("shared","Honda"));
+  current.getJSONArray("vehicles").put(bike("destination","KTM Duke"));
+  JSONObject from=Store.empty();
+  from.getJSONArray("vehicles").put(bike("shared","KTM Duke"));
+  from.getJSONArray("services").put(service("imported-service","shared"));
+  assertEquals(1,JsonDataMerger.merge(current,from).blocked);
+  java.util.Map<String,String> mapping=new java.util.HashMap<>();
+  mapping.put("shared","destination");
+  JsonDataMerger.Result merged=JsonDataMerger.merge(current,from,mapping);
+  assertEquals(0,merged.blocked);assertEquals(1,merged.added);
+  assertEquals("destination",merged.data.getJSONArray("services").getJSONObject(0).getString("vehicleId"));
+  assertEquals(0,current.getJSONArray("services").length());
  }
  @Test public void malformedBackupFailsWithoutTouchingCurrent()throws Exception{
   JSONObject current=Store.empty();

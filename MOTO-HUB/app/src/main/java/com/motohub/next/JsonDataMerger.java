@@ -1,6 +1,10 @@
 package com.motohub.next;
 
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -19,7 +23,25 @@ final class JsonDataMerger {
    this.data=data;this.added=added;this.skipped=skipped;this.blocked=blocked;
   }
  }
- static Result merge(JSONObject current,JSONObject imported)throws JSONException {
+ static List<JSONObject> conflicts(JSONObject current,JSONObject imported)throws JSONException{
+  JSONObject safeCurrent=Store.parse(current.toString());
+  JSONObject safeIncoming=Store.parse(imported.toString());
+  Set<String> ids=new HashSet<>();
+  JSONArray bikes=safeCurrent.getJSONArray("vehicles");
+  for(int i=0;i<bikes.length();i++)ids.add(bikes.getJSONObject(i).getString("id"));
+  List<JSONObject> collisions=new ArrayList<>();
+  JSONArray source=safeIncoming.getJSONArray("vehicles");
+  for(int i=0;i<source.length();i++){
+   JSONObject bike=source.getJSONObject(i);
+   if(ids.contains(bike.getString("id")))collisions.add(bike);
+  }
+  return collisions;
+ }
+ static Result merge(JSONObject current,JSONObject imported)throws JSONException{
+  return merge(current,imported,new HashMap<>());
+ }
+ /** No implicit attribution: source-bicycle ID must be explicitly mapped to an existing bike. */
+ static Result merge(JSONObject current,JSONObject imported,Map<String,String> confirmed)throws JSONException {
   if(current==null||imported==null)throw new JSONException("병합할 기록이 없습니다.");
   JSONObject target=Store.parse(current.toString());
   JSONObject source=Store.parse(imported.toString());
@@ -46,8 +68,8 @@ final class JsonDataMerger {
    ambiguousBikeIds.add(incoming.getString("id"));
    String left=existing.optString("name").trim(),right=incoming.optString("name").trim();
    int oldYear=existing.optInt("year"),newYear=incoming.optInt("year");
-   if(!left.equalsIgnoreCase(right)||(oldYear>0&&newYear>0&&oldYear!=newYear))
-    throw new JSONException("차량 ID 충돌: 서로 다른 바이크가 같은 ID를 사용합니다. 해당 JSON은 자동 병합하지 않습니다.");
+   // A name or model-year difference is a collision, not a reason to discard the JSON.
+   // Leave these records blocked until the user explicitly chooses a destination.
   }
   for(String collection:Store.COLLECTIONS){
    JSONArray dest=target.getJSONArray(collection);
@@ -71,11 +93,16 @@ final class JsonDataMerger {
     if(ids.contains(id)||(!normalized.isEmpty()&&listingUrls.contains(normalized))){
      skipped++;continue;
     }
-    if(("services".equals(collection)||"expenses".equals(collection))&&
-       ambiguousBikeIds.contains(entry.optString("vehicleId"))){
+    boolean child="services".equals(collection)||"expenses".equals(collection);
+    String sourceBike=entry.optString("vehicleId");
+    String mapped=confirmed==null?null:confirmed.get(sourceBike);
+    if(child&&ambiguousBikeIds.contains(sourceBike)&&mapped==null){
      blocked++;continue;
     }
+    if(child&&mapped!=null&&byId.get(mapped)==null)
+     throw new JSONException("선택한 대상 바이크가 현재 데이터에 없습니다.");
     JSONObject copy=new JSONObject(entry.toString());
+    if(child&&mapped!=null)copy.put("vehicleId",mapped);
     dest.put(copy);
     ids.add(id);
     if(!normalized.isEmpty())listingUrls.add(normalized);
