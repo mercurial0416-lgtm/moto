@@ -32,8 +32,10 @@ assert 'if(request==61){prepareJsonMerge(uri);return;}' in main
 ride=(root/"RideUi.java").read_text()
 home=(root/"GarageHomeUi.java").read_text()
 quick=(root/"QuickEntryUi.java").read_text()
-assert 'void finishWithSummary()' in ride and 'RideEndSummary.text(' in ride
-assert 'new File(track.getPath()+".done").isFile()' in ride
+assert 'void finishWithSummary()' in ride and 'a.showPendingRideSummary()' in ride
+inbox=(root/"RideCompletionInbox.java").read_text()
+assert 'RideInsights.analyze(track)' in inbox and 'RideMileageIntegrity.validCompleted(track)' in inbox
+assert 'RideCompletionInbox.record(getApplicationContext(),savedTrack)' in (root/"RideService.java").read_text()
 assert 'new RideUi(a).finishWithSummary()' in home
 assert 'extra_cards' in home and 'if(extra)' in home
 assert '이전 정비주기 불러오기' in quick and 'QuickRecordDraft.nextOdometer(' in quick
