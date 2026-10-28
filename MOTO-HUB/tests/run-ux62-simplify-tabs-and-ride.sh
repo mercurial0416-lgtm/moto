@@ -17,8 +17,8 @@ assert 'void savedRoutes(){' in main and 'edit("routes",null)' in main
 assert 'final String[] tabs={"홈","라이딩","차고","더보기"};' in main
 assert 'String[] labels={"홈","라이딩","정비","설정"};' in design
 assert 'final int[] icons={0,3,2,4};' in design
-assert 'case"매물":listings()' in main and 'case"차고":garage()' in main
-assert 'a.action(p,"저장한 매물 관리"' in settings
+assert 'case"매물":listings()' not in main and 'case"차고":garage()' in main
+assert 'a.action(p,"보관된 옛 매물 데이터"' in settings and 'a.items("listings")' in settings
 assert 'a.action(p,"저장한 수동 코스"' in settings
 assert 'final boolean extras=a.getSharedPreferences("ride_ui",0).getBoolean("extras",false);' in ride
 assert 'if(extras){' in ride and 'GPX 가져오기' in ride
