@@ -52,14 +52,17 @@ public class MainActivity extends Activity {
  interface Work{void run()throws Exception;}
  interface Choice{void pick(String value);}
  @Override public void onCreate(Bundle state){super.onCreate(state);PrivateCacheCleanup.atProcessStart(getCacheDir(),getFilesDir(),System.currentTimeMillis());ReceiptCameraFiles.cleanOld(getCacheDir(),System.currentTimeMillis());new Thread(()->{synchronized(MotorcyclePhoto.class){AutoPhotoCache.trim(new File(getFilesDir(),"moto-year-photos"),System.currentTimeMillis());}},"moto-photo-cache-maintenance").start();if(!RideService.running)Sharing.stop();disk=new AtomicFile(new File(getFilesDir(),"motohub-v3.json"));
-  boolean crashedGpsRecoveryNeedsHelp=false;int crashedGpsRecovered=0;
-  if(!RideService.running&&!RideService.autoArmed){
-   try{crashedGpsRecovered=RideTrash.recoverInterrupted(getFilesDir());}
-   catch(Exception e){readOnly=true;crashedGpsRecoveryNeedsHelp=true;}
-  }
   boolean crashedRestoreRecovered=false,crashedRestoreNeedsHelp=false;
   try{crashedRestoreRecovered=RestoreArchive.CrashJournal.recoverAll(getFilesDir(),bytes->atomic(disk,bytes))>0;}
   catch(Exception e){readOnly=true;crashedRestoreNeedsHelp=true;}
+  // Replay any unfinished full-ZIP rollback before resolving an interrupted GPS-trash move.
+  boolean crashedGpsRecoveryNeedsHelp=false;int crashedGpsRecovered=0;
+  if(!crashedRestoreNeedsHelp&&!RideService.running&&!RideService.autoArmed){
+   try{
+    crashedGpsRecovered=RideTrash.recoverInterrupted(getFilesDir());
+    for(File vaulted:RideTrash.entries(getFilesDir()))RideCompletionInbox.remove(this,vaulted.getName());
+   }catch(Exception e){readOnly=true;crashedGpsRecoveryNeedsHelp=true;}
+  }
   try{db=disk.getBaseFile().exists()||new File(disk.getBaseFile()+".bak").exists()?Store.parse(new String(disk.readFully(),StandardCharsets.UTF_8)):Store.empty();}
   catch(Exception e){try{db=Store.empty();}catch(Exception ignored){}readOnly=true;}
   // Restore local list preference across process death; rotation state wins when available.

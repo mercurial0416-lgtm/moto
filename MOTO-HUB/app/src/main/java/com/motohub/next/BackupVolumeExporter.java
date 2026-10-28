@@ -141,9 +141,10 @@ final class BackupVolumeExporter {
   Uri parent=DocumentsContract.buildDocumentUriUsingTree(folder,DocumentsContract.getTreeDocumentId(folder));
   StringBuilder index=new StringBuilder("MOTO-HUB-VOLUMES-v1\t").append(part).append('\t').append(volumes.size()).append('\n');
   int completed=0;
+  String runId=System.currentTimeMillis()+"-"+UUID.randomUUID().toString().substring(0,8);
   for(int i=0;i<volumes.size();i++){
    Volume volume=volumes.get(i);
-   String filename=String.format(Locale.ROOT,"MOTO-HUB-%s-%03d-of-%03d.zip",part,i+1,volumes.size());
+   String filename=String.format(Locale.ROOT,"MOTO-HUB-%s-%s-%03d-of-%03d.zip",part,runId,i+1,volumes.size());
    Uri document=DocumentsContract.createDocument(resolver,parent,"application/zip",filename);
    if(document==null)throw new IOException("ZIP 파일 생성 실패: "+filename);
    try{
@@ -170,7 +171,7 @@ final class BackupVolumeExporter {
    }
   }
   Uri manifest=DocumentsContract.createDocument(resolver,parent,"text/plain",
-    "MOTO-HUB-"+part+"-VOLUMES-INDEX.txt");
+    "MOTO-HUB-"+part+"-"+runId+"-VOLUMES-INDEX.txt");
   if(manifest==null)throw new IOException("모든 ZIP 검증은 성공했지만 전체 목록 파일을 생성할 수 없습니다.");
   try{
    try(OutputStream out=resolver.openOutputStream(manifest,"wt")){
