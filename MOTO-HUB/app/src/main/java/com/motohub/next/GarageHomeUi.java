@@ -75,6 +75,10 @@ final class GarageHomeUi {
    a.renderPreservingPosition();
   });
   more.setMinHeight(a.dp(44));a.content.addView(more);
+  // Manual access survives suppressed popups and repeated rides.
+  if(!RideCompletionInbox.entries(a).isEmpty()){
+   a.action(a.content,"최근 라이딩 저장 요약",false,a::showRideCompletionHistory);
+  }
   if(extra){a.gap(a.content,16);recent(b);a.gap(a.content,16);insights(b);
    if(!a.items("listings").isEmpty()){a.gap(a.content,18);listings();}
   }

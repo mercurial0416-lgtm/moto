@@ -19,7 +19,7 @@ assert service.count('RideCompletionInbox.record(getApplicationContext(),savedTr
 assert 'if(verified)RideCompletionInbox.record' in service
 assert 'RideMileageIntegrity.validCompleted(track)' in inbox
 assert 'RideInsights.analyze(track)' in inbox
-assert 'putString("summary",recap).commit()' in inbox
+assert 'putString(KEY,next.toString()).commit()' in inbox
 assert 'void showPendingRideSummary()' in activity and 'onResume(){super.onResume()' in activity
 assert 'RideService.running||RideService.saving()' in activity
 assert 'ambiguousBikeIds.contains(entry.optString("vehicleId"))' in merge

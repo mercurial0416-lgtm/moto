@@ -124,15 +124,41 @@ public class MainActivity extends Activity {
  }
  /** Show the durable summary once when the rider comes back from navigation. */
  void showPendingRideSummary(){
-  if(isFinishing()||isDestroyed()||!hasWindowFocus()||RideService.running||RideService.saving()||dialog!=null)return;
-  android.content.SharedPreferences preferences=getSharedPreferences("ride_completion_inbox",MODE_PRIVATE);
-  String heading=preferences.getString("title",""),text=preferences.getString("summary","");
-  if(heading==null||heading.isEmpty()||text==null||text.isEmpty())return;
-  new AlertDialog.Builder(this).setTitle(heading).setMessage(text)
+  if(isFinishing()||isDestroyed()||!hasWindowFocus()||RideService.running||
+     RideService.saving()||dialog!=null)return;
+  JSONObject pending=RideCompletionInbox.unread(this);
+  if(pending==null)return;
+  String id=pending.optString("id"),summary=pending.optString("summary");
+  if(summary.isEmpty())return;
+  new AlertDialog.Builder(this).setTitle("라이딩 저장 완료").setMessage(summary)
    .setNegativeButton("닫기",null)
-   .setPositiveButton("주행 기록 보기",(d,w)->{tab="라이딩";render();})
-   .setOnDismissListener(d->{if(text.equals(preferences.getString("summary","")))
-     preferences.edit().remove("title").remove("summary").commit();}).show();
+   .setPositiveButton("주행 내역 보기",(d,w)->{tab="라이딩";render();})
+   .setOnDismissListener(d->RideCompletionInbox.seen(this,id)).show();
+ }
+ /** A summary can always be reopened, even if another dialog blocked its popup. */
+ void showRideCompletionHistory(){
+  java.util.List<JSONObject> entries=RideCompletionInbox.entries(this);
+  if(entries.isEmpty()){toast("저장된 라이딩 요약이 없어요.");return;}
+  String[] options=new String[entries.size()];
+  for(int i=0;i<options.length;i++){
+   JSONObject item=entries.get(i);
+   String label=RideHistoryLabel.title(
+    new File(item.optString("id","")),java.time.ZoneId.systemDefault());
+   options[i]=(item.optBoolean("seen")?"":"● ")+label;
+  }
+  new AlertDialog.Builder(this).setTitle("최근 완료 라이딩 · 최대 10건")
+   .setItems(options,(d,which)->{
+    JSONObject item=entries.get(which);
+    String id=item.optString("id");
+    RideCompletionInbox.seen(this,id);
+    new AlertDialog.Builder(this).setTitle("저장된 GPS 요약")
+     .setMessage(item.optString("summary","")).setNegativeButton("닫기",null)
+     .setPositiveButton("라이딩 내역",(dd,w)->{tab="라이딩";render();}).show();
+   }).setNegativeButton("닫기",null).show();
+ }
+ @Override public void onWindowFocusChanged(boolean focused){
+  super.onWindowFocusChanged(focused);
+  if(focused&&root!=null)root.postDelayed(this::showPendingRideSummary,200);
  }
  @Override protected void onResume(){super.onResume();
   if(root!=null)root.postDelayed(this::showPendingRideSummary,350);
