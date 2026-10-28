@@ -58,7 +58,10 @@ check(home.count("void quickActions(){") == 1, "duplicated shortcut area")
 check('new QuickEntryUi(a).fuel()' in home, "quick fuel entry missing")
 check('new QuickEntryUi(a).maintenance()' in home, "maintenance shortcut missing")
 check('new RideUi(a).requestStart()' in home, "GPS consent request missing")
-check('RideService.STOP' in home and 'setPositiveButton("종료"' in home, "GPS stop confirmation missing")
+rideui=(JAVA/'RideUi.java').read_text()
+check('new RideUi(a).finishWithSummary()' in home and 'setPositiveButton("종료"' in home
+      and 'RideService.STOP' in rideui and '".done"' in rideui,
+      "GPS stop confirmation or verified finish path missing")
 check("changeHeroPhoto(bike,own)" in home and "switchBike(direction)" in home,
       "hero photo management or bike switching lost")
 check('String[] labels={"홈","라이딩","정비","설정"}' in design,

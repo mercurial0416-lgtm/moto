@@ -26,7 +26,7 @@ public final class JsonDataMergerTest {
   current.getJSONArray("services").put(service("old-service","a"));
   current.getJSONArray("listings").put(listing("old-list","https://example.org/duke"));
   JSONObject incoming=Store.empty().put("settings",new JSONObject().put("theme","light"));
-  incoming.getJSONArray("vehicles").put(bike("a","덮어쓰면 안 됨")).put(bike("b","추가 차량"));
+  incoming.getJSONArray("vehicles").put(bike("a","기존 바이크").put("odo",999)).put(bike("b","추가 차량"));
   incoming.getJSONArray("services").put(service("old-service","a")).put(service("new-service","b"));
   incoming.getJSONArray("listings").put(listing("another-id","https://example.org/duke#details"));
   JsonDataMerger.Result result=JsonDataMerger.merge(current,incoming);
@@ -43,6 +43,24 @@ public final class JsonDataMergerTest {
   assertEquals(0,second.added);
   assertEquals(5,second.skipped);
   assertEquals(2,Store.parse(second.data.toString()).getJSONArray("vehicles").length());
+ }
+ @Test public void collidingVehicleIdsNeverMisattributeServiceHistory()throws Exception{
+  JSONObject existing=Store.empty();
+  existing.getJSONArray("vehicles").put(bike("same-id","KTM Duke 390"));
+  JSONObject imported=Store.empty();
+  imported.getJSONArray("vehicles").put(bike("same-id","Honda Super Cub"));
+  imported.getJSONArray("services").put(service("new-foreign-service","same-id"));
+  try{JsonDataMerger.merge(existing,imported);fail("Different bikes with same ID must not merge");}
+  catch(org.json.JSONException expected){assertTrue(expected.getMessage().contains("ID"));}
+  assertEquals(0,existing.getJSONArray("services").length());
+ }
+ @Test public void yearMismatchAlsoFailsClosed()throws Exception{
+  JSONObject current=Store.empty();
+  current.getJSONArray("vehicles").put(bike("x","KTM").put("year",2024));
+  JSONObject incoming=Store.empty();
+  incoming.getJSONArray("vehicles").put(bike("x","KTM").put("year",2022));
+  try{JsonDataMerger.merge(current,incoming);fail("Mismatched bike year");}
+  catch(org.json.JSONException expected){}
  }
  @Test public void malformedBackupFailsWithoutTouchingCurrent()throws Exception{
   JSONObject current=Store.empty();

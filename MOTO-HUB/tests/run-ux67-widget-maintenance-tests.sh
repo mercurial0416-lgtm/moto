@@ -25,9 +25,19 @@ settings=(root/"HubScreens.java").read_text()
 assert 'String collection:Store.COLLECTIONS' in merge
 assert 'ids.contains(id)' in merge and 'listingUrls.contains(normalized)' in merge
 assert 'return new Result(Store.parse(target.toString()),added,skipped)' in merge
-assert 'JsonDataMerger.merge(db,source)' in main and 'write(actual.data)' in main
+assert 'JsonDataMerger.merge(Store.parse(previewSnapshot),source)' in main and 'JsonDataMerger.merge(Store.parse(currentSnapshot),source)' in main and 'write(ready.data)' in main
 assert 'RestoreRideGate.begin(RideService.running,RideService.autoArmed)' in main
 assert 'if(request==61){prepareJsonMerge(uri);return;}' in main
+ride=(root/"RideUi.java").read_text()
+home=(root/"GarageHomeUi.java").read_text()
+quick=(root/"QuickEntryUi.java").read_text()
+assert 'void finishWithSummary()' in ride and 'RideEndSummary.text(' in ride
+assert 'new File(track.getPath()+".done").isFile()' in ride
+assert 'new RideUi(a).finishWithSummary()' in home
+assert 'extra_cards' in home and 'if(extra)' in home
+assert '이전 정비주기 불러오기' in quick and 'QuickRecordDraft.nextOdometer(' in quick
+assert '차량 ID 충돌' in merge and 'byId.get(incoming.getString("id"))' in merge
+assert 'moto-json-merge-commit' in main
 assert 'before-json-merge.json' in main and 'before-json-merge.json' in settings
 assert 'a::importJsonMerge' in settings and settings.index('a::importJsonMerge')>settings.index('void advancedBackup()')
 print("PASS UX67 widget intent reuse, maintenance fallback and opt-in JSON duplicate-safe merge")

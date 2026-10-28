@@ -66,8 +66,18 @@ final class GarageHomeUi {
   if(RideService.autoArmed&&!RideService.running){TextView arm=a.text("OBD2 자동 감지 대기 · 출발하면 기록 시작",13,orange,true);arm.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));arm.setBackground(a.shape(surface,stroke,13));a.content.addView(arm);a.gap(a.content,10);}
   if(RideService.running){TextView live=a.text("GPS 기록 중 · "+RideService.status,13,orange,true);live.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));live.setBackground(a.shape(surface,stroke,13));a.content.addView(live);a.gap(a.content,10);}
   interruptedRideShortcut();a.gap(a.content,19);
-  recent(b);a.gap(a.content,20);insights(b);
-  if(!a.items("listings").isEmpty()){a.gap(a.content,20);listings();}
+  recent(b);
+  // Keep daily home focused on navigation and maintenance; secondary cards opt-in.
+  boolean extra=a.getSharedPreferences("garage_home",0).getBoolean("extra_cards",false);
+  a.gap(a.content,12);
+  Button more=a.button(extra?"유지비·매물 접기":"유지비·매물 더 보기",false,()->{
+   a.getSharedPreferences("garage_home",0).edit().putBoolean("extra_cards",!extra).apply();
+   a.renderPreservingPosition();
+  });
+  more.setMinHeight(a.dp(44));a.content.addView(more);
+  if(extra){a.gap(a.content,16);insights(b);
+   if(!a.items("listings").isEmpty()){a.gap(a.content,18);listings();}
+  }
  }
  /** Scan local GPS metadata off the UI thread and ignore results for disposed home screens. */
  void interruptedRideShortcut(){
@@ -288,8 +298,7 @@ final class GarageHomeUi {
      .setMessage("기록을 종료하면 현재 GPS 위치 수집을 중단합니다.")
      .setNegativeButton("취소",null)
      .setPositiveButton("종료",(d,w)->{
-      a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));
-      a.toast("정상 종료를 요청했어요.");
+      new RideUi(a).finishWithSummary();
       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},750);
      }).show();
    }else{a.navigate("라이딩");new RideUi(a).requestStart();}
