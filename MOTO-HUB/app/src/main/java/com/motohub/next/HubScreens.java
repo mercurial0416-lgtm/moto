@@ -199,47 +199,6 @@ final class HubScreens {
     if(record==null)throw new Exception("바이크가 삭제됐어요.");
     record.put("soldDate",sold?"":a.today());a.write(next);a.close();a.render();
    })).show());a.action(p,"대표 바이크로 설정",false,()->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("primary",b.getString("id"));a.write(next);a.selected="";a.getSharedPreferences("garage_ui",0).edit().remove("selected_bike").apply();a.close();a.render();}));a.action(p,"다른 바이크 추가",false,()->a.edit("vehicles",null));a.divider(p);a.action(p,"바이크와 관련 기록 삭제",false,()->{a.close();a.remove("vehicles",b);});a.show();}
- void listings(){
-  a.gap(a.content,4);a.label(a.content,"저장한 매물을 검색하고 비교하세요.",12,a.muted,false);
-  EditText search=new EditText(a);search.setSingleLine();search.setTextSize(16);search.setTextColor(a.fg);search.setHintTextColor(a.muted);search.setHint("모델명으로 빠르게 찾기");search.setText(a.query);search.setContentDescription("저장한 매물 검색");search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-  search.setPadding(a.dp(13),a.dp(10),a.dp(13),a.dp(10));search.setMinHeight(a.dp(53));search.setBackground(a.shape(a.panel,a.line,8));a.content.addView(search,new LinearLayout.LayoutParams(-1,-2));
-  a.gap(a.content,13);tabs(new String[]{"전체","확인필요","판매중","예약중","판매완료"},a.filter,v->{a.filter=v;a.listingPageOffset=0;a.render();});
-  LinearLayout toolbar=new LinearLayout(a);toolbar.setGravity(Gravity.CENTER_VERTICAL);TextView label=a.text("저장한 매물",17,a.fg,true);toolbar.addView(label,new LinearLayout.LayoutParams(0,-2,1));Button order=a.button(a.sort+"  ▾",false,()->a.choose("정렬",new String[]{"최신순","가격 낮은순","주행거리순"},v->{a.sort=v;a.listingPageOffset=0;a.render();}));order.setMinHeight(a.dp(42));order.setTextSize(13);toolbar.addView(order);a.content.addView(toolbar);
-  LinearLayout results=a.col();a.content.addView(results);
-  search.setOnEditorActionListener((v,id,event)->{a.hideKeyboard();return true;});
-  final android.os.Handler searchDelay=new android.os.Handler(android.os.Looper.getMainLooper());
-  final Runnable[] pending={null};
-  search.addTextChangedListener(new android.text.TextWatcher(){public void beforeTextChanged(CharSequence s,int x,int c,int d){}public void onTextChanged(CharSequence s,int x,int before,int count){
-   a.query=s.toString().trim();a.listingPageOffset=0;
-   if(pending[0]!=null)searchDelay.removeCallbacks(pending[0]);
-   pending[0]=()->{if(!a.isFinishing()&&!a.isDestroyed()&&results.getParent()!=null)showListingResults(results);};
-   searchDelay.postDelayed(pending[0],180);
-  }public void afterTextChanged(android.text.Editable e){}});
-  showListingResults(results);
- }
- void showListingResults(LinearLayout into){
-  into.removeAllViews();List<JSONObject> list=a.items("listings");
-  final String query=a.query.toLowerCase(Locale.ROOT);
-  list.removeIf(x->!x.optString("model").toLowerCase(Locale.ROOT).contains(query)||!a.filter.equals("전체")&&!a.filter.equals(x.optString("status","확인필요")));
-  if(a.sort.equals("가격 낮은순"))list.sort(Comparator.comparingDouble(x->x.optDouble("price")));if(a.sort.equals("주행거리순"))list.sort(Comparator.comparingDouble(x->x.optDouble("mileage")));
-  a.gap(into,12);a.label(into,list.size()+"개 매물",13,a.muted,false);
-  if(list.isEmpty()){TextView none=a.text("표시할 매물이 없습니다. 필터를 변경하거나 매물을 추가하세요.",14,a.muted,false);none.setPadding(a.dp(16),a.dp(20),a.dp(16),a.dp(20));none.setBackground(a.shape(a.panel,a.line,8));into.addView(none);return;}
-  for(int i=ListPageLimit.start(list.size(),a.listingPageOffset);i<ListPageLimit.end(list.size(),a.listingPageOffset);i++){JSONObject x=list.get(i);
-   LinearLayout card=a.col();card.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(10));card.setBackground(a.shape(a.panel,a.line,8));
-   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);boolean largeListingText=a.getResources().getConfiguration().fontScale>=1.35f;if(largeListingText)head.setOrientation(LinearLayout.VERTICAL);TextView model=a.text(x.optString("model"),18,a.fg,true);model.setMaxLines(2);model.setEllipsize(android.text.TextUtils.TruncateAt.END);head.addView(model,largeListingText?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));TextView status=a.text(x.optString("status","확인필요"),12,a.muted,true);status.setPadding(largeListingText?0:a.dp(8),a.dp(5),0,a.dp(5));status.setMaxLines(1);head.addView(status);card.addView(head);
-   TextView price=MotoDesign.figure(a,a.won(x.optDouble("price")),23,a.fg);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(-1,-2);pp.topMargin=a.dp(11);card.addView(price,pp);
-   String year=x.optInt("year")>0?x.optInt("year")+"년식  ·  ":"";TextView specs=a.text(year+a.num(x.optDouble("mileage"))+" km  ·  "+x.optString("region","지역 미입력"),13,a.muted,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(9);card.addView(specs,sp);
-   card.setClickable(true);card.setFocusable(true);card.setContentDescription(x.optString("model")+", "+a.won(x.optDouble("price"))+". 자세히 보기");card.setOnClickListener(v->a.detail(x));
-   CheckBox check=new CheckBox(a);check.setText("비교에 담기");check.setTextSize(13);check.setTextColor(a.muted);check.setMinHeight(a.dp(44));check.setChecked(a.compare.contains(x.optString("id")));check.setOnCheckedChangeListener((v,on)->{String id=x.optString("id");if(on&&a.compare.size()>=3){check.setChecked(false);a.toast("최대 3개까지 비교할 수 있어요.");return;}if(on)a.compare.add(id);else a.compare.remove(id);});
-   card.addView(check);LinearLayout.LayoutParams cr=new LinearLayout.LayoutParams(-1,-2);cr.bottomMargin=a.dp(11);into.addView(card,cr);
-  }
-  if(ListPageLimit.canPrevious(list.size(),a.listingPageOffset))
-   into.addView(a.button("◀ 최근 매물",false,()->{a.listingPageOffset=ListPageLimit.previous(list.size(),a.listingPageOffset);showListingResults(into);}));
-  if(ListPageLimit.canNext(list.size(),a.listingPageOffset))
-   into.addView(a.button("다음 매물 ▶ · "+ListPageLimit.end(list.size(),a.listingPageOffset)+"/"+list.size(),false,()->{a.listingPageOffset=ListPageLimit.next(list.size(),a.listingPageOffset);showListingResults(into);}));
- }
- void compare(){if(a.compare.isEmpty()){a.toast("비교할 매물을 선택해 주세요.");return;}LinearLayout p=a.page("매물 비교");for(JSONObject x:a.items("listings"))if(a.compare.contains(x.optString("id"))){a.label(p,x.optString("model"),22,a.fg,true);a.label(p,a.won(x.optDouble("price")),26,a.accent,true);a.label(p,x.optInt("year")+"년식 · "+a.num(x.optDouble("mileage"))+" km",17,a.fg,false);a.label(p,"퀵시프터 "+x.optString("quick","미확인")+" · "+x.optString("status","확인필요"),16,a.muted,false);a.divider(p);}a.show();}
-
  void costDashboard(){
   LinearLayout page=a.page("바이크별 유지비");
   java.util.List<JSONObject> bikes=a.items("vehicles");
