@@ -72,6 +72,8 @@ final class RideUi {
     if(!hero.isAttachedToWindow()||a.isFinishing()||a.isDestroyed())return;
     if(!RideService.running){a.render();return;}
     long seconds=Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.startedElapsed)/1000);
+    // Gauge cards are invisible in navigation-first focus mode; GPS is still recorded.
+    if(!focus){
     values[0].setText(String.format(Locale.KOREA,"%.1f km",RideService.liveDistanceKm));
     values[1].setText(String.format(Locale.KOREA,"%02d:%02d",seconds/3600,seconds/60%60));
     values[2].setText(GpsSignalStatus.liveSpeedLabel(RideService.liveSpeedKmh,
@@ -81,6 +83,7 @@ final class RideUi {
     motion.setText(String.format(Locale.KOREA,"이동 %d분 · 정차 %d분 · 이동평균 %.1f km/h (GPS 관측 구간)",
       RideService.liveMovingMillis/60000,RideService.liveStationaryMillis/60000,
       RideTimePolicy.movingAverage(RideService.liveDistanceKm,RideService.liveMovingMillis)));
+    }
     // Suggest, never silently stop a manually recorded ride. A fresh GPS fix,
     // real prior travel and uninterrupted stationary time are all mandatory.
     if(RideStopSuggestion.shouldSuggest(
@@ -624,7 +627,7 @@ final class RideUi {
      else a.toast("GPS 기록 시작을 확인하지 못했어요. 라이딩 상태를 확인해 주세요.");
     }},700);
    }
-   a.root.postDelayed(()->{if(!a.isFinishing())a.render();},800);
+   a.root.postDelayed(()->{if(!a.isFinishing()&&!a.isDestroyed()&&a.hasWindowFocus())a.render();},800);
    if(nav){
     final android.os.Handler starter=new android.os.Handler(android.os.Looper.getMainLooper());
     final long deadline=android.os.SystemClock.elapsedRealtime()+15_000L;
