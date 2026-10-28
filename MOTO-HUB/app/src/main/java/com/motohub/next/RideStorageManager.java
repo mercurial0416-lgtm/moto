@@ -29,15 +29,42 @@ final class RideStorageManager {
        "\n최근 "+labels.length+"건을 확인할 수 있어요. 자동 삭제는 없습니다."+
        "\n삭제는 전체 ZIP 백업을 만들고 정상 검증한 후, 해당 기록을 직접 선택할 때만 가능합니다.")
       .setItems(labels,(d,index)->confirm(a,tracks.get(index)))
+      .setNeutralButton("GPS 복구함", (d,w)->showTrash(a))
       .setNegativeButton("닫기",null).show();
     });
    }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 저장공간 점검 실패: "+e.getMessage());});}
   },"moto-gps-storage-list").start();
  }
+ private static void showTrash(MainActivity a){
+  new Thread(()->{
+   try{
+    List<File> entries=RideTrash.entries(a.getFilesDir());
+    String[] labels=new String[entries.size()];
+    for(int i=0;i<labels.length;i++)labels[i]=RideHistoryLabel.title(entries.get(i),java.time.ZoneId.systemDefault());
+    a.runOnUiThread(()->{
+     if(a.isFinishing()||a.isDestroyed())return;
+     new AlertDialog.Builder(a).setTitle("GPS 복구함 · 수동 복원")
+      .setMessage("자동으로 삭제하지 않습니다. 복구할 기록을 직접 선택하세요.")
+      .setItems(labels,(d,index)->new AlertDialog.Builder(a).setTitle("GPS 기록 복원")
+       .setMessage("선택한 원본과 연결 정보를 라이딩 기록으로 되돌릴까요?")
+       .setNegativeButton("취소",null)
+       .setPositiveButton("복원",(dd,w)->new Thread(()->{
+        try{
+         if(RideService.running||RideService.autoArmed||a.readOnly)
+          throw new IOException("GPS 기록 중에는 복원할 수 없습니다.");
+         File restored=RideTrash.restore(a.getFilesDir(),entries.get(index));
+         a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){
+          a.toast("GPS 원본 복원 완료");a.render();
+         }});
+        }catch(Exception error){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("복원 실패: "+error.getMessage());});}
+       },"moto-gps-trash-restore").start()).show())
+      .setNegativeButton("닫기",null).show();
+    });
+   }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error(e.getMessage());});}
+  },"moto-gps-trash-list").start();
+ }
  private static void confirm(MainActivity a,File track){
-  long backedUpAt=a.getSharedPreferences("verified_full_export",0).getLong("completed_at",0);
-  if(a.readOnly||RideService.running||RideService.autoArmed||backedUpAt<=track.lastModified()||
-     backedUpAt==0){
+  if(a.readOnly||RideService.running||RideService.autoArmed){
    new AlertDialog.Builder(a).setTitle("GPS 원본 삭제 불가")
     .setMessage("해당 기록 생성 이후 검증 완료된 전체 ZIP 백업이 필요합니다. GPS 기록이 진행 중이거나 원본 보호 상태에서도 삭제할 수 없습니다.")
     .setPositiveButton("확인",null).show();return;
@@ -45,15 +72,15 @@ final class RideStorageManager {
   if(RideTrackMerge.mergedSource(track)||RideTrackMerge.archived(track)){
    a.error("통합·보관된 GPS 원본은 다른 기록과 연결될 수 있어 개별 삭제를 지원하지 않아요.");return;
   }
-  new AlertDialog.Builder(a).setTitle("이 GPS 원본을 삭제할까요?")
+  new AlertDialog.Builder(a).setTitle("이 GPS 원본을 복구함으로 옮길까요?")
    .setMessage(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault())+
-    "\n삭제하면 앱에서는 복구할 수 없습니다. 검증된 외부 ZIP 백업은 별도로 보관하세요.")
+    "\n검증된 ZIP에 동일 GPS가 포함된 경우에만 30일 복구함으로 이동합니다. 원본은 즉시 영구 삭제되지 않습니다.")
    .setNegativeButton("취소",null)
-   .setPositiveButton("삭제 절차 진행",(d,w)->new AlertDialog.Builder(a)
-    .setTitle("GPS 파일 최종 확인")
-    .setMessage("선택한 GPS와 부가정보 파일을 영구 삭제합니다. 정말 삭제할까요?")
+   .setPositiveButton("복구함 이동 확인",(d,w)->new AlertDialog.Builder(a)
+    .setTitle("GPS 복구함 이동 · 최종 확인")
+    .setMessage("원본 GPS를 앱 내부 복구함으로 옮겨 라이딩 내역에서 숨깁니다. 나중에 직접 복원할 수 있습니다.")
     .setNegativeButton("돌아가기",null)
-    .setPositiveButton("선택한 파일만 삭제",(dd,ww)->removeInBackground(a,track)).show()).show();
+    .setPositiveButton("선택한 파일 보관",(dd,ww)->removeInBackground(a,track)).show()).show();
  }
  private static void removeInBackground(MainActivity a,File track){
   new Thread(()->{
@@ -62,9 +89,9 @@ final class RideStorageManager {
     String filename=track.getName();
     if(!filename.matches(BackupFormat.TRACK)||!rides.getCanonicalFile().equals(track.getCanonicalFile().getParentFile()))
      throw new IOException("GPS 경로 검증 실패");
-    long backup=a.getSharedPreferences("verified_full_export",0).getLong("completed_at",0);
-    if(backup<=0||backup<=track.lastModified()||RideService.running||RideService.autoArmed||a.readOnly)
-     throw new IOException("백업 또는 기록 상태가 변경됐어요. 삭제를 취소했습니다.");
+    if(RideService.running||RideService.autoArmed||a.readOnly)
+     throw new IOException("기록 또는 보호 상태가 변경돼 보관을 취소했습니다.");
+    BackupGpsProof.requireExact(a,track);
     if(!RideMileageIntegrity.validCompleted(track))throw new IOException("미완료 GPS는 수동 삭제하지 않습니다.");
     // Prevent removal of a merge target referenced by another saved source.
     for(File other:TrackFile.tracks(a.getFilesDir())){
@@ -79,9 +106,9 @@ final class RideStorageManager {
      File file=new File(track.getPath()+suffix);
      if(Files.isSymbolicLink(file.toPath()))throw new IOException("안전하지 않은 GPS 부가정보 경로입니다.");
     }
-    for(String suffix:SIDECARS)Files.deleteIfExists(new File(track.getPath()+suffix).toPath());
-    Files.delete(track.toPath());
-    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){a.toast("선택한 GPS 원본만 삭제했습니다.");a.render();}});
+    RideTrash.move(a.getFilesDir(),track);
+    RideCompletionInbox.remove(a,track.getName());
+    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){a.toast("GPS 원본을 복구함으로 옮겼습니다.");a.render();}});
    }catch(Exception error){
     a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 삭제 취소: "+error.getMessage());});
    }

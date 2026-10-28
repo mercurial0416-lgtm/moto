@@ -4,18 +4,25 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 /** Strict readback of the chosen ZIP; use the same format limits as import. */
 final class BackupIntegrity {
  private BackupIntegrity(){}
  static final class Result {
   final int tracks,photos;
-  Result(int tracks,int photos){this.tracks=tracks;this.photos=photos;}
+  final Map<String,String> trackSha256;
+  Result(int tracks,int photos,Map<String,String> hashes){
+   this.tracks=tracks;this.photos=photos;
+   this.trackSha256=Collections.unmodifiableMap(new HashMap<>(hashes));
+  }
  }
  static Result verify(InputStream source)throws IOException {
   if(source==null)throw new IOException("백업 파일을 열 수 없어요.");
   Set<String> names=new HashSet<>();Map<String,String> small=new HashMap<>();byte[] buffer=new byte[32768];
   int entries=0,tracks=0,photos=0,receipts=0;long total=0;boolean hasData=false;
+  Map<String,String> trackHashes=new HashMap<>();
   try(ZipInputStream zip=new ZipInputStream(new BufferedInputStream(source),StandardCharsets.UTF_8)){
    ZipEntry entry;
    while((entry=zip.getNextEntry())!=null){
@@ -28,6 +35,11 @@ final class BackupIntegrity {
     if(BackupFormat.isReceipt(name)&&++receipts>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증 사진이 너무 많습니다.");
     if("MOTO-HUB-data.json".equals(name))hasData=true;
     long size=0,limit=BackupFormat.entryLimit(name);
+    MessageDigest digest=null;
+    if(BackupFormat.isTrack(name)){
+     try{digest=MessageDigest.getInstance("SHA-256");}
+     catch(NoSuchAlgorithmException unavailable){throw new IOException("GPS SHA-256 검증을 실행할 수 없습니다.",unavailable);}
+    }
     ByteArrayOutputStream value=(BackupFormat.isSidecar(name)&&limit>0)||BackupFormat.isModelMetadata(name)?new ByteArrayOutputStream():null;
     int n;byte[] header=new byte[2],trailer=new byte[2];
     while((n=zip.read(buffer))!=-1){
@@ -37,8 +49,14 @@ final class BackupIntegrity {
      size+=n;total+=n;
      if(size>limit||total>BackupFormat.MAX_TOTAL_BYTES)throw new IOException("백업 크기 제한을 초과했습니다.");
      if(value!=null)value.write(buffer,0,n);
+     if(digest!=null)digest.update(buffer,0,n);
     }
     if((BackupFormat.isReceipt(name)||BackupFormat.isPhoto(name)||BackupFormat.isModelPhoto(name))&&(size<4||(header[0]&255)!=255||(header[1]&255)!=216||(trailer[0]&255)!=255||(trailer[1]&255)!=217))throw new IOException("손상된 사진 파일입니다.");
+    if(digest!=null){
+     StringBuilder hex=new StringBuilder();
+     for(byte part:digest.digest())hex.append(String.format(Locale.ROOT,"%02x",part&255));
+     trackHashes.put(name.substring("rides/".length()),hex.toString());
+    }
     if(name.equals("MOTO-HUB-data.json")&&size==0)throw new IOException("백업 기록이 비어 있습니다.");
     if(value!=null)small.put(name,value.toString("UTF-8"));
     zip.closeEntry(); // Checks the entry CRC before a success message is shown.
@@ -72,6 +90,6 @@ final class BackupIntegrity {
       !Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(small.get(name)))
     throw new IOException("라이딩 분류가 손상됐습니다.");
   }
-  return new Result(tracks,photos);
+  return new Result(tracks,photos,trackHashes);
  }
 }

@@ -1806,6 +1806,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     }
     // Validate every authenticated encrypted chunk BEFORE trusting the ZIP.
     File authenticated=null;
+    BackupIntegrity.Result checkedBackup;
     try{
      if(password!=null){
       try(InputStream check=getContentResolver().openInputStream(uri)){
@@ -1815,13 +1816,11 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      }
      try(InputStream check=authenticated!=null?new FileInputStream(authenticated):getContentResolver().openInputStream(uri)){
       if(check==null)throw new IOException("백업 검증을 위해 파일을 다시 열 수 없어요.");
-      BackupIntegrity.verify(check);
+      checkedBackup=BackupIntegrity.verify(check);
      }
     }finally{if(authenticated!=null)java.nio.file.Files.deleteIfExists(authenticated.toPath());}
-    // Set deletion eligibility ONLY after the user-selected ZIP can be read back and verified.
-    if(!getSharedPreferences("verified_full_export",MODE_PRIVATE).edit()
-      .putLong("completed_at",System.currentTimeMillis()).commit())
-      throw new IOException("백업 검증은 완료됐지만 안전 삭제 승인 기록을 보관하지 못했습니다.");
+    // Allow safe trash only for exact GPS bytes actually found in the verified user-owned ZIP.
+    BackupGpsProof.record(this,checkedBackup.trackSha256);
     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast((password==null?"전체 백업":"암호화 백업")+" 검증 완료 · "+count+"개 기록/사진");});
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 백업 실패: "+e.getMessage());});}
     finally{if(password!=null)Arrays.fill(password,'\0');if(reserved)RestoreRideGate.endExport();}
