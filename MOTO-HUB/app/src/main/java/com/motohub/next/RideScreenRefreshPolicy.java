@@ -2,6 +2,7 @@ package com.motohub.next;
 /** Only visible UI redraw cadence; never changes GPS acquisition or disk recording. */
 final class RideScreenRefreshPolicy {
  private RideScreenRefreshPolicy(){}
+ static final long BACKGROUND_UI_POLL_MS=10000L;
  static long interval(boolean gpsFresh,double speedKmh,boolean focused){
   // The focus view hides numeric gauges; only an occasional UI sanity refresh remains.
   if(focused)return 5000;
