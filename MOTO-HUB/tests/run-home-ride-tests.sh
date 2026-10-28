@@ -12,7 +12,7 @@ checks={
  'home navigates to ride tab before consent': bool(re.search(r'else\s*\{\s*a\.navigate\("라이딩"\);\s*new RideUi\(a\)\.requestStart\(\);\s*\}',home)),
  'ride start requires ride tab': 'if(!a.rideStartConsent.pending()||!"라이딩".equals(a.tab))return;' in ride,
  'start consent still explicit': 'setPositiveButton("동의하고 시작"' in ride,
- 'home stop sends completed STOP command': 'a.startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in home,
+ 'home stop sends completed STOP command': 'new RideUi(a).finishWithSummary()' in home and 'a.startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in ride,
  'ride tab stop sends completed STOP command': 'a.startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in ride,
  'no direct stopService for ride anywhere': all(not re.search(r'\.stopService\(\s*new Intent\([^;]*RideService\.class',p.read_text()) for p in Path('app/src/main/java').rglob('*.java')),
  'STOP is completed not interrupted': 'if(STOP.equals(action))' in service and 'finishUserRideAsync();return START_NOT_STICKY;' in service and 'boolean verified=closeTrack(true)' in service and 'if(AUTO_DISARM.equals(action))' in service,

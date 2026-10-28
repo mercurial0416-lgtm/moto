@@ -122,7 +122,20 @@ public class MainActivity extends Activity {
    finally{recoveryReminderChecking.set(false);}
   },"moto-interrupted-ride-check").start();
  }
+ /** Show the durable summary once when the rider comes back from navigation. */
+ void showPendingRideSummary(){
+  if(isFinishing()||isDestroyed()||!hasWindowFocus()||RideService.running||RideService.saving()||dialog!=null)return;
+  android.content.SharedPreferences preferences=getSharedPreferences("ride_completion_inbox",MODE_PRIVATE);
+  String heading=preferences.getString("title",""),text=preferences.getString("summary","");
+  if(heading==null||heading.isEmpty()||text==null||text.isEmpty())return;
+  new AlertDialog.Builder(this).setTitle(heading).setMessage(text)
+   .setNegativeButton("닫기",null)
+   .setPositiveButton("주행 기록 보기",(d,w)->{tab="라이딩";render();})
+   .setOnDismissListener(d->{if(text.equals(preferences.getString("summary","")))
+     preferences.edit().remove("title").remove("summary").commit();}).show();
+ }
  @Override protected void onResume(){super.onResume();
+  if(root!=null)root.postDelayed(this::showPendingRideSummary,350);
   // Device location/notification settings may have changed while the settings app was open.
   if(root!=null&&"라이딩".equals(tab)&&dialog==null&&rideStateSignature()!=lastRenderedRideState)renderPreservingPosition();
   if(!readOnly)DailyMaintenanceJob.schedule(this);

@@ -326,9 +326,11 @@ public final class RideService extends Service implements LocationListener {
   Sharing.stop();
   if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
   status="GPS 기록 저장·검증 중…";
+  final File savedTrack=track;
   HandlerThread worker=gpsIoThread;
   if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
    boolean verified=closeTrack(true);
+   if(verified)RideCompletionInbox.record(getApplicationContext(),savedTrack);
    handler.post(()->{
     if(!finishPending)return;finishPending=false;
     stopWith(verified?"사용자가 라이딩 기록을 저장하고 종료했습니다.":"GPS 기록 검증 실패 · 복구 화면에서 원본을 확인하세요.",false);
