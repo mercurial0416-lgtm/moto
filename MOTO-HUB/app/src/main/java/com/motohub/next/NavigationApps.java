@@ -59,7 +59,17 @@ final class NavigationApps {
   java.util.ArrayList<NavigationChoice> installed=new java.util.ArrayList<>();
   for(NavigationChoice app:NavigationChoice.values())
    if(installedLaunchIntent(activity,app)!=null)installed.add(app);
-  if(installed.isEmpty()){choose(activity);return;}
+  if(installed.isEmpty()){
+   // Never bounce between two selection dialogs when no navigator is installed.
+   NavigationChoice preferred=preferred(activity);
+   new AlertDialog.Builder(activity).setTitle("내비 앱 설치 필요")
+    .setMessage("설치된 내비를 찾지 못했어요. 먼저 "+preferred.label+"을 설치하거나 다른 내비를 선택하세요. GPS 기록은 중단되지 않습니다.")
+    .setNegativeButton("닫기",null)
+    .setNeutralButton("다른 내비 선택",(d,w)->choose(activity))
+    .setPositiveButton(preferred.label+" 설치",(d,w)->openStore(activity,preferred))
+    .show();
+   return;
+  }
   String[] labels=new String[installed.size()];
   for(int i=0;i<installed.size();i++)labels[i]=installed.get(i).label;
   new AlertDialog.Builder(activity).setTitle("설치된 다른 내비 실행")
