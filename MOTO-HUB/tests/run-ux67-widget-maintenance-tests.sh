@@ -26,7 +26,7 @@ assert 'String collection:Store.COLLECTIONS' in merge
 assert 'ids.contains(id)' in merge and 'listingUrls.contains(normalized)' in merge
 assert 'return new Result(Store.parse(target.toString()),added,skipped,blocked)' in merge
 assert 'ambiguousBikeIds.contains(entry.optString("vehicleId"))' in merge
-assert 'JsonDataMerger.merge(Store.parse(previewSnapshot),source)' in main and 'JsonDataMerger.merge(Store.parse(currentSnapshot),source)' in main and 'write(ready.data)' in main
+assert 'JsonDataMerger.merge(Store.parse(previewSnapshot),source)' in main and 'JsonDataMerger.merge(Store.parse(currentSnapshot),source,mapping)' in main and 'write(ready.data)' in main
 assert 'RestoreRideGate.begin(RideService.running,RideService.autoArmed)' in main
 assert 'if(request==61){prepareJsonMerge(uri);return;}' in main
 ride=(root/"RideUi.java").read_text()
@@ -39,7 +39,7 @@ assert 'RideCompletionInbox.record(getApplicationContext(),savedTrack)' in (root
 assert 'new RideUi(a).finishWithSummary()' in home
 assert 'extra_cards' in home and 'if(extra)' in home
 assert '이전 정비주기 불러오기' in quick and 'QuickRecordDraft.nextOdometer(' in quick
-assert '차량 ID 충돌' in merge and 'byId.get(incoming.getString("id"))' in merge
+assert 'ambiguousBikeIds.add(incoming.getString("id"))' in merge and 'byId.get(incoming.getString("id"))' in merge
 assert 'moto-json-merge-commit' in main
 assert 'before-json-merge.json' in main and 'before-json-merge.json' in settings
 assert 'a::importJsonMerge' in settings and settings.index('a::importJsonMerge')>settings.index('void advancedBackup()')
