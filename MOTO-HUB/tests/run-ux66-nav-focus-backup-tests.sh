@@ -21,7 +21,7 @@ assert 'a.action(p,"전체 ZIP 백업"' in settings
 assert 'a.action(p,"전체 ZIP 복원"' in settings
 section=settings[settings.index("void basicBackup()"):settings.index("void backupMore()")]
 assert '암호화 전체 백업 만들기' not in section
-assert '다른 백업 방식 · 검사' in section
+assert '대용량 백업 · 기기 이전 · 추가 도구' in section
 assert 'void backupMore()' in settings
 assert 'a::exportEncryptedBundle' in settings and 'a::importEncryptedBundle' in settings
 assert 'this::advancedBackup' in settings
