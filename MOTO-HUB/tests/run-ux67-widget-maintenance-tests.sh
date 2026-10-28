@@ -28,6 +28,7 @@ assert 'return new Result(Store.parse(target.toString()),added,skipped)' in merg
 assert 'JsonDataMerger.merge(db,source)' in main and 'write(actual.data)' in main
 assert 'RestoreRideGate.begin(RideService.running,RideService.autoArmed)' in main
 assert 'if(request==61){prepareJsonMerge(uri);return;}' in main
+assert 'before-json-merge.json' in main and 'before-json-merge.json' in settings
 assert 'a::importJsonMerge' in settings and settings.index('a::importJsonMerge')>settings.index('void advancedBackup()')
 print("PASS UX67 widget intent reuse, maintenance fallback and opt-in JSON duplicate-safe merge")
 PY

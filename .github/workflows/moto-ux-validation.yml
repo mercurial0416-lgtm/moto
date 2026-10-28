@@ -16,6 +16,9 @@ on:
       - 'feat/ux50-52-navigation-ride-release-20261026'
 permissions:
   contents: read
+concurrency:
+  group: moto-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
 jobs:
   android-debug-check:
     runs-on: ubuntu-latest

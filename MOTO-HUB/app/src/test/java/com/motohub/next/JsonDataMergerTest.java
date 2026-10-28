@@ -38,7 +38,7 @@ public final class JsonDataMergerTest {
   assertEquals("dark",result.data.getJSONObject("settings").getString("theme"));
   assertEquals("기존 바이크",result.data.getJSONArray("vehicles").getJSONObject(0).getString("name"));
   assertEquals("기존 바이크",current.getJSONArray("vehicles").getJSONObject(0).getString("name"));
-  assertEquals(1,incoming.getJSONArray("services").length()==2?1:0);
+  assertEquals(2,incoming.getJSONArray("services").length());
   JsonDataMerger.Result second=JsonDataMerger.merge(result.data,incoming);
   assertEquals(0,second.added);
   assertEquals(5,second.skipped);

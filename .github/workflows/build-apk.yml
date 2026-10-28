@@ -9,6 +9,9 @@ on:
     paths: ['MOTO-HUB/**', '.github/workflows/build-apk.yml']
 permissions:
   contents: read
+concurrency:
+  group: moto-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
 jobs:
   apk:
     runs-on: ubuntu-latest
