@@ -8,7 +8,6 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
-import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.util.*;
 import org.json.JSONObject;
@@ -152,11 +151,17 @@ final class BackupVolumeExporter {
      if(out==null)throw new IOException("ZIP 파일을 쓸 수 없습니다.");
      BackupBundle.export(json,internal,out,part,preferences,volume.entries);
     }
-    MessageDigest digest=MessageDigest.getInstance("SHA-256");
     BackupIntegrity.Result readback;
     try(InputStream in=resolver.openInputStream(document)){
      if(in==null)throw new IOException("생성한 ZIP을 다시 읽지 못했습니다.");
-     readback=BackupIntegrity.verify(new DigestInputStream(in,digest));
+     readback=BackupIntegrity.verify(in);
+    }
+    // Hash the entire ZIP, including central directory (ZipInputStream stops before it).
+    MessageDigest digest=MessageDigest.getInstance("SHA-256");
+    try(InputStream in=resolver.openInputStream(document)){
+     if(in==null)throw new IOException("전체 ZIP 해시를 검사할 수 없습니다.");
+     byte[] bytes=new byte[32768];int read;
+     while((read=in.read(bytes))!=-1)digest.update(bytes,0,read);
     }
     Set<String> expected=new HashSet<>(volume.entries);
     expected.add("MOTO-HUB-data.json");expected.add("MOTO-HUB-preferences.json");expected.add("README-KO.txt");
