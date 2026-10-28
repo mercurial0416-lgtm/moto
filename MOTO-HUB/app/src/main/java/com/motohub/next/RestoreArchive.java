@@ -345,6 +345,9 @@ public final class RestoreArchive {
   private static void safePath(File root,File target)throws IOException{
    String relative=root.toPath().relativize(target.toPath()).toString().replace(File.separatorChar,'/');
    validate(relative);
+   if(relative.startsWith("rides-trash/")&&
+      Files.isSymbolicLink(new File(root,"rides-trash").toPath()))
+    throw new IOException("GPS 복구함 상위 경로가 안전하지 않습니다.");
    File parent=target.getParentFile();
    if(Files.isSymbolicLink(parent.toPath())||
       (Files.exists(parent.toPath(),LinkOption.NOFOLLOW_LINKS)&&

@@ -30,7 +30,7 @@ final class UpdateDataFootprint {
   }
   File rides=new File(context.getFilesDir(),"rides");
   File[] tracks=rides.isDirectory()?rides.listFiles():null;
-  long count=0,bytes=0,complete=0,photoCount=0,photoBytes=0;
+  long count=0,bytes=0,complete=0,photoCount=0,photoBytes=0,vaultCount=0,vaultBytes=0;
   List<File> toHash=new ArrayList<>();
   if(tracks!=null)for(File file:tracks){
    if(!file.getName().matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"))continue;
@@ -43,6 +43,18 @@ final class UpdateDataFootprint {
    if(bike.exists()){verifyRegular(bike);toHash.add(bike);}
    File recovered=new File(file.getPath()+".recovered");
    if(recovered.exists()){verifyRegular(recovered);toHash.add(recovered);}
+  }
+  for(File track:RideTrash.entries(context.getFilesDir())){
+   verifyRegular(track);
+   if(track.length()>TrackFile.MAX_BYTES)throw new IOException("복구함 GPS 크기 초과");
+   vaultCount++;vaultBytes+=track.length();toHash.add(track);
+   for(String suffix:RideTrash.SIDECARS){
+    File file=new File(track.getPath()+suffix);
+    if(!Files.exists(file.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
+    verifyRegular(file);
+    if(file.length()>100)throw new IOException("복구함 GPS 부가정보 크기 초과");
+    toHash.add(file);
+   }
   }
   File[] photos=context.getFilesDir().listFiles();
   if(photos!=null)for(File file:photos){
@@ -71,7 +83,9 @@ final class UpdateDataFootprint {
   StringBuilder hash=new StringBuilder();
   for(byte b:digest.digest())hash.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
   return value.append(";tracks=").append(count).append(";trackBytes=").append(bytes)
-   .append(";complete=").append(complete).append(";garagePhotos=").append(photoCount)
+   .append(";complete=").append(complete)
+   .append(";vaultTracks=").append(vaultCount).append(";vaultBytes=").append(vaultBytes)
+   .append(";garagePhotos=").append(photoCount)
    .append(";garagePhotoBytes=").append(photoBytes).append(";contentSha256=").append(hash).toString();
  }
  private static void verifyRegular(File file)throws IOException{
