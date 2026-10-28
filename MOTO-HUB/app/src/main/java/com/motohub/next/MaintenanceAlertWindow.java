@@ -20,10 +20,15 @@ final class MaintenanceAlertWindow {
   return Math.max(0,Math.min(preferred,365));
  }
  static MaintenancePlanner.Status status(JSONObject service,String today,double odometer){
-  double km=service.optDouble("nextKm",0);
-  try{return MaintenancePlanner.status(service.optString("nextDate"),km,today,odometer,daysBefore(service),kmBefore(service));}
+  double rawKm=service.optDouble("nextKm",0);
+  boolean validOdo=Double.isFinite(odometer)&&odometer>=0;
+  double safeKm=validOdo&&Double.isFinite(rawKm)&&rawKm>=0?rawKm:0;
+  double safeOdo=validOdo?odometer:0;
+  String dueDate=service.optString("nextDate","").trim();
+  try{return MaintenancePlanner.status(dueDate,safeKm,today,safeOdo,daysBefore(service),kmBefore(service));}
   catch(java.time.DateTimeException invalidDate){
-   return MaintenancePlanner.status("",km,today,odometer,daysBefore(service),kmBefore(service));
+   // Preserve mileage-based reminders if the imported date is invalid.
+   return MaintenancePlanner.status("",safeKm,today,safeOdo,daysBefore(service),kmBefore(service));
   }
  }
 }
