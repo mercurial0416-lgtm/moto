@@ -1,0 +1,8 @@
+MOTO HUB UX70 (code 540) candidate approval marker.
+This marker triggers the EXISTING fail-closed original-key GitHub workflow only once.
+Publish only if all four MOTO_SIGNING_* secrets are available, the APK
+com.motohub.next has version 540, and the signer certificate SHA-256 matches
+212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b.
+Never generate a replacement key or replace installed data with unsigned APK.
+Verified source: 2693169f352980c3162ee24ce805e1ccddb92664
+Release integration: fc30c83a01c56c9941618eba4337e4fc8300d1f7
