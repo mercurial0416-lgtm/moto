@@ -26,6 +26,16 @@ final class NavigationApps {
    .setTitle("내비 선택 · 현재 "+selected.label)
    .setItems(options,(dialog,which)->{
     NavigationChoice selectedApp=NavigationChoice.at(which);
+    if(installedLaunchIntent(activity,selectedApp)==null){
+     // Do not overwrite a working default with an unavailable app.
+     new AlertDialog.Builder(activity).setTitle(selectedApp.label+" 실행 불가")
+      .setMessage("설치 상태를 확인할 수 없어요. 기존 기본 내비 설정은 그대로 유지합니다.")
+      .setNegativeButton("취소",null)
+      .setNeutralButton("다른 내비 실행",(d,w)->chooseInstalledAndLaunch(activity))
+      .setPositiveButton("설치 페이지",(d,w)->openStore(activity,selectedApp))
+      .show();
+     return;
+    }
     boolean saved=activity.getSharedPreferences(PREF,Context.MODE_PRIVATE)
      .edit().putString(KEY,selectedApp.id).commit();
     if(!saved){activity.toast("내비 선택을 저장하지 못했어요.");return;}
@@ -67,19 +77,26 @@ final class NavigationApps {
  static void open(MainActivity activity,NavigationChoice choice){
   Intent launch=installedLaunchIntent(activity,choice);
   if(launch!=null){
-   try{activity.startActivity(launch);return;}
-   catch(RuntimeException ignored){}
+   try{
+    activity.suppressUpdatePromptUntilElapsed=android.os.SystemClock.elapsedRealtime()+120_000L;
+    activity.startActivity(launch);return;
+   }catch(RuntimeException ignored){}
   }
   new AlertDialog.Builder(activity).setTitle(choice.label+" 앱을 실행할 수 없어요")
    .setMessage("앱 설치 상태를 확인하거나 다른 내비를 선택해 주세요. MOTO HUB는 오토바이 길찾기를 보장하지 않습니다.")
    .setNegativeButton("취소",null)
    .setNeutralButton("다른 내비 실행",(d,w)->chooseInstalledAndLaunch(activity))
-   .setPositiveButton("Google Play 열기",(d,w)->{
-    Uri store=Uri.parse("market://details?id="+choice.packageName);
-    Uri web=Uri.parse("https://play.google.com/store/apps/details?id="+choice.packageName);
-    try{activity.startActivity(new Intent(Intent.ACTION_VIEW,store));}
-    catch(Exception e){try{activity.startActivity(new Intent(Intent.ACTION_VIEW,web));}
-      catch(Exception noStore){activity.toast("스토어를 열 수 없어요.");}}
-   }).show();
+   .setPositiveButton("Google Play 열기",(d,w)->openStore(activity,choice)).show();
+ }
+ private static void openStore(MainActivity activity,NavigationChoice choice){
+  Uri store=Uri.parse("market://details?id="+choice.packageName);
+  Uri web=Uri.parse("https://play.google.com/store/apps/details?id="+choice.packageName);
+  try{
+   activity.suppressUpdatePromptUntilElapsed=android.os.SystemClock.elapsedRealtime()+120_000L;
+   activity.startActivity(new Intent(Intent.ACTION_VIEW,store));
+  }catch(Exception e){
+   try{activity.startActivity(new Intent(Intent.ACTION_VIEW,web));}
+   catch(Exception noStore){activity.toast("스토어를 열 수 없어요.");}
+  }
  }
 }
