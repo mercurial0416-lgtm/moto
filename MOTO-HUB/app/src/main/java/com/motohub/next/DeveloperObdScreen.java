@@ -135,6 +135,9 @@ final class DeveloperObdScreen {
   final Runnable update=new Runnable(){@Override public void run(){
    if(owner==null||!owner.isShowing()||telemetry.getParent()==null)return;
    telemetry.setText("상태: "+RideService.obdLink+" · 재접속 "+RideService.obdReconnects+"회 · 정상 속도 샘플 "+RideService.obdSpeedSamples+"건\n"+
+     "ECU 실제 수신: "+ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,
+      ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime()))+
+     " · "+ObdSignalAge.label(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())+"\n"+
     "속도 "+ObdTelemetryFreshness.speedLabel(RideService.obdSpeedKmh,RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())+
     " · RPM "+(RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdRpmAt,android.os.SystemClock.elapsedRealtime())&&Double.isFinite(RideService.obdRpm)?String.format(java.util.Locale.KOREA,"%.0f",RideService.obdRpm):"—")+
     "\n수온 "+(RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdCoolantAt,android.os.SystemClock.elapsedRealtime())&&Double.isFinite(RideService.obdCoolantC)?String.format(java.util.Locale.KOREA,"%.0f°C",RideService.obdCoolantC):"—")+

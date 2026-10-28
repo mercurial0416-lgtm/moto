@@ -354,6 +354,7 @@ public final class RideService extends Service implements LocationListener {
   HandlerThread worker=gpsIoThread;
   if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
    boolean verified=closeTrack(true);
+   if(verified)RideCompletionInbox.record(getApplicationContext(),savedTrack);
    handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,verified);});
   })){
    completeAutoTrack(savedTrack,closeTrack(true));
