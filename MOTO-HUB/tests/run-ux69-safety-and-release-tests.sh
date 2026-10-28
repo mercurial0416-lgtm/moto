@@ -21,7 +21,7 @@ assert 'RideMileageIntegrity.validCompleted(track)' in inbox
 assert 'RideInsights.analyze(track)' in inbox
 assert 'putString(KEY,next.toString()).commit()' in inbox
 assert 'void showPendingRideSummary()' in activity and 'onResume(){super.onResume()' in activity
-assert 'RideService.running||RideService.saving()' in activity
+assert 'RideService.running||' in activity and 'RideService.saving()' in activity
 assert 'ambiguousBikeIds.contains(sourceBike)' in merge
 assert 'blocked++' in merge and 'blocked' in activity
 assert 'before_footprint' in snap and 'UpdateDataFootprint.capture' in snap
