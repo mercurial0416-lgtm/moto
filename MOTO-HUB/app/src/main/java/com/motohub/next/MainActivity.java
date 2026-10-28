@@ -35,6 +35,10 @@ public class MainActivity extends Activity {
  boolean dark,readOnly;int bg,fg,muted,line,accent,panel,highlight;
  final Set<String> compare=new LinkedHashSet<>();
  int recordPageOffset=0, listingPageOffset=0;
+ volatile boolean interruptedRecoveryPromptVisible=false;
+ final java.util.concurrent.atomic.AtomicBoolean recoveryReminderChecking=new java.util.concurrent.atomic.AtomicBoolean();
+ volatile long suppressUpdatePromptUntilElapsed=0;
+ boolean suppressUpdatePrompt(){return android.os.SystemClock.elapsedRealtime()<suppressUpdatePromptUntilElapsed||interruptedRecoveryPromptVisible||rideStartConsent.pending();}
  String garageMode="전체", previousTab="홈", rideHistoryFilter=RideHistoryFilter.ALL, rideHistorySort=RideHistorySort.NEWEST, rideHistoryPeriod=RideHistoryPeriod.ALL, rideHistoryBike=RideHistoryBikeFilter.ALL, rideHistoryQuery="";
  final String[] tabs={"홈","라이딩","차고","더보기"};
  interface Work{void run()throws Exception;}
@@ -76,23 +80,39 @@ public class MainActivity extends Activity {
  }
  /** Process death/reboot leaves a local .track without .done. Only offers a manual review. */
  void showInterruptedRidePrompt(){
+  if(RideService.running||RideService.autoArmed||readOnly||
+     interruptedRecoveryPromptVisible||!recoveryReminderChecking.compareAndSet(false,true))return;
   new Thread(()->{
    try{
     File file=InterruptedRideNotice.latest(getFilesDir(),RideService.active,RideService.running);
     if(file==null)return;
     String filename=file.getName();
-    if(filename.equals(getSharedPreferences("ride_recovery_notice",MODE_PRIVATE).getString("seen","")))return;
+    android.content.SharedPreferences prefs=getSharedPreferences("ride_recovery_notice",MODE_PRIVATE);
+    if(!InterruptedRideReminderPolicy.shouldShow(filename,
+      prefs.getString("acknowledged",""),prefs.getString("snoozed_file",""),
+      prefs.getLong("snoozed_at",0),System.currentTimeMillis()))return;
     runOnUiThread(()->{
-     if(isFinishing()||isDestroyed()||RideService.running||RideService.autoArmed||dialog!=null)return;
-     // Never automatically resume GPS, Bluetooth or any group location sharing.
-     getSharedPreferences("ride_recovery_notice",MODE_PRIVATE).edit().putString("seen",filename).apply();
-     new AlertDialog.Builder(this).setTitle("중단된 라이딩 기록 발견")
-      .setMessage("이전에 정상 종료되지 않은 GPS 경로가 있어요. 저장된 좌표를 확인하고 복구할 수 있습니다. 위치 기록이나 공유를 자동 시작하지 않습니다.")
-      .setNegativeButton("나중에",null)
-      .setPositiveButton("기록 확인",(d,w)->{tab="라이딩";rideHistoryFilter=RideHistoryFilter.INTERRUPTED;render();})
-      .show();
+     if(isFinishing()||isDestroyed()||RideService.running||RideService.autoArmed||
+        interruptedRecoveryPromptVisible||dialog!=null)return;
+     // Never reuse the old seen flag: it hid missed rides permanently on Later.
+     interruptedRecoveryPromptVisible=true;
+     AlertDialog prompt=new AlertDialog.Builder(this).setTitle("중단된 라이딩 기록 발견")
+      .setMessage("정상 종료되지 않은 GPS 경로가 있어요. 저장된 좌표를 확인하고 복구할 수 있습니다. 위치 기록이나 공유를 자동 시작하지 않습니다.")
+      .setNegativeButton("내일 다시 알림",(d,w)->prefs.edit()
+        .putString("snoozed_file",filename)
+        .putLong("snoozed_at",System.currentTimeMillis()).apply())
+      .setPositiveButton("기록 확인",(d,w)->{
+       prefs.edit().putString("acknowledged",filename)
+        .remove("snoozed_file").remove("snoozed_at").apply();
+       tab="라이딩";rideHistoryFilter=RideHistoryFilter.INTERRUPTED;render();
+      }).create();
+     prompt.setOnCancelListener(d->prefs.edit().putString("snoozed_file",filename)
+      .putLong("snoozed_at",System.currentTimeMillis()).apply());
+     prompt.setOnDismissListener(d->interruptedRecoveryPromptVisible=false);
+     prompt.show();
     });
-   }catch(Exception ignored){ /* Never block startup or overwrite the track. */ }
+   }catch(Exception ignored){ /* Never block app opening or modify GPS originals. */ }
+   finally{recoveryReminderChecking.set(false);}
   },"moto-interrupted-ride-check").start();
  }
  @Override protected void onResume(){super.onResume();
@@ -100,6 +120,7 @@ public class MainActivity extends Activity {
   if(root!=null&&"라이딩".equals(tab)&&dialog==null)renderPreservingPosition();
   if(!readOnly)DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
+  if(!RideService.running&&!RideService.autoArmed&&!readOnly&&!"라이딩".equals(tab))showInterruptedRidePrompt();
   AppUpdateNotice.checkOnResume(this);
  }
  @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);applyWidgetQuickActions(intent);confirmStopFromNotification(intent);receiveSharedListing(intent);}
@@ -120,6 +141,7 @@ public class MainActivity extends Activity {
   intent.removeExtra(MotoWidgetProvider.EXTRA_NAVIGATION);
   intent.removeExtra(MotoWidgetProvider.EXTRA_SELECT_NAV);
   if(!ride&&!nav&&!chooseNav)return false;
+  suppressUpdatePromptUntilElapsed=android.os.SystemClock.elapsedRealtime()+120_000L;
   if(dialog!=null&&dialog.isShowing()){toast("입력 중인 화면을 먼저 닫아 주세요.");return true;}
   if(chooseNav)NavigationApps.choose(this);
   else if(ride){
