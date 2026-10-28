@@ -147,7 +147,12 @@ public final class RestoreArchive {
      int n;while((n=zip.read(buffer))!=-1){size+=n;total+=n;if(size>limit||total>MAX_TOTAL)throw new IOException("백업 ZIP 용량 제한을 초과했어요.");out.write(buffer,0,n);}
     }
     if(data){json=new String(jsonBytes.toByteArray(),StandardCharsets.UTF_8);if(json.isEmpty())throw new IOException("JSON 기록이 비어 있어요.");}
-    if(pref){preferences=jsonBytes.toString("UTF-8");UiSettingsArchive.check(preferences);}
+    if(pref){
+     preferences=jsonBytes.toString("UTF-8");
+     if(preferences.length()<2||preferences.length()>8192||
+         !preferences.startsWith("{")||!preferences.endsWith("}"))
+      throw new IOException("화면 설정 파일 형식 오류");
+    }
     if(readme){
      String label=jsonBytes.toString("UTF-8");
      if(label.startsWith("MOTO-HUB-PART:GPS\n"))part="GPS";

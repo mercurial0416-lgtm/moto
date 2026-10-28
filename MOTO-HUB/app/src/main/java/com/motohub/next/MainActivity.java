@@ -1554,6 +1554,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      prepared=RestoreArchive.prepare(stream,getFilesDir());
     }
     if(prepared.preferences==null)throw new IOException("이 백업에는 화면 설정이 없습니다. 543 이상에서 만든 ZIP을 선택하세요.");
+    UiSettingsArchive.check(prepared.preferences);
     final RestoreArchive.Prepared ready=prepared;prepared=null;
     runOnUiThread(()->{
      if(isFinishing()||isDestroyed()){ready.close();return;}

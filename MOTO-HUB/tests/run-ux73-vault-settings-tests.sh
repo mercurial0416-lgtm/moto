@@ -21,7 +21,7 @@ assert 'public final String preferences' in restorer
 assert 'MOTO-HUB-preferences.json' in archive and 'MOTO-HUB-preferences.json' in format
 assert "UiSettingsArchive.restore(this,ready.preferences)" in activity
 assert "void importUiSettingsFromZip()" in activity
-assert 'UiSettingsArchive.check(preferences)' in restorer and 'UiSettingsArchive.capture(this)' in activity
+assert 'UiSettingsArchive.check(prepared.preferences)' in activity and 'UiSettingsArchive.capture(this)' in activity
 assert "BackupVolumeExporter.export(this,folder" in activity
 assert "MOTO-HUB-VOLUMES-v1" in r("BackupVolumeExporter.java")
 assert "readback.entryNames.equals(expected)" in r("BackupVolumeExporter.java")
