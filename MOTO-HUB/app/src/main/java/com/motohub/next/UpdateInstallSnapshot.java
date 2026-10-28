@@ -46,7 +46,7 @@ final class UpdateInstallSnapshot {
    throw new IOException("설치 전 복구 지점 검증에 실패했습니다.");
   String baseline;
   try{baseline=UpdateDataFootprint.capture(context,LocalSafetyBackup.read(recovery));}
-  catch(Exception e){throw new IOException("업데이트 전 기록 개수 검사 실패",e);}
+  catch(Exception e){throw new IOException("업데이트 전 GPS·사진 무결성 검사 실패",e);}
   if(!context.getSharedPreferences(PREFS,0).edit()
       .putInt("pending_version",targetVersion)
       .putString("recovery_file",recovery.getName())
@@ -83,7 +83,7 @@ final class UpdateInstallSnapshot {
   }
   audit.remove("before_footprint");
   if(!audit.commit())return "데이터는 읽었지만 업데이트 완료 기록을 저장하지 못했습니다.";
-  if(!match)return "업데이트 전후 기록 수 또는 GPS·사진 파일 크기가 다릅니다. 기존 복구 지점을 보존했으니 기록을 확인하고 전체 ZIP 백업을 권장합니다.";
+  if(!match)return "업데이트 전후 기록 수 또는 GPS·사진 원본 SHA-256이 다릅니다. 기존 복구 지점을 보존했으니 기록을 확인하고 전체 ZIP 백업을 권장합니다.";
   return snapshotExists?
    "앱 업데이트 후 저장 데이터 확인 완료 · 설치 전 복구 지점 보관 중":
    "앱 데이터는 읽었지만 설치 전 복구 지점을 찾지 못했습니다. 전체 백업을 권장합니다.";
