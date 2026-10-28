@@ -1503,6 +1503,40 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    startActivityForResult(intent,"GPS".equals(part)?65:66);
   });
  }
+ void importUiSettingsFromZip(){
+  Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+  intent.setType("application/zip");intent.addCategory(Intent.CATEGORY_OPENABLE);
+  startActivityForResult(intent,70);
+ }
+ void prepareUiSettingsRestore(Uri uri){
+  new Thread(()->{
+   RestoreArchive.Prepared prepared=null;
+   try{
+    try(InputStream stream=getContentResolver().openInputStream(uri)){
+     if(stream==null)throw new IOException("백업 ZIP을 열 수 없어요.");
+     prepared=RestoreArchive.prepare(stream,getFilesDir());
+    }
+    if(prepared.preferences==null)throw new IOException("이 백업에는 화면 설정이 없습니다. 543 이상에서 만든 ZIP을 선택하세요.");
+    final RestoreArchive.Prepared ready=prepared;prepared=null;
+    runOnUiThread(()->{
+     if(isFinishing()||isDestroyed()){ready.close();return;}
+     new AlertDialog.Builder(this).setTitle("화면 설정만 가져오기")
+      .setMessage("홈 버튼 표시·순서, 기본 내비, 정비 알림을 복원합니다. 바이크·GPS·사진·정비 기록은 건드리지 않습니다.")
+      .setNegativeButton("취소",(d,w)->ready.close())
+      .setOnCancelListener(d->ready.close())
+      .setPositiveButton("화면 설정 복원",(d,w)->{
+       try{
+        UiSettingsArchive.restore(this,ready.preferences);toast("화면 설정을 복원했습니다.");render();
+       }catch(Exception e){error("설정 복원 실패: "+e.getMessage());}
+       finally{ready.close();}
+      }).show();
+    });
+   }catch(Exception e){
+    if(prepared!=null)prepared.close();
+    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("설정 백업 검사 실패: "+e.getMessage());});
+   }
+  },"moto-settings-archive-import").start();
+ }
  void importSplitBundle(){
   if(restoreIsBlocked()){explainRestoreBlocked();return;}
   Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -1853,6 +1887,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   }
   if(request==46){prepareBundleRestore(uri);return;}
   if(request==67){prepareSplitRestore(uri);return;}
+  if(request==70){prepareUiSettingsRestore(uri);return;}
   if(request==48){char[] password=pendingSecurePassword;pendingSecurePassword=null;
    if(password==null){error("암호를 다시 입력해 주세요.");return;}
    prepareBundleRestore(uri,password);return;
@@ -1869,9 +1904,9 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     int count;
     try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
      if(out==null)throw new IOException("백업 파일을 열 수 없어요.");
-     if(password==null)count=BackupBundle.export(snapshot,getFilesDir(),out,part);
+     if(password==null)count=BackupBundle.export(snapshot,getFilesDir(),out,part,UiSettingsArchive.capture(this));
      else try(OutputStream secure=BackupCrypto.encrypt(out,password)){
-      count=BackupBundle.export(snapshot,getFilesDir(),secure);
+      count=BackupBundle.export(snapshot,getFilesDir(),secure,"FULL",UiSettingsArchive.capture(this));
      }
     }
     // Validate every authenticated encrypted chunk BEFORE trusting the ZIP.

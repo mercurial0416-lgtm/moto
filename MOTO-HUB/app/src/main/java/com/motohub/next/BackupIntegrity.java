@@ -57,6 +57,7 @@ final class BackupIntegrity {
      for(byte part:digest.digest())hex.append(String.format(Locale.ROOT,"%02x",part&255));
      trackHashes.put(name.substring("rides/".length()),hex.toString());
     }
+    if(name.equals("MOTO-HUB-preferences.json")&&size<2)throw new IOException("설정 백업이 비어 있습니다.");
     if(name.equals("MOTO-HUB-data.json")&&size==0)throw new IOException("백업 기록이 비어 있습니다.");
     if(value!=null)small.put(name,value.toString("UTF-8"));
     zip.closeEntry(); // Checks the entry CRC before a success message is shown.
