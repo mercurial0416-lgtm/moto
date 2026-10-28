@@ -32,7 +32,7 @@ assert 'gpsIoThread.quitSafely()' in service and 'TrackCompletion.mark(track,cou
 assert 'final boolean saving=RideService.saving();' in ride and 's.finishPending||s.autoFinishPending' in service
 assert 'start.setEnabled(!saving);' in ride
 assert 'finishRide.setEnabled(!saving);' in ride
-assert 'if(!RideService.running){a.render();return;}' in ride
+assert 'if(!RideService.running){a.renderPreservingPosition();return;}' in ride
 assert 'Bitmap bitmap=null;' in gallery and 'finally{if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();}' in gallery
 assert 'if(ready!=null&&!ready.isRecycled())ready.recycle();' in gallery
 assert 'PhotoCacheYearPolicy.canShow(' in photo

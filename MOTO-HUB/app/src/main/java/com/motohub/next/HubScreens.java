@@ -406,9 +406,15 @@ final class HubScreens {
   a.label(p,"데이터를 보존하려면 먼저 ZIP 파일을 휴대폰 외부에 내보내세요. 기존 앱을 삭제하지 않으면 업데이트할 때 기록이 유지됩니다.",15,a.muted,false);
   a.action(p,"전체 ZIP 백업 만들기",true,a::exportBundle);
   a.action(p,"전체 ZIP 백업 복원",false,a::importBundle);
+  a.action(p,"다른 백업 방식 · 검사",false,this::backupMore);
+  a.show();
+ }
+ void backupMore(){
+  LinearLayout p=a.page("백업 추가 옵션");
+  a.label(p,"암호화 방식이나 원본 무결성 검사가 필요할 때만 사용하세요. 기존 GPS·주유·정비 기록은 변경하지 않습니다.",14,a.muted,false);
   a.action(p,"암호화 전체 백업 만들기",false,a::exportEncryptedBundle);
   a.action(p,"암호화 백업 복원",false,a::importEncryptedBundle);
-  a.action(p,"고급 백업 · 정밀 검사 · JSON",false,this::advancedBackup);
+  a.action(p,"정밀 검사 · JSON · 복구 도구",false,this::advancedBackup);
   a.show();
  }
  void advancedBackup(){
