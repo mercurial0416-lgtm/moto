@@ -14,14 +14,14 @@ hub=r("HubScreens.java")
 settings=hub[hub.index("void settings(){"):hub.index("void advancedSettings(){")]
 assert "recoverInterrupted(File files)" in trash
 assert 'RideTrash.recoverInterrupted(getFilesDir())' in activity
-assert 'RideTrash.entries(internal)' in archive
+assert 'archivedGps(internal)' in archive and 'BackupFormat.isTrashSidecar(member)' in archive
 assert 'isTrashTrack' in format and 'isTrashSidecar' in format
 assert 'String prefix="rides-trash/"+name+"/";' in archive
 assert 'public final String preferences' in restorer
 assert 'MOTO-HUB-preferences.json' in archive and 'MOTO-HUB-preferences.json' in format
 assert "UiSettingsArchive.restore(this,ready.preferences)" in activity
 assert "void importUiSettingsFromZip()" in activity
-assert 'UiSettingsArchive.check(preferences)' in archive
+assert 'UiSettingsArchive.check(preferences)' in restorer and 'UiSettingsArchive.capture(this)' in activity
 assert "BackupVolumeExporter.export(this,folder" in activity
 assert "MOTO-HUB-VOLUMES-v1" in r("BackupVolumeExporter.java")
 assert "readback.entryNames.equals(expected)" in r("BackupVolumeExporter.java")
