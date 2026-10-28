@@ -118,9 +118,11 @@ final class RideTrash {
   if(folders!=null)for(File folder:folders){
    if(!folder.getName().matches(BackupFormat.TRACK)||
        Files.isSymbolicLink(folder.toPath())||
-       !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
+       !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS))
+    throw new IOException("잘못된 GPS 복구함 경로입니다.");
    File track=new File(folder,folder.getName());
-   if(regular(track))tracks.add(track);
+   if(!regular(track))throw new IOException("복구함 GPS 원본이 누락되거나 안전하지 않습니다.");
+   tracks.add(track);
   }
   tracks.sort((a,b)->b.getName().compareTo(a.getName()));
   return tracks;

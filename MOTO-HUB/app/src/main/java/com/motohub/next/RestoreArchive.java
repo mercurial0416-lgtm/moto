@@ -80,8 +80,8 @@ public final class RestoreArchive {
    if(!isSplit())throw new IOException("전체 ZIP은 분할 추가 복원으로 가져올 수 없습니다.");
    List<String> assets=stagedAssets(staging);
    for(String path:assets){
-    if("GPS".equals(part)&&!path.startsWith("rides/"))throw new IOException("GPS 분할 파일에 다른 저장 자료가 있습니다.");
-    if("MEDIA".equals(part)&&path.startsWith("rides/"))throw new IOException("사진 분할 파일에 GPS 기록이 포함됐습니다.");
+    if("GPS".equals(part)&&!path.startsWith("rides/")&&!path.startsWith("rides-trash/"))throw new IOException("GPS 분할 파일에 다른 저장 자료가 있습니다.");
+    if("MEDIA".equals(part)&&(path.startsWith("rides/")||path.startsWith("rides-trash/")))throw new IOException("사진 분할 파일에 GPS 기록이 포함됐습니다.");
    }
    RestoreCapacity.ensure(RestoreCapacity.available(internal),RestoreCapacity.sum(staging,assets));
    List<File> created=new ArrayList<>();
@@ -128,8 +128,8 @@ public final class RestoreArchive {
        modelMeta=BackupFormat.isModelMetadata(name),
        photo=name.startsWith("photos/")&&name.substring(7).matches(PHOTO),
        receipt=name.startsWith("receipts/")&&name.substring(9).matches(RECEIPT),
-       track=name.startsWith("rides/")&&name.substring(6).matches(RIDE),
-       marker=name.startsWith("rides/")&&(name.substring(6).matches(RIDE+"\\.done")||name.substring(6).matches(RIDE+"\\.imported")||name.substring(6).matches(RIDE+"\\.recovered")||name.substring(6).matches(RIDE+"\\.mergedinto")||name.substring(6).matches(RIDE+"\\.unmerged")||name.substring(6).matches(RIDE+"\\.category")||name.substring(6).matches(RIDE+"\\.bike")||name.substring(6).matches(RIDE+"\\.favorite")),
+       track=BackupFormat.isTrack(name)||BackupFormat.isTrashTrack(name),
+       marker=BackupFormat.isSidecar(name),
        gpx=name.startsWith("gpx/")&&name.substring(4).matches("[0-9]{10,15}-[a-f0-9-]{36}\\.gpx"),
        readme=name.equals("README-KO.txt");
     if(!data&&!photo&&!receipt&&!track&&!marker&&!gpx&&!readme&&!modelPhoto&&!modelMeta)throw new IOException("지원하지 않는 ZIP 항목: "+name);
@@ -187,16 +187,16 @@ public final class RestoreArchive {
     if(!target.matches(RIDE)||!seen.contains("rides/"+target)||!seen.contains("rides/"+target+".done"))
      throw new IOException("통합 라이딩 대상이 누락되거나 손상됐어요.");
    }
-   for(String name:seen)if(name.startsWith("rides/")&&(name.endsWith(".done")||name.endsWith(".imported")||name.endsWith(".recovered")||name.endsWith(".mergedinto")||name.endsWith(".unmerged")||name.endsWith(".category")||name.endsWith(".bike")||name.endsWith(".favorite")) &&!seen.contains(name.substring(0,name.lastIndexOf('.'))))throw new IOException("원본 GPS가 없는 기록 표시입니다.");
-   for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".bike")){
+   for(String name:seen)if(BackupFormat.isSidecar(name)&&!seen.contains(name.substring(0,name.lastIndexOf('.'))))throw new IOException("원본 GPS가 없는 기록 표시입니다.");
+   for(String name:seen)if(BackupFormat.isSidecar(name)&&name.endsWith(".bike")){
     String id=new String(Files.readAllBytes(new File(stage,name).toPath()),StandardCharsets.US_ASCII);
     if(!id.matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))throw new IOException("잘못된 바이크 연결 정보입니다.");
    }
-   for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".category")){
+   for(String name:seen)if(BackupFormat.isSidecar(name)&&name.endsWith(".category")){
     File label=new File(stage,name);
     if(!java.util.Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(new String(Files.readAllBytes(label.toPath()),StandardCharsets.UTF_8)))throw new IOException("지원하지 않는 라이딩 분류입니다.");
    }
-   for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".unmerged")&&!seen.contains(name.substring(0,name.length()-9)+".done"))
+   for(String name:seen)if(BackupFormat.isSidecar(name)&&name.endsWith(".unmerged")&&!seen.contains(name.substring(0,name.length()-9)+".done"))
     throw new IOException("완료되지 않은 통합 기록입니다.");
    if("GPS".equals(part)&&(photos>0||receipts>0))throw new IOException("GPS 분할 백업의 사진 항목이 유효하지 않습니다.");
    if("MEDIA".equals(part)&&rides>0)throw new IOException("사진 분할 백업의 GPS 항목이 유효하지 않습니다.");
@@ -326,8 +326,9 @@ public final class RestoreArchive {
   private static void validate(String name)throws IOException {
    if(name==null||name.length()>180||name.contains("..")||name.startsWith("/")||name.contains("\\"))throw new IOException("위험한 복원 저널 경로");
    boolean photo=name.matches(BackupFormat.PHOTO),receipt=name.matches(BackupFormat.RECEIPT),
-     ride=name.startsWith("rides/")&&(name.substring(6).matches(BackupFormat.TRACK)||
-      BackupFormat.isSidecar(name)),model=name.startsWith("moto-year-photos/")&&
+     ride=(name.startsWith("rides/")&&(name.substring(6).matches(BackupFormat.TRACK)||
+      BackupFormat.isSidecar(name)))||BackupFormat.isTrashTrack(name)||
+      BackupFormat.isTrashSidecar(name),model=name.startsWith("moto-year-photos/")&&
       (name.substring(17).matches(BackupFormat.MODEL_PHOTO)||name.substring(17).matches(BackupFormat.MODEL_META));
    if(!photo&&!receipt&&!ride&&!model)throw new IOException("지원되지 않는 복원 저널 파일: "+name);
   }
@@ -393,7 +394,9 @@ public final class RestoreArchive {
   if(Files.isSymbolicLink(file.toPath())||
     !Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS))
    throw new IOException("복원 대상에 안전하지 않은 파일이 있습니다: "+path);
-  File expected=path.startsWith("rides/")?new File(root,"rides"):
+  File expected=path.startsWith("rides-trash/")?
+   new File(root,"rides-trash/"+path.split("/")[1]):
+   path.startsWith("rides/")?new File(root,"rides"):
    (path.startsWith("moto-year-photos/")?new File(root,"moto-year-photos"):root);
   if(!file.getParentFile().equals(expected))
    throw new IOException("복원 파일 경로가 앱 저장소 밖입니다.");
@@ -417,6 +420,26 @@ public final class RestoreArchive {
       n.matches(RIDE+"\\.recovered")||n.matches(RIDE+"\\.mergedinto")||
       n.matches(RIDE+"\\.unmerged")||n.matches(RIDE+"\\.category")||n.matches(RIDE+"\\.bike")||n.matches(RIDE+"\\.favorite"))
     addSafeAsset(out,root,f,"rides/"+n);
+  }
+  File vault=new File(root,"rides-trash");
+  if(Files.isSymbolicLink(vault.toPath())||
+     (Files.exists(vault.toPath(),LinkOption.NOFOLLOW_LINKS)&&
+      !Files.isDirectory(vault.toPath(),LinkOption.NOFOLLOW_LINKS)))
+   throw new IOException("복구함 경로가 안전하지 않습니다.");
+  File[] folders=vault.listFiles();
+  if(folders!=null)for(File folder:folders){
+   String id=folder.getName();
+   if(!id.matches(RIDE)||Files.isSymbolicLink(folder.toPath())||
+      !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS))
+    throw new IOException("복구함에 유효하지 않은 경로가 있습니다.");
+   File[] entries=folder.listFiles();
+   if(entries==null)throw new IOException("복구함을 읽을 수 없습니다.");
+   for(File file:entries){
+    String entry="rides-trash/"+id+"/"+file.getName();
+    if(!BackupFormat.isTrashTrack(entry)&&!BackupFormat.isTrashSidecar(entry))
+     throw new IOException("복구함에 알 수 없는 파일이 있습니다.");
+    addSafeAsset(out,root,file,entry);
+   }
   }
   return out;
  }

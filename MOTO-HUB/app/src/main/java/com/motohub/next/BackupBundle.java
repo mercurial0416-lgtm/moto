@@ -185,6 +185,30 @@ public final class BackupBundle {
     }
    }
   }
+  if(gps){
+   for(File file:RideTrash.entries(internal)){
+    String name=file.getName();
+    File folder=file.getParentFile();
+    String prefix="rides-trash/"+name+"/";
+    total=writeFile(zip,file,prefix+name,total);count++;
+    for(String suffix:RideTrash.SIDECARS){
+     File sidecar=new File(folder,name+suffix);
+     if(!sidecar.exists()&&!Files.isSymbolicLink(sidecar.toPath()))continue;
+     requireRegular(sidecar);
+     if(sidecar.length()!=0&&
+        !suffix.equals(".bike")&&!suffix.equals(".category")&&!suffix.equals(".mergedinto"))
+      throw new IOException("GPS 복구함 부가 파일 크기가 올바르지 않습니다: "+sidecar.getName());
+     if(suffix.equals(".bike")&&!new String(readSidecar(sidecar,64),StandardCharsets.US_ASCII)
+        .matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))
+      throw new IOException("GPS 복구함 바이크 연결 정보 오류");
+     if(suffix.equals(".category")&&!Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어")
+        .contains(new String(readSidecar(sidecar,64),StandardCharsets.UTF_8)))
+      throw new IOException("GPS 복구함 분류 정보 오류");
+     if(suffix.equals(".mergedinto"))throw new IOException("복구함에 통합 연결 원본이 있습니다. 점검이 필요합니다.");
+     total=writeFile(zip,sidecar,prefix+sidecar.getName(),total);
+    }
+   }
+  }
   zip.finish();zip.flush();return count;
  }
 }
