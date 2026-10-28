@@ -66,7 +66,7 @@ final class GarageHomeUi {
   if(RideService.autoArmed&&!RideService.running){TextView arm=a.text("OBD2 자동 감지 대기 · 출발하면 기록 시작",13,orange,true);arm.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));arm.setBackground(a.shape(surface,stroke,13));a.content.addView(arm);a.gap(a.content,10);}
   if(RideService.running){TextView live=a.text("GPS 기록 중 · "+RideService.status,13,orange,true);live.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));live.setBackground(a.shape(surface,stroke,13));a.content.addView(live);a.gap(a.content,10);}
   interruptedRideShortcut();a.gap(a.content,19);
-  recent(b);
+  // Recent activity is optional rather than always visible on the first screen.
   // Keep daily home focused on navigation and maintenance; secondary cards opt-in.
   boolean extra=a.getSharedPreferences("garage_home",0).getBoolean("extra_cards",false);
   a.gap(a.content,12);
@@ -75,7 +75,7 @@ final class GarageHomeUi {
    a.renderPreservingPosition();
   });
   more.setMinHeight(a.dp(44));a.content.addView(more);
-  if(extra){a.gap(a.content,16);insights(b);
+  if(extra){a.gap(a.content,16);recent(b);a.gap(a.content,16);insights(b);
    if(!a.items("listings").isEmpty()){a.gap(a.content,18);listings();}
   }
  }

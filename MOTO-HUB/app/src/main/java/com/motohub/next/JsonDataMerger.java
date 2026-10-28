@@ -14,16 +14,17 @@ final class JsonDataMerger {
  private JsonDataMerger(){}
  static final class Result {
   final JSONObject data;
-  final int added, skipped;
-  Result(JSONObject data,int added,int skipped){
-   this.data=data;this.added=added;this.skipped=skipped;
+  final int added, skipped, blocked;
+  Result(JSONObject data,int added,int skipped,int blocked){
+   this.data=data;this.added=added;this.skipped=skipped;this.blocked=blocked;
   }
  }
  static Result merge(JSONObject current,JSONObject imported)throws JSONException {
   if(current==null||imported==null)throw new JSONException("병합할 기록이 없습니다.");
   JSONObject target=Store.parse(current.toString());
   JSONObject source=Store.parse(imported.toString());
-  int added=0,skipped=0;
+  int added=0,skipped=0,blocked=0;
+  Set<String> ambiguousBikeIds=new HashSet<>();
   // vehicles comes first: child service/expense records must retain vehicle IDs.
   // Two backups may reuse a vehicle UUID for DIFFERENT motorcycles.
   // Treat that as a conflict rather than silently connecting imported repairs
@@ -38,6 +39,11 @@ final class JsonDataMerger {
    JSONObject incoming=importedBikes.getJSONObject(i);
    JSONObject existing=byId.get(incoming.getString("id"));
    if(existing==null)continue;
+   // Identity is not proven by a matching local ID + name/year.
+   // Both backups might have been generated from cloned profiles.
+   // Import service/expense records for shared IDs only by deliberate manual restore,
+   // never into a possibly different motorcycle.
+   ambiguousBikeIds.add(incoming.getString("id"));
    String left=existing.optString("name").trim(),right=incoming.optString("name").trim();
    int oldYear=existing.optInt("year"),newYear=incoming.optInt("year");
    if(!left.equalsIgnoreCase(right)||(oldYear>0&&newYear>0&&oldYear!=newYear))
@@ -65,6 +71,10 @@ final class JsonDataMerger {
     if(ids.contains(id)||(!normalized.isEmpty()&&listingUrls.contains(normalized))){
      skipped++;continue;
     }
+    if(("services".equals(collection)||"expenses".equals(collection))&&
+       ambiguousBikeIds.contains(entry.optString("vehicleId"))){
+     blocked++;continue;
+    }
     JSONObject copy=new JSONObject(entry.toString());
     dest.put(copy);
     ids.add(id);
@@ -73,6 +83,6 @@ final class JsonDataMerger {
    }
   }
   // Revalidate referential integrity, per-collection count and 8MB schema limit.
-  return new Result(Store.parse(target.toString()),added,skipped);
+  return new Result(Store.parse(target.toString()),added,skipped,blocked);
  }
 }

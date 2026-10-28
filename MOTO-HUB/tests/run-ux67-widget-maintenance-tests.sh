@@ -24,15 +24,18 @@ main=(root/"MainActivity.java").read_text()
 settings=(root/"HubScreens.java").read_text()
 assert 'String collection:Store.COLLECTIONS' in merge
 assert 'ids.contains(id)' in merge and 'listingUrls.contains(normalized)' in merge
-assert 'return new Result(Store.parse(target.toString()),added,skipped)' in merge
+assert 'return new Result(Store.parse(target.toString()),added,skipped,blocked)' in merge
+assert 'ambiguousBikeIds.contains(entry.optString("vehicleId"))' in merge
 assert 'JsonDataMerger.merge(Store.parse(previewSnapshot),source)' in main and 'JsonDataMerger.merge(Store.parse(currentSnapshot),source)' in main and 'write(ready.data)' in main
 assert 'RestoreRideGate.begin(RideService.running,RideService.autoArmed)' in main
 assert 'if(request==61){prepareJsonMerge(uri);return;}' in main
 ride=(root/"RideUi.java").read_text()
 home=(root/"GarageHomeUi.java").read_text()
 quick=(root/"QuickEntryUi.java").read_text()
-assert 'void finishWithSummary()' in ride and 'RideEndSummary.text(' in ride
-assert 'new File(track.getPath()+".done").isFile()' in ride
+assert 'void finishWithSummary()' in ride and 'a.showPendingRideSummary()' in ride
+inbox=(root/"RideCompletionInbox.java").read_text()
+assert 'RideInsights.analyze(track)' in inbox and 'RideMileageIntegrity.validCompleted(track)' in inbox
+assert 'RideCompletionInbox.record(getApplicationContext(),savedTrack)' in (root/"RideService.java").read_text()
 assert 'new RideUi(a).finishWithSummary()' in home
 assert 'extra_cards' in home and 'if(extra)' in home
 assert '이전 정비주기 불러오기' in quick and 'QuickRecordDraft.nextOdometer(' in quick

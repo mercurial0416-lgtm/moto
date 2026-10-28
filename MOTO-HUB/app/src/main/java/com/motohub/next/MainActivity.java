@@ -122,7 +122,20 @@ public class MainActivity extends Activity {
    finally{recoveryReminderChecking.set(false);}
   },"moto-interrupted-ride-check").start();
  }
+ /** Show the durable summary once when the rider comes back from navigation. */
+ void showPendingRideSummary(){
+  if(isFinishing()||isDestroyed()||!hasWindowFocus()||RideService.running||RideService.saving()||dialog!=null)return;
+  android.content.SharedPreferences preferences=getSharedPreferences("ride_completion_inbox",MODE_PRIVATE);
+  String heading=preferences.getString("title",""),text=preferences.getString("summary","");
+  if(heading==null||heading.isEmpty()||text==null||text.isEmpty())return;
+  new AlertDialog.Builder(this).setTitle(heading).setMessage(text)
+   .setNegativeButton("닫기",null)
+   .setPositiveButton("주행 기록 보기",(d,w)->{tab="라이딩";render();})
+   .setOnDismissListener(d->{if(text.equals(preferences.getString("summary","")))
+     preferences.edit().remove("title").remove("summary").commit();}).show();
+ }
  @Override protected void onResume(){super.onResume();
+  if(root!=null)root.postDelayed(this::showPendingRideSummary,350);
   // Device location/notification settings may have changed while the settings app was open.
   if(root!=null&&"라이딩".equals(tab)&&dialog==null&&rideStateSignature()!=lastRenderedRideState)renderPreservingPosition();
   if(!readOnly)DailyMaintenanceJob.schedule(this);
@@ -1535,7 +1548,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       error("검사 중 기록이 변경됐어요. 최신 기록을 기준으로 다시 파일을 선택해 주세요.");return;
      }
      new AlertDialog.Builder(this).setTitle("JSON 병합 미리보기")
-      .setMessage("새 기록 "+preview.added+"개 추가 · 중복 "+preview.skipped+"개 건너뜀.\n\n현재 기록과 설정, GPS, 사진은 보존합니다. GPS·사진 파일은 JSON 병합 대상이 아닙니다.\n\n충돌하는 바이크 ID는 자동으로 합치지 않습니다.")
+      .setMessage("새 기록 "+preview.added+"개 추가 · 중복 "+preview.skipped+"개 · 차량 연결 보류 "+preview.blocked+"개.\n\n현재 기록과 설정, GPS, 사진은 보존합니다. GPS·사진 파일은 JSON 병합 대상이 아닙니다.\n\n충돌하는 바이크 ID는 자동으로 합치지 않습니다.")
       .setNegativeButton("취소",null)
       .setPositiveButton("새 기록만 추가",(d,w)->{
        if(readOnly||!RestoreRideGate.begin(RideService.running,RideService.autoArmed)){
@@ -1562,7 +1575,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           atomic(rollback,currentSnapshot.getBytes(StandardCharsets.UTF_8));
           write(ready.data);
           render();
-          toast("새 기록 "+ready.added+"개 추가 · 중복 "+ready.skipped+"개 제외");
+          toast("새 기록 "+ready.added+"개 추가 · 중복 "+ready.skipped+"개 · 차량 연결 보류 "+ready.blocked+"개");
          }catch(Exception e){error("JSON 병합 저장 실패: "+e.getMessage());}
          finally{RestoreRideGate.end();}
         });
