@@ -88,6 +88,7 @@ final class DeveloperObdScreen {
     }).setNegativeButton("취소",null).show();
   });
   activity.action(p,"카카오내비 열기 (라이딩 기록은 별도)",false,()->KakaoNaviLaunch.open(activity));
+  activity.action(p,"실차 검증 체크 · 관측값 기록",false,()->ObdOnBikeVerification.show(activity));
   activity.action(p,"듀크 실차 확인 체크리스트",false,()->new AlertDialog.Builder(activity)
    .setTitle("실차 확인 · 개발자 모드")
    .setMessage("정차 상태에서만 OBD2 어댑터를 연결하세요.\n\n① OBD2 지원 PID와 연결 상태를 확인\n② 계기판 RPM·속도·수온과 표시값 비교\n③ 시동 OFF/ON 후 재연결·기록 보존 확인\n④ 선택한 내비 앱 실행, 화면 잠금·전화 수신 중 GPS 기록 확인\n⑤ 주행 종료 후 GPS·GPX 경로 확인\n⑥ 실제 계기판 ODO와 일치하지 않으면 반영 금지\n\n기기와 ECU 설정은 변경하지 않고, 주행 중 화면을 조작하지 마세요. 실차·장시간 배터리 시험이 완료되었다는 의미는 아닙니다.")

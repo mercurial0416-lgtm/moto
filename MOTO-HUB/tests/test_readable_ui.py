@@ -37,20 +37,20 @@ test('TextView summary=a.text(detail,13,a.muted,false)' in records,
      "record descriptions must not be tiny")
 test('summary.setMaxLines(3)' in records,
      "record descriptions should be bounded but legible")
-test('MotoDesign.figure(a,a.won(x.optDouble("price")),23,a.fg)' in records,
-     "listing prices should have stable-width digits")
-test('year=x.optInt("year")>0' in records,
-     "unknown year must not render as 0 model year")
+test('void listings(){' not in records,
+     "retired listing UI stays out of active screens")
+test('void listings(){' not in records,
+     "retired listing UI stays out of active screens")
 test('value.setMaxLines(2);value.setMinHeight(a.dp(30))' in garage,
      "odometer/maintenance values should have room for large text")
 test('new LinearLayout.LayoutParams(-1,-2);vp.topMargin=a.dp(6)' in garage,
      "metrics cannot use a hardcoded one-line height")
-test('model.setMaxLines(2);model.setEllipsize(' in records,
-     "long listing names should not collide with status")
+test('void listings(){' not in records,
+     "retired listing UI stays out of active screens")
 test('b.setMinHeight(a.dp(44))' in records and 'b.setTextColor(selected?a.accent:a.fg)' in records,
      "filter controls should remain tappable with readable selected state")
-test('case 1: // Listings: price tag' in nav,
-     "listing tab must use a coherent icon")
+test('void listings(){' not in records,
+     "retired listing UI stays out of active screens")
 test('default: // Settings: eight-tooth gear' in nav,
      "settings tab must use a recognizable icon")
 test('c.drawCircle(12,12,3.0f,p)' in nav,

@@ -72,13 +72,19 @@ public final class BackupBundle {
   BoundedCounter counter=new BoundedCounter();TrackFile.gpx(track,counter);return counter.count;
  }
  public static int export(String json,File internal,OutputStream target)throws Exception{
+  return export(json,internal,target,"FULL");
+ }
+ /** Archive-only GPS or media partitions. Each has a full JSON snapshot for manual recovery. */
+ static int export(String json,File internal,OutputStream target,String part)throws Exception{
+  if(!Arrays.asList("FULL","GPS","MEDIA").contains(part))throw new IOException("알 수 없는 백업 분할");
+  boolean gps=!"MEDIA".equals(part),media=!"GPS".equals(part);
   if(internal==null||!regularDirectory(internal))throw new IOException("앱 백업 폴더를 확인하지 못했어요.");
   requireDirectoryIfPresent(new File(internal,"rides"));
   byte[] data=json.getBytes(StandardCharsets.UTF_8);if(data.length>8_000_000)throw new IOException("JSON 데이터가 8MB를 넘었어요.");
   long total=data.length;int count=0;
   ZipOutputStream zip=new ZipOutputStream(new BufferedOutputStream(target),StandardCharsets.UTF_8);
   zip.putNextEntry(new ZipEntry("MOTO-HUB-data.json"));zip.write(data);zip.closeEntry();count++;
-  String readme="MOTO HUB 전체 백업 - 개인 위치정보 포함 가능\n"+
+  String readme=("FULL".equals(part)?"MOTO HUB 전체 백업 - 개인 위치정보 포함 가능\n":"MOTO-HUB-PART:"+part+"\n분할 복구 파일: 전체 복원으로 다른 자료를 덮어쓰지 마세요. 분할 ZIP 추가 복원 메뉴를 사용하세요.\n")+
    "MOTO-HUB-data.json은 앱 설정 > JSON 백업 가져오기로 복원합니다.\n"+
    "rides 폴더는 원본 기록, gpx 폴더는 가져오기로 복원 가능한 GPX 경로입니다.\n"+
    "photos에는 바이크 사진, receipts에는 정비·주유 영수증 사진이 있습니다.\n"+
@@ -87,13 +93,13 @@ public final class BackupBundle {
    "친구 로그인 토큰/인증키는 포함되지 않습니다. 위치가 포함될 수 있으니 공유하지 마세요.\n";
   zip.putNextEntry(new ZipEntry("README-KO.txt"));zip.write(readme.getBytes(StandardCharsets.UTF_8));zip.closeEntry();
   File photos=internal;File[] files=photos.listFiles((dir,name)->name.matches("garage-photo-[a-fA-F0-9-]{36}\\.jpg"));
-  if(files!=null){
+  if(media&&files!=null){
    if(files.length>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 백업 한도(1,000장)를 초과했습니다.");
    Arrays.sort(files,Comparator.comparing(File::getName));
    for(File f:files){total=writeFile(zip,f,"photos/"+f.getName(),total);count++;}
   }
   File[] receipts=internal.listFiles((dir,name)->name.matches(BackupFormat.RECEIPT));
-  if(receipts!=null){
+  if(media&&receipts!=null){
    if(receipts.length>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증·작업 사진이 4,000장을 초과했습니다.");
    Arrays.sort(receipts,Comparator.comparing(File::getName));
    for(File file:receipts){total=writeFile(zip,file,"receipts/"+file.getName(),total);count++;}
@@ -102,7 +108,7 @@ public final class BackupBundle {
   File modelFolder=new File(internal,"moto-year-photos");
   requireDirectoryIfPresent(modelFolder);
   File[] selectedModels=modelFolder.listFiles((dir,name)->name.matches(BackupFormat.MODEL_PHOTO));
-  if(selectedModels!=null){
+  if(media&&selectedModels!=null){
    Arrays.sort(selectedModels,Comparator.comparing(File::getName));
    int selectedCount=0;
    for(File image:selectedModels){
@@ -117,7 +123,7 @@ public final class BackupBundle {
    }
   }
   File rides=new File(internal,"rides");File[] tracks=rides.listFiles((dir,name)->name.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));
-  if(tracks!=null){if(tracks.length>BackupFormat.MAX_TRACKS)throw new IOException("주행 기록 10,000건 백업 한도를 초과했습니다.");
+  if(gps&&tracks!=null){if(tracks.length>BackupFormat.MAX_TRACKS)throw new IOException("주행 기록 10,000건 백업 한도를 초과했습니다.");
    Arrays.sort(tracks,Comparator.comparing(File::getName));
    for(File file:tracks){
     // A completely empty crashed session has no location bytes worth archiving.

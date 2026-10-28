@@ -37,6 +37,15 @@ final class RideCompletionInbox {
   for(JSONObject row:entries(c))if(!row.optBoolean("seen"))return row;
   return null;
  }
+ static synchronized void remove(Context c,String id){
+  if(id==null||id.isEmpty())return;
+  JSONArray old=read(c),next=new JSONArray();
+  for(int i=0;i<old.length();i++){
+   JSONObject row=old.optJSONObject(i);
+   if(row!=null&&!id.equals(row.optString("id")))next.put(row);
+  }
+  prefs(c).edit().putString(KEY,next.toString()).commit();
+ }
  static synchronized boolean seen(Context c,String id){
   if(id==null||id.isEmpty())return false;
   JSONArray arr=read(c);boolean found=false;

@@ -2,6 +2,7 @@ package com.motohub.next;
 
 import android.content.Context;
 import org.junit.Test;
+import org.json.JSONObject;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
@@ -13,6 +14,14 @@ import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class) @Config(sdk=35)
 public final class UpdateDataFootprintTest {
+ @Test public void sameSizeGarageSettingsChangesAreCaught()throws Exception{
+  Context context=RuntimeEnvironment.getApplication();
+  JSONObject before=Store.empty(),after=Store.empty();
+  before.getJSONObject("settings").put("theme","light");
+  after.getJSONObject("settings").put("theme","dark");
+  assertNotEquals(UpdateDataFootprint.capture(context,before),
+    UpdateDataFootprint.capture(context,after));
+ }
  @Test public void sameByteCountDifferentGpsContentChangesDigest()throws Exception{
   Context context=RuntimeEnvironment.getApplication();
   File rides=TrackFile.directory(context.getFilesDir());

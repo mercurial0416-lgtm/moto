@@ -18,7 +18,7 @@ screen=(root/"HubScreens.java").read_text()
 garage=(root/"GarageHomeUi.java").read_text()
 assert "LatestServiceByType.latest(allServices,id)" in screen, "maintenance overview must be chronological"
 assert "LatestServiceByType.latest(a.items(\"services\"),b.optString(\"id\"))" in garage, "home same policy"
-assert "final String query=a.query.toLowerCase(Locale.ROOT)" in screen
+assert "void listings(){" not in screen, "retired marketplace renderer must remain absent"
 test=Path("app/src/test/java/com/motohub/next/UpdateTest.java").read_text()
 assert "certificateSha256" in test and "wrongSignerBlocked" in test
 print("PASS UX6 photo dedup, home/dashboard consistency, update validation")
