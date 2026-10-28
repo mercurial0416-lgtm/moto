@@ -26,7 +26,7 @@ public final class JsonDataMergerTest {
   current.getJSONArray("services").put(service("old-service","a"));
   current.getJSONArray("listings").put(listing("old-list","https://example.org/duke"));
   JSONObject incoming=Store.empty().put("settings",new JSONObject().put("theme","light"));
-  incoming.getJSONArray("vehicles").put(bike("a","덮어쓰면 안 됨")).put(bike("b","추가 차량"));
+  incoming.getJSONArray("vehicles").put(bike("a","기존 바이크").put("odo",999)).put(bike("b","추가 차량"));
   incoming.getJSONArray("services").put(service("old-service","a")).put(service("new-service","b"));
   incoming.getJSONArray("listings").put(listing("another-id","https://example.org/duke#details"));
   JsonDataMerger.Result result=JsonDataMerger.merge(current,incoming);

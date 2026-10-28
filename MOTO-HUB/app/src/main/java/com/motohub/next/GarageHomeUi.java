@@ -298,8 +298,7 @@ final class GarageHomeUi {
      .setMessage("기록을 종료하면 현재 GPS 위치 수집을 중단합니다.")
      .setNegativeButton("취소",null)
      .setPositiveButton("종료",(d,w)->{
-      a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));
-      a.toast("정상 종료를 요청했어요.");
+      new RideUi(a).finishWithSummary();
       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},750);
      }).show();
    }else{a.navigate("라이딩");new RideUi(a).requestStart();}
