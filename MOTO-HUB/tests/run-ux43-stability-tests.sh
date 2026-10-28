@@ -34,7 +34,7 @@ checks={
  "spinner fits text":'spinner.setMinimumHeight(a.dp(56))' in quick,
  "small-screen home":'screenWidthDp<360' in garage,
  "small-screen maintenance":'screenWidthDp<360' in service,
- "search field grows":'search.setMinHeight(a.dp(53))' in listing,
+ "retired listings renderer":'void listings(){' not in listing,
  "ride notify safe":'void notifySafely(String message)' in ride,
  "ride available check":'boolean notificationsAvailable()' in ride,
  "no raw telemetry notify":'.notify(404,notification(status))' not in ride,
