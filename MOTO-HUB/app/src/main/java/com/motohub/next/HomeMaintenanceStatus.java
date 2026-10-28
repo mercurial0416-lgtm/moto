@@ -12,10 +12,15 @@ final class HomeMaintenanceStatus {
   Schedule(String dueDate, double dueKm) { this.dueDate=dueDate; this.dueKm=dueKm; }
  }
  static MaintenancePlanner.Status safeStatus(String dueDate,double dueKm,String today,double odo) {
-  try { return MaintenancePlanner.status(dueDate,dueKm,today,odo,30,500); }
+  // Imported records may contain invalid odometer/nextKm values. A bad mileage
+  // must never hide a valid date reminder or crash the home screen.
+  boolean validOdo=Double.isFinite(odo)&&odo>=0;
+  double safeKm=validOdo&&Double.isFinite(dueKm)&&dueKm>=0?dueKm:0;
+  double safeOdo=validOdo?odo:0;
+  String normalizedDate=dueDate==null?"":dueDate.trim();
+  try {return MaintenancePlanner.status(normalizedDate,safeKm,today,safeOdo,30,500);}
   catch (DateTimeException invalidDate) {
-   // A malformed imported date must not crash the home screen or hide a valid km reminder.
-   return MaintenancePlanner.status("",dueKm,today,odo,30,500);
+   return MaintenancePlanner.status("",safeKm,today,safeOdo,30,500);
   }
  }
  static MaintenancePlanner.Status summary(List<Schedule> schedules,String today,double odo) {
