@@ -431,16 +431,6 @@ final class GarageHomeUi {
   LinearLayout.LayoutParams tl=new LinearLayout.LayoutParams(-1,-2);tl.topMargin=a.dp(8);frame.addView(trend,tl);
   a.content.addView(frame);
  }
- void listings(){sectionTitle("저장한 매물","모두 보기  ›",()->a.navigate("매물"));List<JSONObject> cars=a.items("listings");
-  if(cars.isEmpty()){TextView blank=a.text("저장한 매물이 없어. 마음에 드는 바이크를 추가해 봐.",13,soft,false);blank.setPadding(a.dp(13),a.dp(16),a.dp(13),a.dp(16));blank.setBackground(a.shape(surface,stroke,14));blank.setOnClickListener(v->a.navigate("매물"));a.content.addView(blank);return;}
-  LinearLayout row=new LinearLayout(a);int index=0;for(JSONObject x:cars){if(index++>=2)break;
-   LinearLayout tile=a.col();tile.setPadding(a.dp(13),a.dp(13),a.dp(11),a.dp(13));tile.setBackground(a.shape(surface,stroke,13));
-   TextView name=a.text(x.optString("model","모델 미입력"),14,light,true);name.setMaxLines(1);name.setEllipsize(android.text.TextUtils.TruncateAt.END);tile.addView(name);
-   TextView info=a.text(x.optInt("year")+"년 · "+a.num(x.optDouble("mileage"))+" km",11,soft,false);LinearLayout.LayoutParams ip=new LinearLayout.LayoutParams(-1,-2);ip.topMargin=a.dp(6);tile.addView(info,ip);
-   TextView price=a.text(a.won(x.optDouble("price")),15,orange,true);LinearLayout.LayoutParams pp=new LinearLayout.LayoutParams(-1,-2);pp.topMargin=a.dp(9);tile.addView(price,pp);
-   tile.setOnClickListener(v->a.detail(x));tile.setFocusable(true);tile.setClickable(true);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);if(index>1)rp.leftMargin=a.dp(8);row.addView(tile,rp);
-  }a.content.addView(row);
- }
  void friends(){sectionTitle("내 기록 · 기기 저장","열기  ›",()->a.navigate("더보기"));LinearLayout row=new LinearLayout(a);row.setPadding(a.dp(14),a.dp(16),a.dp(12),a.dp(16));row.setBackground(a.shape(surface,stroke,14));row.setGravity(Gravity.CENTER_VERTICAL);
   TextView people=a.text("♧",25,orange,true);row.addView(people,new LinearLayout.LayoutParams(a.dp(34),-2));
   LinearLayout details=a.col();details.addView(a.text("계정 없이 사용하는 MOTO HUB",14,light,true));TextView sub=a.text("내 기록은 이 휴대폰에 저장 · ZIP 백업 가능",11,soft,false);LinearLayout.LayoutParams sl=new LinearLayout.LayoutParams(-1,-2);sl.topMargin=a.dp(5);details.addView(sub,sl);row.addView(details,new LinearLayout.LayoutParams(0,-2,1));row.addView(a.text("›",22,orange,true));row.setClickable(true);row.setOnClickListener(v->a.navigate("더보기"));a.content.addView(row);
