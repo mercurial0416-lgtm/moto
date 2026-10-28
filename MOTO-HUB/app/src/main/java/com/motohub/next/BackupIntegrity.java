@@ -13,9 +13,11 @@ final class BackupIntegrity {
  static final class Result {
   final int tracks,photos;
   final Map<String,String> trackSha256;
-  Result(int tracks,int photos,Map<String,String> hashes){
+  final Set<String> entryNames;
+  Result(int tracks,int photos,Map<String,String> hashes,Set<String> entries){
    this.tracks=tracks;this.photos=photos;
    this.trackSha256=Collections.unmodifiableMap(new HashMap<>(hashes));
+   this.entryNames=Collections.unmodifiableSet(new HashSet<>(entries));
   }
  }
  static Result verify(InputStream source)throws IOException {
@@ -92,6 +94,6 @@ final class BackupIntegrity {
       !Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(small.get(name)))
     throw new IOException("라이딩 분류가 손상됐습니다.");
   }
-  return new Result(tracks,photos,trackHashes);
+  return new Result(tracks,photos,trackHashes,names);
  }
 }

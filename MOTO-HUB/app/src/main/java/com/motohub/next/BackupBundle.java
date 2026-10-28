@@ -79,6 +79,11 @@ public final class BackupBundle {
   return export(json,internal,target,part,null);
  }
  static int export(String json,File internal,OutputStream target,String part,String preferences)throws Exception{
+  return export(json,internal,target,part,preferences,null);
+ }
+ /** Restrict one batch to an explicit, checked set of source asset paths. */
+ static int export(String json,File internal,OutputStream target,String part,String preferences,
+                   Set<String> included)throws Exception{
   if(!Arrays.asList("FULL","GPS","MEDIA").contains(part))throw new IOException("알 수 없는 백업 분할");
   boolean gps=!"MEDIA".equals(part),media=!"GPS".equals(part);
   if(internal==null||!regularDirectory(internal))throw new IOException("앱 백업 폴더를 확인하지 못했어요.");
@@ -105,13 +110,19 @@ public final class BackupBundle {
   if(media&&files!=null){
    if(files.length>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 백업 한도(1,000장)를 초과했습니다.");
    Arrays.sort(files,Comparator.comparing(File::getName));
-   for(File f:files){total=writeFile(zip,f,"photos/"+f.getName(),total);count++;}
+   for(File f:files){
+    if(included!=null&&!included.contains("photos/"+f.getName()))continue;
+    total=writeFile(zip,f,"photos/"+f.getName(),total);count++;
+   }
   }
   File[] receipts=internal.listFiles((dir,name)->name.matches(BackupFormat.RECEIPT));
   if(media&&receipts!=null){
    if(receipts.length>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증·작업 사진이 4,000장을 초과했습니다.");
    Arrays.sort(receipts,Comparator.comparing(File::getName));
-   for(File file:receipts){total=writeFile(zip,file,"receipts/"+file.getName(),total);count++;}
+   for(File file:receipts){
+    if(included!=null&&!included.contains("receipts/"+file.getName()))continue;
+    total=writeFile(zip,file,"receipts/"+file.getName(),total);count++;
+   }
   }
   // Save user-selected online gallery images, not auto-recoverable downloaded thumbnails.
   File modelFolder=new File(internal,"moto-year-photos");
@@ -121,6 +132,7 @@ public final class BackupBundle {
    Arrays.sort(selectedModels,Comparator.comparing(File::getName));
    int selectedCount=0;
    for(File image:selectedModels){
+    if(included!=null&&!included.contains("model-photos/"+image.getName()))continue;
     requireRegular(image);
     File metadata=new File(modelFolder,image.getName()+".json");
     if(!metadata.exists()&&!Files.isSymbolicLink(metadata.toPath()))continue; // no manual selection
@@ -135,6 +147,7 @@ public final class BackupBundle {
   if(gps&&tracks!=null){if(tracks.length>BackupFormat.MAX_TRACKS)throw new IOException("주행 기록 10,000건 백업 한도를 초과했습니다.");
    Arrays.sort(tracks,Comparator.comparing(File::getName));
    for(File file:tracks){
+    if(included!=null&&!included.contains("rides/"+file.getName()))continue;
     // A completely empty crashed session has no location bytes worth archiving.
     // Preserve non-empty interrupted tracks, including their unfinished final row.
     requireRegular(file);
@@ -154,7 +167,7 @@ public final class BackupBundle {
       // The original track is always included; damaged/interrupted tracks
       // cannot be represented as a trustworthy GPX route.
      }
-     if(estimatedGpx>0&&total<=MAX_TOTAL-estimatedGpx){
+     if(included==null&&estimatedGpx>0&&total<=MAX_TOTAL-estimatedGpx){
       zip.putNextEntry(new ZipEntry("gpx/"+file.getName().replace(".track",".gpx")));
       TrackFile.gpx(file,zip); // Any mid-write error aborts the full export.
       zip.closeEntry();total+=estimatedGpx;
@@ -197,6 +210,7 @@ public final class BackupBundle {
   if(gps){
    for(File file:RideTrash.entries(internal)){
     String name=file.getName();
+    if(included!=null&&!included.contains("rides-trash/"+name+"/"+name))continue;
     File folder=file.getParentFile();
     String prefix="rides-trash/"+name+"/";
     total=writeFile(zip,file,prefix+name,total);count++;
