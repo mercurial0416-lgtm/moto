@@ -10,7 +10,7 @@ final class RideStorageManager {
  private static final String[] SIDECARS={".done",".imported",".recovered",".unmerged",".category",".bike",".favorite",".mergedinto"};
  private RideStorageManager(){}
  static void show(MainActivity a){
-  if(RideService.running||RideService.autoArmed){a.toast("GPS 또는 자동 감지가 작동 중에는 파일을 정리하지 않아요.");return;}
+  if(RestoreRideGate.blocked(RideService.running,RideService.autoArmed)){a.toast("GPS 기록·복원·백업 중에는 파일을 정리하지 않아요.");return;}
   a.toast("GPS 파일 크기 확인 중…");
   new Thread(()->{
    try{
@@ -50,9 +50,14 @@ final class RideStorageManager {
        .setNegativeButton("취소",null)
        .setPositiveButton("복원",(dd,w)->new Thread(()->{
         try{
-         if(RideService.running||RideService.autoArmed||a.readOnly)
-          throw new IOException("GPS 기록 중에는 복원할 수 없습니다.");
-         File restored=RideTrash.restore(a.getFilesDir(),entries.get(index));
+         boolean allowed=RestoreRideGate.begin(RideService.running,RideService.autoArmed);
+         if(!allowed||a.readOnly){
+          if(allowed)RestoreRideGate.end();
+          throw new IOException("GPS 기록·백업·복원 중에는 복원할 수 없습니다.");
+         }
+         File restored;
+         try{restored=RideTrash.restore(a.getFilesDir(),entries.get(index));}
+         finally{RestoreRideGate.end();}
          a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){
           a.toast("GPS 원본 복원 완료");a.render();
          }});
@@ -84,7 +89,11 @@ final class RideStorageManager {
  }
  private static void removeInBackground(MainActivity a,File track){
   new Thread(()->{
+   boolean held=false;
    try{
+    if(!RestoreRideGate.begin(RideService.running,RideService.autoArmed))
+     throw new IOException("GPS 기록·백업·복원이 진행 중입니다.");
+    held=true;
     File rides=TrackFile.directory(a.getFilesDir());
     String filename=track.getName();
     if(!filename.matches(BackupFormat.TRACK)||!rides.getCanonicalFile().equals(track.getCanonicalFile().getParentFile()))
@@ -110,8 +119,8 @@ final class RideStorageManager {
     RideCompletionInbox.remove(a,track.getName());
     a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){a.toast("GPS 원본을 복구함으로 옮겼습니다.");a.render();}});
    }catch(Exception error){
-    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 삭제 취소: "+error.getMessage());});
-   }
+    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 보관 취소: "+error.getMessage());});
+   }finally{if(held)RestoreRideGate.end();}
   },"moto-single-gps-delete").start();
  }
 }

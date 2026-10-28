@@ -27,7 +27,6 @@ final class RideTrash {
   List<File> paths=new ArrayList<>();
   File track=new File(folder,name);
   if(!regular(track))throw new IOException("GPS 파일이 존재하지 않습니다.");
-  paths.add(track);
   for(String ext:SIDECARS){
    File file=new File(folder,name+ext);
    if(Files.exists(file.toPath(),LinkOption.NOFOLLOW_LINKS)){
@@ -35,6 +34,7 @@ final class RideTrash {
     paths.add(file);
    }
   }
+  paths.add(track); // Commit the track last. Sidecars never outlive a confirmed GPS move.
   return paths;
  }
  private static void relocate(List<File> files,File target)throws IOException{
