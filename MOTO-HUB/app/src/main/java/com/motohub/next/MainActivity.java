@@ -221,18 +221,11 @@ public class MainActivity extends Activity {
    tab="차고";render();if(readOnly){toast("저장 파일 보호 중이에요.");return;}edit(form,null);
   }
  }
+ /** Legacy text-share entry point: listing discovery was retired, never save new listings. */
  void receiveSharedListing(Intent intent){
-  if(intent==null||!Intent.ACTION_SEND.equals(intent.getAction())||!"text/plain".equals(intent.getType()))return;
-  String shared=intent.getStringExtra(Intent.EXTRA_TEXT);intent.removeExtra(Intent.EXTRA_TEXT); // avoid replay after configuration change
-  String url=QuickEntry.extractUrl(shared);
-  if(url.isEmpty()){toast("웹 링크를 찾지 못했어요.");return;}
-  if(readOnly){toast("저장 파일 보호 중에는 매물을 추가할 수 없어요.");return;}
-  tab="매물";render();edit("listings",null);
-  if(draftFields!=null){EditText u=draftFields.get("url");if(u!=null)u.setText(url);
-   String title=QuickEntry.sharedTitle(shared,url);EditText model=draftFields.get("model");
-   if(model!=null&&!title.isEmpty())model.setText(title);
-  }
-  toast("공유한 매물 링크를 가져왔어요.");
+  if(intent==null||!Intent.ACTION_SEND.equals(intent.getAction()))return;
+  intent.removeExtra(Intent.EXTRA_TEXT);
+  toast("매물 관리 기능을 숨겼습니다. 기존 기록은 전체 백업에 보존돼요.");
  }
  @Override public void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("pendingTrack",pendingTrack);out.putString("tab",tab);out.putString("selected",selected);out.putString("garagePhotoTarget",garagePhotoTarget);out.putString("receiptPhotoTarget",receiptPhotoTarget);out.putString("receiptPhotoKey",receiptPhotoKey);out.putInt("receiptPhotoSlot",receiptPhotoSlot);out.putString("cameraCaptureName",cameraCaptureName);out.putString("rideHistoryFilter",rideHistoryFilter);out.putString("rideHistorySort",rideHistorySort);out.putString("rideHistoryPeriod",rideHistoryPeriod);out.putString("rideHistoryBike",rideHistoryBike);out.putString("rideHistoryQuery",rideHistoryQuery);out.putBoolean("rideStartConsent",rideStartConsent.pending());out.putBoolean("launchNavigationAfterRide",launchNavigationAfterRide);}
  void attempt(Work w){try{w.run();}catch(Exception e){error(e instanceof NumberFormatException?"숫자를 확인해 주세요.":e instanceof java.time.format.DateTimeParseException?"날짜는 YYYY-MM-DD 형식으로 입력해 주세요.":e.getMessage()==null?"작업을 완료하지 못했습니다.":e.getMessage());}}
@@ -428,7 +421,7 @@ public class MainActivity extends Activity {
    }).show();
  }
  void hideKeyboard(){android.view.inputmethod.InputMethodManager imm=getSystemService(android.view.inputmethod.InputMethodManager.class);View focus=getCurrentFocus();if(focus!=null){imm.hideSoftInputFromWindow(focus.getWindowToken(),0);focus.clearFocus();}}
- void navigate(String destination){hideKeyboard();if(destination.equals("더보기")&&!tab.equals("더보기"))previousTab=tab;tab=destination;render();}
+ void navigate(String destination){if("매물".equals(destination))destination="홈";hideKeyboard();if(destination.equals("더보기")&&!tab.equals("더보기"))previousTab=tab;tab=destination;render();}
  void selectRideHistoryFilter(String value){
   String normalized=RideHistoryFilter.normalize(value);
   // Only a local display preference: never part of backup, GPS or cloud sharing.
@@ -508,7 +501,6 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);content=col();content.setPadding(dp(18),dp(8),dp(18),dp(22));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout dock=col();dock.setPadding(dp(18),dp(7),dp(18),0);
   // Home contains contextual quick actions; keep the bottom dock uncluttered.
-  if(tab.equals("매물"))pair(dock,"매물 추가",()->edit("listings",null),"선택 비교",()->new HubScreens(this).compare());
   if(tab.equals("차고")&&bike()!=null)pair(dock,"간편 주유",()->new QuickEntryUi(this).fuel(),"정비주기",()->new QuickEntryUi(this).maintenance());
   // Home quick actions are inside its content, not repeated above the navigation.
   root.addView(dock);
@@ -531,7 +523,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    LinearLayout.LayoutParams actionsLp=new LinearLayout.LayoutParams(-1,-2);actionsLp.topMargin=dp(10);draftCard.addView(draftActions,actionsLp);
    content.addView(draftCard);gap(content,10);
   }
-  switch(tab){case"홈":home();break;case"매물":listings();break;case"라이딩":ride();break;case"차고":garage();break;case"지도":more();break;default:more();}
+  switch(tab){case"홈":home();break;case"라이딩":ride();break;case"차고":garage();break;case"지도":more();break;default:more();}
   if("라이딩".equals(tab))lastRenderedRideState=rideStateSignature();
  }
  String dueText(JSONObject s){return(s.optDouble("nextKm")>0?num(s.optDouble("nextKm"))+" km":"")+(!s.optString("nextDate").isEmpty()?" · "+s.optString("nextDate"):"");}
@@ -1442,7 +1434,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       if(free<need)spaceNote+="\n공간 부족: 기존 파일 보호를 위해 실제 복원을 거부합니다.";
      }catch(IOException e){spaceNote="\n\n저장 공간 점검 불가: 복원 시 안전 검사를 다시 진행합니다.";}
      new AlertDialog.Builder(this).setTitle("전체 백업을 복원할까요?")
-      .setMessage(RestorePreview.text(verified,db,ready.rides,ready.photos)+spaceNote+"\n\n현재 기록과 사진·GPS를 교체합니다. 중복 병합하지 않습니다. 기존 기록이 필요하면 먼저 전체 ZIP을 내보내세요.\n\n계정 없이 기기별 독립 저장됩니다.")
+      .setMessage(RestorePreview.text(verified,db,ready.rides,ready.photos)+RestorePreflightDetail.text(verified,db,ready.rides,ready.photos,ready.receipts)+spaceNote+"\n\n현재 기록과 사진·GPS를 교체합니다. 중복 병합하지 않습니다. 기존 기록이 필요하면 먼저 전체 ZIP을 내보내세요.\n\n계정 없이 기기별 독립 저장됩니다.")
       .setNegativeButton("취소",(d,w)->ready.close())
       .setOnCancelListener(d->ready.close())
       .setPositiveButton("전체 복원",(d,w)->{
@@ -1610,7 +1602,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     num(bike.optDouble("odo"))+" km";
   }
   new AlertDialog.Builder(this).setTitle("원본 바이크 "+(index+1)+"/"+collisions.size()+" · "+name)
-   .setMessage("원본 JSON에서 보류된 정비·주유 기록을 연결할 실제 바이크를 확인해 주세요.")
+   .setMessage("원본 JSON에서 보류된 정비·주유 기록을 연결할 실제 바이크를 확인하세요.\n\n"+JsonConflictPreview.text(source,id))
    .setItems(names,(d,choice)->{
     if(choice>0)selections.put(id,destinations.get(choice-1).optString("id"));else selections.remove(id);
     selectJsonMergeBikes(snapshot,source,collisions,selections,index+1);
@@ -1826,6 +1818,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       BackupIntegrity.verify(check);
      }
     }finally{if(authenticated!=null)java.nio.file.Files.deleteIfExists(authenticated.toPath());}
+    // Set deletion eligibility ONLY after the user-selected ZIP can be read back and verified.
+    if(!getSharedPreferences("verified_full_export",MODE_PRIVATE).edit()
+      .putLong("completed_at",System.currentTimeMillis()).commit())
+      throw new IOException("백업 검증은 완료됐지만 안전 삭제 승인 기록을 보관하지 못했습니다.");
     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast((password==null?"전체 백업":"암호화 백업")+" 검증 완료 · "+count+"개 기록/사진");});
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 백업 실패: "+e.getMessage());});}
     finally{if(password!=null)Arrays.fill(password,'\0');if(reserved)RestoreRideGate.endExport();}

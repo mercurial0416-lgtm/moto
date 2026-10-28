@@ -51,7 +51,6 @@ final class MotoDesign {
   switch(tab){
    case "홈":return "내 차고";
    case "차고":return "정비와 주유";
-   case "매물":return "관심 매물";
    case "라이딩":return "라이딩";
    default:return "설정과 도구";
   }

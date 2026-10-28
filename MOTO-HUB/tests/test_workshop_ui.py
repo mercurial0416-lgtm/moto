@@ -48,13 +48,12 @@ for name, background, foreground in [
           name + " does not have 4.5:1 contrast")
 
 render = home[home.index(" void render(){"):home.index(" void interruptedRideShortcut(){")]
-for marker in ["addHero(b)", "stats(b)", "quickActions()", "rideAction()", "recent(b)", "insights(b)"]:
+for marker in ["addHero(b)", "stats(b)", "HomeShortcutOrder.parse(", "rideAction()", "quickNavigation()", 'quickAction("fuel")', 'quickAction("service")', "recent(b)", "insights(b)"]:
     check(marker in render, "missing home section " + marker)
-order = [render.index(marker) for marker in
-         ["addHero(b)", "stats(b)", "rideAction()", "quickNavigation()", "quickActions()", "recent(b)", "insights(b)"]]
-check(order == sorted(order), "home order regressed")
+check(render.index("addHero(b)") < render.index("stats(b)") < render.index("HomeShortcutOrder.parse("), "hero/stats must precede ordered shortcuts")
+check(render.index("HomeShortcutOrder.parse(") < render.index("recent(b)") < render.index("insights(b)"), "optional home sections must follow shortcuts")
 check("int photoHeight=displayWidth<a.dp(390)?190:211;" in home, "hero doesn't adapt")
-check(home.count("void quickActions(){") == 1, "duplicated shortcut area")
+check(home.count("void quickAction(String key){") == 1 and "changeHomeShortcutOrder()" in home, "ordered shortcut area missing")
 check('new QuickEntryUi(a).fuel()' in home, "quick fuel entry missing")
 check('new QuickEntryUi(a).maintenance()' in home, "maintenance shortcut missing")
 check('new RideUi(a).requestStart()' in home, "GPS consent request missing")

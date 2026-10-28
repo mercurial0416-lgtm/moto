@@ -279,6 +279,8 @@ final class HubScreens {
  }
  void settings(){title("설정","기록·내비·정비·백업만 간편하게 관리");a.section("데이터 및 복구");line("백업 · 복원","바이크·주유·정비·GPS·사진 전체 백업","열기",this::basicBackup);
   line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":"최신 버전 확인 및 설치","열기",()->new AppUpdater(a).show());
+  line("업데이트 데이터 검사",UpdateInstallSnapshot.lastProblem(a)?"이전 검사에서 확인 필요":"기록 상태·복구 지점 확인",
+   "보기",this::updateRecoveryReport);
   a.section("내비 · 홈 위젯");
   line("초소형 위젯 추가","2×1 · 출발 / 내비 · 가장 간단한 형태","홈에 추가",()->MotoWidgetPin.request(a,true));
   line("기본 위젯 추가","4×1 · 기본 내비 변경 + 기록 실행","홈에 추가",()->MotoWidgetPin.request(a,false));
@@ -401,11 +403,21 @@ final class HubScreens {
   if(Sharing.enabled)a.action(p,"위치 공유 즉시 중지",false,()->{Sharing.stop();a.toast("이 기기에서 위치 전송을 중단했어요.");});
   a.show();
  }
+ void updateRecoveryReport(){
+  LinearLayout page=a.page("업데이트 후 데이터 검사");
+  a.label(page,UpdateInstallSnapshot.lastReport(a),15,a.fg,false);
+  a.label(page,"검사 결과는 참고 정보입니다. 정상으로 표시돼도 전체 ZIP 백업을 따로 보관하세요. 자동 복원은 실행하지 않습니다.",13,a.muted,false);
+  a.action(page,"전체 ZIP 백업 만들기",true,a::exportBundle);
+  a.action(page,"보존된 로컬 복구 지점 확인",false,this::advancedBackup);
+  a.action(page,"전체 백업 복원 도구",false,a::importBundle);
+  a.show();
+ }
  void basicBackup(){
   LinearLayout p=a.page("백업 · 복원");
   a.label(p,"데이터를 보존하려면 먼저 ZIP 파일을 휴대폰 외부에 내보내세요. 기존 앱을 삭제하지 않으면 업데이트할 때 기록이 유지됩니다.",15,a.muted,false);
   a.action(p,"전체 ZIP 백업 만들기",true,a::exportBundle);
   a.action(p,"전체 ZIP 백업 복원",false,a::importBundle);
+  a.action(p,"GPS 저장공간 · 원본 관리",false,()->RideStorageManager.show(a));
   a.action(p,"다른 백업 방식 · 검사",false,this::backupMore);
   a.show();
  }
@@ -507,7 +519,11 @@ LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·�
   a.action(p,"보관된 보호장구 기록",false,this::legacyGearManager);
   a.action(p,"기변 계산기",false,a::tradeIn);
   a.action(p,"저장한 수동 코스",false,a::savedRoutes);
-  a.action(p,"저장한 매물 관리",false,()->{a.close();a.navigate("매물");});
+  a.action(p,"보관된 옛 매물 데이터",false,()->
+   new AlertDialog.Builder(a).setTitle("예전 매물 기록")
+    .setMessage("매물 화면은 제거했지만 저장된 "+a.items("listings").size()+
+      "건의 기록은 삭제하지 않았습니다. 전체 ZIP·JSON 백업에 그대로 포함됩니다.")
+    .setPositiveButton("확인",null).show());
   a.action(p,"고급 백업 도구",false,this::advancedBackup);
   a.action(p,"개인정보 없는 진단 보고서",false,this::localDiagnostics);
   a.action(p,"친구·그룹 서버 진단",false,this::serverPreflight);

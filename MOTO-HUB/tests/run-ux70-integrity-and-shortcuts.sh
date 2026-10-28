@@ -22,9 +22,9 @@ assert 'String baseline=UpdateDataFootprint.capture' not in footprint
 assert 'static Result merge(JSONObject current,JSONObject imported,Map<String,String> confirmed)' in merger
 assert 'JsonDataMerger.conflicts(' in activity
 assert 'selectJsonMergeBikes(' in activity and 'commitJsonMerge(source,new java.util.HashMap<>(selections))' in activity
-assert 'shortcut("ride")' in home and 'shortcut("nav")' in home
+assert 'HomeShortcutOrder.parse(' in home and 'quickAction("fuel")' in home and 'quickAction("service")' in home
 assert 'setMultiChoiceItems(labels,visible' in home
 assert 'ObdLinkQuality.score(' in obd and 'qualityScore<55' in obd
-assert 'motoReleaseCode=540' in ci and "versionCode='540'" in ci
+assert 'motoReleaseCode=541' in ci and "versionCode='541'" in ci
 print("PASS UX70 capped persistent recaps, full-file hash audit, explicit JSON bike mapping, OBD quality and home shortcuts")
 PY
