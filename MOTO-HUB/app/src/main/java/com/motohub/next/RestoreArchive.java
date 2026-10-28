@@ -15,8 +15,9 @@ public final class RestoreArchive {
  private static final String RIDE=BackupFormat.TRACK;
  public interface DataWriter {void write(String json)throws Exception;}
  public static final class Prepared implements AutoCloseable {
-  private final File staging; public final String json; public final int photos,receipts,rides;
-  private Prepared(File dir,String data,int p,int receipts,int r){staging=dir;json=data;photos=p;this.receipts=receipts;rides=r;}
+  private final File staging; public final String json; public final int photos,receipts,rides; public final String part;
+  private Prepared(File dir,String data,int p,int receipts,int r,String part){staging=dir;json=data;photos=p;this.receipts=receipts;rides=r;this.part=part;}
+  public boolean isSplit(){return !"FULL".equals(part);}
   /** Snapshot disk-space requirement before replacing any of the current assets. */
   public long requiredSpace(File internal)throws IOException {
    List<String> fresh=stagedAssets(staging);
@@ -29,6 +30,7 @@ public final class RestoreArchive {
   public void install(File internal,DataWriter writer)throws Exception {install(internal,null,writer);}
   /** Protected restore: retain the original JSON alongside the old assets for crash replay. */
   public void install(File internal,byte[] previousJson,DataWriter writer)throws Exception {
+   if(isSplit())throw new IOException("분할 ZIP은 전체 복원할 수 없습니다. 분할 ZIP 추가 복원 메뉴를 사용하세요.");
    // Existing assets are copied into a rollback directory while staged assets
    // are copied into place. Reserve space for BOTH copies before mutation.
    RestoreCapacity.ensure(RestoreCapacity.available(internal),requiredSpace(internal));
@@ -73,11 +75,42 @@ public final class RestoreArchive {
     throw failure;
    }finally{if(!preserveRollback)clean(backup);}
   }
+  /** Additive partition restore. Never overwrites current assets or JSON, even on partial failure. */
+  public int installPart(File internal)throws Exception{
+   if(!isSplit())throw new IOException("전체 ZIP은 분할 추가 복원으로 가져올 수 없습니다.");
+   List<String> assets=stagedAssets(staging);
+   for(String path:assets){
+    if("GPS".equals(part)&&!path.startsWith("rides/"))throw new IOException("GPS 분할 파일에 다른 저장 자료가 있습니다.");
+    if("MEDIA".equals(part)&&path.startsWith("rides/"))throw new IOException("사진 분할 파일에 GPS 기록이 포함됐습니다.");
+   }
+   RestoreCapacity.ensure(RestoreCapacity.available(internal),RestoreCapacity.sum(staging,assets));
+   List<File> created=new ArrayList<>();
+   try{
+    for(String name:assets){
+     File from=new File(staging,name),to=new File(internal,name);
+     if(Files.exists(to.toPath(),LinkOption.NOFOLLOW_LINKS)){
+      if(!Files.isRegularFile(to.toPath(),LinkOption.NOFOLLOW_LINKS)||!sameContent(from,to))
+       throw new IOException("기존 파일과 이름이 같지만 내용이 다릅니다. 원본을 덮어쓰지 않습니다: "+name);
+      continue;
+     }
+     if(!to.getParentFile().isDirectory()&&!to.getParentFile().mkdirs())
+      throw new IOException("복원 위치 준비 실패");
+     copy(from,to);
+     created.add(to);
+     if(!sameContent(from,to))throw new IOException("분할 ZIP 자료 검증 실패: "+name);
+    }
+    return created.size();
+   }catch(Exception failure){
+    for(int i=created.size()-1;i>=0;i--)try{Files.deleteIfExists(created.get(i).toPath());}
+    catch(IOException cleanup){failure.addSuppressed(cleanup);}
+    throw failure;
+   }
+  }
   @Override public void close(){clean(staging);}
  }
  public static Prepared prepare(InputStream source,File internal)throws Exception{
   File stage=new File(internal,"moto-stage-"+UUID.randomUUID());if(!stage.mkdirs())throw new IOException("임시 폴더를 생성하지 못했어요.");
-  String json=null;int photos=0,receipts=0,rides=0,entries=0;long total=0;
+  String json=null,part="FULL";int photos=0,receipts=0,rides=0,entries=0;long total=0;
   Set<String> incomplete=new HashSet<>();
   Set<String> seen=new HashSet<>();byte[] buffer=new byte[32768];
   try(ZipInputStream zip=new ZipInputStream(new BufferedInputStream(source),StandardCharsets.UTF_8)){
@@ -101,7 +134,7 @@ public final class RestoreArchive {
        readme=name.equals("README-KO.txt");
     if(!data&&!photo&&!receipt&&!track&&!marker&&!gpx&&!readme&&!modelPhoto&&!modelMeta)throw new IOException("지원하지 않는 ZIP 항목: "+name);
     long limit=BackupFormat.entryLimit(name);long size=0;
-    ByteArrayOutputStream jsonBytes=data?new ByteArrayOutputStream():null;
+    ByteArrayOutputStream jsonBytes=(data||readme)?new ByteArrayOutputStream():null;
     File destination=(photo||receipt||track||marker||modelPhoto||modelMeta)?
      new File(stage,(modelPhoto||modelMeta)?"moto-year-photos/"+name.substring(13):
        (photo?name.substring(7):(receipt?name.substring(9):name))):null;
@@ -110,6 +143,12 @@ public final class RestoreArchive {
      int n;while((n=zip.read(buffer))!=-1){size+=n;total+=n;if(size>limit||total>MAX_TOTAL)throw new IOException("백업 ZIP 용량 제한을 초과했어요.");out.write(buffer,0,n);}
     }
     if(data){json=new String(jsonBytes.toByteArray(),StandardCharsets.UTF_8);if(json.isEmpty())throw new IOException("JSON 기록이 비어 있어요.");}
+    if(readme){
+     String label=jsonBytes.toString("UTF-8");
+     if(label.startsWith("MOTO-HUB-PART:GPS\n"))part="GPS";
+     else if(label.startsWith("MOTO-HUB-PART:MEDIA\n"))part="MEDIA";
+     else if(label.startsWith("MOTO-HUB-PART:"))throw new IOException("지원하지 않는 분할 백업 형식입니다.");
+    }
     if(photo||receipt||modelPhoto){
      if(size<4||!jpeg(destination))throw new IOException("잘못된 JPG 사진입니다.");
      if((photo||modelPhoto)&&++photos>BackupFormat.MAX_PHOTOS*2)throw new IOException("바이크 사진이 너무 많습니다.");
@@ -159,7 +198,9 @@ public final class RestoreArchive {
    }
    for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".unmerged")&&!seen.contains(name.substring(0,name.length()-9)+".done"))
     throw new IOException("완료되지 않은 통합 기록입니다.");
-   return new Prepared(stage,json,photos,receipts,rides);
+   if("GPS".equals(part)&&(photos>0||receipts>0))throw new IOException("GPS 분할 백업의 사진 항목이 유효하지 않습니다.");
+   if("MEDIA".equals(part)&&rides>0)throw new IOException("사진 분할 백업의 GPS 항목이 유효하지 않습니다.");
+   return new Prepared(stage,json,photos,receipts,rides,part);
   }catch(Exception e){clean(stage);throw e;}
  }
 
