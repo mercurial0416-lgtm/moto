@@ -23,7 +23,7 @@ checks={
  "running or armed ride gets updated notification":'if(running||autoArmed)service.notifySafely(' in service,
  "home direct launch with separate settings":'void quickNavigation()' in home and 'NavigationApps.openPreferred(a)' in home and 'NavigationApps.choose(a)' in home,
  "ride accessible launch without auto sharing":'NavigationApps.openPreferred(a)' in ride and 'GPS 기록은 계속됩니다' in ride,
- "missing navigator offers alternative":'setNeutralButton("다른 내비 선택"' in nav,
+ "missing navigator offers installed alternative":'setNeutralButton("다른 내비 실행"' in nav and 'chooseInstalledAndLaunch(activity)' in nav,
  "no GPS/GPX/ECU data transferred":all(s not in nav for s in ("getLastKnownLocation","Sharing.offer","EXTRA_LATITUDE","GPS_COORDS","putExtra(")),
  "recent fuel price only explicit selection":'지난 리터당 가격' in fuel and 'unitPrice.setText(String.valueOf(lastUnitPrice))' in fuel,
  "only completed service searchable":'if(!service.optBoolean("scheduleOnly"))completed.add(service)' in garage,

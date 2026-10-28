@@ -26,7 +26,11 @@ jobs:
       - name: Pure Java regression tests
         working-directory: MOTO-HUB
         run: |
-          curl --fail --location --retry 3 -o "$RUNNER_TEMP/json.jar" https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar
+          JSON_PATH="org/json/json/20240303/json-20240303.jar"
+          if ! curl --fail --location --retry 3 --retry-all-errors -o "$RUNNER_TEMP/json.jar" "https://repo.maven.apache.org/maven2/$JSON_PATH"; then
+            curl --fail --location --retry 3 --retry-all-errors -o "$RUNNER_TEMP/json.jar" "https://repo1.maven.org/maven2/$JSON_PATH"
+          fi
+          test -s "$RUNNER_TEMP/json.jar"
           export JSON_JAR="$RUNNER_TEMP/json.jar"
           failures=0
           for test in tests/run-*.sh; do
