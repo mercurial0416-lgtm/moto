@@ -389,6 +389,8 @@ final class HubScreens {
   a.action(p,"전체 ZIP 백업 복원",false,a::importBundle);
   a.action(p,"분할 백업 · GPS만 ZIP",false,()->a.exportSplitBundle("GPS"));
   a.action(p,"분할 백업 · 사진·영수증만 ZIP",false,()->a.exportSplitBundle("MEDIA"));
+  a.action(p,"대용량 GPS · 자동 여러 ZIP",false,()->a.exportMultiVolume("GPS"));
+  a.action(p,"대용량 사진 · 자동 여러 ZIP",false,()->a.exportMultiVolume("MEDIA"));
   a.action(p,"분할 ZIP 추가 복원",false,a::importSplitBundle);
   a.action(p,"GPS 저장공간 · 복구함",false,()->RideStorageManager.show(a));
   a.action(p,"다른 기기로 화면 설정 복원",false,a::importUiSettingsFromZip);

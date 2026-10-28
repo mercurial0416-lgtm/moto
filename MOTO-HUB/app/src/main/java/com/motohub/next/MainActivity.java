@@ -22,6 +22,7 @@ public class MainActivity extends Activity {
  JSONObject db;AtomicFile disk;LinearLayout root,content,formFooter;Dialog dialog;LinearLayout formBody;
  String tab="홈",selected="",query="",filter="전체",sort="최신순",pendingExport="";
  String pendingTrack="";String pendingBundleJson="";char[] pendingSecurePassword;
+ String pendingVolumesPart="",pendingVolumesJson="";
  final RideStartConsent rideStartConsent=new RideStartConsent();
   boolean launchNavigationAfterRide=false;
  DeveloperObdScreen developerObd;
@@ -1503,6 +1504,39 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    startActivityForResult(intent,"GPS".equals(part)?65:66);
   });
  }
+ void exportMultiVolume(String part){
+  if(!"GPS".equals(part)&&!"MEDIA".equals(part))return;
+  if(!BackupExportGate.canExport(RideService.running,RideService.autoArmed,RestoreRideGate.isRestoring())){
+   error(BackupExportGate.MESSAGE);return;
+  }
+  attempt(()->{
+   pendingVolumesPart=part;
+   pendingVolumesJson=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);
+   Intent folder=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+   folder.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+   startActivityForResult(folder,71);
+  });
+ }
+ void finishMultiVolume(Uri folder){
+  final String part=pendingVolumesPart,json=pendingVolumesJson;
+  pendingVolumesPart="";pendingVolumesJson="";
+  if(!"GPS".equals(part)&&!"MEDIA".equals(part)||json.isEmpty()){error("백업 작업 정보를 다시 확인하세요.");return;}
+  new Thread(()->{
+   boolean reserved=RestoreRideGate.beginExport(RideService.running,RideService.autoArmed);
+   try{
+    if(!reserved)throw new IOException("GPS 기록·복원 작업이 끝난 후 다시 시도하세요.");
+    int count=BackupVolumeExporter.export(this,folder,getFilesDir(),json,UiSettingsArchive.capture(this),part);
+    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())
+      new AlertDialog.Builder(this).setTitle("분할 백업 검증 완료")
+       .setMessage(count+"개 ZIP을 각각 다시 읽고 파일 누락을 확인했습니다. 선택한 폴더의 INDEX 파일과 모든 ZIP을 함께 보관하세요. GPS와 사진은 유형별로 별도 백업해야 합니다.")
+       .setPositiveButton("확인",null).show();
+    });
+   }catch(Exception failure){
+    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())
+     error("분할 백업 미완료: "+failure.getMessage());});
+   }finally{if(reserved)RestoreRideGate.endExport();}
+  },"moto-volume-zip-export").start();
+ }
  void importUiSettingsFromZip(){
   Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
   intent.setType("application/zip");intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -1857,7 +1891,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     toast("입력칸에만 적용했어요. 확인 후 저장해 주세요.");
    }).show();
  }
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47||request==65||request==66)pendingBundleJson="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==61){prepareJsonMerge(uri);return;}if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47||request==65||request==66)pendingBundleJson="";
+  if(request==71){pendingVolumesPart="";pendingVolumesJson="";}if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();
+  if(request==71){finishMultiVolume(uri);return;}
+  if(request==61){prepareJsonMerge(uri);return;}if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
    GARAGE_PHOTO_SAVER.execute(()->{try{saveGaragePhoto(uri,bikeId);}catch(Exception error){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())this.error("바이크 사진 저장 실패: "+error.getMessage());});}});return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
   if(request==54){scanReceiptOcr(uri,null);return;}
   if(request==57){scanQuickOdometerPhoto(uri);return;}
