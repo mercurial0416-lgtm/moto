@@ -279,6 +279,7 @@ final class GarageHomeUi {
   // Keep consent and stop confirmation; idle GPS action is deliberately secondary.
   boolean recording=RideService.running, armed=RideService.autoArmed;
   String title=armed?"OBD 자동 감지 관리":recording?"GPS 기록 종료":"GPS 기록 시작";
+  if(recording||armed){
   Button btn=a.button(title,false,()->{
    if(RideService.autoArmed){
     a.navigate("라이딩");a.toast("자동 감지는 라이딩 탭에서 중지할 수 있어요.");
@@ -297,6 +298,7 @@ final class GarageHomeUi {
   btn.setBackground(a.shape(recording?(a.dark?0xFF372422:0xFFFCE8E6):surface,
    recording?(a.dark?0xFFAD615B:0xFFD99792):stroke,8));
   a.content.addView(btn,new LinearLayout.LayoutParams(-1,-2));
+  }
   if(!recording&&!armed){
    Button go=a.button("원터치 출발 · GPS + 기본 내비",true,()->{
     a.navigate("라이딩");
