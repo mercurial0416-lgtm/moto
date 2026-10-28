@@ -44,6 +44,16 @@ public final class JsonDataMergerTest {
   assertEquals(5,second.skipped);
   assertEquals(2,Store.parse(second.data.toString()).getJSONArray("vehicles").length());
  }
+ @Test public void sharedBikeIdNeverSilentlyImportsForeignServiceOrFuel()throws Exception{
+  JSONObject current=Store.empty();
+  current.getJSONArray("vehicles").put(bike("same","Duke 390").put("year",2024));
+  JSONObject imported=Store.empty();
+  imported.getJSONArray("vehicles").put(bike("same","Duke 390").put("year",2024));
+  imported.getJSONArray("services").put(service("foreign-service","same"));
+  JsonDataMerger.Result r=JsonDataMerger.merge(current,imported);
+  assertEquals(0,r.added);assertEquals(1,r.skipped);assertEquals(1,r.blocked);
+  assertEquals(0,r.data.getJSONArray("services").length());
+ }
  @Test public void collidingVehicleIdsNeverMisattributeServiceHistory()throws Exception{
   JSONObject existing=Store.empty();
   existing.getJSONArray("vehicles").put(bike("same-id","KTM Duke 390"));
