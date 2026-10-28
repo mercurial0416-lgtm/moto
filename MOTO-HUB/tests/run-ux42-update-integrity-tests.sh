@@ -39,7 +39,7 @@ checks={
  "large font hero stacked":'LinearLayout meta=a.col()' in home,
  "large font metric stacked":'fontScale>=1.35f' in home and 'row.setOrientation(LinearLayout.VERTICAL)' in home,
  "large font record stacked":'if(largeText)head.setOrientation(LinearLayout.VERTICAL)' in screens,
- "large font listing stacked":'if(largeListingText)head.setOrientation(LinearLayout.VERTICAL)' in screens,
+ "retired listings renderer":'void listings(){' not in screens,
  "same pinned signer":'UpdateManifest.PINNED_CERT_SHA256' in up,
  "ride gate unchanged":'UpdateSafety.canInstall(' in up,
 }
