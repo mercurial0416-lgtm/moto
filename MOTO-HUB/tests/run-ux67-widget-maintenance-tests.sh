@@ -19,5 +19,15 @@ assert "onUpdate(context,manager,new int[]{id})" in widget
 assert "validOdo=Double.isFinite(odometer)" in maint
 assert "safeKm=validOdo&&Double.isFinite(rawKm)&&rawKm>=0" in maint
 assert "catch(java.time.DateTimeException invalidDate)" in maint
-print("PASS UX67 widget intent reuse, resize refresh and imported maintenance fallback")
+merge=(root/"JsonDataMerger.java").read_text()
+main=(root/"MainActivity.java").read_text()
+settings=(root/"HubScreens.java").read_text()
+assert 'String collection:Store.COLLECTIONS' in merge
+assert 'ids.contains(id)' in merge and 'listingUrls.contains(normalized)' in merge
+assert 'return new Result(Store.parse(target.toString()),added,skipped)' in merge
+assert 'JsonDataMerger.merge(db,source)' in main and 'write(actual.data)' in main
+assert 'RestoreRideGate.begin(RideService.running,RideService.autoArmed)' in main
+assert 'if(request==61){prepareJsonMerge(uri);return;}' in main
+assert 'a::importJsonMerge' in settings and settings.index('a::importJsonMerge')>settings.index('void advancedBackup()')
+print("PASS UX67 widget intent reuse, maintenance fallback and opt-in JSON duplicate-safe merge")
 PY
