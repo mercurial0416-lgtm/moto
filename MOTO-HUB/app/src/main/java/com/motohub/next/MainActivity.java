@@ -1441,7 +1441,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       if(free<need)spaceNote+="\n공간 부족: 기존 파일 보호를 위해 실제 복원을 거부합니다.";
      }catch(IOException e){spaceNote="\n\n저장 공간 점검 불가: 복원 시 안전 검사를 다시 진행합니다.";}
      new AlertDialog.Builder(this).setTitle("전체 백업을 복원할까요?")
-      .setMessage(RestorePreview.text(verified,db,ready.rides,ready.photos)+spaceNote+"\n\n현재 기록과 사진·GPS를 교체합니다. 중복 병합하지 않습니다. 기존 기록이 필요하면 먼저 전체 ZIP을 내보내세요.\n\n계정 없이 기기별 독립 저장됩니다.")
+      .setMessage(RestorePreview.text(verified,db,ready.rides,ready.photos)+RestorePreflightDetail.text(verified,db,ready.rides,ready.photos,ready.receipts)+spaceNote+"\n\n현재 기록과 사진·GPS를 교체합니다. 중복 병합하지 않습니다. 기존 기록이 필요하면 먼저 전체 ZIP을 내보내세요.\n\n계정 없이 기기별 독립 저장됩니다.")
       .setNegativeButton("취소",(d,w)->ready.close())
       .setOnCancelListener(d->ready.close())
       .setPositiveButton("전체 복원",(d,w)->{
