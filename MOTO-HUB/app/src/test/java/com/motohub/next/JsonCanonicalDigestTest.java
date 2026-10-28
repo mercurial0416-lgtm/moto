@@ -1,7 +1,11 @@
 package com.motohub.next;
 import org.json.JSONObject;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 import static org.junit.Assert.*;
+@RunWith(RobolectricTestRunner.class) @Config(sdk=35)
 public final class JsonCanonicalDigestTest {
  @Test public void keyOrderDoesNotMatterButSameLengthValueDoes()throws Exception{
   JSONObject first=new JSONObject().put("odo",100).put("name","Duke");
