@@ -201,6 +201,42 @@ final class QuickEntryUi {
   Button advancedToggle=a.button("계기판·직접 지정 수정",false,
    ()->advanced.setVisibility(advanced.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
   body.addView(advancedToggle);body.addView(advanced);
+  // Explicitly reuse the last SAME-BIKE/SAME-TYPE service interval.
+  // The previous date, mileage, amount and motorcycle are never copied.
+  Button reuse=a.button("이전 정비주기 불러오기",false,()->a.attempt(()->{
+   String type=service.getSelectedItemPosition()==items.length-1
+    ?customType.getText().toString().trim():service.getSelectedItem().toString();
+   JSONObject last=null;
+   for(JSONObject item:a.items("services")){
+    if(!bike.optString("id").equals(item.optString("vehicleId"))
+      ||!type.equals(item.optString("type")))continue;
+    if(last==null||RecentRecordReuse.isNewer(item.optString("date"),item.optDouble("mileage"),
+      last.optString("date"),last.optDouble("mileage")))last=item;
+   }
+   if(last==null){a.toast("같은 항목의 정비 이력이 없어요.");return;}
+   int km=last.optInt("intervalKm",0),monthsCount=last.optInt("intervalMonths",0);
+   if(km<=0&&monthsCount<=0){a.toast("이전 기록에 설정된 정비주기가 없어요.");return;}
+   int distanceIndex=0,monthIndex=0;
+   for(int i=1;i<intervals.length-1;i++)if(km==intervals[i])distanceIndex=i;
+   for(int i=1;i<months.length-1;i++)if(monthsCount==months[i])monthIndex=i;
+   if(km>0&&distanceIndex==0){
+    distanceIndex=intervals.length-1;
+    nextKm.setText(String.valueOf((long)QuickRecordDraft.nextOdometer(
+      numeric(mileage,"현재 계기판",true),km)));
+    advanced.setVisibility(View.VISIBLE);
+   }
+   if(monthsCount>0&&monthIndex==0){
+    monthIndex=months.length-1;
+    nextDate.setText(LocalDate.parse(a.today()).plusMonths(monthsCount).toString());
+    advanced.setVisibility(View.VISIBLE);
+   }
+   distanceChoice.setSelection(distanceIndex);dateChoice.setSelection(monthIndex);
+   int kmBefore=last.optInt("alertKmBefore",500),days=last.optInt("alertDaysBefore",30);
+   kmAlert.setSelection(kmBefore<=100?0:kmBefore<=300?1:2);
+   dateAlert.setSelection(days<=7?0:days<=15?1:2);
+   a.toast("이전 주기만 적용했어요. 저장 전 계기판과 예정일을 확인하세요.");
+  }));
+  reuse.setMinHeight(a.dp(48));body.addView(reuse);
   // A custom interval must reveal its required input immediately; no second hidden tap.
   android.widget.AdapterView.OnItemSelectedListener revealCustom=new android.widget.AdapterView.OnItemSelectedListener(){
    @Override public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){

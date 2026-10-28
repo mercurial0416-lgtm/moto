@@ -40,6 +40,13 @@ final class RideUi {
   }
  }
  final MainActivity a;RideUi(MainActivity a){this.a=a;}
+ /** Never say "saved" until the GPS file has a verified completion marker. */
+ void finishWithSummary(){
+  if(!RideService.running||RideService.saving()){a.toast("GPS 저장 중이거나 기록이 없어요.");return;}
+  a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));
+  a.toast("GPS 기록 저장·검증 중… 앱에 돌아오면 저장된 주행 결과를 확인할 수 있어요.");
+  a.root.postDelayed(()->{if(!a.isFinishing()&&!a.isDestroyed())a.showPendingRideSummary();},1300);
+ }
  void render(){
   final boolean saving=RideService.saving();
   final boolean focus=RideService.running&&a.getSharedPreferences("ride_display",0).getBoolean("focus",false);
@@ -113,7 +120,7 @@ final class RideUi {
   Button start=a.button(RideService.autoArmed?"자동 감지 종료":RideService.running?"라이딩 종료":"GPS 기록 시작",true,()->{
    if(RideService.autoArmed){new AlertDialog.Builder(a).setTitle("OBD2 자동 기록을 종료할까요?").setMessage("OBD2 자동 출발 감지만 끕니다. 진행 중인 GPS 기록은 계속되며, 종료하려면 라이딩 종료를 눌러 주세요.").setNegativeButton("취소",null).setPositiveButton("중지",(d,w)->{a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);}).show();return;}
    if(RideService.running){new AlertDialog.Builder(a).setTitle("라이딩 기록 종료").setMessage("기록을 끝내고 주행 분석에서 이동거리와 경로를 확인할 수 있어요.").setNegativeButton("취소",null).setPositiveButton("종료",(d,w)->{
-    a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
+    finishWithSummary();a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
    }).show();}else requestStart();
   });start.setTextColor(Color.WHITE);start.setBackground(a.shape(RideService.running?0xffda443c:0xffff6b1b,0,14));start.setMinHeight(a.dp(58));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);hero.addView(start);
   // Auto detection and GPS recording are independent. When both are active,
@@ -126,7 +133,7 @@ final class RideUi {
      .setMessage("진행 중인 GPS 기록을 저장하고 OBD2 자동 감지도 종료합니다. 그룹 위치 공유는 시작하지 않습니다.")
      .setNegativeButton("취소",null)
      .setPositiveButton("기록 종료",(d,w)->{
-      a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));
+      finishWithSummary();
       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
      }).show();
    });

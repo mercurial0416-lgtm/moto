@@ -10,11 +10,13 @@ public final class MaintenancePlanner {
  public static Status status(String dueDate, double dueOdometer, String today,
                              double currentOdometer, int daysBefore, double kmBefore) {
   if(!Double.isFinite(dueOdometer) || !Double.isFinite(currentOdometer) ||
-     dueOdometer < 0 || currentOdometer < 0 || daysBefore < 0 || kmBefore < 0)
+     dueOdometer < 0 || currentOdometer < 0 || daysBefore < 0 ||
+     !Double.isFinite(kmBefore) || kmBefore < 0)
    throw new IllegalArgumentException("정비 예정 주기 정보가 올바르지 않습니다.");
   LocalDate now = LocalDate.parse(today);
-  boolean hasDate = dueDate != null && !dueDate.isEmpty();
-  LocalDate deadline = hasDate ? LocalDate.parse(dueDate) : null;
+  String normalizedDate = dueDate == null ? "" : dueDate.trim();
+  boolean hasDate = !normalizedDate.isEmpty();
+  LocalDate deadline = hasDate ? LocalDate.parse(normalizedDate) : null;
   boolean hasKm = dueOdometer > 0;
   if(!hasDate && !hasKm) return Status.NONE;
   if((hasDate && !deadline.isAfter(now)) || (hasKm && currentOdometer >= dueOdometer))

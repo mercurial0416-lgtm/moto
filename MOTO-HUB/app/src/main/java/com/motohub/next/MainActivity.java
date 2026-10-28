@@ -122,7 +122,46 @@ public class MainActivity extends Activity {
    finally{recoveryReminderChecking.set(false);}
   },"moto-interrupted-ride-check").start();
  }
+ /** Show the durable summary once when the rider comes back from navigation. */
+ void showPendingRideSummary(){
+  if(isFinishing()||isDestroyed()||!hasWindowFocus()||RideService.running||
+     RideService.saving()||dialog!=null)return;
+  JSONObject pending=RideCompletionInbox.unread(this);
+  if(pending==null)return;
+  String id=pending.optString("id"),summary=pending.optString("summary");
+  if(summary.isEmpty())return;
+  new AlertDialog.Builder(this).setTitle("라이딩 저장 완료").setMessage(summary)
+   .setNegativeButton("닫기",null)
+   .setPositiveButton("주행 내역 보기",(d,w)->{tab="라이딩";render();})
+   .setOnDismissListener(d->RideCompletionInbox.seen(this,id)).show();
+ }
+ /** A summary can always be reopened, even if another dialog blocked its popup. */
+ void showRideCompletionHistory(){
+  java.util.List<JSONObject> entries=RideCompletionInbox.entries(this);
+  if(entries.isEmpty()){toast("저장된 라이딩 요약이 없어요.");return;}
+  String[] options=new String[entries.size()];
+  for(int i=0;i<options.length;i++){
+   JSONObject item=entries.get(i);
+   String label=RideHistoryLabel.title(
+    new File(item.optString("id","")),java.time.ZoneId.systemDefault());
+   options[i]=(item.optBoolean("seen")?"":"● ")+label;
+  }
+  new AlertDialog.Builder(this).setTitle("최근 완료 라이딩 · 최대 10건")
+   .setItems(options,(d,which)->{
+    JSONObject item=entries.get(which);
+    String id=item.optString("id");
+    RideCompletionInbox.seen(this,id);
+    new AlertDialog.Builder(this).setTitle("저장된 GPS 요약")
+     .setMessage(item.optString("summary","")).setNegativeButton("닫기",null)
+     .setPositiveButton("라이딩 내역",(dd,w)->{tab="라이딩";render();}).show();
+   }).setNegativeButton("닫기",null).show();
+ }
+ @Override public void onWindowFocusChanged(boolean focused){
+  super.onWindowFocusChanged(focused);
+  if(focused&&root!=null)root.postDelayed(this::showPendingRideSummary,200);
+ }
  @Override protected void onResume(){super.onResume();
+  if(root!=null)root.postDelayed(this::showPendingRideSummary,350);
   // Device location/notification settings may have changed while the settings app was open.
   if(root!=null&&"라이딩".equals(tab)&&dialog==null&&rideStateSignature()!=lastRenderedRideState)renderPreservingPosition();
   if(!readOnly)DailyMaintenanceJob.schedule(this);
@@ -1494,7 +1533,123 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   });
  }
  void exportData(){attempt(()->{pendingExport=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-"+today()+".json");startActivityForResult(i,41);});}
+ /** JSON-only additive import; ZIP restore remains a full replacement with GPS/photo rollback. */
+ void importJsonMerge(){
+  if(readOnly){error("원본 보호 중에는 기록을 합칠 수 없어요. 먼저 복구 상태를 확인해 주세요.");return;}
+  if(restoreIsBlocked()){explainRestoreBlocked();return;}
+  new AlertDialog.Builder(this).setTitle("JSON 기록 추가 · 중복 제외")
+   .setMessage("현재 바이크·정비·주유·매물 기록은 절대 덮어쓰지 않고, 새 ID의 기록만 추가합니다. 동일 매물 주소도 제외합니다. GPS·사진·설정은 합치지 않습니다.\n\n진행 전 전체 ZIP 백업을 외부에 보관하는 걸 권장합니다.")
+   .setNegativeButton("취소",null)
+   .setPositiveButton("JSON 파일 선택",(d,w)->{
+    Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+    i.setType("application/json");
+    i.addCategory(Intent.CATEGORY_OPENABLE);
+    i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/json","text/plain","application/octet-stream"});
+    startActivityForResult(i,61);
+   }).show();
+ }
+ void prepareJsonMerge(Uri uri){
+  // Snapshot on UI, then do both JSON parsing AND large collection diffing off-main.
+  if(readOnly||restoreIsBlocked()){error("라이딩 중이거나 원본 보호 중에는 병합할 수 없어요.");return;}
+  final String previewSnapshot=db.toString();
+  toast("JSON 검사·중복 비교 중…");
+  new Thread(()->{
+   try{
+    JSONObject source;
+    try(InputStream in=getContentResolver().openInputStream(uri)){
+     if(in==null)throw new IOException("JSON 파일을 열지 못했어요.");
+     ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+     byte[] chunk=new byte[8192];int n;
+     while((n=in.read(chunk))!=-1){
+      if(bytes.size()+n>8_000_000)throw new IOException("JSON 파일 최대 크기는 8MB입니다.");
+      bytes.write(chunk,0,n);
+     }
+     source=Store.parse(bytes.toString("UTF-8"));
+    }
+    final JsonDataMerger.Result preview=JsonDataMerger.merge(Store.parse(previewSnapshot),source);
+    runOnUiThread(()->{
+     if(isFinishing()||isDestroyed())return;
+     if(readOnly||restoreIsBlocked()){error("라이딩 중이거나 원본 보호 중에는 병합할 수 없어요.");return;}
+     if(!db.toString().equals(previewSnapshot)){
+      error("검사 중 기록이 변경됐어요. 최신 기록을 기준으로 다시 파일을 선택해 주세요.");return;
+     }
+     new AlertDialog.Builder(this).setTitle("JSON 병합 미리보기")
+      .setMessage("새 기록 "+preview.added+"개 · 중복 "+preview.skipped+"개 · 차량 보류 "+preview.blocked+"개.\n\n차량 ID가 겹친 정비·주유는 자동 연결하지 않습니다. GPS·사진·설정은 병합하지 않습니다.")
+      .setNegativeButton("취소",null)
+      .setNeutralButton("보류된 기록 직접 연결",(d,w)->{
+       if(preview.blocked==0){toast("보류된 기록이 없어요.");return;}
+       try{
+        java.util.List<JSONObject> clashes=JsonDataMerger.conflicts(Store.parse(previewSnapshot),source);
+        selectJsonMergeBikes(previewSnapshot,source,clashes,new java.util.HashMap<>(),0);
+       }catch(Exception e){error("차량 확인 실패: "+e.getMessage());}
+      })
+      .setPositiveButton("안전한 기록만 추가",(d,w)->commitJsonMerge(source,new java.util.HashMap<>())).show();
+    });
+   }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("JSON 병합 불가: "+e.getMessage());});}
+  },"moto-json-merge-preview").start();
+ }
+
  /** A quick-log odometer is suggested from a locally chosen photo and applied only after approval. */
+  void selectJsonMergeBikes(String snapshot,JSONObject source,java.util.List<JSONObject> collisions,
+   java.util.Map<String,String> selections,int index){
+  if(restoreIsBlocked()||!snapshot.equals(db.toString())){error("기록이 바뀌어 병합 선택을 취소했습니다.");return;}
+  if(index>=collisions.size()){
+   new AlertDialog.Builder(this).setTitle("바이크 직접 연결 · 최종 확인")
+    .setMessage("사용자가 직접 연결한 원본 바이크 "+selections.size()+"대입니다. 이 차량에 속한 정비·주유 기록만 지정한 바이크에 추가됩니다. 기존 기록은 덮어쓰지 않습니다.")
+    .setNegativeButton("취소",null)
+    .setPositiveButton("확인하고 추가",(d,w)->commitJsonMerge(source,new java.util.HashMap<>(selections))).show();
+   return;
+  }
+  JSONObject sourceBike=collisions.get(index);
+  String id=sourceBike.optString("id"),name=sourceBike.optString("name");
+  java.util.List<JSONObject> destinations=items("vehicles");
+  String[] names=new String[destinations.size()+1];names[0]="이 원본 바이크 기록은 보류";
+  for(int i=0;i<destinations.size();i++){
+   JSONObject bike=destinations.get(i);
+   names[i+1]=bike.optString("name")+" · "+(bike.optInt("year")>0?bike.optInt("year")+"년식 · ":"")+
+    num(bike.optDouble("odo"))+" km";
+  }
+  new AlertDialog.Builder(this).setTitle("원본 바이크 "+(index+1)+"/"+collisions.size()+" · "+name)
+   .setMessage("원본 JSON에서 보류된 정비·주유 기록을 연결할 실제 바이크를 확인해 주세요.")
+   .setItems(names,(d,choice)->{
+    if(choice>0)selections.put(id,destinations.get(choice-1).optString("id"));else selections.remove(id);
+    selectJsonMergeBikes(snapshot,source,collisions,selections,index+1);
+   }).setNegativeButton("전체 취소",null).show();
+ }
+
+  void commitJsonMerge(JSONObject source,java.util.Map<String,String> mapping){
+       if(readOnly||!RestoreRideGate.begin(RideService.running,RideService.autoArmed)){
+        error("라이딩이 진행 중이거나 데이터를 보호하는 중이에요.");return;
+       }
+       // Block concurrent ride starts while the validated merge is computed.
+       final String currentSnapshot=db.toString();
+       toast("기록 병합·안전 백업 준비 중…");
+       new Thread(()->{
+        JsonDataMerger.Result actual=null;Exception problem=null;
+        try{actual=JsonDataMerger.merge(Store.parse(currentSnapshot),source,mapping);}
+        catch(Exception e){problem=e;}
+        final JsonDataMerger.Result ready=actual;final Exception failure=problem;
+        runOnUiThread(()->{
+         try{
+          if(isFinishing()||isDestroyed())return;
+          if(failure!=null){error("병합 검증 실패: "+failure.getMessage());return;}
+          if(readOnly||RideService.running||RideService.autoArmed
+             ||!db.toString().equals(currentSnapshot)){
+           error("작업 도중 기록이 변경됐어요. 다시 병합을 시작해 주세요.");return;
+          }
+          if(ready.added==0){toast("추가할 새 기록이 없어요.");return;}
+          AtomicFile rollback=new AtomicFile(new File(getFilesDir(),"before-json-merge.json"));
+          atomic(rollback,currentSnapshot.getBytes(StandardCharsets.UTF_8));
+          write(ready.data);
+          render();
+          toast("새 기록 "+ready.added+"개 추가 · 중복 "+ready.skipped+"개 · 차량 연결 보류 "+ready.blocked+"개");
+         }catch(Exception e){error("JSON 병합 저장 실패: "+e.getMessage());}
+         finally{RestoreRideGate.end();}
+        });
+       },"moto-json-merge-commit").start();
+
+ }
+
  void chooseQuickOdometerPhoto(EditText field){
   if(readOnly||dialog==null||field==null||quickOdoField!=field){toast("주유 기록 화면을 확인해 주세요.");return;}
   Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -1608,7 +1763,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     toast("입력칸에만 적용했어요. 확인 후 저장해 주세요.");
    }).show();
  }
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47)pendingBundleJson="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==61){prepareJsonMerge(uri);return;}if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
    GARAGE_PHOTO_SAVER.execute(()->{try{saveGaragePhoto(uri,bikeId);}catch(Exception error){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())this.error("바이크 사진 저장 실패: "+error.getMessage());});}});return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
   if(request==54){scanReceiptOcr(uri,null);return;}
   if(request==57){scanQuickOdometerPhoto(uri);return;}

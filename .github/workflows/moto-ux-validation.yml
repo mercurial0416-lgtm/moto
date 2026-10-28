@@ -16,6 +16,9 @@ on:
       - 'feat/ux50-52-navigation-ride-release-20261026'
 permissions:
   contents: read
+concurrency:
+  group: moto-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
 jobs:
   android-debug-check:
     runs-on: ubuntu-latest
@@ -47,24 +50,40 @@ jobs:
           bash tests/run-ux48-stability-tests.sh
           bash tests/run-ux49-navigation-play-tests.sh
           bash tests/run-ux50-52-navigation-ride-release-tests.sh
+          bash tests/run-ux54-native-widget-tests.sh
+          bash tests/run-ux55-stability-tests.sh
+          bash tests/run-ux56-reliability-tests.sh
+          bash tests/run-ux57-quality-tests.sh
+          bash tests/run-ux58-nav-and-reliability-tests.sh
+          bash tests/run-ux59-widget-and-nav-tests.sh
+          bash tests/run-ux60-no-giant-widgets-tests.sh
+          bash tests/run-ux61-simplified-ui-tests.sh
+          bash tests/run-ux62-simplify-tabs-and-ride.sh
+          bash tests/run-ux63-recovery-resume-tests.sh
+          bash tests/run-ux64-home-nav-tests.sh
+          bash tests/run-ux65-navigation-resume-tests.sh
+          bash tests/run-ux66-nav-focus-backup-tests.sh
+          bash tests/run-ux67-widget-maintenance-tests.sh
+          bash tests/run-ux69-safety-and-release-tests.sh
+          bash tests/run-ux70-integrity-and-shortcuts.sh
       - name: Compile Android application and run lint and unit tests
         working-directory: MOTO-HUB
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug :app:assembleRelease :app:assemblePlayRelease :app:bundlePlayRelease :app:lintDebug :app:testDebugUnitTest -PmotoReleaseCode=523 --no-daemon --stacktrace
+          ./gradlew :app:assembleDebug :app:assembleRelease :app:assemblePlayRelease :app:bundlePlayRelease :app:lintDebug :app:testDebugUnitTest -PmotoReleaseCode=540 --no-daemon --stacktrace
       - name: Verify APK build outputs (signing happens outside CI)
         working-directory: MOTO-HUB
         run: |
           set -euo pipefail
           test -s app/build/outputs/apk/debug/app-debug.apk
           test -s app/build/outputs/apk/release/app-release-unsigned.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/release/app-release-unsigned.apk | grep "versionCode='523'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/release/app-release-unsigned.apk | grep "versionCode='540'"
           aab=$(find app/build/outputs/bundle/playRelease -maxdepth 1 -type f -name '*.aab' -print -quit)
           apk=$(find app/build/outputs/apk/playRelease -maxdepth 1 -type f -name '*.apk' -print -quit)
           test -n "$aab" && test -s "$aab"
           test -n "$apk" && test -s "$apk"
-          cp "$aab" app/build/outputs/bundle/playRelease/MOTO-HUB-play-523.aab
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | grep "versionCode='523'"
+          cp "$aab" app/build/outputs/bundle/playRelease/MOTO-HUB-play-540.aab
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" | grep "versionCode='540'"
           if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk" | grep -Fq 'android.permission.REQUEST_INSTALL_PACKAGES'; then
             echo "Google Play variant must not request APK installation permission"
             exit 1
@@ -76,18 +95,18 @@ jobs:
       - name: Archive unsigned release for private offline fixed signing
         uses: actions/upload-artifact@v4
         with:
-          name: moto-ux54-unsigned-release-and-play-aab-${{ github.sha }}
+          name: moto-ux70-unsigned-release-and-play-aab-${{ github.sha }}
           path: |
             MOTO-HUB/app/build/outputs/apk/release/app-release-unsigned.apk
             MOTO-HUB/app/build/outputs/apk/release/SHA256-unsigned.txt
-            MOTO-HUB/app/build/outputs/bundle/playRelease/MOTO-HUB-play-523.aab
+            MOTO-HUB/app/build/outputs/bundle/playRelease/MOTO-HUB-play-540.aab
           if-no-files-found: error
           retention-days: 7
       - name: Archive build verification reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: moto-ux54-test-reports
+          name: moto-ux70-test-reports
           path: |
             MOTO-HUB/app/build/reports/
             MOTO-HUB/app/build/test-results/

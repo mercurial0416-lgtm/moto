@@ -134,7 +134,18 @@ final class DeveloperObdScreen {
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
   final Runnable update=new Runnable(){@Override public void run(){
    if(owner==null||!owner.isShowing()||telemetry.getParent()==null)return;
+   int qualityScore=ObdLinkQuality.score(RideService.obdLastSampleElapsed,
+     android.os.SystemClock.elapsedRealtime(),RideService.obdAverageLatencyMs,
+     (int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples),
+     RideService.obdQueryFailures,RideService.obdReconnects,
+     RideService.obdConnectionAttempts,RideService.obdConnectionSuccesses);
+   String quality=ObdLinkQuality.label(qualityScore,(int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples));
    telemetry.setText("상태: "+RideService.obdLink+" · 재접속 "+RideService.obdReconnects+"회 · 정상 속도 샘플 "+RideService.obdSpeedSamples+"건\n"+
+    "통신 품질: "+quality+" · 실패 "+RideService.obdQueryFailures+"회"+
+    (RideService.obdSpeedSamples>=3&&qualityScore<55?"\n주의: OBD 신호가 불안정합니다. GPS 기록은 유지됩니다.":"")+"\n"+
+     "ECU 실제 수신: "+ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,
+      ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime()))+
+     " · "+ObdSignalAge.label(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())+"\n"+
     "속도 "+ObdTelemetryFreshness.speedLabel(RideService.obdSpeedKmh,RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())+
     " · RPM "+(RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdRpmAt,android.os.SystemClock.elapsedRealtime())&&Double.isFinite(RideService.obdRpm)?String.format(java.util.Locale.KOREA,"%.0f",RideService.obdRpm):"—")+
     "\n수온 "+(RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdCoolantAt,android.os.SystemClock.elapsedRealtime())&&Double.isFinite(RideService.obdCoolantC)?String.format(java.util.Locale.KOREA,"%.0f°C",RideService.obdCoolantC):"—")+

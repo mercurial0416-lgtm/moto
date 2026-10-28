@@ -92,7 +92,13 @@ final class ServiceStatusUi {
    if(current<bike.optDouble("odo"))throw new IllegalArgumentException("현재보다 적은 주행거리로는 완료할 수 없어요.");
    JSONObject done=ServiceCycle.completed(old,a.today(),current,spent);
    Runnable save=()->a.attempt(()->{
+    // Recheck a current bike and the source schedule before saving an old dialog.
+    if(a.readOnly||a.bike()==null||!bike.optString("id").equals(a.bike().optString("id")))
+      throw new java.io.IOException("선택 바이크가 변경되었어요. 정비 완료 화면을 다시 열어 주세요.");
     JSONObject next=new JSONObject(a.db.toString());
+    if(Store.find(next,"vehicles",bike.optString("id"))==null||
+       Store.find(next,"services",old.optString("id"))==null)
+      throw new java.io.IOException("해당 바이크 또는 정비주기가 변경되었어요.");
     Store.upsert(next,"services",done);
     JSONObject updated=Store.find(next,"vehicles",bike.optString("id"));
     if(updated!=null&&current>updated.optDouble("odo"))updated.put("odo",current);
