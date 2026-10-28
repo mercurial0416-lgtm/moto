@@ -51,6 +51,11 @@ public class MainActivity extends Activity {
  interface Work{void run()throws Exception;}
  interface Choice{void pick(String value);}
  @Override public void onCreate(Bundle state){super.onCreate(state);PrivateCacheCleanup.atProcessStart(getCacheDir(),getFilesDir(),System.currentTimeMillis());ReceiptCameraFiles.cleanOld(getCacheDir(),System.currentTimeMillis());new Thread(()->{synchronized(MotorcyclePhoto.class){AutoPhotoCache.trim(new File(getFilesDir(),"moto-year-photos"),System.currentTimeMillis());}},"moto-photo-cache-maintenance").start();if(!RideService.running)Sharing.stop();disk=new AtomicFile(new File(getFilesDir(),"motohub-v3.json"));
+  boolean crashedGpsRecoveryNeedsHelp=false;int crashedGpsRecovered=0;
+  if(!RideService.running&&!RideService.autoArmed){
+   try{crashedGpsRecovered=RideTrash.recoverInterrupted(getFilesDir());}
+   catch(Exception e){readOnly=true;crashedGpsRecoveryNeedsHelp=true;}
+  }
   boolean crashedRestoreRecovered=false,crashedRestoreNeedsHelp=false;
   try{crashedRestoreRecovered=RestoreArchive.CrashJournal.recoverAll(getFilesDir(),bytes->atomic(disk,bytes))>0;}
   catch(Exception e){readOnly=true;crashedRestoreNeedsHelp=true;}
@@ -72,6 +77,8 @@ public class MainActivity extends Activity {
   DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
   if(state==null)receiveSharedListing(getIntent());
+  if(crashedGpsRecoveryNeedsHelp)error("이전 GPS 복구함 이동이 중단됐고 자동 정리할 수 없습니다. 원본 보호 모드로 전환했습니다. 앱 삭제나 GPS 수동 삭제를 하지 마세요.");
+  else if(crashedGpsRecovered>0)toast("중단된 GPS 파일 이동의 부가 정보를 안전하게 정리했습니다.");
   if(crashedRestoreNeedsHelp)error("미완료 백업 복원의 원본 사본을 안전하게 되돌리지 못했어요. 추가 저장을 차단하고 복구용 파일을 보존했습니다. 앱을 삭제하지 말고 백업 상태를 확인해 주세요.");
   else if(readOnly)error("저장 파일을 읽지 못해 원본을 보존하고 새 저장을 차단했습니다. 더보기에서 백업을 복원해 주세요.");
   else if(crashedRestoreRecovered)toast("중단됐던 백업 복원을 이전 기록으로 안전하게 되돌렸어요.");

@@ -56,8 +56,10 @@ final class RideStorageManager {
           throw new IOException("GPS 기록·백업·복원 중에는 복원할 수 없습니다.");
          }
          File restored;
-         try{restored=RideTrash.restore(a.getFilesDir(),entries.get(index));}
-         finally{RestoreRideGate.end();}
+         try{
+          restored=RideTrash.restore(a.getFilesDir(),entries.get(index));
+          RideCompletionInbox.restored(a,restored);
+         }finally{RestoreRideGate.end();}
          a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){
           a.toast("GPS 원본 복원 완료");a.render();
          }});
@@ -79,7 +81,7 @@ final class RideStorageManager {
   }
   new AlertDialog.Builder(a).setTitle("이 GPS 원본을 복구함으로 옮길까요?")
    .setMessage(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault())+
-    "\n검증된 ZIP에 동일 GPS가 포함된 경우에만 30일 복구함으로 이동합니다. 원본은 즉시 영구 삭제되지 않습니다.")
+    "\n검증된 ZIP에 동일 GPS가 포함된 경우에만 기간 제한 없이 복구함에 보관합니다. 자동 삭제하지 않으며, 앱을 삭제하면 복구함도 삭제됩니다.")
    .setNegativeButton("취소",null)
    .setPositiveButton("복구함 이동 확인",(d,w)->new AlertDialog.Builder(a)
     .setTitle("GPS 복구함 이동 · 최종 확인")
