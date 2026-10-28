@@ -73,7 +73,7 @@ final class GarageHomeUi {
   // Keep daily home focused on navigation and maintenance; secondary cards opt-in.
   boolean extra=a.getSharedPreferences("garage_home",0).getBoolean("extra_cards",false);
   a.gap(a.content,12);
-  Button more=a.button(extra?"유지비·매물 접기":"유지비·매물 더 보기",false,()->{
+  Button more=a.button(extra?"유지비 접기":"유지비 더 보기",false,()->{
    a.getSharedPreferences("garage_home",0).edit().putBoolean("extra_cards",!extra).apply();
    a.renderPreservingPosition();
   });
@@ -83,7 +83,7 @@ final class GarageHomeUi {
    a.action(a.content,"최근 라이딩 저장 요약",false,a::showRideCompletionHistory);
   }
   if(extra){a.gap(a.content,16);recent(b);a.gap(a.content,16);insights(b);
-   if(!a.items("listings").isEmpty()){a.gap(a.content,18);listings();}
+
   }
  }
  /** Scan local GPS metadata off the UI thread and ignore results for disposed home screens. */

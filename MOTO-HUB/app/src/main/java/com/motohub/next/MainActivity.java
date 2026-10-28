@@ -227,7 +227,7 @@ public class MainActivity extends Activity {
   String url=QuickEntry.extractUrl(shared);
   if(url.isEmpty()){toast("웹 링크를 찾지 못했어요.");return;}
   if(readOnly){toast("저장 파일 보호 중에는 매물을 추가할 수 없어요.");return;}
-  tab="매물";render();edit("listings",null);
+  toast("매물 기능은 일반 화면에서 제외했어요. 기존 매물 기록은 백업 데이터에 보존됩니다.");
   if(draftFields!=null){EditText u=draftFields.get("url");if(u!=null)u.setText(url);
    String title=QuickEntry.sharedTitle(shared,url);EditText model=draftFields.get("model");
    if(model!=null&&!title.isEmpty())model.setText(title);
@@ -428,7 +428,7 @@ public class MainActivity extends Activity {
    }).show();
  }
  void hideKeyboard(){android.view.inputmethod.InputMethodManager imm=getSystemService(android.view.inputmethod.InputMethodManager.class);View focus=getCurrentFocus();if(focus!=null){imm.hideSoftInputFromWindow(focus.getWindowToken(),0);focus.clearFocus();}}
- void navigate(String destination){hideKeyboard();if(destination.equals("더보기")&&!tab.equals("더보기"))previousTab=tab;tab=destination;render();}
+ void navigate(String destination){if("매물".equals(destination))destination="홈";hideKeyboard();if(destination.equals("더보기")&&!tab.equals("더보기"))previousTab=tab;tab=destination;render();}
  void selectRideHistoryFilter(String value){
   String normalized=RideHistoryFilter.normalize(value);
   // Only a local display preference: never part of backup, GPS or cloud sharing.
@@ -508,7 +508,6 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);content=col();content.setPadding(dp(18),dp(8),dp(18),dp(22));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   LinearLayout dock=col();dock.setPadding(dp(18),dp(7),dp(18),0);
   // Home contains contextual quick actions; keep the bottom dock uncluttered.
-  if(tab.equals("매물"))pair(dock,"매물 추가",()->edit("listings",null),"선택 비교",()->new HubScreens(this).compare());
   if(tab.equals("차고")&&bike()!=null)pair(dock,"간편 주유",()->new QuickEntryUi(this).fuel(),"정비주기",()->new QuickEntryUi(this).maintenance());
   // Home quick actions are inside its content, not repeated above the navigation.
   root.addView(dock);
@@ -531,7 +530,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    LinearLayout.LayoutParams actionsLp=new LinearLayout.LayoutParams(-1,-2);actionsLp.topMargin=dp(10);draftCard.addView(draftActions,actionsLp);
    content.addView(draftCard);gap(content,10);
   }
-  switch(tab){case"홈":home();break;case"매물":listings();break;case"라이딩":ride();break;case"차고":garage();break;case"지도":more();break;default:more();}
+  switch(tab){case"홈":home();break;case"라이딩":ride();break;case"차고":garage();break;case"지도":more();break;default:more();}
   if("라이딩".equals(tab))lastRenderedRideState=rideStateSignature();
  }
  String dueText(JSONObject s){return(s.optDouble("nextKm")>0?num(s.optDouble("nextKm"))+" km":"")+(!s.optString("nextDate").isEmpty()?" · "+s.optString("nextDate"):"");}

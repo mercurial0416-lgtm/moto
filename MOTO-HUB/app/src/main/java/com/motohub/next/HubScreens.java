@@ -507,7 +507,11 @@ LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·�
   a.action(p,"보관된 보호장구 기록",false,this::legacyGearManager);
   a.action(p,"기변 계산기",false,a::tradeIn);
   a.action(p,"저장한 수동 코스",false,a::savedRoutes);
-  a.action(p,"저장한 매물 관리",false,()->{a.close();a.navigate("매물");});
+  a.action(p,"보관된 옛 매물 데이터",false,()->
+   new AlertDialog.Builder(a).setTitle("예전 매물 기록")
+    .setMessage("매물 화면은 제거했지만 저장된 "+a.items("listings").size()+
+      "건의 기록은 삭제하지 않았습니다. 전체 ZIP·JSON 백업에 그대로 포함됩니다.")
+    .setPositiveButton("확인",null).show());
   a.action(p,"고급 백업 도구",false,this::advancedBackup);
   a.action(p,"개인정보 없는 진단 보고서",false,this::localDiagnostics);
   a.action(p,"친구·그룹 서버 진단",false,this::serverPreflight);
