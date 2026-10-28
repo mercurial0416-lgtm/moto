@@ -31,7 +31,9 @@ jobs:
             tr -d '\n' | base64 --decode |
             python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
           CODE=$((CURRENT+1))
-          if (( CODE < 525 )); then CODE=525; fi
+          # UX70 release candidate is source-validated at code 540.
+          # Never use an older build number for the same source; remain monotonic.
+          if (( CODE < 540 )); then CODE=540; fi
           test "$CODE" -gt "$CURRENT"
           echo "RELEASE_CODE=$CODE" >> "$GITHUB_ENV"
       - name: Full offline-source regressions
