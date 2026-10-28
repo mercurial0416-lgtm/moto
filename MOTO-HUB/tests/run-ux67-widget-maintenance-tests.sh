@@ -25,7 +25,7 @@ settings=(root/"HubScreens.java").read_text()
 assert 'String collection:Store.COLLECTIONS' in merge
 assert 'ids.contains(id)' in merge and 'listingUrls.contains(normalized)' in merge
 assert 'return new Result(Store.parse(target.toString()),added,skipped)' in merge
-assert 'JsonDataMerger.merge(db,source)' in main and 'write(actual.data)' in main
+assert 'JsonDataMerger.merge(Store.parse(previewSnapshot),source)' in main and 'JsonDataMerger.merge(Store.parse(currentSnapshot),source)' in main and 'write(ready.data)' in main
 assert 'RestoreRideGate.begin(RideService.running,RideService.autoArmed)' in main
 assert 'if(request==61){prepareJsonMerge(uri);return;}' in main
 ride=(root/"RideUi.java").read_text()
