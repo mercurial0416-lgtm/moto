@@ -236,16 +236,10 @@ final class HubScreens {
   a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
- void settings(){title("설정","기록·내비·정비·백업만 간편하게 관리");a.section("데이터 및 복구");line("백업 · 복원","바이크·주유·정비·GPS·사진 전체 백업","열기",this::basicBackup);
-  line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":"최신 버전 확인 및 설치","열기",()->new AppUpdater(a).show());
-  line("업데이트 데이터 검사",UpdateInstallSnapshot.lastProblem(a)?"이전 검사에서 확인 필요":"기록 상태·복구 지점 확인",
-   "보기",this::updateRecoveryReport);
-  a.section("내비 · 홈 위젯");
-  line("초소형 위젯 추가","2×1 · 출발 / 내비 · 가장 간단한 형태","홈에 추가",()->MotoWidgetPin.request(a,true));
-  line("기본 위젯 추가","4×1 · 기본 내비 변경 + 기록 실행","홈에 추가",()->MotoWidgetPin.request(a,false));
-  line("기본 내비 선택","현재: "+NavigationApps.preferred(a).label+" · 카카오내비 / 네이버지도 / 티맵","변경",()->NavigationApps.choose(a));
-  line("선택한 내비 실행","GPS 기록과 독립적으로 실행 · 목적지 미전송","열기",()->NavigationApps.openPreferred(a));
-  // Both widgets now show only shortcuts and never expose private garage data; no redundant privacy toggle.
+ void settings(){
+  title("설정","자주 사용하는 설정만 표시합니다.");
+  a.section("기본 설정");
+  line("기본 내비",NavigationApps.preferred(a).label,"변경",()->NavigationApps.choose(a));
   line("정비 알림",DailyMaintenanceJob.remindersEnabled(a)?"켜짐 · 날짜 기준 기기 알림":"꺼짐 · 동의 후 활성화","변경",()->{
    boolean enabled=DailyMaintenanceJob.remindersEnabled(a);
    new AlertDialog.Builder(a).setTitle("정비 알림")
@@ -263,40 +257,57 @@ final class HubScreens {
      }
     }).show();
   });
-  a.section("알림 · 안전");
-  line("라이딩 통합 자가진단","기록·권한·OBD·백업이 이상할 때만 확인","실행",this::selfCheck);
-  // Keep an accessible emergency stop ONLY if group location sharing is actually live.
+
+  line("화면 테마","현재: "+a.settings().optString("theme","dark"),"변경",()->a.choose("화면 테마",new String[]{"system","light","dark"},v->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("theme",v);a.write(next);a.render();})));
+
+  a.section("데이터 · 앱");
+  line("백업 · 복원","전체 ZIP · GPS 복구함 · 다른 기기로 옮기기","열기",this::basicBackup);
+  line("앱 업데이트","현재 "+BuildConfig.VERSION_NAME,"확인",()->new AppUpdater(a).show());
   if(Sharing.enabled)line("위치 공유 중지","현재 다른 사람에게 위치를 공유 중입니다.","즉시 중지",()->{
    if(Sharing.enabled)new AlertDialog.Builder(a).setTitle("위치 공유를 중지할까요?")
     .setNegativeButton("취소",null).setPositiveButton("즉시 중지",(d,w)->{Sharing.stop();a.render();}).show();
    else a.toast("위치 공유는 라이딩 화면에서 동의한 경우에만 시작됩니다.");
   });
-  a.section("기타 기본 설정");
-  line("화면 테마","현재: "+a.settings().optString("theme","dark"),"변경",()->a.choose("화면 테마",new String[]{"system","light","dark"},v->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("theme",v);a.write(next);a.render();})));
-  line("유지비 통계","바이크별 · 최근 6개월 주유/정비 비교","열기",this::costDashboard);
-  // The data structures for gear/trade-in and diagnostic reports stay untouched.
-  // Hidden extras can be opened in version-tap developer settings without cluttering normal UI.
-  a.section("앱 정보");
-  // Deliberately hidden until the user taps the version label seven times.
-  TextView version=a.text("MOTO HUB " + BuildConfig.VERSION_NAME + " · 기기별 독립 저장 · 계정 불필요",16,a.muted,false);
-  LinearLayout.LayoutParams vl=new LinearLayout.LayoutParams(-1,-2);vl.bottomMargin=a.dp(8);a.content.addView(version,vl);
-  final int[] taps={0};version.setOnClickListener(v->{
+
+  line("고급 설정","위젯 · 검사 · 유지비 · 개발자 기능","열기",this::advancedSettings);
+  a.label(a.content,"MOTO HUB "+BuildConfig.VERSION_NAME+" · 계정 없이 기기에 저장",13,a.muted,false);
+ }
+ void advancedSettings(){
+  LinearLayout page=a.page("고급 설정");
+  a.label(page,"자주 쓰지 않는 기능만 모아뒀습니다. 진단·실험 기능은 필요할 때만 사용하세요.",14,a.muted,false);
+  a.action(page,"홈 위젯 · 작은 2×1 추가",false,()->MotoWidgetPin.request(a,true));
+  a.action(page,"홈 위젯 · 기본 4×1 추가",false,()->MotoWidgetPin.request(a,false));
+  a.action(page,"선택한 내비 실행",false,()->NavigationApps.openPreferred(a));
+  a.action(page,"라이딩 통합 자가진단",false,this::selfCheck);
+  a.action(page,"업데이트 데이터 검사",false,this::updateRecoveryReport);
+  a.action(page,"바이크 유지비 통계",false,this::costDashboard);
+  a.action(page,"로컬 진단 보고서",false,this::localDiagnostics);
+  a.action(page,"설치 서명 SHA-256 보기 · 복사",false,this::showSigningIdentity);
+  if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))
+   a.action(page,"개발자 실험 기능",false,this::developerSettings);
+  TextView version=a.text("MOTO HUB "+BuildConfig.VERSION_NAME+" · 앱 정보",14,a.muted,false);
+  page.addView(version);
+  final int[] taps={0};
+  version.setOnClickListener(v->{
    if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))return;
-   if(++taps[0]>=7){a.getSharedPreferences("developer_experiments",0).edit().putBoolean("enabled",true).apply();a.toast("개발자 모드가 활성화됐어요.");a.render();}
-   else if(taps[0]>=4)a.toast("개발자 모드까지 "+(7-taps[0])+"번 남았어요.");
+   if(++taps[0]>=7){
+    a.getSharedPreferences("developer_experiments",0).edit().putBoolean("enabled",true).apply();
+    a.toast("개발자 모드 활성화");a.render();
+   }else if(taps[0]>=4)a.toast("개발자 모드까지 "+(7-taps[0])+"번");
   });
+  a.label(page,"서명키가 다른 APK를 설치하려고 기존 앱을 삭제하지 마세요. 데이터는 ZIP으로 미리 백업하세요.",13,a.muted,false);
+  a.show();
+ }
+ void showSigningIdentity(){
   String signer=SigningIdentity.current(a);
-  line("설치 서명 SHA-256",signer.isEmpty()?"인증서 지문을 확인하지 못했습니다":signer.substring(0,Math.min(16,signer.length()))+"… · 업데이트 전 비교",
-   "복사",()->{
-    if(signer.isEmpty()){a.toast("서명 정보 확인에 실패했어요.");return;}
-    android.content.ClipboardManager clipboard=(android.content.ClipboardManager)a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-    if(clipboard==null){a.toast("클립보드를 사용할 수 없어요.");return;}
-    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("MOTO HUB 설치 인증서 SHA-256",signer));
-    a.toast("공개 인증서 SHA-256을 복사했어요. 개인키는 포함되지 않습니다.");
-   });
-  if(a.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
-   line("개발자 모드","실험 기능 · 순정 TFT 연동과 다름 · 기기 데이터 외부 전송 없음","열기",this::developerSettings);
-  }a.label(a.content,"기존 앱에 덮어쓰기 설치하려면 동일한 서명키로 빌드해야 합니다. 서명이 다른 APK 설치를 위해 기존 앱을 삭제하지 마세요.",13,a.muted,false);a.label(a.content,"앱 삭제 전 전체 ZIP 백업을 저장하세요. GPS는 기기 내 기록입니다. 회원가입과 로그인 없이 이 휴대폰에 기록을 저장합니다. 다른 휴대폰으로 옮길 때는 전체 ZIP 백업을 사용하세요.",16,a.muted,false);
+  if(signer.isEmpty()){a.toast("인증서 정보를 확인하지 못했습니다.");return;}
+  new AlertDialog.Builder(a).setTitle("앱 서명 SHA-256")
+   .setMessage(signer+"\n\n공개 인증서 지문만 복사되며 서명 개인키는 포함하지 않습니다.")
+   .setNegativeButton("닫기",null)
+   .setPositiveButton("복사",(d,w)->{
+    android.content.ClipboardManager cb=(android.content.ClipboardManager)a.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+    if(cb!=null)cb.setPrimaryClip(android.content.ClipData.newPlainText("MOTO HUB 인증서 SHA-256",signer));
+   }).show();
  }
  void localDiagnostics(){
   boolean fine=a.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED;
