@@ -53,8 +53,8 @@ jobs:
             tr -d '\n' | base64 --decode |
             python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
           CODE=$(( CURRENT + 1 ))
-          # UX70 has already passed full Android validation at version 540.
-          if (( CODE < 540 )); then CODE=540; fi
+          # UX71 has passed Android validation at version 541.
+          if (( CODE < 541 )); then CODE=541; fi
           if (( CODE > 999999999 )); then exit 1; fi
           printf 'RELEASE_CODE=%s\n' "$CODE" >> "$GITHUB_ENV"
           echo "Validated next releaseCode $CODE (published: $CURRENT)"
