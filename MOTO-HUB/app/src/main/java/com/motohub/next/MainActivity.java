@@ -38,7 +38,7 @@ public class MainActivity extends Activity {
  volatile boolean interruptedRecoveryPromptVisible=false;
  final java.util.concurrent.atomic.AtomicBoolean recoveryReminderChecking=new java.util.concurrent.atomic.AtomicBoolean();
  volatile long suppressUpdatePromptUntilElapsed=0;
- boolean suppressUpdatePrompt(){return android.os.SystemClock.elapsedRealtime()<suppressUpdatePromptUntilElapsed||interruptedRecoveryPromptVisible||rideStartConsent.pending();}
+ boolean suppressUpdatePrompt(){return android.os.SystemClock.elapsedRealtime()<suppressUpdatePromptUntilElapsed||interruptedRecoveryPromptVisible||recoveryReminderChecking.get()||rideStartConsent.pending();}
  String garageMode="전체", previousTab="홈", rideHistoryFilter=RideHistoryFilter.ALL, rideHistorySort=RideHistorySort.NEWEST, rideHistoryPeriod=RideHistoryPeriod.ALL, rideHistoryBike=RideHistoryBikeFilter.ALL, rideHistoryQuery="";
  final String[] tabs={"홈","라이딩","차고","더보기"};
  interface Work{void run()throws Exception;}
