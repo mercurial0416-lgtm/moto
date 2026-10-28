@@ -44,6 +44,24 @@ public final class JsonDataMergerTest {
   assertEquals(5,second.skipped);
   assertEquals(2,Store.parse(second.data.toString()).getJSONArray("vehicles").length());
  }
+ @Test public void collidingVehicleIdsNeverMisattributeServiceHistory()throws Exception{
+  JSONObject existing=Store.empty();
+  existing.getJSONArray("vehicles").put(bike("same-id","KTM Duke 390"));
+  JSONObject imported=Store.empty();
+  imported.getJSONArray("vehicles").put(bike("same-id","Honda Super Cub"));
+  imported.getJSONArray("services").put(service("new-foreign-service","same-id"));
+  try{JsonDataMerger.merge(existing,imported);fail("Different bikes with same ID must not merge");}
+  catch(org.json.JSONException expected){assertTrue(expected.getMessage().contains("ID"));}
+  assertEquals(0,existing.getJSONArray("services").length());
+ }
+ @Test public void yearMismatchAlsoFailsClosed()throws Exception{
+  JSONObject current=Store.empty();
+  current.getJSONArray("vehicles").put(bike("x","KTM").put("year",2024));
+  JSONObject incoming=Store.empty();
+  incoming.getJSONArray("vehicles").put(bike("x","KTM").put("year",2022));
+  try{JsonDataMerger.merge(current,incoming);fail("Mismatched bike year");}
+  catch(org.json.JSONException expected){}
+ }
  @Test public void malformedBackupFailsWithoutTouchingCurrent()throws Exception{
   JSONObject current=Store.empty();
   JSONObject corrupt=Store.empty();

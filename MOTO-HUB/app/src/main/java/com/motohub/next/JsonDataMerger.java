@@ -25,6 +25,24 @@ final class JsonDataMerger {
   JSONObject source=Store.parse(imported.toString());
   int added=0,skipped=0;
   // vehicles comes first: child service/expense records must retain vehicle IDs.
+  // Two backups may reuse a vehicle UUID for DIFFERENT motorcycles.
+  // Treat that as a conflict rather than silently connecting imported repairs
+  // and fuel costs to an unrelated currently registered vehicle.
+  JSONArray currentBikes=target.getJSONArray("vehicles");
+  JSONArray importedBikes=source.getJSONArray("vehicles");
+  java.util.Map<String,JSONObject> byId=new java.util.HashMap<>();
+  for(int i=0;i<currentBikes.length();i++){
+   JSONObject bike=currentBikes.getJSONObject(i);byId.put(bike.getString("id"),bike);
+  }
+  for(int i=0;i<importedBikes.length();i++){
+   JSONObject incoming=importedBikes.getJSONObject(i);
+   JSONObject existing=byId.get(incoming.getString("id"));
+   if(existing==null)continue;
+   String left=existing.optString("name").trim(),right=incoming.optString("name").trim();
+   int oldYear=existing.optInt("year"),newYear=incoming.optInt("year");
+   if(!left.equalsIgnoreCase(right)||(oldYear>0&&newYear>0&&oldYear!=newYear))
+    throw new JSONException("차량 ID 충돌: 서로 다른 바이크가 같은 ID를 사용합니다. 해당 JSON은 자동 병합하지 않습니다.");
+  }
   for(String collection:Store.COLLECTIONS){
    JSONArray dest=target.getJSONArray(collection);
    JSONArray input=source.getJSONArray(collection);

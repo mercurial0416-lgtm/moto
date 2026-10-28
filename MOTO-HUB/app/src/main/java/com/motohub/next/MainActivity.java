@@ -1510,7 +1510,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    }).show();
  }
  void prepareJsonMerge(Uri uri){
-  // File parsing stays off UI thread; no update until explicit preview approval.
+  // Snapshot on UI, then do both JSON parsing AND large collection diffing off-main.
+  if(readOnly||restoreIsBlocked()){error("라이딩 중이거나 원본 보호 중에는 병합할 수 없어요.");return;}
+  final String previewSnapshot=db.toString();
+  toast("JSON 검사·중복 비교 중…");
   new Thread(()->{
    try{
     JSONObject source;
@@ -1524,32 +1527,47 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      }
      source=Store.parse(bytes.toString("UTF-8"));
     }
+    final JsonDataMerger.Result preview=JsonDataMerger.merge(Store.parse(previewSnapshot),source);
     runOnUiThread(()->{
      if(isFinishing()||isDestroyed())return;
-     if(readOnly||restoreIsBlocked()){error("기록 중이거나 원본 보호 중에는 병합할 수 없어요.");return;}
-     JsonDataMerger.Result preview;
-     try{preview=JsonDataMerger.merge(db,source);}
-     catch(Exception e){error("병합 사전 검사 실패: "+e.getMessage());return;}
+     if(readOnly||restoreIsBlocked()){error("라이딩 중이거나 원본 보호 중에는 병합할 수 없어요.");return;}
+     if(!db.toString().equals(previewSnapshot)){
+      error("검사 중 기록이 변경됐어요. 최신 기록을 기준으로 다시 파일을 선택해 주세요.");return;
+     }
      new AlertDialog.Builder(this).setTitle("JSON 병합 미리보기")
-      .setMessage("새 기록 "+preview.added+"개 추가 · 중복 "+preview.skipped+"개 건너뜀.\n\n현재 기록과 설정, GPS, 사진은 보존합니다. 사진과 GPS는 JSON 파일에서 추가하지 않습니다.\n\n기존 데이터는 자동 안전 백업 후 변경됩니다.")
+      .setMessage("새 기록 "+preview.added+"개 추가 · 중복 "+preview.skipped+"개 건너뜀.\n\n현재 기록과 설정, GPS, 사진은 보존합니다. GPS·사진 파일은 JSON 병합 대상이 아닙니다.\n\n충돌하는 바이크 ID는 자동으로 합치지 않습니다.")
       .setNegativeButton("취소",null)
-      .setPositiveButton("새 기록만 추가",(d,w)->attempt(()->{
-       if(readOnly)throw new IOException("원본 보호 중에는 병합하지 않습니다.");
-       if(!RestoreRideGate.begin(RideService.running,RideService.autoArmed))
-        throw new IOException(RestoreRideGate.MESSAGE);
-       try{
-        // Recompute from current DB because it may have changed since preview.
-        JsonDataMerger.Result actual=JsonDataMerger.merge(db,source);
-        if(actual.added==0){toast("추가할 새 기록이 없어요.");return;}
-        // A known pre-merge copy remains recoverable even if the ordinary
-        // daily snapshot has already been used earlier today.
-        AtomicFile rollback=new AtomicFile(new File(getFilesDir(),"before-json-merge.json"));
-        atomic(rollback,db.toString(2).getBytes(StandardCharsets.UTF_8));
-        write(actual.data);
-        render();
-        toast("새 기록 "+actual.added+"개 추가 · 중복 "+actual.skipped+"개 제외");
-       }finally{RestoreRideGate.end();}
-      })).show();
+      .setPositiveButton("새 기록만 추가",(d,w)->{
+       if(readOnly||!RestoreRideGate.begin(RideService.running,RideService.autoArmed)){
+        error("라이딩이 진행 중이거나 데이터를 보호하는 중이에요.");return;
+       }
+       // Block concurrent ride starts while the validated merge is computed.
+       final String currentSnapshot=db.toString();
+       toast("기록 병합·안전 백업 준비 중…");
+       new Thread(()->{
+        JsonDataMerger.Result actual=null;Exception problem=null;
+        try{actual=JsonDataMerger.merge(Store.parse(currentSnapshot),source);}
+        catch(Exception e){problem=e;}
+        final JsonDataMerger.Result ready=actual;final Exception failure=problem;
+        runOnUiThread(()->{
+         try{
+          if(isFinishing()||isDestroyed())return;
+          if(failure!=null){error("병합 검증 실패: "+failure.getMessage());return;}
+          if(readOnly||RideService.running||RideService.autoArmed
+             ||!db.toString().equals(currentSnapshot)){
+           error("작업 도중 기록이 변경됐어요. 다시 병합을 시작해 주세요.");return;
+          }
+          if(ready.added==0){toast("추가할 새 기록이 없어요.");return;}
+          AtomicFile rollback=new AtomicFile(new File(getFilesDir(),"before-json-merge.json"));
+          atomic(rollback,currentSnapshot.getBytes(StandardCharsets.UTF_8));
+          write(ready.data);
+          render();
+          toast("새 기록 "+ready.added+"개 추가 · 중복 "+ready.skipped+"개 제외");
+         }catch(Exception e){error("JSON 병합 저장 실패: "+e.getMessage());}
+         finally{RestoreRideGate.end();}
+        });
+       },"moto-json-merge-commit").start();
+      }).show();
     });
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("JSON 병합 불가: "+e.getMessage());});}
   },"moto-json-merge-preview").start();

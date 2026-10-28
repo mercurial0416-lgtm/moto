@@ -92,11 +92,17 @@ final class NavigationApps {
     activity.startActivity(launch);return;
    }catch(RuntimeException ignored){}
   }
-  new AlertDialog.Builder(activity).setTitle(choice.label+" 앱을 실행할 수 없어요")
-   .setMessage("앱 설치 상태를 확인하거나 다른 내비를 선택해 주세요. MOTO HUB는 오토바이 길찾기를 보장하지 않습니다.")
-   .setNegativeButton("취소",null)
+  // This is only the external app failing. Never stop or modify GPS/OBD.
+  // A configured but crashed navigator may be retried without reinstalling it.
+  boolean installed=launch!=null;
+  new AlertDialog.Builder(activity).setTitle(choice.label+" 실행 실패")
+   .setMessage(installed
+     ?"내비가 설치되어 있지만 실행되지 않았어요. 다시 시도하거나 다른 내비를 실행하세요. GPS 기록은 계속됩니다."
+     :"선택한 내비를 찾을 수 없어요. 설치 상태를 확인하거나 다른 내비를 실행하세요. GPS 기록은 계속됩니다.")
+   .setNegativeButton("닫기",null)
    .setNeutralButton("다른 내비 실행",(d,w)->chooseInstalledAndLaunch(activity))
-   .setPositiveButton("Google Play 열기",(d,w)->openStore(activity,choice)).show();
+   .setPositiveButton(installed?"다시 실행":"설치 페이지",
+     (d,w)->{if(installed)open(activity,choice);else openStore(activity,choice);}).show();
  }
  private static void openStore(MainActivity activity,NavigationChoice choice){
   Uri store=Uri.parse("market://details?id="+choice.packageName);
