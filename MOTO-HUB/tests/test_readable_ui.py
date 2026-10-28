@@ -58,8 +58,11 @@ test('c.drawCircle(12,12,3.0f,p)' in nav,
 test('new QuickEntryUi(a).fuel()' in garage and
      'new QuickEntryUi(a).maintenance()' in garage,
      "functional quick-entry actions must be retained")
+rideui=(JAVA/'RideUi.java').read_text()
 test('new RideUi(a).requestStart()' in garage and
-     'RideService.STOP' in garage, "ride start consent and stop still wired")
+     'new RideUi(a).finishWithSummary()' in garage and
+     'RideService.STOP' in rideui and '".done"' in rideui,
+     "ride start consent, stop confirmation and verified finish still wired")
 test('switchBike(direction)' in garage and 'changeHeroPhoto(bike,own)' in garage,
      "photo editing and multi-bike switching still wired")
 print(f"PASS UX39 typography / graphics / actions: {checks} checks")
