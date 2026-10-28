@@ -1541,6 +1541,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
         // Recompute from current DB because it may have changed since preview.
         JsonDataMerger.Result actual=JsonDataMerger.merge(db,source);
         if(actual.added==0){toast("추가할 새 기록이 없어요.");return;}
+        // A known pre-merge copy remains recoverable even if the ordinary
+        // daily snapshot has already been used earlier today.
+        AtomicFile rollback=new AtomicFile(new File(getFilesDir(),"before-json-merge.json"));
+        atomic(rollback,db.toString(2).getBytes(StandardCharsets.UTF_8));
         write(actual.data);
         render();
         toast("새 기록 "+actual.added+"개 추가 · 중복 "+actual.skipped+"개 제외");
