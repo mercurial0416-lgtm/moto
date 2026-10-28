@@ -279,6 +279,8 @@ final class HubScreens {
  }
  void settings(){title("설정","기록·내비·정비·백업만 간편하게 관리");a.section("데이터 및 복구");line("백업 · 복원","바이크·주유·정비·GPS·사진 전체 백업","열기",this::basicBackup);
   line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":"최신 버전 확인 및 설치","열기",()->new AppUpdater(a).show());
+  line("업데이트 데이터 검사",UpdateInstallSnapshot.lastProblem(a)?"이전 검사에서 확인 필요":"기록 상태·복구 지점 확인",
+   "보기",this::updateRecoveryReport);
   a.section("내비 · 홈 위젯");
   line("초소형 위젯 추가","2×1 · 출발 / 내비 · 가장 간단한 형태","홈에 추가",()->MotoWidgetPin.request(a,true));
   line("기본 위젯 추가","4×1 · 기본 내비 변경 + 기록 실행","홈에 추가",()->MotoWidgetPin.request(a,false));
@@ -399,6 +401,15 @@ final class HubScreens {
   a.label(p,"위치 공유: "+Sharing.status,15,a.fg,false);
   a.label(p,"진단은 서버로 좌표를 보내지 않습니다. 실제 그룹 공유는 로그인, 그룹 참가, GPS 기록 시작, 명시적 공유 동의가 모두 필요합니다.",14,a.muted,false);
   if(Sharing.enabled)a.action(p,"위치 공유 즉시 중지",false,()->{Sharing.stop();a.toast("이 기기에서 위치 전송을 중단했어요.");});
+  a.show();
+ }
+ void updateRecoveryReport(){
+  LinearLayout page=a.page("업데이트 후 데이터 검사");
+  a.label(page,UpdateInstallSnapshot.lastReport(a),15,a.fg,false);
+  a.label(page,"검사 결과는 참고 정보입니다. 정상으로 표시돼도 전체 ZIP 백업을 따로 보관하세요. 자동 복원은 실행하지 않습니다.",13,a.muted,false);
+  a.action(page,"전체 ZIP 백업 만들기",true,a::exportBundle);
+  a.action(page,"보존된 로컬 복구 지점 확인",false,this::advancedBackup);
+  a.action(page,"전체 백업 복원 도구",false,a::importBundle);
   a.show();
  }
  void basicBackup(){

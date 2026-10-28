@@ -55,6 +55,11 @@ final class UpdateInstallSnapshot {
  }
 
  /** A recovery point selected for update/last validated install is not subject to rotation. */
+ static String lastReport(Context context){
+  return context.getSharedPreferences(PREFS,0).getString("last_message",
+   "이 기기에서 아직 앱 업데이트 후 데이터 비교 기록이 없습니다.");
+ }
+ static boolean lastProblem(Context context){return context.getSharedPreferences(PREFS,0).getBoolean("last_problem",false);}
  static boolean isPinned(Context context,String filename){
   android.content.SharedPreferences prefs=context.getSharedPreferences(PREFS,0);
   return UpdateRecoveryPolicy.isPinned(filename,
@@ -65,7 +70,7 @@ final class UpdateInstallSnapshot {
   android.content.SharedPreferences prefs=context.getSharedPreferences(PREFS,0);
   int target=prefs.getInt("pending_version",0);
   if(target<=0||installedVersion<target)return null;
-  if(!dataLoaded)return "업데이트 후 저장 데이터 확인에 실패했습니다. 기존 백업을 보존하고 쓰기 작업을 차단합니다.";
+  if(!dataLoaded){String error="업데이트 후 JSON 데이터를 읽을 수 없습니다. 원본 보호 중입니다.";prefs.edit().putString("last_message",error).putBoolean("last_problem",true).commit();return error;}
   String filename=prefs.getString("recovery_file","");
   File source=new File(new File(new File(context.getFilesDir(),"local-safety-backup"),"updates"),filename);
   boolean snapshotExists=filename.matches("motohub-[0-9]{13}-[a-f0-9]{8}\\.json")&&LocalSafetyBackup.verified(source);
@@ -74,18 +79,24 @@ final class UpdateInstallSnapshot {
   if(snapshotExists)audit.putString("last_good_snapshot",filename);
   String original=prefs.getString("before_footprint","");
   boolean match=true;
+  String changed="";
   if(!original.isEmpty()){
    try{
     android.util.AtomicFile live=new android.util.AtomicFile(new File(context.getFilesDir(),"motohub-v3.json"));
     JSONObject current=Store.parse(new String(live.readFully(),StandardCharsets.UTF_8));
-    match=original.equals(UpdateDataFootprint.capture(context,current));
-   }catch(Exception e){match=false;}
+    String after=UpdateDataFootprint.capture(context,current);
+    match=original.equals(after);
+    if(!match)changed=UpdateFootprintDiff.describe(original,after);
+   }catch(Exception e){match=false;changed="저장 데이터 또는 GPS·사진 파일 읽기 실패";}
   }
-  audit.remove("before_footprint");
+  String report=!match?
+   "업데이트 검사 주의: "+changed+"\n기존 복구 지점은 보존합니다. 자동으로 기존 기록을 덮어쓰지 않습니다.":
+   snapshotExists?"업데이트 전후 기록 검사 통과 · 복구 지점 보관 중":
+   "현재 데이터는 읽었으나 설치 전 복구 지점을 찾지 못했습니다. 전체 ZIP 백업을 권장합니다.";
+  audit.remove("before_footprint").putString("last_message",report)
+   .putBoolean("last_problem",!match||!snapshotExists)
+   .putInt("last_checked_version",installedVersion);
   if(!audit.commit())return "데이터는 읽었지만 업데이트 완료 기록을 저장하지 못했습니다.";
-  if(!match)return "업데이트 전후 기록 수 또는 GPS·사진 원본 SHA-256이 다릅니다. 기존 복구 지점을 보존했으니 기록을 확인하고 전체 ZIP 백업을 권장합니다.";
-  return snapshotExists?
-   "앱 업데이트 후 저장 데이터 확인 완료 · 설치 전 복구 지점 보관 중":
-   "앱 데이터는 읽었지만 설치 전 복구 지점을 찾지 못했습니다. 전체 백업을 권장합니다.";
+  return report;
  }
 }
