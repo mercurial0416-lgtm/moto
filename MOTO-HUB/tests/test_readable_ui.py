@@ -58,7 +58,7 @@ test('c.drawCircle(12,12,3.0f,p)' in nav,
 test('new QuickEntryUi(a).fuel()' in garage and
      'new QuickEntryUi(a).maintenance()' in garage,
      "functional quick-entry actions must be retained")
-rideui=(JAVA/'RideUi.java').read_text()
+rideui=get("RideUi.java")
 test('new RideUi(a).requestStart()' in garage and
      'new RideUi(a).finishWithSummary()' in garage and
      'RideService.STOP' in rideui and '".done"' in rideui,
