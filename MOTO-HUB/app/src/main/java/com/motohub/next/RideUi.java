@@ -70,7 +70,14 @@ final class RideUi {
    a.gap(hero,12);
    Runnable refresh=new Runnable(){@Override public void run(){
     if(!hero.isAttachedToWindow()||a.isFinishing()||a.isDestroyed())return;
-    if(!RideService.running){a.render();return;}
+    // When the user switches to external navigation the view can remain attached.
+    // Do not refresh hidden gauges or show a stop-confirmation dialog over another app.
+    // GPS capture continues in the foreground service, untouched.
+    if(!a.hasWindowFocus()){
+     hero.postDelayed(this,RideScreenRefreshPolicy.BACKGROUND_UI_POLL_MS);
+     return;
+    }
+    if(!RideService.running){a.renderPreservingPosition();return;}
     long seconds=Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.startedElapsed)/1000);
     // Gauge cards are invisible in navigation-first focus mode; GPS is still recorded.
     if(!focus){
