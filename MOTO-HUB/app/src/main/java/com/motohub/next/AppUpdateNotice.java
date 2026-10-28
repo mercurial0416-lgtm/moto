@@ -15,7 +15,7 @@ final class AppUpdateNotice {
  private AppUpdateNotice(){}
  static void checkOnResume(MainActivity a) {
   if(BuildConfig.STORE_DISTRIBUTION||BuildConfig.UPDATE_MANIFEST_URL.isEmpty()||a.readOnly
-      ||RideService.running||RideService.autoArmed||RestoreRideGate.isExporting()
+      ||a.suppressUpdatePrompt()||RideService.running||RideService.autoArmed||RestoreRideGate.isExporting()
       ||RestoreRideGate.isRestoring())return;
   if(!UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256))return;
   long now=System.currentTimeMillis();
@@ -38,7 +38,7 @@ final class AppUpdateNotice {
        !UpdateVersionPolicy.isUpgrade(manifest.versionCode,BuildConfig.VERSION_CODE))return;
     final long newest=manifest.versionCode;
     a.runOnUiThread(()->{
-     if(a.isFinishing()||a.isDestroyed()||a.dialog!=null||
+     if(a.isFinishing()||a.isDestroyed()||a.dialog!=null||a.suppressUpdatePrompt()||
         RideService.running||RideService.autoArmed||
         RestoreRideGate.isExporting()||RestoreRideGate.isRestoring())return;
      if(!UpdatePromptPolicy.shouldPrompt(newest,BuildConfig.VERSION_CODE,
