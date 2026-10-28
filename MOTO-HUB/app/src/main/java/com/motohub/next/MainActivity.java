@@ -1609,7 +1609,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     num(bike.optDouble("odo"))+" km";
   }
   new AlertDialog.Builder(this).setTitle("원본 바이크 "+(index+1)+"/"+collisions.size()+" · "+name)
-   .setMessage("원본 JSON에서 보류된 정비·주유 기록을 연결할 실제 바이크를 확인해 주세요.")
+   .setMessage("원본 JSON에서 보류된 정비·주유 기록을 연결할 실제 바이크를 확인하세요.\n\n"+JsonConflictPreview.text(source,id))
    .setItems(names,(d,choice)->{
     if(choice>0)selections.put(id,destinations.get(choice-1).optString("id"));else selections.remove(id);
     selectJsonMergeBikes(snapshot,source,collisions,selections,index+1);
