@@ -25,7 +25,7 @@ assert 'if(extras){' in ride and 'GPX 가져오기' in ride
 assert '라이딩 2건 통합' in ride
 assert 'a.label(a.content,"기록된 라이딩"' in ride
 assert 'renderPreservingPosition()' in main
-assert 'if(root!=null&&"라이딩".equals(tab)&&dialog==null)renderPreservingPosition();' in main
+assert 'rideStateSignature()!=lastRenderedRideState' in main and 'renderPreservingPosition();' in main
 assert 'target.scrollTo(0,restoreY)' in main
 assert 'if(java.util.Arrays.equals(ids,lastWidgetIds)&&navigator.equals(lastNavigationChoice))return;' in widget
 assert 'manager.updateAppWidget(id,build(context))' in widget

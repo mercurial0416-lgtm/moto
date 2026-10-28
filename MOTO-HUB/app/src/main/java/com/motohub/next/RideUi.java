@@ -588,6 +588,7 @@ final class RideUi {
  }
  void requestStart(){requestStart(false);}
  void requestStart(boolean openNavigatorAfterStart){
+  a.suppressUpdatePromptUntilElapsed=android.os.SystemClock.elapsedRealtime()+120_000L;
   RideReadiness.State state=readiness();
   if(state==RideReadiness.State.GPS_DISABLED||state==RideReadiness.State.NOTIFICATIONS_DISABLED){handleReadiness(state);return;}
   new AlertDialog.Builder(a).setTitle(openNavigatorAfterStart?"GPS 기록 + 내비 실행":"GPS 경로를 기록할까요?")
