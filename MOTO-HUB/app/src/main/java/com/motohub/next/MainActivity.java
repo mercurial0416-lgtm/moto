@@ -1464,9 +1464,14 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           db=next;readOnly=false; // no fallible work after the JSON commit
          });
          // Settings are imported only after database/assets commit. Legacy ZIPs retain current settings.
-         boolean preferencesOk=true;
-         try{DevicePreferencesBackup.restore(this,ready.preferences);}catch(Exception ignored){preferencesOk=false;}
-         final boolean settingsReady=preferencesOk;
+         boolean preferencesOk=true,rollbackNeedsAttention=false;
+         try{DevicePreferencesBackup.restore(this,ready.preferences);}
+         catch(Exception failure){
+          preferencesOk=false;
+          // A failed preferences rollback is explicitly surfaced instead of silently swallowed.
+          rollbackNeedsAttention=failure.getSuppressed().length>0;
+         }
+         final boolean settingsReady=preferencesOk,settingsNeedReview=rollbackNeedsAttention;
          // Non-critical follow-up must never turn a successfully committed restore
          // into an asset-only rollback. The previous JSON remains in before-import.json.
          boolean checkpointOk=true;
@@ -1475,7 +1480,12 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          final boolean checkpointReady=checkpointOk;
          runOnUiThread(()->{selected="";compare.clear();render();
           toast("복원 완료 · GPS "+ready.rides+"개 · 사진 "+ready.photos+"개"+
-           (checkpointReady?"":" · 자동 안전 백업 갱신 실패")+(settingsReady?"":" · 홈/내비 설정 복원 실패"));});
+           (checkpointReady?"":" · 자동 안전 백업 갱신 실패")+
+           (settingsReady?"":settingsNeedReview?" · 설정 일부 복구 실패 · 확인 필요":" · 홈/내비 설정 복원 실패 · 이전 설정 유지/복구 시도"));
+          if(!settingsReady)new AlertDialog.Builder(this).setTitle("백업의 기기 설정 확인")
+           .setMessage(settingsNeedReview?"일부 설정의 자동 복구도 실패했습니다. 기존 기록은 복원됐지만 홈 버튼·기본 내비·알림을 직접 확인하세요.":
+            "바이크·GPS 데이터 복원은 완료됐습니다. 다만 홈 버튼·내비·알림 설정은 복원되지 않았거나 이전 상태로 되돌렸습니다.")
+           .setNegativeButton("닫기",null).setPositiveButton("설정 열기",(d,w)->navigate("더보기")).show();});
         }catch(Exception e){runOnUiThread(()->error("전체 백업 복원 실패: "+e.getMessage()));}
         finally{if(entered)RestoreRideGate.end();ready.close();}
        },"MOTO-ZIP-restore-apply").start();
