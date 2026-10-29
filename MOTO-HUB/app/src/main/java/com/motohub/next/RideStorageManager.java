@@ -44,7 +44,7 @@ final class RideStorageManager {
   AlertDialog.Builder dialog=new AlertDialog.Builder(a)
    .setTitle("GPS 원본 · "+matches.size()+"건")
    .setMessage("약 "+String.format(Locale.KOREA,"%.1f MB",bytes/1_000_000.0)+
-     " · "+(from+1)+"–"+to+" / "+matches.size()+"건\\n자동 영구 삭제 없음 · 검증된 ZIP 백업 후 복구함 이동 가능")
+     " · "+(matches.isEmpty()?0:from+1)+"–"+to+" / "+matches.size()+"건\n자동 영구 삭제 없음 · 검증된 ZIP 백업 후 복구함 이동 가능")
    .setItems(items,(d,index)->{
     if(index==0){
      android.widget.EditText input=new android.widget.EditText(a);
@@ -68,32 +68,44 @@ final class RideStorageManager {
     for(int i=0;i<labels.length;i++)labels[i]=RideHistoryLabel.title(entries.get(i),java.time.ZoneId.systemDefault());
     a.runOnUiThread(()->{
      if(a.isFinishing()||a.isDestroyed())return;
-     new AlertDialog.Builder(a).setTitle("GPS 복구함 · 수동 복원")
-      .setMessage("자동으로 삭제하지 않습니다. 복구할 기록을 직접 선택하세요.")
-      .setItems(labels,(d,index)->new AlertDialog.Builder(a).setTitle("GPS 기록 복원")
-       .setMessage("선택한 원본과 연결 정보를 라이딩 기록으로 되돌릴까요?")
-       .setNegativeButton("취소",null)
-       .setPositiveButton("복원",(dd,w)->new Thread(()->{
-        try{
-         boolean allowed=RestoreRideGate.begin(RideService.running,RideService.autoArmed);
-         if(!allowed||a.readOnly){
-          if(allowed)RestoreRideGate.end();
-          throw new IOException("GPS 기록·백업·복원 중에는 복원할 수 없습니다.");
-         }
-         File restored;
-         try{restored=RideTrash.restore(a.getFilesDir(),entries.get(index));}
-         finally{RestoreRideGate.end();}
-         // Recreate the offline summary for the recovered complete route.
-         RideCompletionInbox.record(a,restored);
-         a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){
-          a.toast("GPS 원본 복원 완료");a.render();
-         }});
-        }catch(Exception error){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("복원 실패: "+error.getMessage());});}
-       },"moto-gps-trash-restore").start()).show())
-      .setNegativeButton("닫기",null).show();
+     showTrashPage(a,entries,labels,0);
     });
    }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error(e.getMessage());});}
   },"moto-gps-trash-list").start();
+ }
+ /** A bounded picker prevents thousands of GPS trash rows being inflated into one dialog. */
+ private static void showTrashPage(MainActivity a,List<File> entries,String[] labels,int requestedPage){
+  if(a.isFinishing()||a.isDestroyed())return;
+  int page=Math.max(0,Math.min(requestedPage,Math.max(0,(entries.size()-1)/30)));
+  int from=page*30,to=Math.min(from+30,entries.size());
+  String[] visible=java.util.Arrays.copyOfRange(labels,from,to);
+  AlertDialog.Builder dialog=new AlertDialog.Builder(a)
+   .setTitle("GPS 복구함 · "+entries.size()+"건")
+   .setMessage(entries.isEmpty()?"복구함에 기록이 없습니다.":
+    "자동 삭제 없음 · "+(from+1)+"–"+to+" / "+entries.size()+"건 · 직접 선택해서 복원")
+   .setItems(visible,(d,index)->new AlertDialog.Builder(a).setTitle("GPS 기록 복원")
+    .setMessage("선택한 원본과 연결 정보를 라이딩 기록으로 되돌릴까요?")
+    .setNegativeButton("취소",null)
+    .setPositiveButton("복원",(dd,w)->new Thread(()->{
+     try{
+      boolean allowed=RestoreRideGate.begin(RideService.running,RideService.autoArmed);
+      if(!allowed||a.readOnly){
+       if(allowed)RestoreRideGate.end();
+       throw new IOException("GPS 기록·백업·복원 중에는 복원할 수 없습니다.");
+      }
+      File restored;
+      try{restored=RideTrash.restore(a.getFilesDir(),entries.get(from+index));}
+      finally{RestoreRideGate.end();}
+      RideCompletionInbox.record(a,restored);
+      a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){
+       a.toast("GPS 원본 복원 완료");a.render();
+      }});
+     }catch(Exception error){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("복원 실패: "+error.getMessage());});}
+    },"moto-gps-trash-restore").start()).show())
+   .setNegativeButton("닫기",null);
+  if(to<entries.size())dialog.setPositiveButton("다음 30건",(d,w)->showTrashPage(a,entries,labels,page+1));
+  if(page>0)dialog.setNeutralButton("이전 30건",(d,w)->showTrashPage(a,entries,labels,page-1));
+  dialog.show();
  }
  private static void confirm(MainActivity a,File track){
   if(a.readOnly||RideService.running||RideService.autoArmed){
