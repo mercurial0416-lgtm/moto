@@ -60,7 +60,7 @@ jobs:
           check=lambda content:hashlib.sha256(content).hexdigest()
           assert len(data)==47298770 and check(data)=='16ccbaab4f3ff04a75d9d4a9e654318c8c5209eb3902e281a36081f92cf2e17b', 'Unsigned artifact is not the validated 548 build'
           offset=47261316
-          assert data[-22:-18]==b'PK\\x05\\x06' and int.from_bytes(data[-6:-2],'little')==offset
+          assert data[-22:-18]==bytes.fromhex("504b0506") and int.from_bytes(data[-6:-2],'little')==offset
           signature=base64.b64decode(Path('.github/release-helpers/v548-public-v2-signature.b64').read_text().strip(),validate=True)
           assert len(signature)==2016, 'Wrong public APK signature block'
           signed=data[:offset]+signature+data[offset:-6]+struct.pack('<I',offset+len(signature))+data[-2:]
