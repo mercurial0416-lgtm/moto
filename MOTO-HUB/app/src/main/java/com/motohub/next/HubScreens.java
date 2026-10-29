@@ -7,9 +7,14 @@ final class HubScreens {
   Thread t=new Thread(r,"moto-local-backup-io");t.setDaemon(true);return t;
  });
  final MainActivity a;
+ final Map<JSONObject,String> visibleLedgerCollections=new IdentityHashMap<>();
  static final class GpsSearchRow {
-  final String title,filename;
-  GpsSearchRow(String title,String filename){this.title=title;this.filename=filename;}
+  final String title,filename,bikeId,date,index;
+  GpsSearchRow(String title,String filename,String bikeId){
+   this.title=title;this.filename=filename;this.bikeId=bikeId;
+   this.date=title.length()>=10&&title.charAt(4)=='.'?title.substring(0,10).replace('.','-'):"";
+   this.index=(title+" "+filename).toLowerCase(Locale.KOREA);
+  }
  }
  static final class LedgerSearchRow {
   final JSONObject item;final String collection,type,detail,amount,search;
@@ -73,12 +78,13 @@ final class HubScreens {
   tile.setClickable(true);tile.setFocusable(true);tile.setContentDescription(name+" "+detail);tile.setOnClickListener(v->click.run());return tile;
  }
  List<JSONObject> records(String mode,JSONObject bike){
-  List<JSONObject> result=new ArrayList<>();String bikeId=bike.optString("id");
+  List<JSONObject> result=new ArrayList<>();
+  visibleLedgerCollections.clear();String bikeId=bike.optString("id");
   for(String key:new String[]{"services","expenses"})for(JSONObject record:a.items(key)){
    if(!bikeId.equals(record.optString("vehicleId")))continue;
    boolean service=key.equals("services"),fuel="주유".equals(record.optString("type"));
    if(mode.equals("정비")&&!service||mode.equals("주유")&&!fuel||mode.equals("기타")&&(service||fuel))continue;
-   result.add(record);
+   result.add(record);visibleLedgerCollections.put(record,key);
   }
   result.sort((x,y)->{int date=y.optString("date").compareTo(x.optString("date"));
    return date!=0?date:Double.compare(y.optDouble("mileage"),x.optDouble("mileage"));});
@@ -113,18 +119,68 @@ final class HubScreens {
   input.setContentDescription("모든 바이크 기록 검색어");
   body.addView(input,new LinearLayout.LayoutParams(-1,a.dp(52)));
   TextView count=a.text("기록을 불러오는 중",12,a.muted,false);body.addView(count);
+  final int[] page={0};final Runnable[] redraw={null};
+  final String[] kind={"전체"},bikeScope={RideHistoryBikeFilter.ALL},since={""},until={""};
+  final List<JSONObject> motorcycles=a.items("vehicles");
+  final Button[] filterControl={null};
+  filterControl[0]=a.button("필터 · 전체 / 전체 바이크 / 전체 기간",false,()->{
+   String[] options={"기록 종류 · "+kind[0],"바이크 · "+(RideHistoryBikeFilter.ALL.equals(bikeScope[0])?"전체":bikeNames.getOrDefault(bikeScope[0],"바이크")),
+    "날짜 범위 · "+(since[0].isEmpty()?"전체":since[0]+" ~ "+(until[0].isEmpty()?"오늘":until[0])),"필터 초기화"};
+   new AlertDialog.Builder(a).setTitle("기록 검색 필터").setItems(options,(d,choice)->{
+    if(choice==0){
+     String[] kinds={"전체","주유","정비","비용","GPS"};
+     new AlertDialog.Builder(a).setTitle("기록 종류").setItems(kinds,(dd,index)->{
+      kind[0]=kinds[index];page[0]=0;redraw[0].run();
+     }).show();
+    }else if(choice==1){
+     String[] names=new String[motorcycles.size()+1];
+     names[0]="전체 바이크";
+     for(int i=0;i<motorcycles.size();i++)names[i+1]=motorcycles.get(i).optString("name");
+     new AlertDialog.Builder(a).setTitle("바이크 선택").setItems(names,(dd,index)->{
+      bikeScope[0]=index==0?RideHistoryBikeFilter.ALL:motorcycles.get(index-1).optString("id");
+      page[0]=0;redraw[0].run();
+     }).show();
+    }else if(choice==2){
+     LinearLayout dates=a.col();dates.setPadding(a.dp(18),a.dp(8),a.dp(18),a.dp(4));
+     EditText from=new EditText(a);from.setSingleLine(true);from.setHint("시작일 YYYY-MM-DD");
+     from.setText(since[0]);dates.addView(from);
+     EditText to=new EditText(a);to.setSingleLine(true);to.setHint("종료일 YYYY-MM-DD");
+     to.setText(until[0]);dates.addView(to);
+     new AlertDialog.Builder(a).setTitle("날짜 범위 · 비우면 제한 없음").setView(dates)
+      .setNegativeButton("취소",null).setPositiveButton("적용",(dd,w)->{
+       String start=from.getText().toString().trim(),end=to.getText().toString().trim();
+       try{
+        if(!start.isEmpty())Store.validateDate(start);
+        if(!end.isEmpty())Store.validateDate(end);
+        if(!start.isEmpty()&&!end.isEmpty()&&start.compareTo(end)>0)
+         throw new IllegalArgumentException("시작일이 종료일보다 늦어요.");
+       }catch(Exception bad){a.toast("날짜 형식을 확인해 주세요 (YYYY-MM-DD).");return;}
+       since[0]=start;until[0]=end;page[0]=0;redraw[0].run();
+      }).show();
+    }else{kind[0]="전체";bikeScope[0]=RideHistoryBikeFilter.ALL;since[0]="";until[0]="";page[0]=0;redraw[0].run();}
+   }).show();
+  });
+  body.addView(filterControl[0]);
   ScrollView scroll=new ScrollView(a);LinearLayout results=a.col();scroll.addView(results);
   body.addView(scroll,new LinearLayout.LayoutParams(-1,a.dp(340)));
   AlertDialog dialog=new AlertDialog.Builder(a).setTitle("주유 · 정비 · 비용 통합 검색")
     .setView(body).setNegativeButton("닫기",null).create();
-  final int[] page={0};final Runnable[] redraw={null};
   final List<GpsSearchRow> gpsLabels=new ArrayList<>();final boolean[] gpsReady={false},gpsFailed={false};
   redraw[0]=()->{
    if(a.isFinishing()||a.isDestroyed()||!dialog.isShowing())return;
    String q=input.getText().toString().trim().toLowerCase(Locale.KOREA);
+   filterControl[0].setText("필터 · "+kind[0]+" / "+(RideHistoryBikeFilter.ALL.equals(bikeScope[0])?"전체 바이크":bikeNames.getOrDefault(bikeScope[0],"선택 바이크"))+
+    (since[0].isEmpty()&&until[0].isEmpty()?"":" / 날짜 적용"));
    results.removeAllViews();int found=0,shown=0;
    int from=page[0]*30;
    for(LedgerSearchRow row:indexed){
+    if("GPS".equals(kind[0]))continue;
+    boolean service="services".equals(row.collection),fuel="주유".equals(row.item.optString("type"));
+    if("정비".equals(kind[0])&&!service||"주유".equals(kind[0])&&(!fuel||service)||
+      "비용".equals(kind[0])&&(fuel||service))continue;
+    if(!RideHistoryBikeFilter.ALL.equals(bikeScope[0])&&!bikeScope[0].equals(row.item.optString("vehicleId")))continue;
+    String day=row.item.optString("date");
+    if(!since[0].isEmpty()&&day.compareTo(since[0])<0||!until[0].isEmpty()&&day.compareTo(until[0])>0)continue;
     if(!q.isEmpty()&&!row.search.contains(q))continue;
     if(found>=from&&shown<30){
      shown++;
@@ -135,7 +191,11 @@ final class HubScreens {
     found++;
    }
    for(GpsSearchRow ride:gpsLabels){
-    if(!q.isEmpty()&&!ride.title.toLowerCase(Locale.KOREA).contains(q)&&!ride.filename.toLowerCase(Locale.KOREA).contains(q))continue;
+    if(!"전체".equals(kind[0])&&!"GPS".equals(kind[0]))continue;
+    if(!RideHistoryBikeFilter.ALL.equals(bikeScope[0])&&!bikeScope[0].equals(ride.bikeId))continue;
+    if(!since[0].isEmpty()&&(ride.date.isEmpty()||ride.date.compareTo(since[0])<0)||
+      !until[0].isEmpty()&&(ride.date.isEmpty()||ride.date.compareTo(until[0])>0))continue;
+    if(!q.isEmpty()&&!ride.index.contains(q))continue;
     if(found>=from&&shown<30){
      shown++;
      line(results,"GPS 라이딩",ride.title,"",()->{
@@ -163,8 +223,11 @@ final class HubScreens {
   new Thread(()->{
    List<GpsSearchRow> loaded=new ArrayList<>();boolean success=true;
    try{
-    for(java.io.File track:TrackFile.tracks(a.getFilesDir()))
-     loaded.add(new GpsSearchRow(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault()),track.getName()));
+    for(java.io.File track:TrackFile.tracks(a.getFilesDir())){
+     String binding;
+     try{binding=RideBikeBinding.readStrict(track);}catch(java.io.IOException invalid){binding="__corrupt__";}
+     loaded.add(new GpsSearchRow(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault()),track.getName(),binding));
+    }
    }catch(Exception unavailable){success=false;}
    final boolean complete=success;
    a.runOnUiThread(()->{
@@ -267,7 +330,8 @@ final class HubScreens {
    if(!month.equals(last)){a.section(month);last=month;}
    boolean receipt=a.receiptCount(x.optString("id"))>0;
    line(x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km"+(receipt?" · 영수증":""),
-    a.won(x.optDouble(x.has("amount")?"amount":"cost")),()->a.edit(x.has("amount")?"expenses":"services",x));
+    a.won(x.optDouble("expenses".equals(visibleLedgerCollections.get(x))?"amount":"cost")),
+    ()->a.edit(visibleLedgerCollections.getOrDefault(x,"services"),x));
   }
   if(ListPageLimit.canPrevious(list.size(),a.recordPageOffset))a.action(a.content,"◀ 최근 기록",false,()->{a.recordPageOffset=ListPageLimit.previous(list.size(),a.recordPageOffset);a.render();});
   if(ListPageLimit.canNext(list.size(),a.recordPageOffset))a.action(a.content,"이전 기록 ▶ · "+ListPageLimit.end(list.size(),a.recordPageOffset)+"/"+list.size(),false,()->{a.recordPageOffset=ListPageLimit.next(list.size(),a.recordPageOffset);a.render();});
