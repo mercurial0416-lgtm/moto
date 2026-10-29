@@ -117,8 +117,9 @@ final class ServiceStatusUi {
     Store.upsert(next,"services",done);
     JSONObject updated=Store.find(next,"vehicles",bike.optString("id"));
     if(updated!=null&&current>updated.optDouble("odo"))updated.put("odo",current);
-    a.write(next);DailyMaintenanceJob.checkSoon(a);a.close();a.render();
-    a.toast("완료 기록을 저장하고 다음 정비주기를 계산했어요.");
+    String beforeSave=a.db.toString();
+    a.write(next);DailyMaintenanceJob.clearReminderState(a);DailyMaintenanceJob.checkSoon(a);a.close();a.render();
+    UndoLastSave.offer(a,beforeSave,a.db.toString(),"정비 완료");
    });
    boolean duplicate=false;
    for(JSONObject x:a.items("services"))if(!x.optBoolean("scheduleOnly")
