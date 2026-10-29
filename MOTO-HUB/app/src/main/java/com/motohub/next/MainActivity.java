@@ -779,7 +779,21 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,-2);p.rightMargin=dp(5);bar.addView(button,p);
   }
   scroll.addView(bar);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);
-  p.bottomMargin=dp(10);parent.addView(scroll,p);
+  p.bottomMargin=dp(8);parent.addView(scroll,p);
+  TextView readable=text("직접 금액을 입력하세요.",13,muted,false);
+  parent.addView(readable);
+  android.text.TextWatcher moneyWatcher=new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence t,int start,int count,int after){}
+   public void onTextChanged(CharSequence t,int start,int before,int count){
+    try{
+     long value=MoneyStep.apply(t.toString(),0);
+     readable.setText("금액 확인 · "+won(value)+(value>=10000?" · "+String.format(java.util.Locale.KOREA,"%,d만 원",value/10000):""));
+    }catch(IllegalArgumentException invalid){readable.setText("숫자를 확인해 주세요.");}
+   }
+   public void afterTextChanged(android.text.Editable e){}
+  };
+  input.addTextChangedListener(moneyWatcher);
+  moneyWatcher.onTextChanged(input.getText(),0,0,input.length());
  }
  long money(EditText e){String value=e.getText().toString().trim();return value.isEmpty()?0:Long.parseLong(value);}
  void tradeIn(){
@@ -1430,7 +1444,50 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     if(which==0)captureReceiptPhoto(key,item,1);else chooseReceiptPhoto(key,item,1);
    }).setNegativeButton("나중에",null).show();
  }
- void remove(String key,JSONObject item){new AlertDialog.Builder(this).setTitle("기록을 삭제할까요?").setMessage(key.equals("vehicles")?"이 바이크의 정비·비용 기록도 함께 삭제됩니다. 필요한 기록은 먼저 백업해 주세요.":"삭제 후 되돌릴 수 없습니다.").setNegativeButton("취소",null).setPositiveButton("삭제",(d,w)->attempt(()->{JSONObject next=new JSONObject(db.toString());String id=item.getString("id");List<String> childReceipts=new ArrayList<>();
+ void remove(String key,JSONObject item){
+  if("vehicles".equals(key)){
+   final String id=item.optString("id");
+   int servicesCount=0,expenseCount=0;
+   for(JSONObject row:items("services"))if(id.equals(row.optString("vehicleId")))servicesCount++;
+   for(JSONObject row:items("expenses"))if(id.equals(row.optString("vehicleId")))expenseCount++;
+   final int serviceTotal=servicesCount,expenseTotal=expenseCount;
+   new AlertDialog.Builder(this).setTitle("바이크 삭제 전 기록 확인")
+    .setMessage(item.optString("name")+"\\n연결 정비 "+serviceTotal+"건 · 주유/비용 "+expenseTotal+"건\\n"+
+      "일반적으로는 판매 처리로 보관하는 게 안전해요. 삭제 시 바이크와 연결된 기록/사진이 함께 사라지고 GPS 바이크 연결은 미지정으로 남을 수 있습니다.\\n\\n먼저 설정 → 백업·복원에서 전체 ZIP 백업을 보관하세요.")
+    .setNegativeButton("취소",null)
+    .setNeutralButton("판매 처리 (기록 유지)",(d,w)->attempt(()->{
+     JSONObject next=new JSONObject(db.toString());
+     JSONObject vehicle=Store.find(next,"vehicles",id);
+     if(vehicle==null)throw new java.io.IOException("바이크 기록이 없어졌어요.");
+     vehicle.put("soldDate",today());write(next);render();
+     toast("판매한 바이크로 보관했어요. 기록은 유지됩니다.");
+    }))
+    .setPositiveButton("영구 삭제 단계로",(d,w)->confirmPermanentBikeDelete(key,item,serviceTotal,expenseTotal)).show();
+   return;
+  }
+  removeConfirmed(key,item);
+ }
+ void confirmPermanentBikeDelete(String key,JSONObject item,int serviceCount,int expenseCount){
+  EditText confirmation=new EditText(this);
+  confirmation.setSingleLine(true);
+  confirmation.setHint("삭제");
+  confirmation.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+  int margin=dp(20);confirmation.setPadding(margin,dp(12),margin,dp(12));
+  new AlertDialog.Builder(this).setTitle("바이크와 기록 영구 삭제")
+   .setMessage("정비 "+serviceCount+"건 · 주유/비용 "+expenseCount+"건과 사진이 삭제됩니다.\\n"+
+     "백업을 보관한 경우에만 아래 칸에 '삭제'를 입력하세요.")
+   .setView(confirmation)
+   .setNegativeButton("취소",null)
+   .setPositiveButton("확인",(d,w)->{
+    if(!"삭제".equals(confirmation.getText().toString().trim())){toast("확인 문구가 달라 삭제하지 않았어요.");return;}
+    removeConfirmed(key,item);
+   }).show();
+ }
+ void removeConfirmed(String key,JSONObject item){new AlertDialog.Builder(this).setTitle("정말 삭제할까요?")
+ .setMessage("삭제 후 연결 기록·사진을 원래대로 돌리기 어려울 수 있습니다.")
+ .setNegativeButton("유지",null).setPositiveButton("영구 삭제",(d,w)->attempt(()->{JSONObject next=new JSONObject(db.toString());String id=item.getString("id");List<String> childReceipts=new ArrayList<>();
+  if(readOnly||RestoreRideGate.blocked(RideService.running,RideService.autoArmed))throw new java.io.IOException("라이딩 중 또는 데이터 보호 모드에서는 삭제할 수 없어요.");
+  if(Store.find(db,key,id)==null)throw new java.io.IOException("이미 삭제된 기록이에요.");
   if(key.equals("vehicles"))for(String collection:new String[]{"services","expenses"})for(JSONObject oldEntry:items(collection))if(id.equals(oldEntry.optString("vehicleId")))childReceipts.add(oldEntry.optString("id"));
   Store.remove(next,key,id);if(key.equals("vehicles")){for(String k:new String[]{"services","expenses"}){JSONArray a=next.getJSONArray(k);for(int i=a.length()-1;i>=0;i--)if(a.getJSONObject(i).optString("vehicleId").equals(id))a.remove(i);}if(next.getJSONObject("settings").optString("primary").equals(id))next.getJSONObject("settings").remove("primary");selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();}write(next);if(key.equals("vehicles"))for(String childId:childReceipts)clearReceiptFiles(childId);if(key.equals("services")||key.equals("expenses")){clearReceiptFiles(id);}render();})).show();}
  boolean restoreIsBlocked(){return RestoreRideGate.blocked(RideService.running,RideService.autoArmed);}
