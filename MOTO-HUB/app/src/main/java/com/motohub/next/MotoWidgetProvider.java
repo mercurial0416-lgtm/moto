@@ -20,6 +20,7 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
  public static final String EXTRA_NAVIGATION="com.motohub.next.WIDGET_NAVIGATION";
  public static final String EXTRA_SELECT_NAV="com.motohub.next.WIDGET_SELECT_NAV";
  private static String lastNavigationChoice=null;
+ private static String lastBikeLabel=null;
  private static int[] lastWidgetIds=null;
  @Override public void onUpdate(Context context,AppWidgetManager manager,int[] ids){
   for(int id:ids)manager.updateAppWidget(id,build(context));
@@ -30,6 +31,7 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
  }
  static RemoteViews build(Context context){
   RemoteViews v=new RemoteViews(context.getPackageName(),R.layout.moto_widget);
+  v.setTextViewText(R.id.widget_home,WidgetBikeSnapshot.label(context));
   v.setTextViewText(R.id.widget_nav_choice,"내비 · "+NavigationApps.preferred(context).label+"  ›");
   v.setOnClickPendingIntent(R.id.widget_home,pending(context,51,"HOME",EXTRA_TAB,"홈"));
   v.setOnClickPendingIntent(R.id.widget_nav_choice,pending(context,52,"CHOOSE_NAV",EXTRA_SELECT_NAV,true));
@@ -51,11 +53,13 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
   int[] ids=manager.getAppWidgetIds(new ComponentName(context,MotoWidgetProvider.class));
   java.util.Arrays.sort(ids);
   String navigator=NavigationApps.preferred(context).id;
-  if(java.util.Arrays.equals(ids,lastWidgetIds)&&navigator.equals(lastNavigationChoice))return;
+  String bike=WidgetBikeSnapshot.label(context);
+  if(java.util.Arrays.equals(ids,lastWidgetIds)&&navigator.equals(lastNavigationChoice)&&bike.equals(lastBikeLabel))return;
   // Widgets contain shortcuts and navigator name only. GPS fixes and fuel/ride
   // database writes must not trigger repeated expensive launcher RemoteViews.
   if(ids.length>0)for(int id:ids)manager.updateAppWidget(id,build(context));
   lastWidgetIds=ids.clone();
   lastNavigationChoice=navigator;
+  lastBikeLabel=bike;
  }
 }

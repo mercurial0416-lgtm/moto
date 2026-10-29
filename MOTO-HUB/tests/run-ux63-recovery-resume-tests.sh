@@ -25,7 +25,7 @@ assert 'rideStateSignature()!=lastRenderedRideState' in main
 assert 'if("라이딩".equals(tab))lastRenderedRideState=rideStateSignature();' in main
 assert 'renderPreservingPosition()' in main
 assert 'final String[] tabs={"홈","라이딩","차고","더보기"}' in main
-assert 'if(java.util.Arrays.equals(ids,lastWidgetIds)&&navigator.equals(lastNavigationChoice))return;' in widget
+assert 'if(java.util.Arrays.equals(ids,lastWidgetIds)&&navigator.equals(lastNavigationChoice)&&bike.equals(lastBikeLabel))return;' in widget
 assert 'MotoWidgetProvider.refresh(this)' in main
 assert 'new RideUi(this).requestStart(true)' in main
 assert 'rideStartConsent.consume(' in ride

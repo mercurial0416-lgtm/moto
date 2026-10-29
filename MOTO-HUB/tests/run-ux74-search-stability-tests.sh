@@ -31,6 +31,6 @@ assert 'homeOk=restoreKeys(' in prefs
 assert 'notifyOk=restoreKeys(' in prefs
 assert 'boolean saved=' in nav
 assert 'FLAG_ACTIVITY_SINGLE_TOP' in widget
-assert 'versionCode=\'550\'' in Path("../.github/workflows/moto-ux-validation.yml").read_text()
+assert 'versionCode=\'551\'' in Path("../.github/workflows/moto-ux-validation.yml").read_text()
 print("PASS UX74 all-bike search, GPS deeplink, storage paging, navigator restore and widget safety")
 PY

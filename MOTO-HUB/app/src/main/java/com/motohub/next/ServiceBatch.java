@@ -32,14 +32,25 @@ final class ServiceBatch {
    long cost=Long.parseLong(item.cost.trim());if(cost>1_000_000_000L||total>1_000_000_000L-cost)throw new IllegalArgumentException("금액 한도를 초과했습니다.");
    total+=cost;
    if(item.note!=null&&item.note.length()>500)throw new IllegalArgumentException("메모는 500자 이내로 입력해 주세요.");
-   long nextKm=0;
+   long nextKm=0;String nextDate="";
+   int intervalKm=0,intervalMonths=0,alertKm=0,alertDays=0;
    if(reuseIntervals){
     JSONObject latest=QuickServiceHistory.latest(previous,bikeId,item.type.trim());
-    if(latest!=null)nextKm=RecentRecordReuse.nextServiceKm(latest.optDouble("mileage",Double.NaN),latest.optDouble("nextKm",Double.NaN),km);
+    if(latest!=null){
+     nextKm=RecentRecordReuse.nextServiceKm(latest.optDouble("mileage",Double.NaN),latest.optDouble("nextKm",Double.NaN),km);
+     intervalKm=latest.optInt("intervalKm",0);
+     intervalMonths=latest.optInt("intervalMonths",0);
+     alertKm=latest.optInt("alertKmBefore",0);alertDays=latest.optInt("alertDaysBefore",0);
+     if(intervalMonths>0&&intervalMonths<=120)nextDate=LocalDate.parse(date).plusMonths(intervalMonths).toString();
+     if(intervalKm<0||intervalKm>100000){intervalKm=0;nextKm=0;}
+    }
    }
    JSONObject row=new JSONObject();row.put("id",UUID.randomUUID().toString());row.put("vehicleId",bikeId);
    row.put("type",item.type.trim());row.put("date",date);row.put("mileage",km);row.put("cost",cost);
-   row.put("nextKm",nextKm);row.put("nextDate","");row.put("note",item.note==null?"":item.note.trim());row.put("serviceBatchId",bundleId);
+   row.put("nextKm",nextKm).put("nextDate",nextDate).put("intervalKm",intervalKm)
+    .put("intervalMonths",intervalMonths).put("alertKmBefore",alertKm).put("alertDaysBefore",alertDays)
+    .put("scheduleOnly",false)
+    .put("note",item.note==null?"":item.note.trim()).put("serviceBatchId",bundleId);
    result.add(row);
   }
   return new Result(result,total);

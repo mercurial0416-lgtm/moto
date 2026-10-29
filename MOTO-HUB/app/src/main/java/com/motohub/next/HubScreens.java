@@ -411,6 +411,7 @@ final class HubScreens {
   a.show();
  }
  void settings(){title("설정","기록·내비·정비·백업만 간편하게 관리");a.section("데이터 및 복구");line("백업 · 복원","바이크·주유·정비·GPS·사진 전체 백업","열기",this::basicBackup);
+ line("데이터 연결 검사","주유·정비 기록의 바이크 연결, 계기판, 중복 점검","검사",()->a.auditGarageSoon(true));
   line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":"최신 버전 확인 및 설치","열기",()->new AppUpdater(a).show());
 
   a.section("내비 · 알림");

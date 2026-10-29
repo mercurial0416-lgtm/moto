@@ -86,7 +86,23 @@ public class MainActivity extends Activity {
     if(audit!=null)runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast(audit);});
    },"moto-post-update-data-audit").start();
   }
+  if(state==null&&!readOnly)auditGarageSoon(false);
   if(state==null && !RideService.running && !RideService.autoArmed && !widgetActionTaken&&!notificationActionTaken)showInterruptedRidePrompt();
+ }
+ void auditGarageSoon(boolean showAll){
+  if(readOnly){if(showAll)error("원본 보호 중이에요. 저장 파일과 백업부터 확인해 주세요.");return;}
+  String snapshot=db.toString();
+  new Thread(()->{
+   String result;
+   try{result=GarageIntegrity.report(Store.parse(snapshot));}
+   catch(Exception e){result="데이터 검사 실패 · 저장 파일과 백업을 확인해 주세요.";}
+   String text=result;
+   runOnUiThread(()->{
+    if(isFinishing()||isDestroyed())return;
+    if(showAll)error(text);
+    else if(GarageIntegrity.hasIssue(text))toast("주유·정비 연결 점검에서 이상 징후가 있어요. 설정 → 데이터 검사에서 확인하세요.");
+   });
+  },"moto-garage-integrity").start();
  }
  /** Process death/reboot leaves a local .track without .done. Only offers a manual review. */
  void showInterruptedRidePrompt(){
@@ -520,7 +536,12 @@ public class MainActivity extends Activity {
    });break;
   }
  }
- void render(){String theme=settings().optString("theme","dark");dark=theme.equals("dark")||(theme.equals("system")&&(getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);
+ void render(){
+  if(WidgetBikeSnapshot.update(this)){
+   MotoWidgetProvider.refresh(this);
+   QuickWidgetChoices.refresh(this);
+  }
+  String theme=settings().optString("theme","dark");dark=theme.equals("dark")||(theme.equals("system")&&(getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);
   int[] palette=MotoDesign.colors(dark);bg=palette[0];fg=palette[1];muted=palette[2];line=palette[3];accent=palette[4];panel=palette[5];highlight=palette[6];
 getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(panel);
  getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
@@ -613,6 +634,30 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   i.setType("*/*");i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/gpx+xml","application/xml","text/xml","application/octet-stream"});
   startActivityForResult(i,44);
  }
+ void editRideNote(File track){
+  if(readOnly){toast("데이터 보호 상태에서는 메모를 수정할 수 없어요.");return;}
+  if(RideService.running&&track.getName().equals(RideService.active)){
+   toast("진행 중인 GPS 기록은 종료 후 수정해 주세요.");return;
+  }
+  LinearLayout body=page("라이딩 제목·메모");
+  label(body,"라이딩 제목 (60자 이내)",14,fg,true);
+  EditText title=new EditText(this);title.setText(RideNotes.title(db,track));title.setSingleLine(true);
+  title.setTextColor(fg);title.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(60)});
+  body.addView(title);
+  gap(body,12);label(body,"메모 (500자 이내)",14,fg,true);
+  EditText memo=new EditText(this);memo.setText(RideNotes.memo(db,track));memo.setTextColor(fg);
+  memo.setMinLines(3);memo.setMaxLines(6);
+  memo.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(500)});
+  body.addView(memo);
+  label(body,"GPS 좌표는 변경하지 않고 전체 백업에 포함되는 기록 정보만 저장합니다.",12,muted,false);
+  action(body,"제목·메모 저장",true,()->attempt(()->{
+   if(readOnly)throw new IOException("원본 보호 중에는 저장할 수 없어요.");
+   JSONObject next=new JSONObject(db.toString());
+   RideNotes.update(next,track,title.getText().toString(),memo.getText().toString());
+   write(next);close();openRideInsights(track);
+  }));
+  show();
+ }
  void openRideInsights(File track){
   if(RideService.running&&track.getName().equals(RideService.active)){toast("기록 종료 후 확인해 주세요.");return;}
   toast("주행 기록을 분석하고 있어요.");
@@ -629,6 +674,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      label(p,info.distanceLabel(),33,accent,true);
      String elapsed=String.format(Locale.KOREA,"%d시간 %d분",info.durationMillis/3600000,(info.durationMillis/60000)%60);
      label(p,"총 소요 "+elapsed+" · 좌표 "+info.points+"개",16,muted,false);
+     String customTitle=RideNotes.title(db,track),rideMemo=RideNotes.memo(db,track);
+     if(!customTitle.isEmpty())label(p,customTitle,22,fg,true);
+     if(!rideMemo.isEmpty())label(p,rideMemo,13,muted,false);
+     action(p,"라이딩 제목·메모 수정",false,()->editRideNote(track));
      LinearLayout row=col();row.setPadding(dp(15),dp(15),dp(15),dp(15));row.setBackground(shape(panel,line,16));
      label(row,String.format(Locale.KOREA,"평균 %.1f km/h · 최고 %.0f km/h",info.averageKmh,info.peakKmh),18,fg,true);
      label(row,String.format(Locale.KOREA,"이동 중 평균 %.1f km/h · GPS 추정 이동 시간 %d분",info.movingAverageKmh,info.movingMillis/60000),13,muted,false);
@@ -1588,7 +1637,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          try{LocalSafetyBackup.checkpoint(this,db);}catch(Exception ignored){checkpointOk=false;}
          try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){ /* Restore is already committed. */ }
          final boolean checkpointReady=checkpointOk;
-         runOnUiThread(()->{selected="";compare.clear();render();
+         runOnUiThread(()->{selected="";compare.clear();render();auditGarageSoon(false);
           toast("복원 완료 · GPS "+ready.rides+"개 · 사진 "+ready.photos+"개"+
            (checkpointReady?"":" · 자동 안전 백업 갱신 실패")+
            (settingsReady?"":settingsNeedReview?" · 설정 일부 복구 실패 · 확인 필요":" · 홈/내비 설정 복원 실패 · 이전 설정 유지/복구 시도"));
@@ -1886,7 +1935,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           AtomicFile rollback=new AtomicFile(new File(getFilesDir(),"before-json-merge.json"));
           atomic(rollback,currentSnapshot.getBytes(StandardCharsets.UTF_8));
           write(ready.data);
-          render();
+          render();auditGarageSoon(false);
           toast("새 기록 "+ready.added+"개 추가 · 중복 "+ready.skipped+"개 · 차량 연결 보류 "+ready.blocked+"개");
          }catch(Exception e){error("JSON 병합 저장 실패: "+e.getMessage());}
          finally{RestoreRideGate.end();}

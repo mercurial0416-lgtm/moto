@@ -91,6 +91,19 @@ final class QuickEntryUi {
   };
   amount.addTextChangedListener(unitHint);liters.addTextChangedListener(unitHint);
   JSONObject recentFuel=RecentFuelRecord.latest(a.items("expenses"),bike.optString("id"));
+  if(recentFuel!=null&&recentFuel.optDouble("liters")>0){
+   long typicalPrice=Math.round(recentFuel.optDouble("amount")/recentFuel.optDouble("liters"));
+   Button lastFuel=a.button("이 바이크 최근 주유 · "+
+     String.format(java.util.Locale.KOREA,"%.2f L",recentFuel.optDouble("liters"))+
+     " · "+typicalPrice+"원/L 적용",false,()->{
+    calculator.setVisibility(View.GONE);
+    fuelAuto.reset();
+    liters.setText(String.valueOf(recentFuelLitersSafe(recentFuel)));
+    if(typicalPrice>0)unitPrice.setText(String.valueOf(typicalPrice));
+    a.toast("지난 주유량과 단가를 참고값으로 채웠어요. 실제 결제 금액은 직접 확인하세요.");
+   });
+   body.addView(lastFuel);
+  }
   if(recentFuel!=null){
    final JSONObject previous=recentFuel;
    Button reuse=a.button("지난 주유 금액·리터 불러오기",false,()->{
@@ -144,15 +157,73 @@ final class QuickEntryUi {
    a.startQuickOdometerCamera(odo);
   });
   // Full-to-full efficiency requires the real odometer; don't hide it on a full fill.
+  CheckBox odoConfirmed=new CheckBox(a);
+  odoConfirmed.setText("실제 계기판 "+odo.getText().toString()+" km를 확인했어요");
+  odoConfirmed.setTextColor(a.fg);odoConfirmed.setTextSize(14);odoConfirmed.setMinHeight(a.dp(46));
+  odoConfirmed.setVisibility(View.GONE);body.addView(odoConfirmed);
+  odo.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence t,int start,int count,int after){}
+   public void onTextChanged(CharSequence t,int start,int before,int count){
+    odoConfirmed.setChecked(false);
+    odoConfirmed.setText("실제 계기판 "+t.toString()+" km를 확인했어요");
+   }
+   public void afterTextChanged(android.text.Editable e){}
+  });
   full.setOnCheckedChangeListener((button,checked)->{
    if(checked)extra.setVisibility(View.VISIBLE);
+   odoConfirmed.setVisibility(checked?View.VISIBLE:View.GONE);
+   if(!checked)odoConfirmed.setChecked(false);
   });
+  // Keep an isolated draft while switching to navigation or after Android process restart.
+  final String bikeId=bike.optString("id");
+  final boolean[] restoring={false};
+  Runnable persistDraft=()->{
+   if(restoring[0])return;
+   FuelDraft.save(a,bikeId,amount.getText().toString(),liters.getText().toString(),
+    unitPrice.getText().toString(),odo.getText().toString(),date.getText().toString(),full.isChecked());
+  };
+  android.text.TextWatcher draftWatcher=new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence v,int st,int c,int after){}
+   public void onTextChanged(CharSequence v,int st,int before,int count){persistDraft.run();}
+   public void afterTextChanged(android.text.Editable e){}
+  };
+  amount.addTextChangedListener(draftWatcher);liters.addTextChangedListener(draftWatcher);
+  unitPrice.addTextChangedListener(draftWatcher);odo.addTextChangedListener(draftWatcher);
+  date.addTextChangedListener(draftWatcher);full.setOnCheckedChangeListener((v,checked)->{
+   if(checked)extra.setVisibility(View.VISIBLE);
+   odoConfirmed.setVisibility(checked?View.VISIBLE:View.GONE);
+   if(!checked)odoConfirmed.setChecked(false);
+   persistDraft.run();
+  });
+  JSONObject previouslyTyped=FuelDraft.read(a,bikeId);
+  if(previouslyTyped!=null){
+   a.action(body,"작성 중이던 이 바이크 주유 기록 불러오기",false,()->{
+    restoring[0]=true;
+    try{
+     amount.setText(previouslyTyped.optString("amount"));
+     liters.setText(previouslyTyped.optString("liters"));
+     unitPrice.setText(previouslyTyped.optString("unitPrice"));
+     odo.setText(previouslyTyped.optString("odo"));
+     date.setText(previouslyTyped.optString("date",a.today()));
+     full.setChecked(previouslyTyped.optBoolean("full"));
+     if(full.isChecked())extra.setVisibility(View.VISIBLE);
+     odoConfirmed.setChecked(false);
+    }finally{restoring[0]=false;}
+    a.toast("임시기록을 불러왔어요. 금액·날짜·계기판을 확인하고 저장하세요.");
+   });
+   a.action(body,"임시 주유 기록 삭제",false,()->{
+    FuelDraft.clear(a,bikeId);
+    a.toast("임시 주유 기록만 삭제했어요.");
+   });
+  }
   a.gap(body,12);
   final long[] lastSaveClick={0};
   a.action(body,"저장",true,()->a.attempt(()->{
    long now=android.os.SystemClock.elapsedRealtime();
    if(now-lastSaveClick[0]<1200)return;
    lastSaveClick[0]=now;
+   if(full.isChecked()&&!odoConfirmed.isChecked())
+    throw new IllegalArgumentException("가득 주유는 실제 계기판 km를 확인한 뒤 체크해 주세요.");
    JSONObject record=QuickRecordDraft.fuel(bike.optString("id"),date.getText().toString().trim(),
     numeric(odo,"계기판",true),numeric(amount,"주유 금액",true),numeric(liters,"주유량",true),full.isChecked());
    Runnable persist=()->a.attempt(()->{
@@ -161,7 +232,8 @@ final class QuickEntryUi {
     Store.upsert(next,"expenses",record);
     JSONObject vehicle=Store.find(next,"vehicles",bike.optString("id"));
     if(vehicle!=null&&record.optDouble("mileage")>vehicle.optDouble("odo"))vehicle.put("odo",record.optDouble("mileage"));
-    a.write(next);a.close();a.render();DailyMaintenanceJob.checkSoon(a);
+    a.write(next);FuelDraft.clear(a,bikeId);
+    a.close();a.render();DailyMaintenanceJob.checkSoon(a);
     UndoLastSave.offer(a,beforeSave,a.db.toString(),"주유");
    });
    boolean exact=QuickLogDuplicate.exists(a.items("expenses"),record,"expenses");
@@ -193,12 +265,24 @@ final class QuickEntryUi {
    }
   },200);
  }
+ private static double recentFuelLitersSafe(JSONObject recent){
+  double liters=recent.optDouble("liters",0);
+  return Double.isFinite(liters)&&liters>0&&liters<1000?liters:0;
+ }
  void maintenance(){
   JSONObject bike=a.bike();if(bike==null||a.readOnly){a.toast("기록 가능한 바이크를 먼저 등록해 주세요.");return;}
   LinearLayout body=a.page("정비주기 등록");
   a.label(body,bike.optString("name")+" · 기준 주행거리 "+a.num(bike.optDouble("odo"))+" km",13,a.muted,false);a.gap(body,13);
   String[] items={"엔진오일","오일필터","체인","타이어","브레이크 패드","냉각수","배터리","기타 직접 입력"};
   Spinner service=options(body,"정비 항목",items);
+  for(JSONObject previousService:a.items("services")){
+   if(!bike.optString("id").equals(previousService.optString("vehicleId")))continue;
+   int match=java.util.Arrays.asList(items).indexOf(previousService.optString("type"));
+   if(match>=0&&match<items.length-1){
+    Button recent=a.button("이 바이크 최근 정비 항목 · "+items[match]+" 선택",false,()->service.setSelection(match));
+    body.addView(recent);break;
+   }
+  }
   EditText customType=new EditText(a);customType.setSingleLine(true);customType.setHint("정비 항목 이름");
   customType.setTextColor(a.fg);customType.setHintTextColor(a.muted);
   customType.setPadding(a.dp(14),a.dp(12),a.dp(14),a.dp(12));customType.setBackground(a.shape(a.panel,a.line,11));
