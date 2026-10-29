@@ -282,8 +282,9 @@ final class QuickEntryUi {
     JSONObject vehicle=Store.find(next,"vehicles",bike.optString("id"));
     if(vehicle!=null&&odo>vehicle.optDouble("odo"))vehicle.put("odo",odo);
     a.write(next);a.close();a.render();DailyMaintenanceJob.checkSoon(a);
-    if(!DailyMaintenanceJob.remindersEnabled(a))askEnableNotifications();
-    UndoLastSave.offer(a,beforeSave,a.db.toString(),"정비주기");
+    UndoLastSave.offer(a,beforeSave,a.db.toString(),"정비주기",()->{
+     if(!DailyMaintenanceJob.remindersEnabled(a))askEnableNotifications();
+    });
    });
    if(QuickLogDuplicate.exists(a.items("services"),record,"services")){
     new AlertDialog.Builder(a).setTitle("이미 등록된 정비주기")
