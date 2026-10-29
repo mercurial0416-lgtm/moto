@@ -1412,14 +1412,14 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    if(key.equals("expenses")){if(!"주유".equals(item.optString("type")))item.put("liters",0);
     else FuelRecordValidation.requireFuel(item.optDouble("amount"),item.optDouble("liters"));
     boolean isFull=full.isChecked()&&"주유".equals(item.optString("type"));if(isFull&&item.optDouble("liters")<=0)throw new Exception("가득 주유의 주유량을 입력해 주세요.");item.put("fullTank",isFull);}
-   if(key.equals("services")||key.equals("expenses"))item.put("vehicleId",old.optString("vehicleId",b.optString("id")));JSONObject next=new JSONObject(db.toString());Store.upsert(next,key,item);if(key.equals("services")||key.equals("expenses")){JSONObject v=Store.find(next,"vehicles",item.getString("vehicleId"));if(v!=null&&item.optDouble("mileage")>v.optDouble("odo"))v.put("odo",item.optDouble("mileage"));}if(existing==null&&QuickLogDuplicate.exists(items(key),item,key)){
+   if(key.equals("services")||key.equals("expenses"))item.put("vehicleId",old.optString("vehicleId",b.optString("id")));String beforeSave=db.toString();JSONObject next=new JSONObject(beforeSave);Store.upsert(next,key,item);if(key.equals("services")||key.equals("expenses")){JSONObject v=Store.find(next,"vehicles",item.getString("vehicleId"));if(v!=null&&item.optDouble("mileage")>v.optDouble("odo"))v.put("odo",item.optDouble("mileage"));}if(existing==null&&QuickLogDuplicate.exists(items(key),item,key)){
     new AlertDialog.Builder(this).setTitle("중복으로 보이는 기록")
      .setMessage("이 바이크에 같은 날짜·거리·항목·금액의 기록이 이미 있어요. 두 번 저장할까요?")
      .setNegativeButton("취소",null).setPositiveButton("그래도 저장",(d,which)->attempt(()->{
-      write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();toast("중복 확인 후 저장했어요.");
+      write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();UndoLastSave.offer(this,beforeSave,db.toString(),title);
       if(attachAfterSave.isChecked())offerReceiptForSavedRecord(key,item);
      })).show();return;
-   }write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();toast("저장했어요.");
+   }write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();UndoLastSave.offer(this,beforeSave,db.toString(),title);
    if(attachAfterSave.isChecked())offerReceiptForSavedRecord(key,item);}));if(existing!=null&&!key.equals("vehicles"))action(p,"기록 삭제",false,()->{close();remove(key,old);});show();
  }
  void offerReceiptForSavedRecord(String key,JSONObject item){
