@@ -73,7 +73,15 @@ final class RideTrash {
    File live=new File(rides,name),stored=new File(folder,name);
    boolean inLive=regular(live),inTrash=regular(stored);
    if(inLive&&inTrash)throw new IOException("GPS 원본이 두 위치에 중복되어 복구를 중단합니다: "+name);
-   if(!inLive&&!inTrash)throw new IOException("GPS 원본이 양쪽 모두 없어 자동 복구할 수 없습니다: "+name);
+   if(!inLive&&!inTrash){
+    File[] loose=folder.listFiles();
+    if(loose!=null&&loose.length==0){
+     // Crash immediately after creating the quarantine folder, before moving sidecars.
+     if(!folder.delete())throw new IOException("빈 GPS 복구함 폴더 정리 실패");
+     continue;
+    }
+    throw new IOException("GPS 원본이 양쪽 모두 없어 자동 복구할 수 없습니다: "+name);
+   }
    File owner=inTrash?folder:rides,orphan=inTrash?rides:folder;
    for(String suffix:SIDECARS){
     File stray=new File(orphan,name+suffix);
