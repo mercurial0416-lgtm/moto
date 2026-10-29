@@ -26,7 +26,7 @@ assert '.put("bikeId",boundBike)' in inbox
 assert 'void promptRideOdometer(JSONObject ride)' in main
 assert 'if(bound.isEmpty())' in main
 assert 'UndoLastSave.offer(a,beforeSave,a.db.toString(),"주유")' in quick
-assert 'UndoLastSave.offer(this,beforeSave,db.toString(),title)' in main
+assert 'UndoLastSave.offer(this,beforeSave,db.toString(),title,' in main
 assert 'UndoLastSave.offer(a,beforeSave,a.db.toString(),"정비 완료")' in service
 assert 'UndoLastSave.available(a)' in home and 'void showQuickTools(' in home
 assert 'FuelNearDuplicate.near(' in quick and 'lastSaveClick' in quick
