@@ -804,10 +804,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   if(key.equals("type")&&form.equals("services"))chips(parent,
    new String[]{"엔진오일","오일필터","타이어","브레이크 패드","체인","냉각수","배터리"},
    new String[]{"엔진오일","오일필터","타이어","브레이크 패드","체인","냉각수","배터리"},e);
-  if(key.equals("name")&&form.equals("vehicles")||key.equals("model")&&form.equals("listings")){
+  if(key.equals("model")&&form.equals("listings")){
    String[] names=modelSuggestions();chips(parent,names,names,e);
   }
-  if(key.equals("year")){
+  if(key.equals("year")&&!form.equals("vehicles")){
    String y=String.valueOf(LocalDate.now().getYear());String[] values={y,String.valueOf(LocalDate.now().getYear()-1),String.valueOf(LocalDate.now().getYear()-2),"2024","2023","2022"};
    chips(parent,values,values,e);
   }
@@ -1247,6 +1247,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    TextView status=text("연식·모델 사진은 확인된 후보만 표시 · 직접 사진은 차고에서 변경",12,muted,false);p.addView(status);
    catalogPreview=preview;catalogStatus=status;
    Button catalog=button("⌕  브랜드 / 모델 / 연식 선택",true,()->showBikeCatalog(f,preview,status));
+   if(key.equals("vehicles"))label(p,"선택하면 이름·연식이 자동 입력됩니다. 목록에 없으면 아래에서 직접 입력하세요.",12,muted,false);
    LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,dp(54));bp.topMargin=dp(10);bp.bottomMargin=dp(18);p.addView(catalog,bp);
   }
   if(key.equals("expenses")||key.equals("services"))label(p,"차량: "+bikeName(old.optString("vehicleId",b.optString("id"))),16,fg,true);
