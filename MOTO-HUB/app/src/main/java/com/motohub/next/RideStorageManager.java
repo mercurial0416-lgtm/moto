@@ -129,7 +129,7 @@ final class RideStorageManager {
   if(page>0)dialog.setNeutralButton("이전 30건",(d,w)->showTrashPage(a,entries,labels,page-1,query));
   dialog.show();
  }
- private static void confirm(MainActivity a,File track){
+ static void confirm(MainActivity a,File track){
   if(a.readOnly||RideService.running||RideService.autoArmed){
    new AlertDialog.Builder(a).setTitle("GPS 원본 삭제 불가")
     .setMessage("해당 기록 생성 이후 검증 완료된 전체 ZIP 백업이 필요합니다. GPS 기록이 진행 중이거나 원본 보호 상태에서도 삭제할 수 없습니다.")
