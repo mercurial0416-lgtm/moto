@@ -772,33 +772,14 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
        action(p,"주행거리 확인 후 정비주기 반영",false,()->confirmRideMileage(track,info,sourceHash));
       else label(p,"통합 원본·보관본 또는 미완료 기록은 누적 주행거리에 반영할 수 없어요.",13,muted,false);
      }
-     action(p,"기록 삭제",false,()->{
+     action(p,"GPS 복구함으로 이동",false,()->{
       if(!RideTrackMerge.canDelete(getFilesDir(),track)){
-       error("통합된 기록입니다. 먼저 통합을 취소한 뒤 삭제해 주세요.");return;
+       error("통합된 기록입니다. 먼저 통합을 취소한 뒤 보관해 주세요.");return;
       }
-      new AlertDialog.Builder(this).setTitle("이 라이딩을 삭제할까요?")
-      .setMessage("GPX 파일을 백업했다면 보관해 주세요. 이미 반영한 계기판 주행거리는 자동으로 줄어들지 않습니다.")
-      .setNegativeButton("취소",null).setPositiveButton("삭제",(d,w)->{
-       attempt(()->{
-        if(readOnly||RideService.running&&track.getName().equals(RideService.active))
-         throw new IOException("기록 중이거나 원본 보호 중에는 삭제할 수 없어요.");
-        if(!RideTrackMerge.canDelete(getFilesDir(),track))throw new IOException("통합된 라이딩은 삭제할 수 없어요.");
-        JSONObject next=new JSONObject(db.toString());
-        RideNotes.clearDeleted(next,track.getName());
-        if(!track.delete())throw new IOException("GPS 원본 삭제 실패. 기록을 유지했어요.");
-        int missingMarkers=0;
-        for(String suffix:new String[]{".done",".imported",".recovered",".category",".bike",".unmerged",".favorite"}){
-         File marker=new File(track.getPath()+suffix);
-         if(marker.exists()&&!marker.delete())missingMarkers++;
-        }
-        try{write(next);}catch(Exception saved){
-         throw new IOException("GPS 파일은 삭제했지만 제목·메모 정리에 실패했습니다. 설정에서 백업 점검을 실행하세요.",saved);
-        }
-        close();render();
-        if(missingMarkers>0)toast("GPS 삭제 완료 · 관련 표시 "+missingMarkers+"개 정리 실패. 데이터 검사를 권장해요.");
-        else toast("GPS·즐겨찾기·메모까지 정리했어요.");
-       });
-      }).show();});
+      // Reuse the backup-proof, crash-recoverable, sidecar-preserving quarantine.
+      // Keeping rideNotes in the JSON allows title/memo to reappear on restore.
+      RideStorageManager.confirm(this,track);
+     });
      show();
     });
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("분석에 실패했어요: "+e.getMessage());});}
