@@ -1637,7 +1637,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          try{LocalSafetyBackup.checkpoint(this,db);}catch(Exception ignored){checkpointOk=false;}
          try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){ /* Restore is already committed. */ }
          final boolean checkpointReady=checkpointOk;
-         runOnUiThread(()->{selected="";compare.clear();render();
+         runOnUiThread(()->{selected="";compare.clear();render();auditGarageSoon(false);
           toast("복원 완료 · GPS "+ready.rides+"개 · 사진 "+ready.photos+"개"+
            (checkpointReady?"":" · 자동 안전 백업 갱신 실패")+
            (settingsReady?"":settingsNeedReview?" · 설정 일부 복구 실패 · 확인 필요":" · 홈/내비 설정 복원 실패 · 이전 설정 유지/복구 시도"));
@@ -1935,7 +1935,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           AtomicFile rollback=new AtomicFile(new File(getFilesDir(),"before-json-merge.json"));
           atomic(rollback,currentSnapshot.getBytes(StandardCharsets.UTF_8));
           write(ready.data);
-          render();
+          render();auditGarageSoon(false);
           toast("새 기록 "+ready.added+"개 추가 · 중복 "+ready.skipped+"개 · 차량 연결 보류 "+ready.blocked+"개");
          }catch(Exception e){error("JSON 병합 저장 실패: "+e.getMessage());}
          finally{RestoreRideGate.end();}
