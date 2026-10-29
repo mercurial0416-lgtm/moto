@@ -1485,7 +1485,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           if(!settingsReady)new AlertDialog.Builder(this).setTitle("백업의 기기 설정 확인")
            .setMessage(settingsNeedReview?"일부 설정의 자동 복구도 실패했습니다. 기존 기록은 복원됐지만 홈 버튼·기본 내비·알림을 직접 확인하세요.":
             "바이크·GPS 데이터 복원은 완료됐습니다. 다만 홈 버튼·내비·알림 설정은 복원되지 않았거나 이전 상태로 되돌렸습니다.")
-           .setNegativeButton("닫기",null).setPositiveButton("설정 열기",(d,w)->navigate("더보기")).show();});
+           .setNegativeButton("닫기",null).setPositiveButton("설정 열기",(preferencesDialog,preferencesChoice)->navigate("더보기")).show();});
         }catch(Exception e){runOnUiThread(()->error("전체 백업 복원 실패: "+e.getMessage()));}
         finally{if(entered)RestoreRideGate.end();ready.close();}
        },"MOTO-ZIP-restore-apply").start();
