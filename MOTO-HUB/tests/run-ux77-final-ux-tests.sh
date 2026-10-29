@@ -19,7 +19,7 @@ assert 'dialog.setOnShowListener' in home and 'if(shown==0)' in home
 assert 'if(edit.commit()){dialog.dismiss();' in home
 assert 'ObdConnectionState.label(' in obd
 assert 'LocalDate.of(' in dates
-assert '-PmotoReleaseCode=551' in ci
-assert "versionCode='551'" in ci
+assert '-PmotoReleaseCode=552' in ci
+assert "versionCode='552'" in ci
 print("PASS UX77 date filters, fuel classification, retained dialog and OBD dashboard")
 PY
