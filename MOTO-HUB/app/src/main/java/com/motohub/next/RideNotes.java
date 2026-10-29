@@ -22,6 +22,13 @@ final class RideNotes {
   JSONObject record=notes==null?null:notes.optJSONObject(track.getName());
   return record==null?"":record.optString(field,"");
  }
+ static void clearDeleted(JSONObject database,String fileName)throws Exception{
+  if(database==null||fileName==null||!fileName.matches(BackupFormat.TRACK))
+   throw new IllegalArgumentException("GPS 메모 파일 이름이 올바르지 않아요.");
+  JSONObject settings=database.optJSONObject("settings");
+  JSONObject notes=settings==null?null:settings.optJSONObject("rideNotes");
+  if(notes!=null)notes.remove(fileName);
+ }
  static void update(JSONObject database,File track,String title,String memo)throws Exception{
   if(!valid(track))throw new IllegalArgumentException("기록된 라이딩 파일을 찾지 못했어요.");
   if(title==null||memo==null||title.length()>60||memo.length()>500||
