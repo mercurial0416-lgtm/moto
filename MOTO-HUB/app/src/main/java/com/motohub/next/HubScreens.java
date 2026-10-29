@@ -74,6 +74,64 @@ final class HubScreens {
    return date!=0?date:Double.compare(y.optDouble("mileage"),x.optDouble("mileage"));});
   return result;
  }
+ /** Search every saved garage ledger on this phone, irrespective of the selected bike.
+  * Render at most 30 matching rows per page to keep the dialog usable on older devices. */
+ void searchAllRecords(){
+  List<JSONObject> all=new ArrayList<>();
+  all.addAll(a.items("services"));all.addAll(a.items("expenses"));
+  all.sort((x,y)->y.optString("date").compareTo(x.optString("date")));
+  Map<String,String> bikeNames=new HashMap<>();
+  for(JSONObject vehicle:a.items("vehicles"))
+   bikeNames.put(vehicle.optString("id"),vehicle.optString("name"));
+  LinearLayout body=a.col();body.setPadding(a.dp(16),a.dp(6),a.dp(16),a.dp(8));
+  EditText input=new EditText(a);input.setSingleLine(true);input.setHint("바이크 · 주유 · 정비 · 날짜 · 금액");
+  input.setTextColor(a.fg);input.setHintTextColor(a.muted);
+  input.setContentDescription("모든 바이크 기록 검색어");
+  body.addView(input,new LinearLayout.LayoutParams(-1,a.dp(52)));
+  TextView count=a.text("기록을 불러오는 중",12,a.muted,false);body.addView(count);
+  ScrollView scroll=new ScrollView(a);LinearLayout results=a.col();scroll.addView(results);
+  body.addView(scroll,new LinearLayout.LayoutParams(-1,a.dp(340)));
+  AlertDialog dialog=new AlertDialog.Builder(a).setTitle("주유 · 정비 · 비용 통합 검색")
+   .setView(body).setNegativeButton("닫기",null).create();
+  final int[] page={0};final Runnable[] redraw={null};
+  redraw[0]=()->{
+   if(a.isFinishing()||a.isDestroyed()||!dialog.isShowing())return;
+   String q=input.getText().toString().trim().toLowerCase(Locale.KOREA);
+   results.removeAllViews();int found=0,shown=0;
+   int from=page[0]*30;
+   for(JSONObject item:all){
+    String type=item.optString("type","기타");
+    String name=bikeNames.getOrDefault(item.optString("vehicleId"),"등록되지 않은 바이크");
+    String detail=name+" · "+item.optString("date")+" · "+a.num(item.optDouble("mileage"))+" km";
+    String note=item.optString("memo")+" "+item.optString("note")+" "+item.optString("description");
+    String amount=a.won(item.optDouble(item.has("amount")?"amount":"cost"));
+    String search=(type+" "+detail+" "+note+" "+amount).toLowerCase(Locale.KOREA);
+    if(!q.isEmpty()&&!search.contains(q))continue;
+    if(found>=from&&shown<30){
+     shown++;
+     line(results,type,detail,amount,()->{
+      dialog.dismiss();a.edit(item.has("amount")?"expenses":"services",item);
+     });
+    }
+    found++;
+   }
+   if(found==0)results.addView(a.text("검색 결과가 없어요.",13,a.muted,false));
+   if(from+shown<found)results.addView(a.button("다음 30건 보기",false,()->{
+    page[0]++;redraw[0].run();scroll.scrollTo(0,0);
+   }));
+   if(page[0]>0)results.addView(a.button("처음 30건으로",false,()->{
+    page[0]=0;redraw[0].run();scroll.scrollTo(0,0);
+   }));
+   count.setText("검색 결과 "+found+"건 · "+(found==0?0:Math.min(found,from+1))+"–"+Math.min(found,from+shown)+"건");
+  };
+  input.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence text,int start,int before,int count){page[0]=0;redraw[0].run();}
+   public void afterTextChanged(android.text.Editable text){}
+  });
+  a.action(body,"GPS 라이딩 원본도 검색",false,()->{dialog.dismiss();RideStorageManager.show(a);});
+  dialog.show();redraw[0].run();
+ }
  void searchMaintenanceHistory(){
   JSONObject bike=a.bike();
   if(bike==null){a.toast("바이크를 먼저 등록해 주세요.");return;}
@@ -130,7 +188,7 @@ final class HubScreens {
   });
   reveal.setContentDescription("추가 비용·영수증·일괄 정비 입력 도구 펼치기");
   actions.addView(reveal);actions.addView(details);
-  a.action(actions,"완료한 정비 이력 검색",false,this::searchMaintenanceHistory);
+  a.action(actions,"전체 기록 검색 · 주유 / 정비 / 비용 / GPS",false,this::searchAllRecords);
   a.content.addView(actions);a.gap(a.content,16);
   new ServiceStatusUi(a).render(a.content);a.gap(a.content,15);
   String bikeId=a.bike().optString("id");
