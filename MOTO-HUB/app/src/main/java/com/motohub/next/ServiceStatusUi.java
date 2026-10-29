@@ -79,7 +79,7 @@ final class ServiceStatusUi {
    });
    if(OdometerGuard.largeJump(bike.optDouble("odo"),km)){
     new AlertDialog.Builder(a).setTitle("주행거리 증가 폭 확인")
-     .setMessage("기존 "+a.num(bike.optDouble("odo"))+" km → 입력 "+a.num(km)+" km\\n2,000km 이상 차이가 나요. 실제 계기판 숫자가 맞나요?")
+     .setMessage("기존 "+a.num(bike.optDouble("odo"))+" km → 입력 "+a.num(km)+" km\n2,000km 이상 차이가 나요. 실제 계기판 숫자가 맞나요?")
      .setNegativeButton("다시 확인",null).setPositiveButton("맞아요",(d,w)->commit.run()).show();
    }else commit.run();
   }));
