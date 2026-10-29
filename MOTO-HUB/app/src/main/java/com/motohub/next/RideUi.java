@@ -222,7 +222,8 @@ final class RideUi {
     for(File file:visible){
      if(generation!=HISTORY_GENERATION.get())return;
      String category=RideCategory.read(file);
-     String label=RideHistoryLabel.title(file,java.time.ZoneId.systemDefault())+
+     String savedTitle=RideNotes.title(a.db,file);
+     String label=(savedTitle.isEmpty()?"":savedTitle+" · ")+RideHistoryLabel.title(file,java.time.ZoneId.systemDefault())+
       (RideTrackMerge.mergedSource(file)?" · 통합 원본":"")+
       (RideTrackMerge.archived(file)?" · 통합 취소 보관본":"")+
       (RideCategory.AUTO.equals(category)?"":" · "+category)+
