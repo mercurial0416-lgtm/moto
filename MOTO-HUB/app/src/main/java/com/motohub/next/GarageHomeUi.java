@@ -54,7 +54,7 @@ final class GarageHomeUi {
 
  void render(){
   JSONObject b=a.bike();if(b==null){emptyGarage();return;}
-  addHero(b);a.gap(a.content,8);stats(b);a.gap(a.content,18);
+  addHero(b);a.gap(a.content,6);stats(b);a.gap(a.content,12);
   for(String key:HomeShortcutOrder.parse(a.getSharedPreferences("home_shortcuts",0).getString("order",""))){
    if(!shortcut(key))continue;
    switch(key){
@@ -63,7 +63,7 @@ final class GarageHomeUi {
     case "fuel":quickAction("fuel");break;
     case "service":quickAction("service");break;
    }
-   a.gap(a.content,10);
+   a.gap(a.content,5);
   }
   // Home shortcut editing lives under Advanced Settings to keep the riding screen focused.
   String condition=condition(b);
@@ -75,12 +75,11 @@ final class GarageHomeUi {
   }
   if(RideService.autoArmed&&!RideService.running){TextView arm=a.text("OBD2 자동 감지 대기 · 출발하면 기록 시작",13,orange,true);arm.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));arm.setBackground(a.shape(surface,stroke,13));a.content.addView(arm);a.gap(a.content,10);}
   if(RideService.running){TextView live=a.text("GPS 기록 중 · "+RideService.status,13,orange,true);live.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));live.setBackground(a.shape(surface,stroke,13));a.content.addView(live);a.gap(a.content,10);}
-  interruptedRideShortcut();a.gap(a.content,19);
+  interruptedRideShortcut();a.gap(a.content,8);
   // Recent activity is optional rather than always visible on the first screen.
   // Keep daily home focused on navigation and maintenance; secondary cards opt-in.
   boolean extra=a.getSharedPreferences("garage_home",0).getBoolean("extra_cards",false);
-  a.gap(a.content,12);
-  Button more=a.button(extra?"유지비 접기":"유지비 더 보기",false,()->{
+  Button more=a.button(extra?"활동·유지비 접기":"활동·유지비 더 보기",false,()->{
    a.getSharedPreferences("garage_home",0).edit().putBoolean("extra_cards",!extra).apply();
    a.renderPreservingPosition();
   });
