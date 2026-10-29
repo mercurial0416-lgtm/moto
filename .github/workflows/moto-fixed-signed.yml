@@ -33,9 +33,9 @@ jobs:
         id: release-version
         run: |
           set -euo pipefail
-          # v545 candidate is built from the integrated and CI-validated release branch.
+          # v546 candidate is built from the integrated and CI-validated release branch.
           # Refuse an older/same published code; never silently release v537 from legacy defaults.
-          CODE=545
+          CODE=546
           CURRENT=$(python3 -c 'import json; print(int(json.load(open("release-meta/updates/manifest.json",encoding="utf-8"))["versionCode"]))')
           test "$CODE" -gt "$CURRENT" || { echo "Refusing to publish non-upgrade version"; exit 1; }
           printf 'code=%s\n' "$CODE" >> "$GITHUB_OUTPUT"
