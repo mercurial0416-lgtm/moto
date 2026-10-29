@@ -161,8 +161,10 @@ public class MainActivity extends Activity {
  String rideBikeCaption(JSONObject ride){
   String bikeId=ride==null?"":ride.optString("bikeId");
   if(!RideBikeBinding.valid(bikeId))return "바이크 미지정";
-  JSONObject vehicle=Store.find(db,"vehicles",bikeId);
-  return vehicle==null?"삭제된 바이크의 라이딩":vehicle.optString("name","이름 없는 바이크");
+  try{
+   JSONObject vehicle=Store.find(db,"vehicles",bikeId);
+   return vehicle==null?"삭제된 바이크의 라이딩":vehicle.optString("name","이름 없는 바이크");
+  }catch(org.json.JSONException invalid){return "바이크 연결 확인 불가";}
  }
  /** A summary can always be reopened, even if another dialog blocked its popup. */
  void showRideCompletionHistory(){
