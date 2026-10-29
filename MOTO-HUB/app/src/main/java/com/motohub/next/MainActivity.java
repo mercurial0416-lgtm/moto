@@ -1458,8 +1458,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    for(JSONObject row:items("expenses"))if(id.equals(row.optString("vehicleId")))expenseCount++;
    final int serviceTotal=servicesCount,expenseTotal=expenseCount;
    new AlertDialog.Builder(this).setTitle("바이크 삭제 전 기록 확인")
-    .setMessage(item.optString("name")+"\\n연결 정비 "+serviceTotal+"건 · 주유/비용 "+expenseTotal+"건\\n"+
-      "일반적으로는 판매 처리로 보관하는 게 안전해요. 삭제 시 바이크와 연결된 기록/사진이 함께 사라지고 GPS 바이크 연결은 미지정으로 남을 수 있습니다.\\n\\n먼저 설정 → 백업·복원에서 전체 ZIP 백업을 보관하세요.")
+    .setMessage(item.optString("name")+"\n연결 정비 "+serviceTotal+"건 · 주유/비용 "+expenseTotal+"건\n"+
+      "일반적으로는 판매 처리로 보관하는 게 안전해요. 삭제 시 바이크와 연결된 기록/사진이 함께 사라지고 GPS 바이크 연결은 미지정으로 남을 수 있습니다.\n\n먼저 설정 → 백업·복원에서 전체 ZIP 백업을 보관하세요.")
     .setNegativeButton("취소",null)
     .setNeutralButton("판매 처리 (기록 유지)",(d,w)->attempt(()->{
      JSONObject next=new JSONObject(db.toString());
@@ -1480,7 +1480,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   confirmation.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
   int margin=dp(20);confirmation.setPadding(margin,dp(12),margin,dp(12));
   new AlertDialog.Builder(this).setTitle("바이크와 기록 영구 삭제")
-   .setMessage("정비 "+serviceCount+"건 · 주유/비용 "+expenseCount+"건과 사진이 삭제됩니다.\\n"+
+   .setMessage("정비 "+serviceCount+"건 · 주유/비용 "+expenseCount+"건과 사진이 삭제됩니다.\n"+
      "백업을 보관한 경우에만 아래 칸에 '삭제'를 입력하세요.")
    .setView(confirmation)
    .setNegativeButton("취소",null)
