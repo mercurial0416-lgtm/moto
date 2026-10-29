@@ -610,11 +610,19 @@ final class RideUi {
   a.suppressUpdatePromptUntilElapsed=android.os.SystemClock.elapsedRealtime()+120_000L;
   RideReadiness.State state=readiness();
   if(state==RideReadiness.State.GPS_DISABLED||state==RideReadiness.State.NOTIFICATIONS_DISABLED){handleReadiness(state);return;}
+  final org.json.JSONObject selectedBike=a.bike();
+  final String approvedBike=selectedBike==null?"":selectedBike.optString("id");
+  final String displayBike=selectedBike==null?"바이크 미지정 (차고에서 선택 가능)":selectedBike.optString("name","바이크 이름 없음");
   new AlertDialog.Builder(a).setTitle(openNavigatorAfterStart?"GPS 기록 + 내비 실행":"GPS 경로를 기록할까요?")
-   .setMessage("정확한 위치를 라이딩 중 이 휴대폰에 저장합니다. 화면이 꺼져도 지속 알림으로 기록하며, 서버나 친구에게 자동 전송하지 않습니다."+
+   .setMessage("기록할 바이크: "+displayBike+"\n\n정확한 위치를 라이딩 중 이 휴대폰에 저장합니다. 화면이 꺼져도 지속 알림으로 기록하며, 서버나 친구에게 자동 전송하지 않습니다."+
     (openNavigatorAfterStart?"\n\nGPS 기록이 실제 시작된 뒤 선택한 외부 내비를 실행합니다. OBD2는 자동 연결하지 않습니다.":""))
-   .setNegativeButton("취소",(d,w)->a.launchNavigationAfterRide=false)
-   .setPositiveButton("동의하고 시작",(d,w)->{a.launchNavigationAfterRide=openNavigatorAfterStart;a.rideStartConsent.approve();start();}).show();
+   .setNegativeButton("취소",(d,w)->{a.launchNavigationAfterRide=false;a.approvedRideBikeId="";})
+   .setPositiveButton("이 바이크로 기록 시작",(d,w)->{
+    String liveBike=a.bike()==null?"":a.bike().optString("id");
+    if(!approvedBike.equals(liveBike)){a.toast("바이크 선택이 변경됐어요. 다시 확인해 주세요.");return;}
+    a.approvedRideBikeId=approvedBike;
+    a.launchNavigationAfterRide=openNavigatorAfterStart;a.rideStartConsent.approve();start();
+   }).show();
  }
  void start(){
   if(!a.rideStartConsent.pending()||!"라이딩".equals(a.tab))return;
@@ -623,9 +631,16 @@ final class RideUi {
   if(a.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){a.requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION,android.Manifest.permission.ACCESS_COARSE_LOCATION},70);return;}
   if(Build.VERSION.SDK_INT>=33&&a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){a.requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},71);return;}
   if(readiness()!=RideReadiness.State.READY){a.rideStartConsent.cancel();a.toast("GPS 준비 상태가 변경됐어요. 확인 후 다시 시작해 주세요.");return;}
+  String liveBike=a.bike()==null?"":a.bike().optString("id");
+  if(!a.approvedRideBikeId.equals(liveBike)){
+   a.rideStartConsent.cancel();a.launchNavigationAfterRide=false;
+   a.toast("바이크가 변경돼 GPS 시작을 취소했어요. 다시 확인해 주세요.");return;
+  }
   if(!a.rideStartConsent.consume("라이딩".equals(a.tab),true))return;
+  final String fixedBikeId=a.approvedRideBikeId;
+  a.approvedRideBikeId="";
   a.attempt(()->{
-   a.startForegroundService(new Intent(a,RideService.class).putExtra(RideService.EXTRA_BIKE_ID,a.bike()==null?"":a.bike().optString("id")));
+   a.startForegroundService(new Intent(a,RideService.class).putExtra(RideService.EXTRA_BIKE_ID,fixedBikeId));
    boolean nav=a.launchNavigationAfterRide;a.launchNavigationAfterRide=false;
    a.toast("GPS 기록을 시작하는 중…");
    if(!nav){
