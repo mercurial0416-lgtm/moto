@@ -465,10 +465,10 @@ final class GarageHomeUi {
     text.append(" · ").append(MaintenanceNoticeText.detail(item.optString("nextDate"),item.optDouble("nextKm"),a.today(),bike.optDouble("odo")));
    }else text.append("최근 기록 ").append(item.optString("date","날짜 없음"))
     .append(" · ").append(a.num(item.optDouble("mileage"))).append(" km");
-   text.append("\\n");
+   text.append("\n");
   }
   new AlertDialog.Builder(a).setTitle("소모품 현황 · "+bike.optString("name"))
-   .setMessage(text.toString().trim()+"\\n\\n수명 추정이 아닌 실제 입력 기록 기준입니다.")
+   .setMessage(text.toString().trim()+"\n\n수명 추정이 아닌 실제 입력 기록 기준입니다.")
    .setNegativeButton("닫기",null).setPositiveButton("정비 관리",(d,w)->a.navigate("차고")).show();
  }
  void sectionTitle(String title,String action,Runnable click){LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
