@@ -356,17 +356,22 @@ final class GarageHomeUi {
   final String[] labels={"GPS 출발·종료","선택한 내비 실행","주유 기록","정비주기"};
   final boolean[] visible=new boolean[keys.length];
   for(int i=0;i<keys.length;i++)visible[i]=shortcut(keys[i]);
-  new AlertDialog.Builder(a).setTitle("홈에서 보여줄 빠른 버튼")
+  AlertDialog dialog=new AlertDialog.Builder(a).setTitle("홈에서 보여줄 빠른 버튼")
    .setMultiChoiceItems(labels,visible,(d,i,checked)->visible[i]=checked)
    .setNegativeButton("취소",null)
    .setNeutralButton("버튼 순서 변경",(d,w)->changeHomeShortcutOrder())
-   .setPositiveButton("저장",(d,w)->{
-    int shown=0;for(boolean selected:visible)if(selected)shown++;
-    if(shown==0){a.toast("버튼은 하나 이상 선택해 주세요.");return;}
-    android.content.SharedPreferences.Editor edit=a.getSharedPreferences("home_shortcuts",0).edit();
-    for(int i=0;i<keys.length;i++)edit.putBoolean(keys[i],visible[i]);
-    if(edit.commit())a.renderPreservingPosition();else a.toast("버튼 설정 저장 실패");
-   }).show();
+   .setPositiveButton("저장",null).create();
+  // Standard AlertDialog positive callbacks dismiss even if validation fails.
+  // Keep the choices and unsaved edits visible until at least one shortcut is selected.
+  dialog.setOnShowListener(ignored->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+   int shown=0;for(boolean selected:visible)if(selected)shown++;
+   if(shown==0){a.toast("버튼은 하나 이상 선택해 주세요.");return;}
+   android.content.SharedPreferences.Editor edit=a.getSharedPreferences("home_shortcuts",0).edit();
+   for(int i=0;i<keys.length;i++)edit.putBoolean(keys[i],visible[i]);
+   if(edit.commit()){dialog.dismiss();a.renderPreservingPosition();}
+   else a.toast("버튼 설정 저장 실패 · 다시 시도해 주세요.");
+  }));
+  dialog.show();
  }
  void changeHomeShortcutOrder(){
   android.content.SharedPreferences prefs=a.getSharedPreferences("home_shortcuts",0);
