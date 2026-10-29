@@ -22,12 +22,13 @@ final class UndoLastSave {
     &&SystemClock.elapsedRealtime()-state.time<WINDOW_MS
     &&a.db!=null&&state.after.equals(a.db.toString());
  }
- static void offer(MainActivity a,String before,String after,String label){
+ static void offer(MainActivity a,String before,String after,String label){offer(a,before,after,label,null);}
+ static void offer(MainActivity a,String before,String after,String label,Runnable onConfirmed){
   if(before==null||after==null||before.equals(after))return;
   last=new State(before,after,label);
   new AlertDialog.Builder(a).setTitle(label+" 저장 완료")
    .setMessage("방금 저장한 기록을 되돌릴 수 있어요. 2분 이내에만 가능하며 다른 변경이 있으면 취소가 차단됩니다.")
-   .setNegativeButton("확인",null)
+   .setNegativeButton("확인",(d,w)->{if(onConfirmed!=null)onConfirmed.run();})
    .setPositiveButton("저장 취소",(d,w)->undo(a)).show();
  }
  static void undo(MainActivity a){
