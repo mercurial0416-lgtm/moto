@@ -191,11 +191,12 @@ final class BackupFormat {
  static boolean allowed(String name,boolean directory){
   if(name==null||name.startsWith("/")||name.contains("..")||name.contains("\\")||name.indexOf('\0')>=0)return false;
   if(directory)return isDirectory(name);
-  return "MOTO-HUB-data.json".equals(name)||"MOTO-HUB-preferences.json".equals(name)||"README-KO.txt".equals(name)||isPhoto(name)||isReceipt(name)||isTrack(name)||isTrashAsset(name)||isGpx(name)||isSidecar(name)||isModelPhoto(name)||isModelMetadata(name);
+  return "MOTO-HUB-data.json".equals(name)||"MOTO-HUB-preferences.json".equals(name)||"MOTO-HUB-batch.txt".equals(name)||"README-KO.txt".equals(name)||isPhoto(name)||isReceipt(name)||isTrack(name)||isTrashAsset(name)||isGpx(name)||isSidecar(name)||isModelPhoto(name)||isModelMetadata(name);
  }
  static long entryLimit(String name){
   if("MOTO-HUB-data.json".equals(name))return MAX_JSON_BYTES;
   if("MOTO-HUB-preferences.json".equals(name))return 4096;
+  if("MOTO-HUB-batch.txt".equals(name))return 256;
   if("README-KO.txt".equals(name))return 8192;
   if(isGpx(name))return MAX_GPX_BYTES;
   if(isModelMetadata(name))return 8192;
