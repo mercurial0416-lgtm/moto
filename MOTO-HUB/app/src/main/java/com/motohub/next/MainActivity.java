@@ -135,8 +135,17 @@ public class MainActivity extends Activity {
   if(summary.isEmpty())return;
   new AlertDialog.Builder(this).setTitle("라이딩 저장 완료").setMessage(summary)
    .setNegativeButton("닫기",null)
-   .setPositiveButton("주행 내역 보기",(d,w)->{tab="라이딩";render();})
+   .setNeutralButton("주행 내역 보기",(d,w)->{tab="라이딩";render();})
+   .setPositiveButton("계기판 갱신",(d,w)->promptRideOdometer())
    .setOnDismissListener(d->RideCompletionInbox.seen(this,id)).show();
+ }
+ /** A completed GPS recap can offer an ODO shortcut, never derive ODO from GPS. */
+ void promptRideOdometer(){
+  if(readOnly){toast("저장 파일 보호 중입니다.");return;}
+  if(RideService.running||RideService.saving()){toast("GPS 기록 저장이 끝난 뒤 계기판을 입력해 주세요.");return;}
+  JSONObject bike=bike();
+  if(bike==null){toast("차고에 바이크를 먼저 등록해 주세요.");return;}
+  new ServiceStatusUi(this).updateOdo(bike);
  }
  /** A summary can always be reopened, even if another dialog blocked its popup. */
  void showRideCompletionHistory(){
@@ -156,7 +165,8 @@ public class MainActivity extends Activity {
     RideCompletionInbox.seen(this,id);
     new AlertDialog.Builder(this).setTitle("저장된 GPS 요약")
      .setMessage(item.optString("summary","")).setNegativeButton("닫기",null)
-     .setPositiveButton("라이딩 내역",(dd,w)->{tab="라이딩";render();}).show();
+     .setNeutralButton("라이딩 내역",(dd,w)->{tab="라이딩";render();})
+     .setPositiveButton("계기판 갱신",(dd,w)->promptRideOdometer()).show();
    }).setNegativeButton("닫기",null).show();
  }
  @Override public void onWindowFocusChanged(boolean focused){
@@ -219,6 +229,11 @@ public class MainActivity extends Activity {
   String form=intent.getStringExtra(MotoWidgetProvider.EXTRA_FORM);
   intent.removeExtra(MotoWidgetProvider.EXTRA_FORM);
   // Widgets may only open a local form. They must never auto-save records or start GPS/sharing.
+  if("fuel_quick".equals(form)){
+   if(dialog!=null&&dialog.isShowing()){toast("작성 중인 입력을 먼저 저장하거나 닫아 주세요.");return;}
+   if(readOnly){toast("저장 파일 보호 중이에요.");return;}
+   new QuickEntryUi(this).fuel();return;
+  }
   if("expenses".equals(form)||"services".equals(form)){
    if(dialog!=null){toast("작성 중인 입력을 먼저 저장하거나 닫아 주세요.");return;}
    tab="차고";render();if(readOnly){toast("저장 파일 보호 중이에요.");return;}edit(form,null);
