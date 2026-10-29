@@ -17,26 +17,27 @@ final class RideStorageManager {
    try{
     List<File> tracks=TrackFile.tracks(a.getFilesDir());
     String[] labels=new String[tracks.size()];
+    String[] indexed=new String[tracks.size()];
     long total=0;
     for(int i=0;i<tracks.size();i++){
      File f=tracks.get(i);
      total+=f.length();
      labels[i]=RideHistoryLabel.title(f,java.time.ZoneId.systemDefault())+
       " · "+String.format(Locale.KOREA,"%.2f MB",f.length()/1_000_000.0);
+     indexed[i]=(labels[i]+" "+f.getName()).toLowerCase(Locale.KOREA);
     }
     final long bytes=total;
     a.runOnUiThread(()->{
-     if(!a.isFinishing()&&!a.isDestroyed())showPage(a,tracks,labels,0,initialFilter,bytes);
+     if(!a.isFinishing()&&!a.isDestroyed())showPage(a,tracks,labels,indexed,0,initialFilter,bytes);
     });
    }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 저장공간 점검 실패: "+e.getMessage());});}
   },"moto-gps-storage-list").start();
  }
- private static void showPage(MainActivity a,List<File> tracks,String[] labels,int page,String filter,long bytes){
+ private static void showPage(MainActivity a,List<File> tracks,String[] labels,String[] indexed,int page,String filter,long bytes){
   if(a.isFinishing()||a.isDestroyed())return;
   List<Integer> matches=new ArrayList<>();
   String query=filter.trim().toLowerCase(Locale.KOREA);
-  for(int i=0;i<labels.length;i++)if(labels[i].toLowerCase(Locale.KOREA).contains(query)||
-   tracks.get(i).getName().toLowerCase(Locale.KOREA).contains(query))matches.add(i);
+  for(int i=0;i<indexed.length;i++)if(indexed[i].contains(query))matches.add(i);
   int from=Math.max(0,Math.min(page*30,Math.max(0,matches.size()-1)/30*30));
   int to=Math.min(from+30,matches.size());
   String[] items=new String[to-from+2];
@@ -54,12 +55,12 @@ final class RideStorageManager {
      new AlertDialog.Builder(a).setTitle("GPS 날짜 검색")
       .setMessage("연·월·일 일부로 검색할 수 있습니다.")
       .setView(input).setNegativeButton("취소",null)
-      .setPositiveButton("검색",(x,y)->showPage(a,tracks,labels,0,input.getText().toString(),bytes)).show();
+      .setPositiveButton("검색",(x,y)->showPage(a,tracks,labels,indexed,0,input.getText().toString(),bytes)).show();
     }else if(index==1)showTrash(a);
     else confirm(a,tracks.get(matches.get(from+index-2)));
    }).setNegativeButton("닫기",null);
-  if(to<matches.size())dialog.setPositiveButton("다음 30건",(d,w)->showPage(a,tracks,labels,from/30+1,query,bytes));
-  if(from>0)dialog.setNeutralButton("이전 30건",(d,w)->showPage(a,tracks,labels,from/30-1,query,bytes));
+  if(to<matches.size())dialog.setPositiveButton("다음 30건",(d,w)->showPage(a,tracks,labels,indexed,from/30+1,query,bytes));
+  if(from>0)dialog.setNeutralButton("이전 30건",(d,w)->showPage(a,tracks,labels,indexed,from/30-1,query,bytes));
   dialog.show();
  }
  private static void showTrash(MainActivity a){

@@ -5,6 +5,12 @@ final class ObdFailureGuide {
  private ObdFailureGuide(){}
  static String classify(String text){
   String v=text==null?"":text.toLowerCase(java.util.Locale.ROOT);
+  if(v.contains("bluetooth off")||v.contains("adapter disabled")||v.contains("블루투스 꺼"))
+   return "휴대폰 Bluetooth 꺼짐 · 설정에서 켠 후 직접 재연결";
+  if(v.contains("device busy")||v.contains("resource busy")||v.contains("already in use"))
+   return "동글 연결 점유 중 · 다른 OBD 앱을 닫고 재연결";
+  if(v.contains("no data")||v.contains("no response")||v.contains("데이터 없음"))
+   return "ECU 센서 응답 없음 · GPS 단독 기록 가능, 시동·호환성 확인";
   if(v.contains("permission")||v.contains("security")||v.contains("권한"))
    return "주변 기기 권한 없음 · Android 설정에서 Bluetooth 권한 허용";
   if(v.contains("010d")||v.contains("speed pid")||v.contains("속도 pid")

@@ -15,11 +15,11 @@ assert 'a.items("services")' in hub and 'a.items("expenses")' in hub
 assert 'IdentityHashMap<>' in hub and 'a.edit(row.collection,row.item)' in hub
 assert 'moto-unified-gps-search' in hub and 'TrackFile.tracks(a.getFilesDir())' in hub
 assert 'RideStorageManager.show(a,ride.filename)' in hub
-assert 'final String title,filename;' in hub
+assert 'final String title,filename,bikeId,date,index;' in hub
 assert 'shown<30' in hub and 'page[0]++' in hub
 assert 'void showPage(MainActivity a,' in storage
 assert 'static void show(MainActivity a,String initialFilter)' in storage
-assert 'tracks.get(i).getName().toLowerCase(Locale.KOREA).contains(query)' in storage
+assert 'indexed[i]=(labels[i]+' in storage
 assert 'showTrashPage(a,entries,labels,page+1,query)' in storage
 assert 'GPS 복구함 날짜 검색' in storage
 assert 'matches.get(from+index-1)' in storage
@@ -31,6 +31,6 @@ assert 'homeOk=restoreKeys(' in prefs
 assert 'notifyOk=restoreKeys(' in prefs
 assert 'boolean saved=' in nav
 assert 'FLAG_ACTIVITY_SINGLE_TOP' in widget
-assert 'versionCode=\'544\'' in Path("../.github/workflows/moto-ux-validation.yml").read_text()
+assert 'versionCode=\'545\'' in Path("../.github/workflows/moto-ux-validation.yml").read_text()
 print("PASS UX74 all-bike search, GPS deeplink, storage paging, navigator restore and widget safety")
 PY
