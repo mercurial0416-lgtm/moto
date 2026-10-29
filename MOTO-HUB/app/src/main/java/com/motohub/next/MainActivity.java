@@ -117,7 +117,8 @@ public class MainActivity extends Activity {
        try{
         JSONObject record=Store.find(db,found.collection,found.id);
         JSONObject owner=Store.find(db,"vehicles",found.bikeId);
-        if(record==null||owner==null){error("연결된 바이크가 없어 직접 수정할 수 없어요. 백업과 차고 기록을 확인하세요.");return;}
+        if(record==null){error("점검한 원본 기록을 찾지 못했어요. 다시 검사해 주세요.");return;}
+        if(owner==null){relinkOrphanGarageRecord(found,record,snapshot);return;}
         selected=found.bikeId;
         edit(found.collection,record);
        }catch(Exception e){error("해당 기록을 열지 못했어요: "+e.getMessage());}
@@ -126,6 +127,46 @@ public class MainActivity extends Activity {
      toast("주유·정비 연결 점검에서 이상 징후가 있어요. 설정 → 데이터 검사에서 확인하세요.");
    });
   },"moto-garage-integrity").start();
+ }
+ /** Manual owner recovery changes ONLY the selected service/fuel record's vehicleId. */
+ void relinkOrphanGarageRecord(GarageIntegrity.Finding finding,JSONObject original,String auditSnapshot){
+  if(readOnly||RestoreRideGate.blocked(RideService.running,RideService.autoArmed)){
+   error("라이딩·복원 중이거나 원본 보호 상태에서는 연결을 수정할 수 없어요.");return;
+  }
+  List<JSONObject> bikes=items("vehicles");
+  if(bikes.isEmpty()){error("연결할 바이크가 없어요. 먼저 차고에 실제 바이크를 등록해 주세요.");return;}
+  String[] names=new String[bikes.size()];
+  for(int i=0;i<bikes.size();i++)
+   names[i]=bikes.get(i).optString("name","이름 없는 바이크")+" · "+
+     bikes.get(i).optInt("year")+"년식";
+  new AlertDialog.Builder(this).setTitle("기록의 실제 바이크 지정")
+   .setMessage("기존 바이크 연결 정보가 유효하지 않아요. 실제 이 정비·주유를 한 바이크를 선택하세요. 계기판은 자동 변경하지 않습니다.")
+   .setItems(names,(dialog,which)->{
+    JSONObject target=bikes.get(which);
+    String chosen=target.optString("id");
+    new AlertDialog.Builder(this).setTitle("바이크 연결 변경 확인")
+     .setMessage(finding.reason+"\n이전 연결: "+finding.bikeId+
+      "\n새 연결: "+target.optString("name")+"\n\n주유량·금액·정비주기·계기판은 그대로 두고 이 기록의 바이크 ID만 변경합니다.")
+     .setNegativeButton("취소",null)
+     .setPositiveButton("연결 복구", (d,w)->attempt(()->{
+      if(readOnly||RestoreRideGate.blocked(RideService.running,RideService.autoArmed))
+       throw new IOException("라이딩 또는 백업·복원 중에는 기록을 변경하지 않아요.");
+      if(!auditSnapshot.equals(db.toString()))
+       throw new IOException("검사 이후 데이터가 변경됐어요. 다시 점검해 주세요.");
+      JSONObject nextDb=new JSONObject(auditSnapshot);
+      JSONObject toFix=Store.find(nextDb,finding.collection,finding.id);
+      if(toFix==null||!finding.bikeId.equals(toFix.optString("vehicleId")))
+       throw new IOException("원래 기록 연결이 변경됐어요. 다시 점검해 주세요.");
+      if(Store.find(nextDb,"vehicles",chosen)==null)
+       throw new IOException("대상 바이크가 삭제됐어요. 다시 선택해 주세요.");
+      toFix.put("vehicleId",chosen);
+      String prior=auditSnapshot;
+      write(nextDb);DailyMaintenanceJob.checkSoon(this);
+      selected=chosen;render();
+      UndoLastSave.offer(this,prior,db.toString(),"바이크 기록 연결 복구");
+      toast("연결을 복구했어요. 필요하면 기록을 열어 계기판을 확인하세요.");
+     })).show();
+   }).setNegativeButton("취소",null).show();
  }
  /** Process death/reboot leaves a local .track without .done. Only offers a manual review. */
  void showInterruptedRidePrompt(){
