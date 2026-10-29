@@ -51,7 +51,9 @@ final class QuickEntryUi {
   LinearLayout body=a.page("주유 기록");a.label(body,bike.optString("name")+" · 오늘",13,a.muted,false);
   a.gap(body,12);
   EditText amount=number(body,"주유 금액 (원)","","예: 12000");
+  amount.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
   EditText liters=number(body,"실제 주유량 (L)","","예: 4.5");
+  liters.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
   LinearLayout tools=a.col();tools.setVisibility(View.GONE);
   LinearLayout calculator=a.col();calculator.setVisibility(View.GONE);
   EditText unitPrice=number(calculator,"리터당 가격 (원)","","예: 1750");
@@ -170,7 +172,26 @@ final class QuickEntryUi {
      .setNegativeButton("취소",null).setPositiveButton("별도 주유 맞아요",(dialog,which)->persist.run()).show();
    }else persist.run();
   }));
+  // The primary save button is already in the dialog footer; keyboard Done invokes it.
+  liters.setOnEditorActionListener((view,actionId,event)->{
+   if(actionId==android.view.inputmethod.EditorInfo.IME_ACTION_DONE){
+    a.hideKeyboard();
+    if(a.formFooter!=null&&a.formFooter.getChildCount()>0){
+     a.formFooter.getChildAt(a.formFooter.getChildCount()-1).performClick();
+    }
+    return true;
+   }
+   return false;
+  });
   a.show();
+  amount.requestFocus();
+  amount.postDelayed(()->{
+   if(a.dialog!=null&&a.dialog.isShowing()&&amount.isAttachedToWindow()){
+    android.view.inputmethod.InputMethodManager imm=
+     (android.view.inputmethod.InputMethodManager)a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+    if(imm!=null)imm.showSoftInput(amount,android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+   }
+  },200);
  }
  void maintenance(){
   JSONObject bike=a.bike();if(bike==null||a.readOnly){a.toast("기록 가능한 바이크를 먼저 등록해 주세요.");return;}
