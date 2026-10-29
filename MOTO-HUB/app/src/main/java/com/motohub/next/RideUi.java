@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 final class RideUi {
  static final class HistoryEntry {
   final File file;final String date,status,searchKey;
-  HistoryEntry(File file,String date,String status){this.file=file;this.date=date;this.status=status;this.searchKey=RideHistorySearch.index(date,status);}
+  HistoryEntry(File file,String date,String status,String memo){this.file=file;this.date=date;this.status=status;this.searchKey=RideHistorySearch.index(date+" "+memo,status);}
  }
  /** One background reader prevents file-system I/O from freezing the history screen. */
  private static final ExecutorService HISTORY_EXECUTOR=Executors.newSingleThreadExecutor(r->{
@@ -223,12 +223,13 @@ final class RideUi {
      if(generation!=HISTORY_GENERATION.get())return;
      String category=RideCategory.read(file);
      String savedTitle=RideNotes.title(a.db,file);
+     String savedMemo=RideNotes.memo(a.db,file);
      String label=(savedTitle.isEmpty()?"":savedTitle+" · ")+RideHistoryLabel.title(file,java.time.ZoneId.systemDefault())+
       (RideTrackMerge.mergedSource(file)?" · 통합 원본":"")+
       (RideTrackMerge.archived(file)?" · 통합 취소 보관본":"")+
       (RideCategory.AUTO.equals(category)?"":" · "+category)+
       " · "+RideHistoryBikeLabel.label(file,bikeNames);
-     entries.add(new HistoryEntry(file,label,RideHistoryFilter.status(file,activeName,recording)));
+     entries.add(new HistoryEntry(file,label,RideHistoryFilter.status(file,activeName,recording),savedMemo));
     }
     int unfinished=0;
     for(File file:bikeRides)if(RideHistoryFilter.INTERRUPTED.equals(RideHistoryFilter.status(file,activeName,recording)))unfinished++;
