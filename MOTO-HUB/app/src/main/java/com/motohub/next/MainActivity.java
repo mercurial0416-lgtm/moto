@@ -136,16 +136,27 @@ public class MainActivity extends Activity {
   new AlertDialog.Builder(this).setTitle("라이딩 저장 완료").setMessage(summary)
    .setNegativeButton("닫기",null)
    .setNeutralButton("주행 내역 보기",(d,w)->{tab="라이딩";render();})
-   .setPositiveButton("계기판 갱신",(d,w)->promptRideOdometer())
+   .setPositiveButton("계기판 갱신",(d,w)->promptRideOdometer(pending))
    .setOnDismissListener(d->RideCompletionInbox.seen(this,id)).show();
  }
  /** A completed GPS recap can offer an ODO shortcut, never derive ODO from GPS. */
- void promptRideOdometer(){
+ void promptRideOdometer(JSONObject ride){
   if(readOnly){toast("저장 파일 보호 중입니다.");return;}
   if(RideService.running||RideService.saving()){toast("GPS 기록 저장이 끝난 뒤 계기판을 입력해 주세요.");return;}
-  JSONObject bike=bike();
-  if(bike==null){toast("차고에 바이크를 먼저 등록해 주세요.");return;}
-  new ServiceStatusUi(this).updateOdo(bike);
+  if(ride==null){error("라이딩 연결 정보를 찾을 수 없어요.");return;}
+  try{
+   File track=new File(TrackFile.directory(getFilesDir()),ride.optString("id"));
+   if(!RideMileageIntegrity.validCompleted(track))throw new java.io.IOException("라이딩 원본이 없거나 완료되지 않았습니다.");
+   String bound=RideBikeBinding.readStrict(track);
+   if(bound.isEmpty())throw new java.io.IOException("이전 라이딩은 바이크 연결 기록이 없어요. 차고에서 직접 계기판을 갱신해 주세요.");
+   JSONObject linked=Store.find(db,"vehicles",bound);
+   if(linked==null)throw new java.io.IOException("라이딩과 연결된 바이크가 차고에 없어요.");
+   if(!bound.equals(ride.optString("bikeId",bound)))throw new java.io.IOException("라이딩과 저장 요약의 바이크 정보가 일치하지 않아요.");
+   new AlertDialog.Builder(this).setTitle("라이딩 바이크 확인")
+    .setMessage("기록에 연결된 바이크: "+linked.optString("name")+"\nGPS 거리는 자동 반영하지 않습니다. 실제 계기판을 직접 입력할까요?")
+    .setNegativeButton("취소",null)
+    .setPositiveButton("계기판 입력",(d,w)->new ServiceStatusUi(this).updateOdo(linked)).show();
+  }catch(Exception invalid){error(invalid.getMessage()==null?"라이딩 바이크 연결을 확인하지 못했어요.":invalid.getMessage());}
  }
  /** A summary can always be reopened, even if another dialog blocked its popup. */
  void showRideCompletionHistory(){
@@ -166,7 +177,7 @@ public class MainActivity extends Activity {
     new AlertDialog.Builder(this).setTitle("저장된 GPS 요약")
      .setMessage(item.optString("summary","")).setNegativeButton("닫기",null)
      .setNeutralButton("라이딩 내역",(dd,w)->{tab="라이딩";render();})
-     .setPositiveButton("계기판 갱신",(dd,w)->promptRideOdometer()).show();
+     .setPositiveButton("계기판 갱신",(dd,w)->promptRideOdometer(item)).show();
    }).setNegativeButton("닫기",null).show();
  }
  @Override public void onWindowFocusChanged(boolean focused){
@@ -746,7 +757,29 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
   input.setSingleLine(true);input.setMinimumHeight(dp(52));input.setPadding(dp(12),dp(8),dp(12),dp(8));input.setBackground(shape(panel,line,10));
   input.setContentDescription(title);
-  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(16);parent.addView(input,lp);return input;
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);parent.addView(input,lp);
+  if(title.equals("새 바이크 구매가")||title.equals("기존 바이크 예상 판매가"))moneyStepButtons(parent,input);
+  return input;
+ }
+ void moneyStepButtons(LinearLayout parent,EditText input){
+  LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);
+  HorizontalScrollView scroll=new HorizontalScrollView(this);
+  scroll.setHorizontalScrollBarEnabled(false);
+  final long[] changes={-1000000,-100000,-100000,100000,500000,1000000};
+  final String[] labels={"−100만","−10만","−10만","+10만","+50만","+100만"};
+  // Repeated negative adjustments would be confusing; use one −50만 step instead.
+  changes[2]=-500000;labels[2]="−50만";
+  for(int i=0;i<labels.length;i++){
+   final long delta=changes[i];
+   Button button=button(labels[i],false,()->attempt(()->{
+    long next=MoneyStep.apply(input.getText().toString(),delta);
+    input.setText(String.valueOf(next));input.setSelection(input.length());
+   }));
+   button.setTextSize(12);button.setMinHeight(dp(42));
+   LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,-2);p.rightMargin=dp(5);bar.addView(button,p);
+  }
+  scroll.addView(bar);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);
+  p.bottomMargin=dp(10);parent.addView(scroll,p);
  }
  long money(EditText e){String value=e.getText().toString().trim();return value.isEmpty()?0:Long.parseLong(value);}
  void tradeIn(){
@@ -833,10 +866,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    new String[]{"1만원","2만원","3만원","5만원","10만원"},new String[]{"10000","20000","30000","50000","100000"},e);
   if(key.equals("cost")&&form.equals("services"))chips(parent,
    new String[]{"1만원","3만원","5만원","10만원","20만원"},new String[]{"10000","30000","50000","100000","200000"},e);
-  if(key.equals("purchase")&&form.equals("vehicles"))chips(parent,
-   new String[]{"100만","300만","500만","700만","1000만"},new String[]{"1000000","3000000","5000000","7000000","10000000"},e);
-  if(key.equals("price")&&form.equals("listings"))chips(parent,
-   new String[]{"100만","300만","500만","700만","1000만"},new String[]{"1000000","3000000","5000000","7000000","10000000"},e);
+  if(key.equals("purchase")&&form.equals("vehicles"))moneyStepButtons(parent,e);
+  if(key.equals("price")&&form.equals("listings"))moneyStepButtons(parent,e);
   if(key.equals("date")&&(form.equals("expenses")||form.equals("services")))label(parent,"저장 전 날짜와 계기판을 확인하세요. 이전 기록 불러오기는 이 두 항목을 바꾸지 않아요.",12,muted,false);
   if(key.equals("liters")&&form.equals("expenses"))chips(parent,
    new String[]{"2L","3L","4L","5L","6L","10L"},new String[]{"2","3","4","5","6","10"},e);
@@ -1381,15 +1412,13 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    if(key.equals("expenses")){if(!"주유".equals(item.optString("type")))item.put("liters",0);
     else FuelRecordValidation.requireFuel(item.optDouble("amount"),item.optDouble("liters"));
     boolean isFull=full.isChecked()&&"주유".equals(item.optString("type"));if(isFull&&item.optDouble("liters")<=0)throw new Exception("가득 주유의 주유량을 입력해 주세요.");item.put("fullTank",isFull);}
-   if(key.equals("services")||key.equals("expenses"))item.put("vehicleId",old.optString("vehicleId",b.optString("id")));JSONObject next=new JSONObject(db.toString());Store.upsert(next,key,item);if(key.equals("services")||key.equals("expenses")){JSONObject v=Store.find(next,"vehicles",item.getString("vehicleId"));if(v!=null&&item.optDouble("mileage")>v.optDouble("odo"))v.put("odo",item.optDouble("mileage"));}if(existing==null&&QuickLogDuplicate.exists(items(key),item,key)){
+   if(key.equals("services")||key.equals("expenses"))item.put("vehicleId",old.optString("vehicleId",b.optString("id")));String beforeSave=db.toString();JSONObject next=new JSONObject(beforeSave);Store.upsert(next,key,item);if(key.equals("services")||key.equals("expenses")){JSONObject v=Store.find(next,"vehicles",item.getString("vehicleId"));if(v!=null&&item.optDouble("mileage")>v.optDouble("odo"))v.put("odo",item.optDouble("mileage"));}if(existing==null&&QuickLogDuplicate.exists(items(key),item,key)){
     new AlertDialog.Builder(this).setTitle("중복으로 보이는 기록")
      .setMessage("이 바이크에 같은 날짜·거리·항목·금액의 기록이 이미 있어요. 두 번 저장할까요?")
      .setNegativeButton("취소",null).setPositiveButton("그래도 저장",(d,which)->attempt(()->{
-      write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();toast("중복 확인 후 저장했어요.");
-      if(attachAfterSave.isChecked())offerReceiptForSavedRecord(key,item);
+      write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();UndoLastSave.offer(this,beforeSave,db.toString(),title,attachAfterSave.isChecked()?()->offerReceiptForSavedRecord(key,item):null);
      })).show();return;
-   }write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();toast("저장했어요.");
-   if(attachAfterSave.isChecked())offerReceiptForSavedRecord(key,item);}));if(existing!=null&&!key.equals("vehicles"))action(p,"기록 삭제",false,()->{close();remove(key,old);});show();
+   }write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();UndoLastSave.offer(this,beforeSave,db.toString(),title,attachAfterSave.isChecked()?()->offerReceiptForSavedRecord(key,item):null);}));if(existing!=null&&!key.equals("vehicles"))action(p,"기록 삭제",false,()->{close();remove(key,old);});show();
  }
  void offerReceiptForSavedRecord(String key,JSONObject item){
   if(!"services".equals(key)&&!"expenses".equals(key))return;
@@ -1933,7 +1962,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       final int rides=prepared.rides,photos=prepared.photos;
       runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())
        new AlertDialog.Builder(this).setTitle("ZIP 복구 사전 검증 통과")
-       .setMessage("백업 내용·데이터 JSON·GPS 및 사진 구조 검사 통과\\nGPS "+rides+"건 · 사진 "+photos+"장\\n검사 중 기존 기록은 변경하지 않았습니다. 실제 복원 시 여유공간과 기기 상태를 다시 확인합니다.")
+       .setMessage("백업 내용·데이터 JSON·GPS 및 사진 구조 검사 통과\nGPS "+rides+"건 · 사진 "+photos+"장\n검사 중 기존 기록은 변경하지 않았습니다. 실제 복원 시 여유공간과 기기 상태를 다시 확인합니다.")
        .setPositiveButton("확인",null).show();
       });
      }

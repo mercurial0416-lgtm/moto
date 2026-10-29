@@ -92,10 +92,7 @@ final class GarageHomeUi {
   if(RideService.autoArmed&&!RideService.running){TextView arm=a.text("OBD2 자동 감지 대기 · 출발하면 기록 시작",13,orange,true);arm.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));arm.setBackground(a.shape(surface,stroke,13));a.content.addView(arm);a.gap(a.content,10);}
   if(RideService.running){TextView live=a.text("GPS 기록 중 · "+RideService.status,13,orange,true);live.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));live.setBackground(a.shape(surface,stroke,13));a.content.addView(live);a.gap(a.content,10);}
   interruptedRideShortcut();a.gap(a.content,8);
-  a.action(a.content,ParkingSpotUi.stored(b)?"주차 위치 보기·갱신":"주차 위치 저장",false,
-    ()->new ParkingSpotUi(a).show(b));
-  a.action(a.content,"최근 주유·정비 수정",false,()->quickRecentEdit(b));
-  a.action(a.content,"소모품 정비 현황",false,()->showConsumables(b));
+  a.action(a.content,UndoLastSave.available(a)?"빠른 도구 · 저장 취소 가능":"빠른 도구 · 주차·기록·소모품",false,()->showQuickTools(b));
   a.gap(a.content,6);
   // Recent activity is optional rather than always visible on the first screen.
   // Keep daily home focused on navigation and maintenance; secondary cards opt-in.
@@ -418,6 +415,18 @@ final class GarageHomeUi {
   button.setMinHeight(a.dp(50));
   button.setBackground(a.shape(fuel?orange:surface,fuel?0:stroke,8));
   a.content.addView(button,new LinearLayout.LayoutParams(-1,-2));
+ }
+ void showQuickTools(JSONObject bike){
+  java.util.List<String> labels=new java.util.ArrayList<>();
+  java.util.List<Runnable> actions=new java.util.ArrayList<>();
+  labels.add(ParkingSpotUi.stored(bike)?"주차 위치 보기·갱신":"주차 위치 저장");
+  actions.add(()->new ParkingSpotUi(a).show(bike));
+  labels.add("최근 주유·정비 수정");actions.add(()->quickRecentEdit(bike));
+  labels.add("소모품 정비 현황");actions.add(()->showConsumables(bike));
+  if(UndoLastSave.available(a)){labels.add("방금 저장한 기록 취소");actions.add(()->UndoLastSave.undo(a));}
+  new AlertDialog.Builder(a).setTitle("빠른 도구")
+   .setItems(labels.toArray(new String[0]),(d,index)->actions.get(index).run())
+   .setNegativeButton("닫기",null).show();
  }
  /** Edit the latest existing ledger entry without creating a duplicate record. */
  void quickRecentEdit(JSONObject bike){

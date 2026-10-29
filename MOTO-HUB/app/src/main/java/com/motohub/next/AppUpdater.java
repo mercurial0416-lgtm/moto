@@ -185,7 +185,7 @@ final class AppUpdater {
  }
  void check(){if(BuildConfig.STORE_DISTRIBUTION){openGooglePlay();return;}if(!UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256)){a.error(UpdateReadiness.state(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256));return;}work("배포 버전 확인 중",()->{HttpURLConnection c=connect(BuildConfig.UPDATE_MANIFEST_URL);UpdateManifest m;try(InputStream in=c.getInputStream()){m=new UpdateManifest(new String(UpdateManifest.bounded(in,65536),StandardCharsets.UTF_8),a.getPackageName());}finally{c.disconnect();}if(m.minSdk>Build.VERSION.SDK_INT)throw new IOException("이 업데이트는 더 높은 Android 버전이 필요합니다.");updateProgress("배포 버전 확인 완료",-1);ui(()->{if(!UpdateVersionPolicy.isUpgrade(m.versionCode,BuildConfig.VERSION_CODE)){
     new AlertDialog.Builder(a).setTitle("업데이트 없음")
-     .setMessage(UpdateVersionPolicy.currentMessage(m.versionCode,BuildConfig.VERSION_CODE))
+     .setMessage("서버 공개 버전: "+m.versionName+" ("+m.versionCode+")\\n현재 설치 버전: "+BuildConfig.VERSION_CODE+"\\n\\n"+UpdateVersionPolicy.currentMessage(m.versionCode,BuildConfig.VERSION_CODE))
      .setPositiveButton("확인",null).show();return;}new AlertDialog.Builder(a).setTitle(m.versionName+" 업데이트").setMessage(m.notes+"\n\n다운로드: "+String.format(Locale.KOREA,"%.1f MB",m.sizeBytes/1048576.0)).setNegativeButton("나중에",null).setPositiveButton("다운로드",(d,w)->download(m)).show();});});}
  void download(UpdateManifest m){
   if(BuildConfig.STORE_DISTRIBUTION){openGooglePlay();return;}

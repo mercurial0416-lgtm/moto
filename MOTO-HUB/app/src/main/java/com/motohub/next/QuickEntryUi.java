@@ -146,20 +146,28 @@ final class QuickEntryUi {
    if(checked)extra.setVisibility(View.VISIBLE);
   });
   a.gap(body,12);
+  final long[] lastSaveClick={0};
   a.action(body,"저장",true,()->a.attempt(()->{
+   long now=android.os.SystemClock.elapsedRealtime();
+   if(now-lastSaveClick[0]<1200)return;
+   lastSaveClick[0]=now;
    JSONObject record=QuickRecordDraft.fuel(bike.optString("id"),date.getText().toString().trim(),
     numeric(odo,"계기판",true),numeric(amount,"주유 금액",true),numeric(liters,"주유량",true),full.isChecked());
    Runnable persist=()->a.attempt(()->{
-    JSONObject next=new JSONObject(a.db.toString());
+    String beforeSave=a.db.toString();
+    JSONObject next=new JSONObject(beforeSave);
     Store.upsert(next,"expenses",record);
     JSONObject vehicle=Store.find(next,"vehicles",bike.optString("id"));
     if(vehicle!=null&&record.optDouble("mileage")>vehicle.optDouble("odo"))vehicle.put("odo",record.optDouble("mileage"));
-    a.write(next);a.close();a.render();a.toast("주유 기록을 저장했어요.");DailyMaintenanceJob.checkSoon(a);
+    a.write(next);a.close();a.render();DailyMaintenanceJob.checkSoon(a);
+    UndoLastSave.offer(a,beforeSave,a.db.toString(),"주유");
    });
-   if(QuickLogDuplicate.exists(a.items("expenses"),record,"expenses")){
-    new AlertDialog.Builder(a).setTitle("같은 주유 기록이 있어요")
-     .setMessage("금액·리터·날짜·주행거리가 같은 기록이 이미 있습니다. 그래도 저장할까요?")
-     .setNegativeButton("취소",null).setPositiveButton("저장",(dialog,which)->persist.run()).show();
+   boolean exact=QuickLogDuplicate.exists(a.items("expenses"),record,"expenses");
+   if(exact||FuelNearDuplicate.near(a.items("expenses"),record)){
+    new AlertDialog.Builder(a).setTitle(exact?"같은 주유 기록이 있어요":"비슷한 주유 기록 확인")
+     .setMessage(exact?"금액·리터·날짜·주행거리가 같은 기록이 이미 있습니다. 그래도 저장할까요?":
+      "오늘 같은 바이크에 주행거리·주유량·금액이 비슷한 기록이 있어요. 실제로 다시 주유한 게 맞나요?")
+     .setNegativeButton("취소",null).setPositiveButton("별도 주유 맞아요",(dialog,which)->persist.run()).show();
    }else persist.run();
   }));
   a.show();
@@ -269,12 +277,14 @@ final class QuickEntryUi {
    record.put("alertKmBefore",kmBeforeChoices[kmAlert.getSelectedItemPosition()]);
    record.put("alertDaysBefore",daysBeforeChoices[dateAlert.getSelectedItemPosition()]);
    Runnable save=()->a.attempt(()->{
-    JSONObject next=new JSONObject(a.db.toString());Store.upsert(next,"services",record);
+    String beforeSave=a.db.toString();
+    JSONObject next=new JSONObject(beforeSave);Store.upsert(next,"services",record);
     JSONObject vehicle=Store.find(next,"vehicles",bike.optString("id"));
     if(vehicle!=null&&odo>vehicle.optDouble("odo"))vehicle.put("odo",odo);
     a.write(next);a.close();a.render();DailyMaintenanceJob.checkSoon(a);
-    if(!DailyMaintenanceJob.remindersEnabled(a))askEnableNotifications();
-    else a.toast("정비주기를 등록했어요. 예정 시 알림을 확인하세요.");
+    UndoLastSave.offer(a,beforeSave,a.db.toString(),"정비주기",()->{
+     if(!DailyMaintenanceJob.remindersEnabled(a))askEnableNotifications();
+    });
    });
    if(QuickLogDuplicate.exists(a.items("services"),record,"services")){
     new AlertDialog.Builder(a).setTitle("이미 등록된 정비주기")

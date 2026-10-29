@@ -54,21 +54,36 @@ final class ServiceStatusUi {
   return MaintenanceAlertWindow.status(item,a.today(),bike.optDouble("odo"));
  }
  void updateOdo(JSONObject bike){
+  if(bike==null)return;
+  String bikeId=bike.optString("id");
   EditText field=new EditText(a);
   field.setSingleLine(true);field.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
-  field.setText(String.valueOf((long)bike.optDouble("odo")));field.selectAll();field.setPadding(a.dp(18),a.dp(15),a.dp(18),a.dp(15));
-  new AlertDialog.Builder(a).setTitle("현재 계기판 거리")
-   .setMessage("실제 계기판 숫자를 입력하면 남은 정비 거리와 알림 시점을 다시 계산해요.")
-   .setView(field).setNegativeButton("취소",null)
-   .setPositiveButton("저장",(d,w)->a.attempt(()->{
-    double km=Double.parseDouble(field.getText().toString().trim());
-    if(!Double.isFinite(km)||km<bike.optDouble("odo")||km>1e9)
-     throw new IllegalArgumentException("현재 계기판과 같거나 큰 주행거리를 입력해 주세요.");
+  field.setText(String.valueOf((long)bike.optDouble("odo")));field.selectAll();
+  field.setPadding(a.dp(18),a.dp(15),a.dp(18),a.dp(15));
+  AlertDialog dialog=new AlertDialog.Builder(a).setTitle(bike.optString("name")+" · 계기판 거리")
+   .setMessage("실제 계기판 숫자를 입력해 주세요. GPS 거리는 자동 반영하지 않아요.")
+   .setView(field).setNegativeButton("취소",null).setPositiveButton("저장",null).create();
+  dialog.setOnShowListener(x->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+   double km;
+   try{km=Double.parseDouble(field.getText().toString().trim());
+    OdometerGuard.require(bike.optDouble("odo"),km);}
+   catch(Exception e){field.setError("현재 등록값보다 크거나 같은 실제 계기판 km를 입력해 주세요.");return;}
+   Runnable commit=()->a.attempt(()->{
+    if(a.readOnly)throw new java.io.IOException("읽기 전용 데이터 상태입니다.");
     JSONObject next=new JSONObject(a.db.toString());
-    Store.find(next,"vehicles",bike.optString("id")).put("odo",km);
-    a.write(next);DailyMaintenanceJob.checkSoon(a);a.render();
-    a.toast("정비 잔여 거리를 다시 계산했어요.");
-   })).show();
+    JSONObject current=Store.find(next,"vehicles",bikeId);
+    if(current==null)throw new java.io.IOException("선택한 바이크가 없어졌어요.");
+    OdometerGuard.require(current.optDouble("odo"),km);
+    current.put("odo",km);a.write(next);DailyMaintenanceJob.checkSoon(a);
+    dialog.dismiss();a.render();a.toast("계기판을 갱신했어요.");
+   });
+   if(OdometerGuard.largeJump(bike.optDouble("odo"),km)){
+    new AlertDialog.Builder(a).setTitle("주행거리 증가 폭 확인")
+     .setMessage("기존 "+a.num(bike.optDouble("odo"))+" km → 입력 "+a.num(km)+" km\n2,000km 이상 차이가 나요. 실제 계기판 숫자가 맞나요?")
+     .setNegativeButton("다시 확인",null).setPositiveButton("맞아요",(d,w)->commit.run()).show();
+   }else commit.run();
+  }));
+  dialog.show();
  }
  void complete(JSONObject old){
   JSONObject bike=a.bike();if(bike==null)return;
@@ -102,8 +117,9 @@ final class ServiceStatusUi {
     Store.upsert(next,"services",done);
     JSONObject updated=Store.find(next,"vehicles",bike.optString("id"));
     if(updated!=null&&current>updated.optDouble("odo"))updated.put("odo",current);
-    a.write(next);DailyMaintenanceJob.checkSoon(a);a.close();a.render();
-    a.toast("완료 기록을 저장하고 다음 정비주기를 계산했어요.");
+    String beforeSave=a.db.toString();
+    a.write(next);DailyMaintenanceJob.clearReminderState(a);DailyMaintenanceJob.checkSoon(a);a.close();a.render();
+    UndoLastSave.offer(a,beforeSave,a.db.toString(),"정비 완료");
    });
    boolean duplicate=false;
    for(JSONObject x:a.items("services"))if(!x.optBoolean("scheduleOnly")

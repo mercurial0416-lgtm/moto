@@ -25,6 +25,15 @@ final class ParkingSpotUi {
   return Double.isFinite(lat)&&Double.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180
     &&bike.optLong("parkingSavedAt",0)>0;
  }
+ static String parkedInfo(JSONObject bike){
+  if(!stored(bike))return "저장된 주차 위치가 없어요.";
+  long saved=bike.optLong("parkingSavedAt",0),age=System.currentTimeMillis()-saved;
+  String when=new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.KOREA).format(new java.util.Date(saved));
+  float accuracy=(float)bike.optDouble("parkingAccuracyM",Double.NaN);
+  String quality=Float.isFinite(accuracy)?" · GPS 오차 약 "+Math.round(accuracy)+"m":" · GPS 정확도 미기록";
+  String stale=age<0?" · 기기 시계를 확인하세요":age>24L*60*60*1000?" · 하루 이상 지난 저장 위치":"";
+  return "저장 시각: "+when+quality+stale+"\n직접 저장한 위치만 보관하며 자동 추적하지 않습니다.";
+ }
  void show(JSONObject bike){
   if(bike==null)return;
   String bikeId=bike.optString("id"),bikeName=bike.optString("name");
@@ -32,7 +41,7 @@ final class ParkingSpotUi {
    new String[]{"저장한 주차 위치 지도에서 보기","현재 위치를 주차 위치로 다시 저장","저장된 주차 위치 삭제"}:
    new String[]{"현재 위치를 주차 위치로 저장"};
   new AlertDialog.Builder(a).setTitle(bikeName+" · 주차 위치")
-   .setMessage(stored(bike)?"직접 저장한 위치만 보관합니다. GPS 자동 추적은 하지 않아요.":"주차한 곳에서 저장을 눌러 현재 GPS 위치를 한 번만 확인합니다.")
+   .setMessage(stored(bike)?parkedInfo(bike):"주차한 곳에서 저장을 눌러 현재 GPS 위치를 한 번만 확인합니다.")
    .setItems(actions,(d,index)->{
     if(stored(bike)){if(index==0)view(bike);else if(index==1)capture(bikeId);else clear(bikeId);}
     else capture(bikeId);
@@ -86,7 +95,7 @@ final class ParkingSpotUi {
    if(!id.equals(a.bike()==null?"":a.bike().optString("id")))
      throw new IllegalArgumentException("선택 바이크가 바뀌었어요. 다시 저장해 주세요.");
    bike.put("parkingLat",point.getLatitude()).put("parkingLon",point.getLongitude())
-    .put("parkingSavedAt",System.currentTimeMillis());
+    .put("parkingSavedAt",System.currentTimeMillis()).put("parkingAccuracyM",point.getAccuracy());
    a.write(next);a.renderPreservingPosition();a.toast("주차 위치를 이 바이크에 저장했어요.");
   });
  }
@@ -97,7 +106,7 @@ final class ParkingSpotUi {
     JSONObject next=new JSONObject(a.db.toString());
     JSONObject bike=Store.find(next,"vehicles",id);
     if(bike==null)throw new IllegalArgumentException("바이크가 없어요.");
-    bike.remove("parkingLat");bike.remove("parkingLon");bike.remove("parkingSavedAt");
+    bike.remove("parkingLat");bike.remove("parkingLon");bike.remove("parkingSavedAt");bike.remove("parkingAccuracyM");
     a.write(next);a.renderPreservingPosition();a.toast("주차 위치를 삭제했어요.");
    })).show();
  }
