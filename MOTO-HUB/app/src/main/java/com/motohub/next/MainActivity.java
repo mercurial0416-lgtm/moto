@@ -95,13 +95,35 @@ public class MainActivity extends Activity {
   String snapshot=db.toString();
   new Thread(()->{
    String result;
-   try{result=GarageIntegrity.report(Store.parse(snapshot));}
-   catch(Exception e){result="데이터 검사 실패 · 저장 파일과 백업을 확인해 주세요.";}
-   String text=result;
+   java.util.List<GarageIntegrity.Finding> findings=new java.util.ArrayList<>();
+   try{
+    JSONObject checked=Store.parse(snapshot);
+    result=GarageIntegrity.report(checked);
+    if(showAll)findings=GarageIntegrity.findings(checked);
+   }catch(Exception e){result="데이터 검사 실패 · 저장 파일과 백업을 확인해 주세요.";}
+   final String text=result;
+   final java.util.List<GarageIntegrity.Finding> matched=findings;
    runOnUiThread(()->{
     if(isFinishing()||isDestroyed())return;
-    if(showAll)error(text);
-    else if(GarageIntegrity.hasIssue(text))toast("주유·정비 연결 점검에서 이상 징후가 있어요. 설정 → 데이터 검사에서 확인하세요.");
+    if(showAll){
+     if(matched.isEmpty()){error(text);return;}
+     String[] labels=new String[matched.size()];
+     for(int i=0;i<matched.size();i++)labels[i]=(i+1)+". "+matched.get(i).reason;
+     new AlertDialog.Builder(this).setTitle("데이터 점검 · 의심 기록 "+matched.size()+"건")
+      .setMessage("원본은 수정하지 않았습니다. 상세 기록을 직접 확인할 수 있어요. 삭제 전 전체 백업을 권장합니다.")
+      .setItems(labels,(dlg,choice)->{
+       if(readOnly||!snapshot.equals(db.toString())){error("검사 후 기록이 변경됐어요. 검사를 다시 실행해 주세요.");return;}
+       GarageIntegrity.Finding found=matched.get(choice);
+       try{
+        JSONObject record=Store.find(db,found.collection,found.id);
+        JSONObject owner=Store.find(db,"vehicles",found.bikeId);
+        if(record==null||owner==null){error("연결된 바이크가 없어 직접 수정할 수 없어요. 백업과 차고 기록을 확인하세요.");return;}
+        selected=found.bikeId;
+        edit(found.collection,record);
+       }catch(Exception e){error("해당 기록을 열지 못했어요: "+e.getMessage());}
+      }).setNegativeButton("닫기",null).show();
+    }else if(GarageIntegrity.hasIssue(text))
+     toast("주유·정비 연결 점검에서 이상 징후가 있어요. 설정 → 데이터 검사에서 확인하세요.");
    });
   },"moto-garage-integrity").start();
  }
