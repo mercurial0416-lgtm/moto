@@ -1,0 +1,49 @@
+name: Audit published MOTO HUB OTA artifact
+on:
+  push:
+    branches: [main]
+    paths:
+      - updates/manifest.json
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-public-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install APK validation tools
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;36.0.0"'
+      - name: Confirm manifest matches a real public signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > "$RUNNER_TEMP/update.env"
+          import json,shlex
+          x=json.load(open('updates/manifest.json',encoding='utf-8'))
+          code=int(x['versionCode'])
+          expected=f"https://github.com/mercurial0416-lgtm/moto/releases/download/moto-hub-v{code}/MOTO-HUB.apk"
+          # Legacy fixed-signed v536 had an explicitly different release tag.
+          if code>536 and x['apkUrl']!=expected: raise SystemExit("OTA manifest URL differs from release version")
+          if x['packageName']!='com.motohub.next':raise SystemExit("Wrong Android package")
+          if x['certificateSha256'].lower()!='212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b':
+              raise SystemExit("Wrong signing certificate pin")
+          for k,v in {'APK_URL':x['apkUrl'],'APK_SHA':x['sha256'],'APK_SIZE':x['sizeBytes'],'VERSION':code}.items():
+              print(k+'='+shlex.quote(str(v)))
+          PY
+          source "$RUNNER_TEMP/update.env"
+          curl --fail --location --silent --show-error --retry 3 --max-time 240 "$APK_URL" -o "$RUNNER_TEMP/release.apk"
+          test "$(stat -c%s "$RUNNER_TEMP/release.apk")" = "$APK_SIZE"
+          echo "$APK_SHA  $RUNNER_TEMP/release.apk" | sha256sum --check --status
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$RUNNER_TEMP/release.apk" > "$RUNNER_TEMP/signature.txt"
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/signature.txt" | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+          test "$CERT" = '212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b'
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$RUNNER_TEMP/release.apk" > "$RUNNER_TEMP/badging.txt"
+          grep -q "package: name='com.motohub.next'" "$RUNNER_TEMP/badging.txt"
+          grep -q "versionCode='$VERSION'" "$RUNNER_TEMP/badging.txt"
+          echo "PASS: manifest SHA-256, public APK, official v2+ signature, certificate and version"
