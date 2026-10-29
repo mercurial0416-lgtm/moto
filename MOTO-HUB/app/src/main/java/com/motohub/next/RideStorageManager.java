@@ -9,7 +9,8 @@ import java.util.*;
 final class RideStorageManager {
  private static final String[] SIDECARS={".done",".imported",".recovered",".unmerged",".category",".bike",".favorite",".mergedinto"};
  private RideStorageManager(){}
- static void show(MainActivity a){
+ static void show(MainActivity a){show(a,"");}
+ static void show(MainActivity a,String initialFilter){
   if(RestoreRideGate.blocked(RideService.running,RideService.autoArmed)){a.toast("GPS 기록·복원·백업 중에는 파일을 정리하지 않아요.");return;}
   a.toast("GPS 기록 확인 중…");
   new Thread(()->{
@@ -25,7 +26,7 @@ final class RideStorageManager {
     }
     final long bytes=total;
     a.runOnUiThread(()->{
-     if(!a.isFinishing()&&!a.isDestroyed())showPage(a,tracks,labels,0,"",bytes);
+     if(!a.isFinishing()&&!a.isDestroyed())showPage(a,tracks,labels,0,initialFilter,bytes);
     });
    }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 저장공간 점검 실패: "+e.getMessage());});}
   },"moto-gps-storage-list").start();
