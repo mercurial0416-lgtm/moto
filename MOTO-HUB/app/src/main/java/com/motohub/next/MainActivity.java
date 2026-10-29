@@ -86,7 +86,23 @@ public class MainActivity extends Activity {
     if(audit!=null)runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast(audit);});
    },"moto-post-update-data-audit").start();
   }
+  if(state==null&&!readOnly)auditGarageSoon(false);
   if(state==null && !RideService.running && !RideService.autoArmed && !widgetActionTaken&&!notificationActionTaken)showInterruptedRidePrompt();
+ }
+ void auditGarageSoon(boolean showAll){
+  if(readOnly){if(showAll)error("원본 보호 중이에요. 저장 파일과 백업부터 확인해 주세요.");return;}
+  String snapshot=db.toString();
+  new Thread(()->{
+   String result;
+   try{result=GarageIntegrity.report(Store.parse(snapshot));}
+   catch(Exception e){result="데이터 검사 실패 · 저장 파일과 백업을 확인해 주세요.";}
+   String text=result;
+   runOnUiThread(()->{
+    if(isFinishing()||isDestroyed())return;
+    if(showAll)error(text);
+    else if(GarageIntegrity.hasIssue(text))toast("주유·정비 연결 점검에서 이상 징후가 있어요. 설정 → 데이터 검사에서 확인하세요.");
+   });
+  },"moto-garage-integrity").start();
  }
  /** Process death/reboot leaves a local .track without .done. Only offers a manual review. */
  void showInterruptedRidePrompt(){
