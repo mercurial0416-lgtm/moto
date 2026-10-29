@@ -292,6 +292,7 @@ final class HubScreens {
  void advancedSettings(){
   LinearLayout p=a.page("고급 설정 · 문제 해결");
   a.label(p,"가끔 사용하는 기능을 모았어요. 기존 데이터와 알림 설정은 그대로 유지됩니다.",14,a.muted,false);
+  a.action(p,"홈 버튼 표시 · 순서 편집",false,()->new GarageHomeUi(a).editHomeShortcuts());
   a.action(p,"초소형 위젯 추가 (2×1)",false,()->MotoWidgetPin.request(a,true));
   a.action(p,"기본 위젯 추가 (4×1)",false,()->MotoWidgetPin.request(a,false));
   a.action(p,"선택한 내비 실행",false,()->NavigationApps.openPreferred(a));
@@ -384,22 +385,23 @@ final class HubScreens {
  }
  void basicBackup(){
   LinearLayout p=a.page("백업 · 복원");
-  a.label(p,"데이터는 전체 ZIP으로 백업하는 것이 가장 안전합니다. 250MB 제한으로 실패하면 GPS ZIP과 사진 ZIP을 각각 저장하고, 둘 다 검증하세요. 분할 복원은 기존 자료를 덮어쓰지 않습니다.",15,a.muted,false);
-  a.action(p,"전체 ZIP 백업 만들기",true,a::exportBundle);
-  a.action(p,"전체 ZIP 백업 복원",false,a::importBundle);
-  a.action(p,"분할 백업 · GPS만 ZIP",false,()->a.exportSplitBundle("GPS"));
-  a.action(p,"분할 백업 · 사진·영수증만 ZIP",false,()->a.exportSplitBundle("MEDIA"));
-  a.action(p,"분할 ZIP 추가 복원",false,a::importSplitBundle);
-  a.action(p,"GPS 저장공간 · 복구함",false,()->RideStorageManager.show(a));
-  a.action(p,"다른 백업 방식 · 검사",false,this::backupMore);
+  a.label(p,"전체 ZIP에는 주행 기록·GPS 복구함·사진·기본 홈 설정이 포함됩니다. 앱 삭제 전에 휴대폰 밖에 보관하세요.",14,a.muted,false);
+  a.action(p,"전체 ZIP 백업",true,a::exportBundle);
+  a.action(p,"전체 ZIP 복원",false,a::importBundle);
+  a.action(p,"추가 도구 · 대용량 백업 · GPS",false,this::backupMore);
   a.show();
  }
  void backupMore(){
-  LinearLayout p=a.page("백업 추가 옵션");
-  a.label(p,"암호화 방식이나 원본 무결성 검사가 필요할 때만 사용하세요. 기존 GPS·주유·정비 기록은 변경하지 않습니다.",14,a.muted,false);
-  a.action(p,"암호화 전체 백업 만들기",false,a::exportEncryptedBundle);
+  LinearLayout p=a.page("백업 추가 도구");
+  a.label(p,"250MB를 넘는 자료나 암호화 백업이 필요할 때 사용하세요. 분할 ZIP은 기존 자료를 덮어쓰지 않는 방식으로 복원합니다.",14,a.muted,false);
+  a.action(p,"GPS·사진 분할 ZIP 자동 만들기",false,a::exportBatchedBackup);
+  a.action(p,"GPS만 ZIP으로 저장",false,()->a.exportSplitBundle("GPS"));
+  a.action(p,"사진·영수증만 ZIP으로 저장",false,()->a.exportSplitBundle("MEDIA"));
+  a.action(p,"분할 ZIP 추가 복원",false,a::importSplitBundle);
+  a.action(p,"GPS 원본 검색 · 복구함",false,()->RideStorageManager.show(a));
+  a.action(p,"암호화 전체 백업",false,a::exportEncryptedBundle);
   a.action(p,"암호화 백업 복원",false,a::importEncryptedBundle);
-  a.action(p,"정밀 검사 · JSON · 복구 도구",false,this::advancedBackup);
+  a.action(p,"정밀 검사 · JSON 복원",false,this::advancedBackup);
   a.show();
  }
  void advancedBackup(){

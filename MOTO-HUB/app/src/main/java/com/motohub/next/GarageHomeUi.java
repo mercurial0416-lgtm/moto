@@ -65,7 +65,7 @@ final class GarageHomeUi {
    }
    a.gap(a.content,10);
   }
-  a.action(a.content,"홈 버튼 편집 · 순서",false,this::editHomeShortcuts);a.gap(a.content,10);
+  // Home shortcut editing lives under Advanced Settings to keep the riding screen focused.
   String condition=condition(b);
   if("점검 필요".equals(condition)||"곧 점검".equals(condition)){
    TextView alert=a.text(condition+" · 정비 일정 확인",13,a.fg,true);
