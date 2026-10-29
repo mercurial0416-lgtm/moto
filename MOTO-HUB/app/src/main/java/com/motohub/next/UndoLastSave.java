@@ -9,9 +9,9 @@ final class UndoLastSave {
  private UndoLastSave(){}
  private static final long WINDOW_MS=120000;
  private static final class State {
-  final String before,after,label; final long time;
-  State(String before,String after,String label){
-   this.before=before;this.after=after;this.label=label;
+  final String before,after,label; final long time; final Runnable onUndone;
+  State(String before,String after,String label,Runnable onUndone){
+   this.before=before;this.after=after;this.label=label;this.onUndone=onUndone;
    this.time=SystemClock.elapsedRealtime();
   }
  }
@@ -25,9 +25,15 @@ final class UndoLastSave {
  static void offer(MainActivity a,String before,String after,String label){offer(a,before,after,label,null);}
  static void offer(MainActivity a,String before,String after,String label,Runnable onConfirmed){
   if(before==null||after==null||before.equals(after))return;
-  last=new State(before,after,label);
+  last=new State(before,after,label,null);
   a.toast(label+" 저장 완료 · 홈의 실행 취소에서 2분 내 복원 가능");
   if(onConfirmed!=null)onConfirmed.run();
+ }
+ /** Post-rollback UI restoration runs only when database rollback actually succeeds. */
+ static void offerOnUndo(MainActivity a,String before,String after,String label,Runnable onUndone){
+  if(before==null||after==null||before.equals(after))return;
+  last=new State(before,after,label,onUndone);
+  a.toast(label+" 저장 완료 · 홈이나 기록에서 2분 내 실행 취소 가능");
  }
  static void undo(MainActivity a){
   State state=last;
@@ -37,6 +43,7 @@ final class UndoLastSave {
    JSONObject restore=Store.parse(state.before);
    a.write(restore);
    last=null;DailyMaintenanceJob.checkSoon(a);a.render();
+   if(state.onUndone!=null)state.onUndone.run();
    a.toast("마지막 "+state.label+" 저장을 취소했어요.");
   });
  }
