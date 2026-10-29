@@ -1426,7 +1426,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      if(password!=null)Arrays.fill(password,'\0');
     }
     JSONObject verified;
-    try{verified=Store.parse(ready.json);}catch(Exception e){ready.close();throw e;}
+    try{verified=Store.parse(ready.json);DevicePreferencesBackup.validate(ready.preferences);}catch(Exception e){ready.close();throw e;}
     runOnUiThread(()->{
      if(isFinishing()||isDestroyed()){ready.close();return;}
      String spaceNote;
@@ -1463,6 +1463,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));
           db=next;readOnly=false; // no fallible work after the JSON commit
          });
+         // Settings are imported only after database/assets commit. Legacy ZIPs retain current settings.
+         boolean preferencesOk=true;
+         try{DevicePreferencesBackup.restore(this,ready.preferences);}catch(Exception ignored){preferencesOk=false;}
+         final boolean settingsReady=preferencesOk;
          // Non-critical follow-up must never turn a successfully committed restore
          // into an asset-only rollback. The previous JSON remains in before-import.json.
          boolean checkpointOk=true;
@@ -1471,7 +1475,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          final boolean checkpointReady=checkpointOk;
          runOnUiThread(()->{selected="";compare.clear();render();
           toast("복원 완료 · GPS "+ready.rides+"개 · 사진 "+ready.photos+"개"+
-           (checkpointReady?"":" · 자동 안전 백업 갱신 실패"));});
+           (checkpointReady?"":" · 자동 안전 백업 갱신 실패")+(settingsReady?"":" · 홈/내비 설정 복원 실패"));});
         }catch(Exception e){runOnUiThread(()->error("전체 백업 복원 실패: "+e.getMessage()));}
         finally{if(entered)RestoreRideGate.end();ready.close();}
        },"MOTO-ZIP-restore-apply").start();
@@ -1865,9 +1869,9 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     int count;
     try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){
      if(out==null)throw new IOException("백업 파일을 열 수 없어요.");
-     if(password==null)count=BackupBundle.export(snapshot,getFilesDir(),out,part);
+     if(password==null)count=BackupBundle.export(snapshot,getFilesDir(),out,part,"FULL".equals(part)?DevicePreferencesBackup.snapshot(this):"");
      else try(OutputStream secure=BackupCrypto.encrypt(out,password)){
-      count=BackupBundle.export(snapshot,getFilesDir(),secure);
+      count=BackupBundle.export(snapshot,getFilesDir(),secure,"FULL",DevicePreferencesBackup.snapshot(this));
      }
     }
     // Validate every authenticated encrypted chunk BEFORE trusting the ZIP.

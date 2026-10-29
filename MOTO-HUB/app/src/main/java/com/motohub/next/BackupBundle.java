@@ -76,6 +76,9 @@ public final class BackupBundle {
  }
  /** Archive-only GPS or media partitions. Each has a full JSON snapshot for manual recovery. */
  static int export(String json,File internal,OutputStream target,String part)throws Exception{
+  return export(json,internal,target,part,"");
+ }
+ static int export(String json,File internal,OutputStream target,String part,String uiPreferences)throws Exception{
   if(!Arrays.asList("FULL","GPS","MEDIA").contains(part))throw new IOException("알 수 없는 백업 분할");
   boolean gps=!"MEDIA".equals(part),media=!"GPS".equals(part);
   if(internal==null||!regularDirectory(internal))throw new IOException("앱 백업 폴더를 확인하지 못했어요.");
@@ -84,6 +87,12 @@ public final class BackupBundle {
   long total=data.length;int count=0;
   ZipOutputStream zip=new ZipOutputStream(new BufferedOutputStream(target),StandardCharsets.UTF_8);
   zip.putNextEntry(new ZipEntry("MOTO-HUB-data.json"));zip.write(data);zip.closeEntry();count++;
+  if(uiPreferences!=null&&!uiPreferences.isEmpty()&&"FULL".equals(part)){
+   byte[] ui=uiPreferences.getBytes(StandardCharsets.UTF_8);
+   if(ui.length>4096)throw new IOException("설정 백업 크기 제한");
+   zip.putNextEntry(new ZipEntry("MOTO-HUB-preferences.json"));zip.write(ui);zip.closeEntry();
+   total+=ui.length;count++;
+  }
   String readme=("FULL".equals(part)?"MOTO HUB 전체 백업 - 개인 위치정보 포함 가능\n":"MOTO-HUB-PART:"+part+"\n분할 복구 파일: 전체 복원으로 다른 자료를 덮어쓰지 마세요. 분할 ZIP 추가 복원 메뉴를 사용하세요.\n")+
    "MOTO-HUB-data.json은 앱 설정 > JSON 백업 가져오기로 복원합니다.\n"+
    "rides 폴더는 원본 기록, gpx 폴더는 가져오기로 복원 가능한 GPX 경로입니다.\n"+
