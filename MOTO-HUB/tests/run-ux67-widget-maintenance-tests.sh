@@ -13,7 +13,7 @@ from pathlib import Path
 root=Path("app/src/main/java/com/motohub/next")
 widget=(root/"MotoQuickWidgetProvider.java").read_text()
 maint=(root/"MaintenanceAlertWindow.java").read_text()
-assert widget.count("Intent.FLAG_ACTIVITY_SINGLE_TOP") == 2, "Both widget actions must reuse MainActivity"
+assert "Intent.FLAG_ACTIVITY_SINGLE_TOP" in widget and "new Intent(context,MainActivity.class)" in widget, "Every configured shortcut must reuse MainActivity"\nassert "launch(context,id,1,first)" in widget and "launch(context,id,2,second)" in widget
 assert "onAppWidgetOptionsChanged" in widget, "Resized widgets must be rebound"
 assert "onUpdate(context,manager,new int[]{id})" in widget
 assert "validOdo=Double.isFinite(odometer)" in maint
