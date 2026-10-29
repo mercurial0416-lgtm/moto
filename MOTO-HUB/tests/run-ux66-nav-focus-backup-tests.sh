@@ -17,8 +17,8 @@ assert "new AlertDialog.Builder(a).setTitle(\"라이딩을 종료할까요?\")" 
 assert 'a.renderPreservingPosition();return;' in ui
 assert "startForegroundService(new Intent(a,RideService.class)" in ui
 assert "output.getFD().sync()" in service
-assert 'a.action(p,"전체 ZIP 백업 만들기"' in settings
-assert 'a.action(p,"전체 ZIP 백업 복원"' in settings
+assert 'a.action(p,"전체 ZIP 백업"' in settings
+assert 'a.action(p,"전체 ZIP 복원"' in settings
 section=settings[settings.index("void basicBackup()"):settings.index("void backupMore()")]
 assert '암호화 전체 백업 만들기' not in section
 assert '다른 백업 방식 · 검사' in section
