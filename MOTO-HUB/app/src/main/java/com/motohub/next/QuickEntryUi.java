@@ -150,11 +150,13 @@ final class QuickEntryUi {
    JSONObject record=QuickRecordDraft.fuel(bike.optString("id"),date.getText().toString().trim(),
     numeric(odo,"계기판",true),numeric(amount,"주유 금액",true),numeric(liters,"주유량",true),full.isChecked());
    Runnable persist=()->a.attempt(()->{
-    JSONObject next=new JSONObject(a.db.toString());
+    String beforeSave=a.db.toString();
+    JSONObject next=new JSONObject(beforeSave);
     Store.upsert(next,"expenses",record);
     JSONObject vehicle=Store.find(next,"vehicles",bike.optString("id"));
     if(vehicle!=null&&record.optDouble("mileage")>vehicle.optDouble("odo"))vehicle.put("odo",record.optDouble("mileage"));
-    a.write(next);a.close();a.render();a.toast("주유 기록을 저장했어요.");DailyMaintenanceJob.checkSoon(a);
+    a.write(next);a.close();a.render();DailyMaintenanceJob.checkSoon(a);
+    UndoLastSave.offer(a,beforeSave,a.db.toString(),"주유");
    });
    if(QuickLogDuplicate.exists(a.items("expenses"),record,"expenses")){
     new AlertDialog.Builder(a).setTitle("같은 주유 기록이 있어요")
@@ -269,12 +271,13 @@ final class QuickEntryUi {
    record.put("alertKmBefore",kmBeforeChoices[kmAlert.getSelectedItemPosition()]);
    record.put("alertDaysBefore",daysBeforeChoices[dateAlert.getSelectedItemPosition()]);
    Runnable save=()->a.attempt(()->{
-    JSONObject next=new JSONObject(a.db.toString());Store.upsert(next,"services",record);
+    String beforeSave=a.db.toString();
+    JSONObject next=new JSONObject(beforeSave);Store.upsert(next,"services",record);
     JSONObject vehicle=Store.find(next,"vehicles",bike.optString("id"));
     if(vehicle!=null&&odo>vehicle.optDouble("odo"))vehicle.put("odo",odo);
     a.write(next);a.close();a.render();DailyMaintenanceJob.checkSoon(a);
     if(!DailyMaintenanceJob.remindersEnabled(a))askEnableNotifications();
-    else a.toast("정비주기를 등록했어요. 예정 시 알림을 확인하세요.");
+    UndoLastSave.offer(a,beforeSave,a.db.toString(),"정비주기");
    });
    if(QuickLogDuplicate.exists(a.items("services"),record,"services")){
     new AlertDialog.Builder(a).setTitle("이미 등록된 정비주기")
