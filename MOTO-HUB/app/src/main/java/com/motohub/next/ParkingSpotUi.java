@@ -32,7 +32,7 @@ final class ParkingSpotUi {
   float accuracy=(float)bike.optDouble("parkingAccuracyM",Double.NaN);
   String quality=Float.isFinite(accuracy)?" · GPS 오차 약 "+Math.round(accuracy)+"m":" · GPS 정확도 미기록";
   String stale=age<0?" · 기기 시계를 확인하세요":age>24L*60*60*1000?" · 하루 이상 지난 저장 위치":"";
-  return "저장 시각: "+when+quality+stale+"\\n직접 저장한 위치만 보관하며 자동 추적하지 않습니다.";
+  return "저장 시각: "+when+quality+stale+"\n직접 저장한 위치만 보관하며 자동 추적하지 않습니다.";
  }
  void show(JSONObject bike){
   if(bike==null)return;
