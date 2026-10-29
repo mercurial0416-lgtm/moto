@@ -48,9 +48,14 @@ final class DevicePreferencesBackup {
      .putString("order",json.getString("order"));
    for(String key:new String[]{"ride","nav","fuel","service"})home.putBoolean(key,json.getBoolean(key));
    if(!home.commit())throw new IOException("홈 버튼 배치 복원 실패");
-   if(!c.getSharedPreferences("navigation_choice",0).edit()
-     .putString("preferred",json.getString("navigator")).commit())
-    throw new IOException("기본 내비 복원 실패");
+   // Backups can come from another phone with different navigator apps.
+   // Never replace a working default with an app that cannot be launched here.
+   NavigationChoice requested=NavigationChoice.fromId(json.getString("navigator"));
+   if(NavigationApps.installedLaunchIntent(c,requested)!=null){
+    if(!c.getSharedPreferences("navigation_choice",0).edit()
+      .putString("preferred",requested.id).commit())
+     throw new IOException("기본 내비 복원 실패");
+   }
    if(!c.getSharedPreferences("notifications",0).edit()
      .putBoolean("maintenance_opt_in",json.getBoolean("maintenanceNotifications")).commit())
     throw new IOException("정비 알림 설정 복원 실패");
