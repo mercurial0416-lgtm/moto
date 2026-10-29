@@ -464,6 +464,7 @@ final class HubScreens {
   LinearLayout p=a.page("고급 설정 · 문제 해결");
   a.label(p,"가끔 사용하는 기능을 모았어요. 기존 데이터와 알림 설정은 그대로 유지됩니다.",14,a.muted,false);
   a.action(p,"홈 버튼 표시 · 순서 편집",false,()->new GarageHomeUi(a).editHomeShortcuts());
+  a.action(p,"작은 위젯 버튼 선택",false,()->QuickWidgetChoices.configure(a));
   a.action(p,"초소형 위젯 추가 (2×1)",false,()->MotoWidgetPin.request(a,true));
   a.action(p,"기본 위젯 추가 (4×1)",false,()->MotoWidgetPin.request(a,false));
   a.action(p,"선택한 내비 실행",false,()->NavigationApps.openPreferred(a));

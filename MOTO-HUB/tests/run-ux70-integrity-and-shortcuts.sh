@@ -25,6 +25,6 @@ assert 'selectJsonMergeBikes(' in activity and 'commitJsonMerge(source,new java.
 assert 'HomeShortcutOrder.parse(' in home and 'quickAction("fuel")' in home and 'quickAction("service")' in home
 assert 'setMultiChoiceItems(labels,visible' in home
 assert 'ObdLinkQuality.score(' in obd and 'qualityScore<55' in obd
-assert 'motoReleaseCode=547' in ci and "versionCode='547'" in ci
+assert 'motoReleaseCode=548' in ci and "versionCode='548'" in ci
 print("PASS UX70 capped persistent recaps, full-file hash audit, explicit JSON bike mapping, OBD quality and home shortcuts")
 PY

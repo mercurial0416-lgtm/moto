@@ -52,12 +52,13 @@ final class QuickEntryUi {
   a.gap(body,12);
   EditText amount=number(body,"주유 금액 (원)","","예: 12000");
   EditText liters=number(body,"실제 주유량 (L)","","예: 4.5");
+  LinearLayout tools=a.col();tools.setVisibility(View.GONE);
   LinearLayout calculator=a.col();calculator.setVisibility(View.GONE);
   EditText unitPrice=number(calculator,"리터당 가격 (원)","","예: 1750");
   a.label(calculator,"리터당 가격 × 주유량으로 예상 금액을 자동 채웁니다. 실제 결제액이 다르면 금액을 수정하세요.",12,a.muted,false);
   Button calcToggle=a.button("리터당 가격으로 자동 계산",false,
    ()->calculator.setVisibility(calculator.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
-  body.addView(calcToggle);body.addView(calculator);
+  tools.addView(calcToggle);tools.addView(calculator);
   FuelAutoAmount fuelAuto=new FuelAutoAmount();
   amount.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence value,int start,int count,int after){}
@@ -97,7 +98,7 @@ final class QuickEntryUi {
     amount.setText(String.valueOf((long)previous.optDouble("amount")));
     liters.setText(String.valueOf(previous.optDouble("liters")));
    });
-   body.addView(reuse);
+   tools.addView(reuse);
    double lastLiters=previous.optDouble("liters",Double.NaN);
    double lastAmount=previous.optDouble("amount",Double.NaN);
    if(Double.isFinite(lastLiters)&&lastLiters>0&&Double.isFinite(lastAmount)&&lastAmount>0){
@@ -108,10 +109,16 @@ final class QuickEntryUi {
       unitPrice.setText(String.valueOf(lastUnitPrice));
       a.toast("지난 단가를 불러왔어요. 실제 주유소 단가를 확인해 주세요.");
      });
-     reuseUnitPrice.setMinHeight(a.dp(45));body.addView(reuseUnitPrice);
+     reuseUnitPrice.setMinHeight(a.dp(45));tools.addView(reuseUnitPrice);
     }
    }
   }
+  Button toolsToggle=a.button("지난 기록·단가 계산 도구  ▾",false,()->{
+   boolean open=tools.getVisibility()!=View.VISIBLE;
+   tools.setVisibility(open?View.VISIBLE:View.GONE);
+  });
+  body.addView(toolsToggle);body.addView(tools);
+  a.label(body,"금액·리터만 입력하면 오늘 날짜와 현재 계기판으로 저장합니다.",12,a.muted,false);
   CheckBox full=new CheckBox(a);full.setText("가득 주유했어요 (연비 계산용)");
   full.setTextColor(a.fg);full.setTextSize(14);full.setMinHeight(a.dp(50));body.addView(full);
   LinearLayout extra=a.col();extra.setVisibility(View.GONE);
@@ -130,7 +137,7 @@ final class QuickEntryUi {
    extra.setVisibility(extra.getVisibility()==View.GONE?View.VISIBLE:View.GONE);
   });
   body.addView(toggle);body.addView(extra);
-  a.action(body,"계기판 바로 촬영",false,()->{
+  a.action(extra,"계기판 바로 촬영",false,()->{
    extra.setVisibility(View.VISIBLE);
    a.startQuickOdometerCamera(odo);
   });
