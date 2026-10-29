@@ -9,7 +9,8 @@ import java.util.*;
 final class RideStorageManager {
  private static final String[] SIDECARS={".done",".imported",".recovered",".unmerged",".category",".bike",".favorite",".mergedinto"};
  private RideStorageManager(){}
- static void show(MainActivity a){
+ static void show(MainActivity a){show(a,"");}
+ static void show(MainActivity a,String initialFilter){
   if(RestoreRideGate.blocked(RideService.running,RideService.autoArmed)){a.toast("GPS 기록·복원·백업 중에는 파일을 정리하지 않아요.");return;}
   a.toast("GPS 기록 확인 중…");
   new Thread(()->{
@@ -25,7 +26,7 @@ final class RideStorageManager {
     }
     final long bytes=total;
     a.runOnUiThread(()->{
-     if(!a.isFinishing()&&!a.isDestroyed())showPage(a,tracks,labels,0,"",bytes);
+     if(!a.isFinishing()&&!a.isDestroyed())showPage(a,tracks,labels,0,initialFilter,bytes);
     });
    }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 저장공간 점검 실패: "+e.getMessage());});}
   },"moto-gps-storage-list").start();
@@ -34,7 +35,8 @@ final class RideStorageManager {
   if(a.isFinishing()||a.isDestroyed())return;
   List<Integer> matches=new ArrayList<>();
   String query=filter.trim().toLowerCase(Locale.KOREA);
-  for(int i=0;i<labels.length;i++)if(labels[i].toLowerCase(Locale.KOREA).contains(query))matches.add(i);
+  for(int i=0;i<labels.length;i++)if(labels[i].toLowerCase(Locale.KOREA).contains(query)||
+   tracks.get(i).getName().toLowerCase(Locale.KOREA).contains(query))matches.add(i);
   int from=Math.max(0,Math.min(page*30,Math.max(0,matches.size()-1)/30*30));
   int to=Math.min(from+30,matches.size());
   String[] items=new String[to-from+2];
@@ -44,7 +46,7 @@ final class RideStorageManager {
   AlertDialog.Builder dialog=new AlertDialog.Builder(a)
    .setTitle("GPS 원본 · "+matches.size()+"건")
    .setMessage("약 "+String.format(Locale.KOREA,"%.1f MB",bytes/1_000_000.0)+
-     " · "+(from+1)+"–"+to+" / "+matches.size()+"건\\n자동 영구 삭제 없음 · 검증된 ZIP 백업 후 복구함 이동 가능")
+     " · "+(matches.isEmpty()?0:from+1)+"–"+to+" / "+matches.size()+"건\n자동 영구 삭제 없음 · 검증된 ZIP 백업 후 복구함 이동 가능")
    .setItems(items,(d,index)->{
     if(index==0){
      android.widget.EditText input=new android.widget.EditText(a);
@@ -68,32 +70,63 @@ final class RideStorageManager {
     for(int i=0;i<labels.length;i++)labels[i]=RideHistoryLabel.title(entries.get(i),java.time.ZoneId.systemDefault());
     a.runOnUiThread(()->{
      if(a.isFinishing()||a.isDestroyed())return;
-     new AlertDialog.Builder(a).setTitle("GPS 복구함 · 수동 복원")
-      .setMessage("자동으로 삭제하지 않습니다. 복구할 기록을 직접 선택하세요.")
-      .setItems(labels,(d,index)->new AlertDialog.Builder(a).setTitle("GPS 기록 복원")
-       .setMessage("선택한 원본과 연결 정보를 라이딩 기록으로 되돌릴까요?")
-       .setNegativeButton("취소",null)
-       .setPositiveButton("복원",(dd,w)->new Thread(()->{
-        try{
-         boolean allowed=RestoreRideGate.begin(RideService.running,RideService.autoArmed);
-         if(!allowed||a.readOnly){
-          if(allowed)RestoreRideGate.end();
-          throw new IOException("GPS 기록·백업·복원 중에는 복원할 수 없습니다.");
-         }
-         File restored;
-         try{restored=RideTrash.restore(a.getFilesDir(),entries.get(index));}
-         finally{RestoreRideGate.end();}
-         // Recreate the offline summary for the recovered complete route.
-         RideCompletionInbox.record(a,restored);
-         a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){
-          a.toast("GPS 원본 복원 완료");a.render();
-         }});
-        }catch(Exception error){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("복원 실패: "+error.getMessage());});}
-       },"moto-gps-trash-restore").start()).show())
-      .setNegativeButton("닫기",null).show();
+     showTrashPage(a,entries,labels,0,"");
     });
    }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error(e.getMessage());});}
   },"moto-gps-trash-list").start();
+ }
+ /** Paginated, searchable recovery without modifying any archived GPS data. */
+ private static void showTrashPage(MainActivity a,List<File> entries,String[] labels,int requestedPage,String filter){
+  if(a.isFinishing()||a.isDestroyed())return;
+  String query=filter.trim().toLowerCase(Locale.KOREA);
+  List<Integer> matches=new ArrayList<>();
+  for(int i=0;i<labels.length;i++)
+   if(labels[i].toLowerCase(Locale.KOREA).contains(query))matches.add(i);
+  int page=Math.max(0,Math.min(requestedPage,Math.max(0,(matches.size()-1)/30)));
+  int from=page*30,to=Math.min(from+30,matches.size());
+  String[] visible=new String[to-from+1];
+  visible[0]="복구함 검색"+(query.isEmpty()?"":" · "+query);
+  for(int i=from;i<to;i++)visible[i-from+1]=labels[matches.get(i)];
+  AlertDialog.Builder dialog=new AlertDialog.Builder(a)
+   .setTitle("GPS 복구함 · "+matches.size()+"건 / 전체 "+entries.size()+"건")
+   .setMessage(matches.isEmpty()?"일치하는 복구 기록이 없습니다. 검색을 변경하세요.":
+    "자동 영구 삭제 없음 · "+(from+1)+"–"+to+" / "+matches.size()+"건 · 직접 선택해서 복원")
+   .setItems(visible,(d,index)->{
+    if(index==0){
+     android.widget.EditText input=new android.widget.EditText(a);
+     input.setSingleLine(true);input.setHint("날짜 일부 · 예: 2026.10");
+     input.setText(query);
+     new AlertDialog.Builder(a).setTitle("GPS 복구함 날짜 검색")
+      .setView(input).setNegativeButton("취소",null)
+      .setPositiveButton("검색",(dd,which)->showTrashPage(a,entries,labels,0,input.getText().toString()))
+      .show();
+     return;
+    }
+    // Filtered row indices are not the backing file indices.
+    final File target=entries.get(matches.get(from+index-1));
+    new AlertDialog.Builder(a).setTitle("GPS 기록 복원")
+     .setMessage("선택한 원본과 연결 정보를 라이딩 기록으로 되돌릴까요?")
+     .setNegativeButton("취소",null)
+     .setPositiveButton("복원",(dd,w)->new Thread(()->{
+      try{
+       boolean allowed=RestoreRideGate.begin(RideService.running,RideService.autoArmed);
+       if(!allowed||a.readOnly){
+        if(allowed)RestoreRideGate.end();
+        throw new IOException("GPS 기록·백업·복원 중에는 복원할 수 없습니다.");
+       }
+       File restored;
+       try{restored=RideTrash.restore(a.getFilesDir(),target);}
+       finally{RestoreRideGate.end();}
+       RideCompletionInbox.record(a,restored);
+       a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){
+        a.toast("GPS 원본 복원 완료");a.render();
+       }});
+      }catch(Exception error){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("복원 실패: "+error.getMessage());});}
+     },"moto-gps-trash-restore").start()).show();
+   }).setNegativeButton("닫기",null);
+  if(to<matches.size())dialog.setPositiveButton("다음 30건",(d,w)->showTrashPage(a,entries,labels,page+1,query));
+  if(page>0)dialog.setNeutralButton("이전 30건",(d,w)->showTrashPage(a,entries,labels,page-1,query));
+  dialog.show();
  }
  private static void confirm(MainActivity a,File track){
   if(a.readOnly||RideService.running||RideService.autoArmed){

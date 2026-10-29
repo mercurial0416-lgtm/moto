@@ -7,6 +7,16 @@ final class HubScreens {
   Thread t=new Thread(r,"moto-local-backup-io");t.setDaemon(true);return t;
  });
  final MainActivity a;
+ static final class GpsSearchRow {
+  final String title,filename;
+  GpsSearchRow(String title,String filename){this.title=title;this.filename=filename;}
+ }
+ static final class LedgerSearchRow {
+  final JSONObject item;final String collection,type,detail,amount,search;
+  LedgerSearchRow(JSONObject item,String collection,String type,String detail,String amount,String search){
+   this.item=item;this.collection=collection;this.type=type;this.detail=detail;this.amount=amount;this.search=search;
+  }
+ }
  HubScreens(MainActivity activity){a=activity;}
  void title(String name,String detail){a.heading(name,detail);}
  void go(String tab){a.navigate(tab);}
@@ -74,6 +84,95 @@ final class HubScreens {
    return date!=0?date:Double.compare(y.optDouble("mileage"),x.optDouble("mileage"));});
   return result;
  }
+ /** Search every saved garage ledger on this phone, irrespective of the selected bike.
+  * Render at most 30 matching rows per page to keep the dialog usable on older devices. */
+ void searchAllRecords(){
+  List<JSONObject> all=new ArrayList<>();
+  Map<JSONObject,String> collection=new IdentityHashMap<>();
+  for(JSONObject record:a.items("services")){all.add(record);collection.put(record,"services");}
+  for(JSONObject record:a.items("expenses")){all.add(record);collection.put(record,"expenses");}
+  all.sort((x,y)->y.optString("date").compareTo(x.optString("date")));
+  Map<String,String> bikeNames=new HashMap<>();
+  for(JSONObject vehicle:a.items("vehicles"))
+   bikeNames.put(vehicle.optString("id"),vehicle.optString("name"));
+  // Index text once. Fast typing must not format 10,000 JSON records every keystroke.
+  List<LedgerSearchRow> indexed=new ArrayList<>(all.size());
+  for(JSONObject item:all){
+   String key=collection.get(item);
+   String type=(key.equals("services")?"정비":"주유".equals(item.optString("type"))?"주유":"비용")+" · "+item.optString("type","기타");
+   String name=bikeNames.getOrDefault(item.optString("vehicleId"),"등록되지 않은 바이크");
+   String detail=name+" · "+item.optString("date")+" · "+a.num(item.optDouble("mileage"))+" km";
+   String note=item.optString("memo")+" "+item.optString("note")+" "+item.optString("description");
+   String amount=a.won(item.optDouble(key.equals("expenses")?"amount":"cost"));
+   indexed.add(new LedgerSearchRow(item,key,type,detail,amount,
+    (type+" "+detail+" "+note+" "+amount).toLowerCase(Locale.KOREA)));
+  }
+  LinearLayout body=a.col();body.setPadding(a.dp(16),a.dp(6),a.dp(16),a.dp(8));
+  EditText input=new EditText(a);input.setSingleLine(true);input.setHint("바이크 · 주유 · 정비 · 라이딩 · 날짜");
+  input.setTextColor(a.fg);input.setHintTextColor(a.muted);
+  input.setContentDescription("모든 바이크 기록 검색어");
+  body.addView(input,new LinearLayout.LayoutParams(-1,a.dp(52)));
+  TextView count=a.text("기록을 불러오는 중",12,a.muted,false);body.addView(count);
+  ScrollView scroll=new ScrollView(a);LinearLayout results=a.col();scroll.addView(results);
+  body.addView(scroll,new LinearLayout.LayoutParams(-1,a.dp(340)));
+  AlertDialog dialog=new AlertDialog.Builder(a).setTitle("주유 · 정비 · 비용 통합 검색")
+    .setView(body).setNegativeButton("닫기",null).create();
+  final int[] page={0};final Runnable[] redraw={null};
+  final List<GpsSearchRow> gpsLabels=new ArrayList<>();final boolean[] gpsReady={false},gpsFailed={false};
+  redraw[0]=()->{
+   if(a.isFinishing()||a.isDestroyed()||!dialog.isShowing())return;
+   String q=input.getText().toString().trim().toLowerCase(Locale.KOREA);
+   results.removeAllViews();int found=0,shown=0;
+   int from=page[0]*30;
+   for(LedgerSearchRow row:indexed){
+    if(!q.isEmpty()&&!row.search.contains(q))continue;
+    if(found>=from&&shown<30){
+     shown++;
+     line(results,row.type,row.detail,row.amount,()->{
+      dialog.dismiss();a.edit(row.collection,row.item);
+     });
+    }
+    found++;
+   }
+   for(GpsSearchRow ride:gpsLabels){
+    if(!q.isEmpty()&&!ride.title.toLowerCase(Locale.KOREA).contains(q)&&!ride.filename.toLowerCase(Locale.KOREA).contains(q))continue;
+    if(found>=from&&shown<30){
+     shown++;
+     line(results,"GPS 라이딩",ride.title,"",()->{
+      dialog.dismiss();RideStorageManager.show(a,ride.filename);
+     });
+    }
+    found++;
+   }
+   if(found==0)results.addView(a.text(gpsFailed[0]?"GPS 기록 검색 실패 · 주유/정비 결과만 표시":gpsReady[0]?"검색 결과가 없어요.":"GPS 라이딩 기록 확인 중…",13,a.muted,false));
+   if(from+shown<found)results.addView(a.button("다음 30건 보기",false,()->{
+    page[0]++;redraw[0].run();scroll.scrollTo(0,0);
+   }));
+   if(page[0]>0)results.addView(a.button("처음 30건으로",false,()->{
+    page[0]=0;redraw[0].run();scroll.scrollTo(0,0);
+   }));
+   count.setText("검색 결과 "+found+"건 · "+(found==0?0:Math.min(found,from+1))+"–"+Math.min(found,from+shown)+"건"+(gpsFailed[0]?" · GPS 검색 실패":gpsReady[0]?"":" · GPS 확인 중"));
+  };
+  input.addTextChangedListener(new android.text.TextWatcher(){
+   public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+   public void onTextChanged(CharSequence text,int start,int before,int count){page[0]=0;redraw[0].run();}
+   public void afterTextChanged(android.text.Editable text){}
+  });
+  a.action(body,"GPS 라이딩 원본도 검색",false,()->{dialog.dismiss();RideStorageManager.show(a);});
+  dialog.show();redraw[0].run();
+  new Thread(()->{
+   List<GpsSearchRow> loaded=new ArrayList<>();boolean success=true;
+   try{
+    for(java.io.File track:TrackFile.tracks(a.getFilesDir()))
+     loaded.add(new GpsSearchRow(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault()),track.getName()));
+   }catch(Exception unavailable){success=false;}
+   final boolean complete=success;
+   a.runOnUiThread(()->{
+    if(a.isFinishing()||a.isDestroyed()||!dialog.isShowing())return;
+    gpsLabels.addAll(loaded);gpsReady[0]=true;gpsFailed[0]=!complete;redraw[0].run();
+   });
+  },"moto-unified-gps-search").start();
+ }
  void searchMaintenanceHistory(){
   JSONObject bike=a.bike();
   if(bike==null){a.toast("바이크를 먼저 등록해 주세요.");return;}
@@ -130,7 +229,7 @@ final class HubScreens {
   });
   reveal.setContentDescription("추가 비용·영수증·일괄 정비 입력 도구 펼치기");
   actions.addView(reveal);actions.addView(details);
-  a.action(actions,"완료한 정비 이력 검색",false,this::searchMaintenanceHistory);
+  a.action(actions,"전체 기록 검색 · 주유 / 정비 / 비용 / GPS",false,this::searchAllRecords);
   a.content.addView(actions);a.gap(a.content,16);
   new ServiceStatusUi(a).render(a.content);a.gap(a.content,15);
   String bikeId=a.bike().optString("id");
