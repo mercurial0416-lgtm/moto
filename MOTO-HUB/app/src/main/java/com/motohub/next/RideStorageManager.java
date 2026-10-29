@@ -35,7 +35,8 @@ final class RideStorageManager {
   if(a.isFinishing()||a.isDestroyed())return;
   List<Integer> matches=new ArrayList<>();
   String query=filter.trim().toLowerCase(Locale.KOREA);
-  for(int i=0;i<labels.length;i++)if(labels[i].toLowerCase(Locale.KOREA).contains(query))matches.add(i);
+  for(int i=0;i<labels.length;i++)if(labels[i].toLowerCase(Locale.KOREA).contains(query)||
+   tracks.get(i).getName().toLowerCase(Locale.KOREA).contains(query))matches.add(i);
   int from=Math.max(0,Math.min(page*30,Math.max(0,matches.size()-1)/30*30));
   int to=Math.min(from+30,matches.size());
   String[] items=new String[to-from+2];
