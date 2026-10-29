@@ -13,8 +13,12 @@ main=s('MainActivity.java');ride=s('RideUi.java');notes=s('RideNotes.java')
 fuel=s('QuickEntryUi.java');batch=s('ServiceBatch.java');audit=s('GarageIntegrity.java')
 assert 'String savedMemo=RideNotes.memo(a.db,file)' in ride
 assert 'date+" "+memo' in ride
-assert 'RideNotes.clearDeleted(next,track.getName())' in main
-assert 'new String[]{".done",".imported",".recovered",".category",".bike",".unmerged",".favorite"}' in main
+assert 'RideStorageManager.confirm(this,track)' in main
+assert 'RideNotes.clearDeleted(next,track.getName())' not in main
+storage=s('RideStorageManager.java')
+assert 'static void confirm(MainActivity a,File track)' in storage
+assert 'RideTrash.move(a.getFilesDir(),track)' in storage
+assert 'restoreDraftButton.setVisibility(View.GONE)' in fuel
 assert '이전 주유 날짜 확인' in fuel and '오늘 날짜로 변경' in fuel
 assert 'FuelAnomalyPolicy.unusualLiters' in fuel and 'FuelAnomalyPolicy.lowOdometer' in fuel
 assert 'FuelAnomalyPolicy.unusualAmount' in fuel
@@ -26,5 +30,5 @@ assert 'apksigner' in Path('../.github/workflows/moto-fixed-signed.yml').read_te
 ci=Path('../.github/workflows/moto-ux-validation.yml').read_text()
 assert '-PmotoReleaseCode=552' in ci and "versionCode='552'" in ci
 assert 'bash tests/run-ux83-stabilization-tests.sh' in ci
-print("PASS UX83: memo search, ride delete cleanup, fuel/date warnings, per-item service overrides, audit drilldown and fixed GPS bike")
+print("PASS UX83: memo search, reversible ride quarantine, fuel/date warnings, per-item service overrides, audit drilldown and fixed GPS bike")
 PY
