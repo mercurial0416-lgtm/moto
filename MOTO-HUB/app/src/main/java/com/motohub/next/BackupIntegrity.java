@@ -32,7 +32,7 @@ final class BackupIntegrity {
     String name=entry.getName();
     if(!BackupFormat.allowed(name,entry.isDirectory())||!names.add(name))
      throw new IOException("백업 ZIP 항목이 유효하지 않습니다.");
-    if((BackupFormat.isTrack(name)||BackupFormat.isTrashTrack(name))&&++tracks>BackupFormat.MAX_TRACKSthrow new IOException("GPS 기록이 너무 많습니다.");
+    if((BackupFormat.isTrack(name)||BackupFormat.isTrashTrack(name))&&++tracks>BackupFormat.MAX_TRACKS)throw new IOException("GPS 기록이 너무 많습니다.");
     if((BackupFormat.isPhoto(name)||BackupFormat.isModelPhoto(name))&&++photos>BackupFormat.MAX_PHOTOS*2)throw new IOException("사진이 너무 많습니다.");
     if(BackupFormat.isReceipt(name)&&++receipts>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증 사진이 너무 많습니다.");
     if("MOTO-HUB-data.json".equals(name))hasData=true;
