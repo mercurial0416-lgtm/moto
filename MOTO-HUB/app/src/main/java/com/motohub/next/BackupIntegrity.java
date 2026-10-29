@@ -30,7 +30,7 @@ final class BackupIntegrity {
     String name=entry.getName();
     if(!BackupFormat.allowed(name,entry.isDirectory())||!names.add(name))
      throw new IOException("백업 ZIP 항목이 유효하지 않습니다.");
-    if(BackupFormat.isTrack(name)&&++tracks>BackupFormat.MAX_TRACKS)throw new IOException("GPS 기록이 너무 많습니다.");
+    if((BackupFormat.isTrack(name)||BackupFormat.isTrashTrack(name))&&++tracks>BackupFormat.MAX_TRACKSthrow new IOException("GPS 기록이 너무 많습니다.");
     if((BackupFormat.isPhoto(name)||BackupFormat.isModelPhoto(name))&&++photos>BackupFormat.MAX_PHOTOS*2)throw new IOException("사진이 너무 많습니다.");
     if(BackupFormat.isReceipt(name)&&++receipts>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증 사진이 너무 많습니다.");
     if("MOTO-HUB-data.json".equals(name))hasData=true;
@@ -40,7 +40,7 @@ final class BackupIntegrity {
      try{digest=MessageDigest.getInstance("SHA-256");}
      catch(NoSuchAlgorithmException unavailable){throw new IOException("GPS SHA-256 검증을 실행할 수 없습니다.",unavailable);}
     }
-    ByteArrayOutputStream value=(BackupFormat.isSidecar(name)&&limit>0)||BackupFormat.isModelMetadata(name)?new ByteArrayOutputStream():null;
+    ByteArrayOutputStream value=((BackupFormat.isSidecar(name)||BackupFormat.isTrashSidecar(name))&&limit>0)||BackupFormat.isModelMetadata(name)?new ByteArrayOutputStream():null;
     int n;byte[] header=new byte[2],trailer=new byte[2];
     while((n=zip.read(buffer))!=-1){
      if(BackupFormat.isReceipt(name)||BackupFormat.isPhoto(name)||BackupFormat.isModelPhoto(name)){
@@ -71,7 +71,7 @@ final class BackupIntegrity {
        !BackupFormat.selectedModelMetadata(small.get(name)))
      throw new IOException("선택한 모델 사진 출처 정보가 손상됐습니다.");
    }
-   if(!BackupFormat.isSidecar(name))continue;
+   if(!BackupFormat.isSidecar(name)&&!BackupFormat.isTrashSidecar(name))continue;
    String suffix=BackupFormat.sidecarSuffix(name);
    String origin=name.substring(0,name.length()-suffix.length());
    if(!names.contains(origin))throw new IOException("원본 GPS 없이 표시만 남은 기록: "+name);

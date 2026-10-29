@@ -185,6 +185,26 @@ public final class BackupBundle {
     }
    }
   }
+  // Preserve explicitly quarantined GPS in their own namespace: full restore keeps them hidden.
+  if(gps){
+   List<File> retired=RideTrash.entries(internal);
+   if(retired.size()+(tracks==null?0:tracks.length)>BackupFormat.MAX_TRACKS)
+    throw new IOException("GPS와 복구함 기록 합계가 백업 한도를 넘었어요.");
+   for(File track:retired){
+    String name=track.getName(),prefix="rides-trash/"+name+"/";
+    if(track.length()==0)throw new IOException("복구함 GPS가 비어 있습니다: "+name);
+    total=writeFile(zip,track,prefix+name,total);count++;
+    for(String suffix:RideTrash.SIDECARS){
+     File marker=new File(track.getPath()+suffix);
+     if(Files.exists(marker.toPath(),LinkOption.NOFOLLOW_LINKS)){
+      requireRegular(marker);
+      if(marker.length()>BackupFormat.entryLimit(prefix+name+suffix))
+       throw new IOException("복구함 GPS 메타데이터 크기 초과");
+      total=writeFile(zip,marker,prefix+name+suffix,total);count++;
+     }
+    }
+   }
+  }
   zip.finish();zip.flush();return count;
  }
 }
