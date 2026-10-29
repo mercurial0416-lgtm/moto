@@ -37,14 +37,14 @@ jobs:
         id: release-version
         run: |
           set -euo pipefail
-          # v550 candidate is built from the integrated and CI-validated release branch.
+          # v551 candidate is built from the integrated and CI-validated release branch.
           # Refuse an older/same published code; never silently release v537 from legacy defaults.
           # One-time push release refuses an unverified or mutated source candidate.
           if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
             test "$(cat release-meta/.github/release-triggers/v548.txt)" = "release=548 source=2b9bf74fcb4af648b21e348e4fd6fa709ed1a983"
             test "$(git -C source rev-parse HEAD)" = "2b9bf74fcb4af648b21e348e4fd6fa709ed1a983"
           fi
-          CODE=550
+          CODE=551
           CURRENT=$(python3 -c 'import json; print(int(json.load(open("release-meta/updates/manifest.json",encoding="utf-8"))["versionCode"]))')
           test "$CODE" -gt "$CURRENT" || { echo "Refusing to publish non-upgrade version"; exit 1; }
           printf 'code=%s\n' "$CODE" >> "$GITHUB_OUTPUT"
