@@ -24,6 +24,11 @@ final class ServiceStatusUi {
   Button odo=a.button("계기판 갱신",false,()->updateOdo(bike));odo.setTextSize(12);
   odo.setMinHeight(a.dp(48));heading.addView(odo);target.addView(heading);
   a.gap(target,9);
+  java.util.Map<String,JSONObject> serviceMap=LatestServiceByType.latest(a.items("services"),bike.optString("id"));
+  JSONObject engineOil=serviceMap.get("엔진오일"),oilFilter=serviceMap.get("오일필터");
+  if(engineOil!=null&&oilFilter!=null){
+   a.action(target,"엔진오일 + 오일필터 함께 완료",false,()->completeOilPair(bike,engineOil,oilFilter));
+  }
   if(entries.isEmpty()){
    TextView blank=a.text("등록된 정비주기가 없어요. 엔진오일·체인 등 필요한 항목부터 등록하세요.",13,a.muted,false);
    blank.setPadding(a.dp(13),a.dp(13),a.dp(13),a.dp(13));target.addView(blank);
@@ -84,6 +89,58 @@ final class ServiceStatusUi {
    }else commit.run();
   }));
   dialog.show();
+ }
+ /** Atomically close two existing maintenance cycles using one real date and odometer. */
+ void completeOilPair(JSONObject bike,JSONObject oil,JSONObject filter){
+  if(bike==null||oil==null||filter==null)return;
+  String bikeId=bike.optString("id");
+  LinearLayout body=a.page("엔진오일 + 오일필터 함께 완료");
+  a.label(body,"두 항목 모두 실제로 교체했을 때만 저장하세요. 날짜·계기판을 한 번만 입력합니다.",14,a.muted,false);
+  EditText odo=new EditText(a);odo.setSingleLine(true);
+  odo.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
+  odo.setText(String.valueOf((long)bike.optDouble("odo")));odo.setTextColor(a.fg);
+  a.label(body,"실제 계기판 (km)",14,a.fg,true);body.addView(odo,new LinearLayout.LayoutParams(-1,a.dp(52)));
+  EditText oilCost=new EditText(a),filterCost=new EditText(a);
+  for(EditText field:new EditText[]{oilCost,filterCost}){
+   field.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
+   field.setSingleLine(true);field.setText("0");field.setTextColor(a.fg);
+  }
+  a.gap(body,12);a.label(body,"엔진오일 비용 (원)",14,a.fg,true);body.addView(oilCost,new LinearLayout.LayoutParams(-1,a.dp(52)));
+  a.gap(body,12);a.label(body,"오일필터 비용 (원)",14,a.fg,true);body.addView(filterCost,new LinearLayout.LayoutParams(-1,a.dp(52)));
+  a.label(body,"비용은 각각 입력하고 저장 시 두 정비주기가 함께 갱신돼요.",12,a.muted,false);
+  a.action(body,"두 항목 모두 완료 저장",true,()->a.attempt(()->{
+   double km=OdometerGuard.require(bike.optDouble("odo"),Double.parseDouble(odo.getText().toString().trim()));
+   JSONObject oilDone=ServiceCycle.completed(oil,a.today(),km,Double.parseDouble(oilCost.getText().toString().trim()));
+   JSONObject filterDone=ServiceCycle.completed(filter,a.today(),km,Double.parseDouble(filterCost.getText().toString().trim()));
+   Runnable persist=()->a.attempt(()->{
+    if(a.readOnly||a.bike()==null||!bikeId.equals(a.bike().optString("id")))
+     throw new java.io.IOException("바이크가 바뀌었거나 원본 보호 중이에요.");
+    String previous=a.db.toString();
+    JSONObject next=new JSONObject(previous);
+    JSONObject current=Store.find(next,"vehicles",bikeId);
+    if(current==null)throw new java.io.IOException("바이크를 찾지 못했어요.");
+    OdometerGuard.require(current.optDouble("odo"),km);
+    if(Store.find(next,"services",oil.optString("id"))==null||
+       Store.find(next,"services",filter.optString("id"))==null)
+     throw new java.io.IOException("기존 정비주기가 변경됐어요. 다시 확인해 주세요.");
+    java.util.Map<String,JSONObject> latest=LatestServiceByType.latest(a.items("services"),bikeId);
+    if(!oil.optString("id").equals(latest.containsKey("엔진오일")?latest.get("엔진오일").optString("id"):"")||
+       !filter.optString("id").equals(latest.containsKey("오일필터")?latest.get("오일필터").optString("id"):""))
+     throw new java.io.IOException("정비주기가 바뀌었어요. 화면을 다시 열어 주세요.");
+    if(QuickLogDuplicate.exists(a.items("services"),oilDone,"services")||
+       QuickLogDuplicate.exists(a.items("services"),filterDone,"services"))
+     throw new java.io.IOException("같은 정비 기록이 이미 존재해요.");
+    Store.upsert(next,"services",oilDone);Store.upsert(next,"services",filterDone);
+    if(km>current.optDouble("odo"))current.put("odo",km);
+    a.write(next);DailyMaintenanceJob.clearReminderState(a);DailyMaintenanceJob.checkSoon(a);
+    a.close();a.render();UndoLastSave.offer(a,previous,a.db.toString(),"엔진오일·오일필터");
+   });
+   new AlertDialog.Builder(a).setTitle("정비 두 항목 저장 확인")
+    .setMessage("엔진오일과 오일필터 두 건을 한 번에 저장하고 다음 정비주기를 계산합니다.")
+    .setNegativeButton("계속 수정",null)
+    .setPositiveButton("저장",(d,w)->persist.run()).show();
+  }));
+  a.show();
  }
  void complete(JSONObject old){
   JSONObject bike=a.bike();if(bike==null)return;
