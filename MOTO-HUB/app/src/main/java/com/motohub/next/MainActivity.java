@@ -1360,7 +1360,28 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    List<ServiceBatch.Item> rows=new ArrayList<>();
    for(int i=0;i<choices.size();i++)if(choices.get(i).isChecked())rows.add(new ServiceBatch.Item(ServiceBatch.COMMON[i],costs.get(i).getText().toString(),""));
    ServiceBatch.Result result=ServiceBatch.build(bikeId,date.getText().toString().trim(),mileage.getText().toString().trim(),rows,items("services"),intervals.isChecked());
-   // Always snapshot current storage again before confirming; one write commits all records.
+   // Preview and individually adjust the due date/km of EACH chosen maintenance item.
+   // The main entry form stays compact; only the final confirmation expands these fields.
+   LinearLayout dueRows=col();dueRows.setPadding(dp(12),dp(8),dp(12),dp(8));
+   List<EditText> dueKms=new ArrayList<>(),dueDates=new ArrayList<>();
+   for(JSONObject row:result.records){
+    label(dueRows,row.optString("type")+" · 다음 정비 목표",14,fg,true);
+    EditText nextKm=new EditText(this);nextKm.setSingleLine(true);nextKm.setTextColor(fg);
+    nextKm.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+    nextKm.setHint("다음 정비 km · 0=미설정");
+    nextKm.setText(String.valueOf((long)row.optDouble("nextKm",0)));
+    dueRows.addView(nextKm,new LinearLayout.LayoutParams(-1,dp(47)));dueKms.add(nextKm);
+    EditText nextDate=new EditText(this);nextDate.setSingleLine(true);nextDate.setTextColor(fg);
+    nextDate.setInputType(android.text.InputType.TYPE_CLASS_DATETIME|android.text.InputType.TYPE_DATETIME_VARIATION_DATE);
+    nextDate.setHint("다음 정비일 YYYY-MM-DD · 비워두면 없음");
+    nextDate.setText(row.optString("nextDate",""));
+    dueRows.addView(nextDate,new LinearLayout.LayoutParams(-1,dp(47)));dueDates.add(nextDate);
+    gap(dueRows,10);
+   }
+   ScrollView dueScroll=new ScrollView(this);
+   dueScroll.setFillViewport(false);dueScroll.addView(dueRows);
+   int previewHeight=dp(Math.min(340,Math.max(140,result.records.size()*125)));
+   dueScroll.setLayoutParams(new LinearLayout.LayoutParams(-1,previewHeight));
    int duplicated=ServiceBatch.duplicates(items("services"),result.records);
    StringBuilder detail=new StringBuilder();for(JSONObject row:result.records){
     detail.append("\n · ").append(row.optString("type")).append("  ").append(won(row.optDouble("cost")));
@@ -1368,9 +1389,13 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    String message=result.records.size()+"개 항목 · 총 "+won(result.totalCost)+detail+"\n"+
     date.getText().toString()+" · "+mileage.getText().toString()+" km"+
     (duplicated>0?"\n\n⚠ 기존 기록과 유사한 항목 "+duplicated+"개가 있어요.":"")+
-    "\n\n모든 정비 기록을 한 번에 저장할까요?";
-   new AlertDialog.Builder(this).setTitle("정비 내용 확인").setMessage(message)
-    .setNegativeButton("계속 수정",null).setPositiveButton("모두 저장",(d,w)->attempt(()->{
+    "\n\n아래에서 항목별 다음 거리·날짜를 확인하고 수정할 수 있어요.";
+   AlertDialog confirm=new AlertDialog.Builder(this).setTitle("정비 내용 확인").setMessage(message)
+    .setView(dueScroll).setNegativeButton("계속 수정",null).setPositiveButton("모두 저장",null).create();
+   confirm.setOnShowListener(ignored->confirm.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->attempt(()->{
+     for(int i=0;i<result.records.size();i++)
+      MaintenanceDueOverrides.apply(result.records.get(i),dueKms.get(i).getText().toString(),
+       dueDates.get(i).getText().toString());
      if(!bikeId.equals(bike()==null?"":bike().optString("id")))throw new IOException("선택 바이크가 변경됐습니다. 다시 확인하세요.");
      JSONObject next=new JSONObject(db.toString());
      if(Store.find(next,"vehicles",bikeId)==null)throw new IOException("바이크가 삭제됐습니다.");
@@ -1380,8 +1405,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      JSONObject updated=Store.find(next,"vehicles",bikeId);
      double km=Double.parseDouble(mileage.getText().toString().trim());
      if(km>updated.optDouble("odo",0))updated.put("odo",km);
-     write(next);batchPrefs.edit().remove(batchKey).apply();DailyMaintenanceJob.checkSoon(this);close();render();toast("정비 "+result.records.size()+"건을 저장했어요.");
-    })).show();
+     write(next);batchPrefs.edit().remove(batchKey).apply();DailyMaintenanceJob.checkSoon(this);
+     confirm.dismiss();close();render();toast("정비 "+result.records.size()+"건을 저장했어요.");
+    })));
+   confirm.show();
   }));
   show();
  }
