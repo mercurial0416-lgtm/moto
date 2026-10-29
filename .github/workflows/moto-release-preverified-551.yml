@@ -89,7 +89,7 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Refusing to overwrite existing release"; exit 1
           fi
-          gh release create "$TAG" "MOTO-HUB.apk#MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" --title "MOTO HUB 551 (fixed signed)" --notes "551: editable purchase price +10/50/100만원, eight usability and safety improvements. Original pinned signing certificate. Data-preserving upgrade."
+          gh release create "$TAG" "MOTO-HUB.apk#MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" --title "MOTO HUB 551 (fixed signed)" --notes "551: per-bike fuel drafts, full-tank odometer confirmation, last values, multi-service completion, ride titles and notes, motorcycle widgets and read-only garage audit. Fixed original signing identity. Data-preserving upgrade."
           URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
           python3 source/MOTO-HUB/tools/make_update_manifest.py --apk MOTO-HUB.apk --apk-url "$URL" --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" --output release-meta/updates/manifest.json
           git -C release-meta config user.name "github-actions[bot]"
