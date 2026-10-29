@@ -27,6 +27,26 @@ public final class BackupBundle {
     (Files.isSymbolicLink(dir.toPath())||!Files.isDirectory(dir.toPath(),LinkOption.NOFOLLOW_LINKS)))
    throw new IOException("백업 폴더가 안전하지 않습니다: "+dir.getName());
  }
+ private static final String[] TRASH_SIDECARS={".done",".imported",".recovered",".unmerged",".category",".bike",".favorite",".mergedinto"};
+ /** Explicitly enumerate quarantined sessions without Android dependencies; incomplete folders block export. */
+ private static List<File> trashTracks(File internal)throws IOException{
+  File root=new File(internal,"rides-trash");
+  requireDirectoryIfPresent(root);
+  List<File> list=new ArrayList<>();
+  File[] folders=root.listFiles();
+  if(folders==null)return list;
+  for(File folder:folders){
+   if(!folder.getName().matches(BackupFormat.TRACK)||
+      !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS)||
+      Files.isSymbolicLink(folder.toPath()))
+    throw new IOException("GPS 복구함 폴더를 확인할 수 없습니다.");
+   File track=new File(folder,folder.getName());
+   requireRegular(track);
+   list.add(track);
+  }
+  list.sort(Comparator.comparing(File::getName));
+  return list;
+ }
  private static byte[] readSidecar(File file,long maxBytes)throws IOException{
   requireRegular(file);
   if(file.length()>maxBytes)throw new IOException("라이딩 부속 파일 크기가 너무 큽니다: "+file.getName());
@@ -194,16 +214,16 @@ public final class BackupBundle {
     }
    }
   }
-  // Preserve explicitly quarantined GPS in their own namespace: full restore keeps them hidden.
+  // Preserve quarantined GPS inside its own namespace; refuse incomplete trash structures.
   if(gps){
-   List<File> retired=RideTrash.entries(internal);
+   List<File> retired=trashTracks(internal);
    if(retired.size()+(tracks==null?0:tracks.length)>BackupFormat.MAX_TRACKS)
     throw new IOException("GPS와 복구함 기록 합계가 백업 한도를 넘었어요.");
    for(File track:retired){
     String name=track.getName(),prefix="rides-trash/"+name+"/";
     if(track.length()==0)throw new IOException("복구함 GPS가 비어 있습니다: "+name);
     total=writeFile(zip,track,prefix+name,total);count++;
-    for(String suffix:RideTrash.SIDECARS){
+    for(String suffix:TRASH_SIDECARS){
      File marker=new File(track.getPath()+suffix);
      if(Files.exists(marker.toPath(),LinkOption.NOFOLLOW_LINKS)){
       requireRegular(marker);

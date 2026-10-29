@@ -23,7 +23,7 @@ assert 'RideCompletionInbox.record(a,restored)' in store
 assert 'void showPage(MainActivity a,' in store and 'GPS 날짜 검색' in store
 assert '30일 복구함' not in store
 assert 'BackupFormat.isTrashAsset(name)' in rest
-assert 'List<File> retired=RideTrash.entries(internal)' in export
+assert 'List<File> retired=trashTracks(internal)' in export
 assert 'rides-trash/' in archive and 'TARGET_BYTES=175_000_000L' in archive
 assert 'BatchArchiveExport.write(part,snapshot,id,output)' in main
 assert 'verified.entryNames.equals(part.expectedEntries())' in main
