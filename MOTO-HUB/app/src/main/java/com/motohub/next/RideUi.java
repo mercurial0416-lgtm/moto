@@ -179,6 +179,7 @@ final class RideUi {
   a.action(a.content,"라이딩 2건 통합 · 원본 보존",false,this::chooseMerge);
   }
   a.gap(a.content,8);a.label(a.content,"기록된 라이딩",20,a.fg,true);
+  a.action(a.content,"GPS 복구함 · 삭제한 라이딩 복원",false,()->RideStorageManager.showTrash(a));
   // Render controls immediately and read track/sidecar metadata on one background worker.
   // A new render invalidates the previous snapshot; no GPS file is modified here.
   LinearLayout historyPanel=a.col();
