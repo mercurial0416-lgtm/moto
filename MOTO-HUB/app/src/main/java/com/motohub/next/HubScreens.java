@@ -286,6 +286,9 @@ final class HubScreens {
   a.gap(a.content,4);
   if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}
   bikePicker();
+  if(UndoLastSave.available(a)){
+   a.action(a.content,"↶ 방금 저장한 기록 취소 · 2분",false,()->UndoLastSave.undo(a));
+  }
   LinearLayout actions=a.col();actions.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(6));actions.setBackground(a.shape(a.panel,a.line,8));
   a.label(actions,"기록 추가",15,a.fg,true);
   a.pair(actions,"간편 주유",()->new QuickEntryUi(a).fuel(),"정비주기 설정",()->new QuickEntryUi(a).maintenance());
