@@ -7,6 +7,10 @@ final class HubScreens {
   Thread t=new Thread(r,"moto-local-backup-io");t.setDaemon(true);return t;
  });
  final MainActivity a;
+ static final class GpsSearchRow {
+  final String title,filename;
+  GpsSearchRow(String title,String filename){this.title=title;this.filename=filename;}
+ }
  static final class LedgerSearchRow {
   final JSONObject item;final String collection,type,detail,amount,search;
   LedgerSearchRow(JSONObject item,String collection,String type,String detail,String amount,String search){
@@ -114,7 +118,7 @@ final class HubScreens {
   AlertDialog dialog=new AlertDialog.Builder(a).setTitle("주유 · 정비 · 비용 통합 검색")
     .setView(body).setNegativeButton("닫기",null).create();
   final int[] page={0};final Runnable[] redraw={null};
-  final List<String> gpsLabels=new ArrayList<>();final boolean[] gpsReady={false},gpsFailed={false};
+  final List<GpsSearchRow> gpsLabels=new ArrayList<>();final boolean[] gpsReady={false},gpsFailed={false};
   redraw[0]=()->{
    if(a.isFinishing()||a.isDestroyed()||!dialog.isShowing())return;
    String q=input.getText().toString().trim().toLowerCase(Locale.KOREA);
@@ -130,12 +134,12 @@ final class HubScreens {
     }
     found++;
    }
-   for(String title:gpsLabels){
-    if(!q.isEmpty()&&!title.toLowerCase(Locale.KOREA).contains(q))continue;
+   for(GpsSearchRow ride:gpsLabels){
+    if(!q.isEmpty()&&!ride.title.toLowerCase(Locale.KOREA).contains(q)&&!ride.filename.toLowerCase(Locale.KOREA).contains(q))continue;
     if(found>=from&&shown<30){
      shown++;
-     line(results,"GPS 라이딩",title,"",()->{
-      dialog.dismiss();RideStorageManager.show(a,title);
+     line(results,"GPS 라이딩",ride.title,"",()->{
+      dialog.dismiss();RideStorageManager.show(a,ride.filename);
      });
     }
     found++;
@@ -157,10 +161,10 @@ final class HubScreens {
   a.action(body,"GPS 라이딩 원본도 검색",false,()->{dialog.dismiss();RideStorageManager.show(a);});
   dialog.show();redraw[0].run();
   new Thread(()->{
-   List<String> loaded=new ArrayList<>();boolean success=true;
+   List<GpsSearchRow> loaded=new ArrayList<>();boolean success=true;
    try{
     for(java.io.File track:TrackFile.tracks(a.getFilesDir()))
-     loaded.add(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault()));
+     loaded.add(new GpsSearchRow(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault()),track.getName()));
    }catch(Exception unavailable){success=false;}
    final boolean complete=success;
    a.runOnUiThread(()->{
