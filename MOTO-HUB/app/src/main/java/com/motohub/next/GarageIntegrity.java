@@ -39,5 +39,50 @@ final class GarageIntegrity {
     "건, 형식 오류 "+invalid+"건, 중복 의심 "+possibleDuplicates+
     "건. 원본은 수정하지 않았어요. 전체 백업 후 기록별로 확인해 주세요.";
  }
+ static final class Finding {
+  final String collection,id,bikeId,reason;
+  Finding(String collection,String id,String bikeId,String reason){
+   this.collection=collection;this.id=id;this.bikeId=bikeId;this.reason=reason;
+  }
+ }
+ /** Read-only detailed findings that can be opened in the normal record editor. */
+ static List<Finding> findings(JSONObject db){
+  List<Finding> out=new ArrayList<>();
+  if(db==null)return out;
+  JSONArray bikes=db.optJSONArray("vehicles");
+  Map<String,Double> bikeOdos=new HashMap<>();
+  if(bikes!=null)for(int i=0;i<bikes.length();i++){
+   JSONObject b=bikes.optJSONObject(i);
+   if(b!=null)bikeOdos.put(b.optString("id"),b.optDouble("odo",0));
+  }
+  for(String collection:new String[]{"services","expenses"}){
+   JSONArray rows=db.optJSONArray(collection);
+   if(rows==null)continue;
+   Map<String,String> seen=new HashMap<>();
+   for(int i=0;i<rows.length()&&out.size()<70;i++){
+    JSONObject row=rows.optJSONObject(i);
+    if(row==null)continue;
+    String id=row.optString("id"),bikeId=row.optString("vehicleId");
+    String date=row.optString("date"),name=row.optString("type",collection.equals("services")?"정비":"비용");
+    String context=name+" · "+date;
+    if(!bikeOdos.containsKey(bikeId)){
+     out.add(new Finding(collection,id,bikeId,context+" · 연결된 바이크 없음"));
+     continue;
+    }
+    double km=row.optDouble("mileage",Double.NaN);
+    double cost=row.optDouble(collection.equals("services")?"cost":"amount",Double.NaN);
+    if(!Double.isFinite(km)||km<0||!Double.isFinite(cost)||cost<0){
+     out.add(new Finding(collection,id,bikeId,context+" · 거리/비용 형식 오류"));
+     continue;
+    }
+    if(km>bikeOdos.get(bikeId)+2000)
+     out.add(new Finding(collection,id,bikeId,context+" · 현재 계기판보다 2,000km 이상 큼"));
+    String key=bikeId+"|"+date+"|"+name+"|"+km+"|"+cost;
+    if(seen.putIfAbsent(key,id)!=null)
+     out.add(new Finding(collection,id,bikeId,context+" · 중복 의심 (삭제 전 확인)"));
+   }
+  }
+  return out;
+ }
  static boolean hasIssue(String result){return result!=null&&result.startsWith("데이터 점검 ·");}
 }
