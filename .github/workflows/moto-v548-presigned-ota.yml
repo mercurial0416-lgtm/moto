@@ -1,0 +1,112 @@
+name: Publish verified MOTO HUB v548 OTA (pre-signed exact APK)
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/release-triggers/v548-presigned.txt'
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: moto-fixed-signed-release
+  cancel-in-progress: false
+jobs:
+  publish-presigned-548:
+    if: github.ref == 'refs/heads/main' && github.event.head_commit.message == 'Publish already signed MOTO HUB v548'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout public manifest and immutable signature data
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Checkout verified source and manifest generator
+        uses: actions/checkout@v4
+        with:
+          ref: release/moto-hub-apk
+          path: source
+          persist-credentials: false
+      - name: Verify one-time release request and published version policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(cat .github/release-triggers/v548-presigned.txt)" = 'release=548 sha256=0804987b223bb86fc56a117ebe51eea28c42d7f119b2e54ed46998f58c3511ec'
+          test "$(git -C source rev-parse HEAD)" = '2b9bf74fcb4af648b21e348e4fd6fa709ed1a983'
+          CURRENT=$(python3 -c 'import json; print(json.load(open("updates/manifest.json"))["versionCode"])')
+          test "$CURRENT" -lt 548 || { echo 'Manifest already current/newer; refusing overwrite'; exit 1; }
+          if gh release view moto-hub-v548 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release tag already exists; refusing overwrite'; exit 1
+          fi
+      - name: Download exact unsigned APK from successful v548 Android CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/unsigned"
+          gh run download 40900759454 --repo "$GITHUB_REPOSITORY" \
+            --name moto-ux76-unsigned-release-and-play-aab-5054514518da6f8e59faca7e23c6223ec940422c \
+            --dir "$RUNNER_TEMP/unsigned"
+          test -s "$RUNNER_TEMP/unsigned/apk/release/app-release-unsigned.apk"
+      - name: Reassemble previously signed APK with public signature (no private key)
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, hashlib, struct
+          import os
+          unsigned=Path(os.environ['RUNNER_TEMP'])/'unsigned/apk/release/app-release-unsigned.apk'
+          data=unsigned.read_bytes()
+          check=lambda content:hashlib.sha256(content).hexdigest()
+          assert len(data)==47298770 and check(data)=='16ccbaab4f3ff04a75d9d4a9e654318c8c5209eb3902e281a36081f92cf2e17b', 'Unsigned artifact is not the validated 548 build'
+          offset=47261316
+          assert data[-22:-18]==b'PK\\x05\\x06' and int.from_bytes(data[-6:-2],'little')==offset
+          signature=base64.b64decode(Path('.github/release-helpers/v548-public-v2-signature.b64').read_text().strip(),validate=True)
+          assert len(signature)==2016, 'Wrong public APK signature block'
+          signed=data[:offset]+signature+data[offset:-6]+struct.pack('<I',offset+len(signature))+data[-2:]
+          assert len(signed)==47300786 and check(signed)=='0804987b223bb86fc56a117ebe51eea28c42d7f119b2e54ed46998f58c3511ec', 'Signed APK differs from already delivered 548'
+          out=Path('MOTO-HUB.apk');out.write_bytes(signed)
+          print('Exact signed APK reconstructed:',len(signed),'bytes, SHA-256:',check(signed))
+          PY
+      - name: Install official Android verifier
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Verify official Android signature, certificate and version
+        run: |
+          set -euo pipefail
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$SIGNER" verify --verbose --print-certs MOTO-HUB.apk > signature.txt
+          grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' signature.txt
+          CERT=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' signature.txt | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          test "$CERT" = '212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b'
+          "$AAPT" dump badging MOTO-HUB.apk > badging.txt
+          grep -q "package: name='com.motohub.next'" badging.txt
+          grep -q "versionCode='548'" badging.txt
+          sha256sum MOTO-HUB.apk
+      - name: Publish signed APK and OTA manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=moto-hub-v548
+          ASSET="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
+          python3 source/MOTO-HUB/tools/make_update_manifest.py \
+            --apk MOTO-HUB.apk --apk-url "$ASSET" \
+            --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" \
+            --output updates/manifest.json
+          python3 - <<'PY'
+          import json
+          m=json.load(open('updates/manifest.json'))
+          assert m['versionCode']==548 and m['sha256']=='0804987b223bb86fc56a117ebe51eea28c42d7f119b2e54ed46998f58c3511ec'
+          PY
+          gh release create "$TAG" "MOTO-HUB.apk#MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" \
+            --title 'MOTO HUB 548 (verified fixed-signed)' \
+            --notes 'Verified existing signed APK; no signing key uploaded. SHA-256: 0804987b223bb86fc56a117ebe51eea28c42d7f119b2e54ed46998f58c3511ec.'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add updates/manifest.json
+          git commit -m 'Publish verified MOTO HUB 548 OTA manifest [skip ci]'
+          git push origin HEAD:main
