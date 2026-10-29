@@ -26,16 +26,18 @@ jobs:
       - name: Checkout integrated Android source
         uses: actions/checkout@v4
         with:
-          ref: build/di518-ux4-prebuild-20261020
+          ref: release/moto-hub-apk
           path: source
           persist-credentials: false
       - name: Select next version and test release policy
         id: release-version
         run: |
           set -euo pipefail
-          CODE=$(python3 source/MOTO-HUB/tools/choose_release_version.py \
-            --gradle source/MOTO-HUB/app/build.gradle \
-            --manifest release-meta/updates/manifest.json)
+          # v545 candidate is built from the integrated and CI-validated release branch.
+          # Refuse an older/same published code; never silently release v537 from legacy defaults.
+          CODE=545
+          CURRENT=$(python3 -c 'import json; print(int(json.load(open("release-meta/updates/manifest.json",encoding="utf-8"))["versionCode"]))')
+          test "$CODE" -gt "$CURRENT" || { echo "Refusing to publish non-upgrade version"; exit 1; }
           printf 'code=%s\n' "$CODE" >> "$GITHUB_OUTPUT"
           printf 'revision=%s\n' "$(git -C source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           python3 source/MOTO-HUB/tests/test_release_version.py
