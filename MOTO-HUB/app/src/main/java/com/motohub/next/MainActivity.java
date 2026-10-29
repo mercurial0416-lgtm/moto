@@ -136,16 +136,27 @@ public class MainActivity extends Activity {
   new AlertDialog.Builder(this).setTitle("라이딩 저장 완료").setMessage(summary)
    .setNegativeButton("닫기",null)
    .setNeutralButton("주행 내역 보기",(d,w)->{tab="라이딩";render();})
-   .setPositiveButton("계기판 갱신",(d,w)->promptRideOdometer())
+   .setPositiveButton("계기판 갱신",(d,w)->promptRideOdometer(pending))
    .setOnDismissListener(d->RideCompletionInbox.seen(this,id)).show();
  }
  /** A completed GPS recap can offer an ODO shortcut, never derive ODO from GPS. */
- void promptRideOdometer(){
+ void promptRideOdometer(JSONObject ride){
   if(readOnly){toast("저장 파일 보호 중입니다.");return;}
   if(RideService.running||RideService.saving()){toast("GPS 기록 저장이 끝난 뒤 계기판을 입력해 주세요.");return;}
-  JSONObject bike=bike();
-  if(bike==null){toast("차고에 바이크를 먼저 등록해 주세요.");return;}
-  new ServiceStatusUi(this).updateOdo(bike);
+  if(ride==null){error("라이딩 연결 정보를 찾을 수 없어요.");return;}
+  try{
+   File track=new File(TrackFile.directory(getFilesDir()),ride.optString("id"));
+   if(!RideMileageIntegrity.validCompleted(track))throw new java.io.IOException("라이딩 원본이 없거나 완료되지 않았습니다.");
+   String bound=RideBikeBinding.readStrict(track);
+   if(bound.isEmpty())throw new java.io.IOException("이전 라이딩은 바이크 연결 기록이 없어요. 차고에서 직접 계기판을 갱신해 주세요.");
+   JSONObject linked=Store.find(db,"vehicles",bound);
+   if(linked==null)throw new java.io.IOException("라이딩과 연결된 바이크가 차고에 없어요.");
+   if(!bound.equals(ride.optString("bikeId",bound)))throw new java.io.IOException("라이딩과 저장 요약의 바이크 정보가 일치하지 않아요.");
+   new AlertDialog.Builder(this).setTitle("라이딩 바이크 확인")
+    .setMessage("기록에 연결된 바이크: "+linked.optString("name")+"\\nGPS 거리는 자동 반영하지 않습니다. 실제 계기판을 직접 입력할까요?")
+    .setNegativeButton("취소",null)
+    .setPositiveButton("계기판 입력",(d,w)->new ServiceStatusUi(this).updateOdo(linked)).show();
+  }catch(Exception invalid){error(invalid.getMessage()==null?"라이딩 바이크 연결을 확인하지 못했어요.":invalid.getMessage());}
  }
  /** A summary can always be reopened, even if another dialog blocked its popup. */
  void showRideCompletionHistory(){
@@ -166,7 +177,7 @@ public class MainActivity extends Activity {
     new AlertDialog.Builder(this).setTitle("저장된 GPS 요약")
      .setMessage(item.optString("summary","")).setNegativeButton("닫기",null)
      .setNeutralButton("라이딩 내역",(dd,w)->{tab="라이딩";render();})
-     .setPositiveButton("계기판 갱신",(dd,w)->promptRideOdometer()).show();
+     .setPositiveButton("계기판 갱신",(dd,w)->promptRideOdometer(item)).show();
    }).setNegativeButton("닫기",null).show();
  }
  @Override public void onWindowFocusChanged(boolean focused){
