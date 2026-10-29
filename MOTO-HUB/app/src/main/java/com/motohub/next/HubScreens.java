@@ -140,7 +140,7 @@ final class HubScreens {
     }
     found++;
    }
-   if(found==0)results.addView(a.text(gpsFailed[0]?"GPS 기록 검색 실패 · 주유/정비 결과만 표시":"검색 결과가 없어요.",13,a.muted,false));
+   if(found==0)results.addView(a.text(gpsFailed[0]?"GPS 기록 검색 실패 · 주유/정비 결과만 표시":gpsReady[0]?"검색 결과가 없어요.":"GPS 라이딩 기록 확인 중…",13,a.muted,false));
    if(from+shown<found)results.addView(a.button("다음 30건 보기",false,()->{
     page[0]++;redraw[0].run();scroll.scrollTo(0,0);
    }));
