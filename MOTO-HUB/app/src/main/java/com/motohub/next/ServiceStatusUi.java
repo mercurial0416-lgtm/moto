@@ -24,6 +24,7 @@ final class ServiceStatusUi {
   Button odo=a.button("계기판 갱신",false,()->updateOdo(bike));odo.setTextSize(12);
   odo.setMinHeight(a.dp(48));heading.addView(odo);target.addView(heading);
   a.gap(target,9);
+  a.action(target,"여러 정비 항목 한 번에 완료",false,a::batchServiceEntry);
   java.util.Map<String,JSONObject> serviceMap=LatestServiceByType.latest(a.items("services"),bike.optString("id"));
   JSONObject engineOil=serviceMap.get("엔진오일"),oilFilter=serviceMap.get("오일필터");
   if(engineOil!=null&&oilFilter!=null&&(engineOil.optDouble("nextKm")>0||!engineOil.optString("nextDate").isEmpty())
