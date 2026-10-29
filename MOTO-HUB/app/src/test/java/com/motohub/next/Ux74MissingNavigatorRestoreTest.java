@@ -12,7 +12,7 @@ import static org.junit.Assume.*;
 public final class Ux74MissingNavigatorRestoreTest {
  @Test public void restoringBackupCannotChooseAbsentNavigator()throws Exception {
   Context c=RuntimeEnvironment.getApplication();
-  assumeNull(NavigationApps.installedLaunchIntent(c,NavigationChoice.TMAP));
+  assumeTrue(NavigationApps.installedLaunchIntent(c,NavigationChoice.TMAP)==null);
   c.getSharedPreferences("navigation_choice",0).edit().putString("preferred",NavigationChoice.NAVER.id).commit();
   JSONObject backup=new JSONObject().put("schema",1).put("order","ride,nav,fuel,service")
    .put("ride",true).put("nav",true).put("fuel",true).put("service",true)
