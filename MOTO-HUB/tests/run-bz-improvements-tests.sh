@@ -23,7 +23,7 @@ checks={
 'restore comparison before consent': 'RestorePreview.text(verified,db,ready.rides,ready.photos)' in java('MainActivity') and '.setPositiveButton("전체 복원"' in java('MainActivity'),
 'ride comparison visible': 'RideTrend.compare(report.current.km,report.previous.km)' in java('RideUi'),
 'group consent untouched': '.setPositiveButton("동의하고 공유"' in java('GroupUi') and 'Sharing.start(id)' in java('GroupUi'),
-'update signing warning': '동일한 서명키로 빌드해야 합니다' in java('HubScreens'),
+'update signing warning': '서명이 다른 APK를 설치하려고 기존 앱을 삭제하지 마세요' in java('HubScreens'),
 'version and workflow': version_declaration_ok() and debug_alignment_ok(),
 'fuel 2-tap for nonfuel latest': '최근 주유값으로 채우기' in java('MainActivity') and '최근 주유 기록의 금액과 리터만 불러오기' not in java('MainActivity') and 'FuelRecordValidation.requireFuel(x.optDouble(' in java('MainActivity'),
 'cost current vs previous month': 'CostTrend.caption(currentMonth,previousMonth)' in java('HubScreens'),

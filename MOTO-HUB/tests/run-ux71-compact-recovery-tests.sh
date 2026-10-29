@@ -27,7 +27,7 @@ assert 'RideStorageManager.show(a)' in hub
 assert 'RideMileageIntegrity.validCompleted(track)' in storage
 assert 'RideService.running||RideService.autoArmed' in storage
 assert 'lastReport(Context context)' in snapshot and 'last_problem' in snapshot
-assert 'updateRecoveryReport()' in hub and '전체 ZIP 백업 만들기' in hub
+assert 'updateRecoveryReport()' in hub and '전체 ZIP 백업' in hub
 assert 'RestorePreflightDetail.text(' in main and 'ready.receipts' in main
 assert 'JsonConflictPreview.text(source,id)' in main
 print("PASS UX71 hidden listing UI preserving DB, ordered home, GPS backup-gated delete, restore review, manual mapping details, saved ride notification")

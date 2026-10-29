@@ -168,6 +168,17 @@ final class BackupFormat {
   return "";
  }
  static boolean isTrack(String name){return name!=null&&name.matches("rides/"+TRACK);}
+ static boolean isTrashTrack(String name){
+  if(name==null||!name.startsWith("rides-trash/"))return false;
+  String[] segments=name.split("/",-1);
+  return segments.length==3&&segments[1].matches(TRACK)&&segments[1].equals(segments[2]);
+ }
+ static boolean isTrashSidecar(String name){
+  if(name==null||!name.startsWith("rides-trash/"))return false;
+  String suffix=sidecarSuffix(name);
+  return !suffix.isEmpty()&&isTrashTrack(name.substring(0,name.length()-suffix.length()));
+ }
+ static boolean isTrashAsset(String name){return isTrashTrack(name)||isTrashSidecar(name);}
  static boolean isReceipt(String name){return name!=null&&name.matches("receipts/"+RECEIPT);}
  static boolean isPhoto(String name){return name!=null&&name.matches("photos/"+PHOTO);}
  static boolean isGpx(String name){return name!=null&&name.matches("gpx/[0-9]{10,15}-[a-f0-9-]{36}\\.gpx");}
@@ -180,14 +191,16 @@ final class BackupFormat {
  static boolean allowed(String name,boolean directory){
   if(name==null||name.startsWith("/")||name.contains("..")||name.contains("\\")||name.indexOf('\0')>=0)return false;
   if(directory)return isDirectory(name);
-  return "MOTO-HUB-data.json".equals(name)||"README-KO.txt".equals(name)||isPhoto(name)||isReceipt(name)||isTrack(name)||isGpx(name)||isSidecar(name)||isModelPhoto(name)||isModelMetadata(name);
+  return "MOTO-HUB-data.json".equals(name)||"MOTO-HUB-preferences.json".equals(name)||"MOTO-HUB-batch.txt".equals(name)||"README-KO.txt".equals(name)||isPhoto(name)||isReceipt(name)||isTrack(name)||isTrashAsset(name)||isGpx(name)||isSidecar(name)||isModelPhoto(name)||isModelMetadata(name);
  }
  static long entryLimit(String name){
   if("MOTO-HUB-data.json".equals(name))return MAX_JSON_BYTES;
+  if("MOTO-HUB-preferences.json".equals(name))return 4096;
+  if("MOTO-HUB-batch.txt".equals(name))return 256;
   if("README-KO.txt".equals(name))return 8192;
   if(isGpx(name))return MAX_GPX_BYTES;
   if(isModelMetadata(name))return 8192;
-  if(isSidecar(name)){
+  if(isSidecar(name)||isTrashSidecar(name)){
    if(name.endsWith(".mergedinto"))return 100;
    if(name.endsWith(".category")||name.endsWith(".bike"))return 64;
    return 0;

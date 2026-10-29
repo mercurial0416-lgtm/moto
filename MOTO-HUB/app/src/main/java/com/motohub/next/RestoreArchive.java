@@ -15,8 +15,8 @@ public final class RestoreArchive {
  private static final String RIDE=BackupFormat.TRACK;
  public interface DataWriter {void write(String json)throws Exception;}
  public static final class Prepared implements AutoCloseable {
-  private final File staging; public final String json; public final int photos,receipts,rides; public final String part;
-  private Prepared(File dir,String data,int p,int receipts,int r,String part){staging=dir;json=data;photos=p;this.receipts=receipts;rides=r;this.part=part;}
+  private final File staging; public final String json,preferences,batchRecord; public final int photos,receipts,rides; public final String part;
+  private Prepared(File dir,String data,int p,int receipts,int r,String part,String preferences,String batchRecord){staging=dir;json=data;photos=p;this.receipts=receipts;rides=r;this.part=part;this.preferences=preferences;this.batchRecord=batchRecord;}
   public boolean isSplit(){return !"FULL".equals(part);}
   /** Snapshot disk-space requirement before replacing any of the current assets. */
   public long requiredSpace(File internal)throws IOException {
@@ -80,8 +80,8 @@ public final class RestoreArchive {
    if(!isSplit())throw new IOException("전체 ZIP은 분할 추가 복원으로 가져올 수 없습니다.");
    List<String> assets=stagedAssets(staging);
    for(String path:assets){
-    if("GPS".equals(part)&&!path.startsWith("rides/"))throw new IOException("GPS 분할 파일에 다른 저장 자료가 있습니다.");
-    if("MEDIA".equals(part)&&path.startsWith("rides/"))throw new IOException("사진 분할 파일에 GPS 기록이 포함됐습니다.");
+    if("GPS".equals(part)&&!path.startsWith("rides/")&&!path.startsWith("rides-trash/"))throw new IOException("GPS 분할 파일에 다른 저장 자료가 있습니다.");
+    if("MEDIA".equals(part)&&(path.startsWith("rides/")||path.startsWith("rides-trash/")))throw new IOException("사진 분할 파일에 GPS 기록이 포함됐습니다.");
    }
    RestoreCapacity.ensure(RestoreCapacity.available(internal),RestoreCapacity.sum(staging,assets));
    List<File> created=new ArrayList<>();
@@ -110,7 +110,7 @@ public final class RestoreArchive {
  }
  public static Prepared prepare(InputStream source,File internal)throws Exception{
   File stage=new File(internal,"moto-stage-"+UUID.randomUUID());if(!stage.mkdirs())throw new IOException("임시 폴더를 생성하지 못했어요.");
-  String json=null,part="FULL";int photos=0,receipts=0,rides=0,entries=0;long total=0;
+  String json=null,part="FULL",preferences="",batchRecord="";int photos=0,receipts=0,rides=0,entries=0;long total=0;
   Set<String> incomplete=new HashSet<>();
   Set<String> seen=new HashSet<>();byte[] buffer=new byte[32768];
   try(ZipInputStream zip=new ZipInputStream(new BufferedInputStream(source),StandardCharsets.UTF_8)){
@@ -128,13 +128,13 @@ public final class RestoreArchive {
        modelMeta=BackupFormat.isModelMetadata(name),
        photo=name.startsWith("photos/")&&name.substring(7).matches(PHOTO),
        receipt=name.startsWith("receipts/")&&name.substring(9).matches(RECEIPT),
-       track=name.startsWith("rides/")&&name.substring(6).matches(RIDE),
-       marker=name.startsWith("rides/")&&(name.substring(6).matches(RIDE+"\\.done")||name.substring(6).matches(RIDE+"\\.imported")||name.substring(6).matches(RIDE+"\\.recovered")||name.substring(6).matches(RIDE+"\\.mergedinto")||name.substring(6).matches(RIDE+"\\.unmerged")||name.substring(6).matches(RIDE+"\\.category")||name.substring(6).matches(RIDE+"\\.bike")||name.substring(6).matches(RIDE+"\\.favorite")),
+       track=(name.startsWith("rides/")&&name.substring(6).matches(RIDE))||BackupFormat.isTrashTrack(name),
+       marker=BackupFormat.isTrashSidecar(name)||(name.startsWith("rides/")&&(name.substring(6).matches(RIDE+"\\.done")||name.substring(6).matches(RIDE+"\\.imported")||name.substring(6).matches(RIDE+"\\.recovered")||name.substring(6).matches(RIDE+"\\.mergedinto")||name.substring(6).matches(RIDE+"\\.unmerged")||name.substring(6).matches(RIDE+"\\.category")||name.substring(6).matches(RIDE+"\\.bike")||name.substring(6).matches(RIDE+"\\.favorite"))),
        gpx=name.startsWith("gpx/")&&name.substring(4).matches("[0-9]{10,15}-[a-f0-9-]{36}\\.gpx"),
-       readme=name.equals("README-KO.txt");
-    if(!data&&!photo&&!receipt&&!track&&!marker&&!gpx&&!readme&&!modelPhoto&&!modelMeta)throw new IOException("지원하지 않는 ZIP 항목: "+name);
+       readme=name.equals("README-KO.txt"),ui=name.equals("MOTO-HUB-preferences.json"),batch=name.equals("MOTO-HUB-batch.txt");
+    if(!data&&!ui&&!batch&&!photo&&!receipt&&!track&&!marker&&!gpx&&!readme&&!modelPhoto&&!modelMeta)throw new IOException("지원하지 않는 ZIP 항목: "+name);
     long limit=BackupFormat.entryLimit(name);long size=0;
-    ByteArrayOutputStream jsonBytes=(data||readme)?new ByteArrayOutputStream():null;
+    ByteArrayOutputStream jsonBytes=(data||readme||ui||batch)?new ByteArrayOutputStream():null;
     File destination=(photo||receipt||track||marker||modelPhoto||modelMeta)?
      new File(stage,(modelPhoto||modelMeta)?"moto-year-photos/"+name.substring(13):
        (photo?name.substring(7):(receipt?name.substring(9):name))):null;
@@ -143,6 +143,12 @@ public final class RestoreArchive {
      int n;while((n=zip.read(buffer))!=-1){size+=n;total+=n;if(size>limit||total>MAX_TOTAL)throw new IOException("백업 ZIP 용량 제한을 초과했어요.");out.write(buffer,0,n);}
     }
     if(data){json=new String(jsonBytes.toByteArray(),StandardCharsets.UTF_8);if(json.isEmpty())throw new IOException("JSON 기록이 비어 있어요.");}
+    if(ui)preferences=jsonBytes.toString("UTF-8");
+    if(batch){
+     batchRecord=jsonBytes.toString("UTF-8");
+     if(!batchRecord.matches("MOTO-HUB-BATCH:v1:[a-f0-9-]{36}:(GPS|MEDIA):[0-9]{1,5}/[0-9]{1,5}\\n"))
+      throw new IOException("분할 ZIP 배치 정보 오류");
+    }
     if(readme){
      String label=jsonBytes.toString("UTF-8");
      if(label.startsWith("MOTO-HUB-PART:GPS\n"))part="GPS";
@@ -187,7 +193,7 @@ public final class RestoreArchive {
     if(!target.matches(RIDE)||!seen.contains("rides/"+target)||!seen.contains("rides/"+target+".done"))
      throw new IOException("통합 라이딩 대상이 누락되거나 손상됐어요.");
    }
-   for(String name:seen)if(name.startsWith("rides/")&&(name.endsWith(".done")||name.endsWith(".imported")||name.endsWith(".recovered")||name.endsWith(".mergedinto")||name.endsWith(".unmerged")||name.endsWith(".category")||name.endsWith(".bike")||name.endsWith(".favorite")) &&!seen.contains(name.substring(0,name.lastIndexOf('.'))))throw new IOException("원본 GPS가 없는 기록 표시입니다.");
+   for(String name:seen)if((name.startsWith("rides/")||name.startsWith("rides-trash/"))&&(name.endsWith(".done")||name.endsWith(".imported")||name.endsWith(".recovered")||name.endsWith(".mergedinto")||name.endsWith(".unmerged")||name.endsWith(".category")||name.endsWith(".bike")||name.endsWith(".favorite")) &&!seen.contains(name.substring(0,name.lastIndexOf('.'))))throw new IOException("원본 GPS가 없는 기록 표시입니다.");
    for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".bike")){
     String id=new String(Files.readAllBytes(new File(stage,name).toPath()),StandardCharsets.US_ASCII);
     if(!id.matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))throw new IOException("잘못된 바이크 연결 정보입니다.");
@@ -200,7 +206,7 @@ public final class RestoreArchive {
     throw new IOException("완료되지 않은 통합 기록입니다.");
    if("GPS".equals(part)&&(photos>0||receipts>0))throw new IOException("GPS 분할 백업의 사진 항목이 유효하지 않습니다.");
    if("MEDIA".equals(part)&&rides>0)throw new IOException("사진 분할 백업의 GPS 항목이 유효하지 않습니다.");
-   return new Prepared(stage,json,photos,receipts,rides,part);
+   return new Prepared(stage,json,photos,receipts,rides,part,preferences,batchRecord);
   }catch(Exception e){clean(stage);throw e;}
  }
 
@@ -326,7 +332,7 @@ public final class RestoreArchive {
   private static void validate(String name)throws IOException {
    if(name==null||name.length()>180||name.contains("..")||name.startsWith("/")||name.contains("\\"))throw new IOException("위험한 복원 저널 경로");
    boolean photo=name.matches(BackupFormat.PHOTO),receipt=name.matches(BackupFormat.RECEIPT),
-     ride=name.startsWith("rides/")&&(name.substring(6).matches(BackupFormat.TRACK)||
+     ride=BackupFormat.isTrashAsset(name)||name.startsWith("rides/")&&(name.substring(6).matches(BackupFormat.TRACK)||
       BackupFormat.isSidecar(name)),model=name.startsWith("moto-year-photos/")&&
       (name.substring(17).matches(BackupFormat.MODEL_PHOTO)||name.substring(17).matches(BackupFormat.MODEL_META));
    if(!photo&&!receipt&&!ride&&!model)throw new IOException("지원되지 않는 복원 저널 파일: "+name);
@@ -393,7 +399,8 @@ public final class RestoreArchive {
   if(Files.isSymbolicLink(file.toPath())||
     !Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS))
    throw new IOException("복원 대상에 안전하지 않은 파일이 있습니다: "+path);
-  File expected=path.startsWith("rides/")?new File(root,"rides"):
+  File expected=path.startsWith("rides-trash/")?new File(root,"rides-trash/"+path.split("/")[1]):
+   path.startsWith("rides/")?new File(root,"rides"):
    (path.startsWith("moto-year-photos/")?new File(root,"moto-year-photos"):root);
   if(!file.getParentFile().equals(expected))
    throw new IOException("복원 파일 경로가 앱 저장소 밖입니다.");
@@ -417,6 +424,23 @@ public final class RestoreArchive {
       n.matches(RIDE+"\\.recovered")||n.matches(RIDE+"\\.mergedinto")||
       n.matches(RIDE+"\\.unmerged")||n.matches(RIDE+"\\.category")||n.matches(RIDE+"\\.bike")||n.matches(RIDE+"\\.favorite"))
     addSafeAsset(out,root,f,"rides/"+n);
+  }
+  File trash=new File(root,"rides-trash");
+  if(Files.isSymbolicLink(trash.toPath())||
+      (trash.exists()&&!Files.isDirectory(trash.toPath(),LinkOption.NOFOLLOW_LINKS)))
+   throw new IOException("복구함 경로 안전 검증 실패");
+  File[] folders=trash.listFiles();
+  if(folders!=null)for(File folder:folders){
+   if(!folder.getName().matches(BackupFormat.TRACK)||
+      Files.isSymbolicLink(folder.toPath())||
+      !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS))
+    throw new IOException("복구함에 확인되지 않은 폴더가 있습니다.");
+   File[] markers=folder.listFiles();
+   if(markers!=null)for(File file:markers){
+    String name="rides-trash/"+folder.getName()+"/"+file.getName();
+    if(!BackupFormat.isTrashAsset(name))throw new IOException("복구함 파일 형식 오류: "+name);
+    addSafeAsset(out,root,file,name);
+   }
   }
   return out;
  }

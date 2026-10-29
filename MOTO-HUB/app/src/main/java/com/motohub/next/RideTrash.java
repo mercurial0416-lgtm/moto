@@ -57,6 +57,50 @@ final class RideTrash {
    throw failure;
   }
  }
+ /** Finish interrupted transfers at startup without overwriting any GPS file.
+  * The presence of the source track determines which directory owns the session.
+  * A crash can occur between sidecar moves and the final track move. */
+ static synchronized int recoverInterrupted(File files)throws IOException{
+  File rides=TrackFile.directory(files),trash=root(files);
+  File[] folders=trash.listFiles();
+  int repaired=0;
+  if(folders==null)return 0;
+  for(File folder:folders){
+   if(Files.isSymbolicLink(folder.toPath())||!Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS)||
+      !folder.getName().matches(BackupFormat.TRACK))
+    throw new IOException("복구함에 알 수 없는 항목이 있습니다.");
+   String name=folder.getName();
+   File live=new File(rides,name),stored=new File(folder,name);
+   boolean inLive=regular(live),inTrash=regular(stored);
+   if(inLive&&inTrash)throw new IOException("GPS 원본이 두 위치에 중복되어 복구를 중단합니다: "+name);
+   if(!inLive&&!inTrash){
+    File[] loose=folder.listFiles();
+    if(loose!=null&&loose.length==0){
+     // Crash immediately after creating the quarantine folder, before moving sidecars.
+     if(!folder.delete())throw new IOException("빈 GPS 복구함 폴더 정리 실패");
+     continue;
+    }
+    throw new IOException("GPS 원본이 양쪽 모두 없어 자동 복구할 수 없습니다: "+name);
+   }
+   File owner=inTrash?folder:rides,orphan=inTrash?rides:folder;
+   for(String suffix:SIDECARS){
+    File stray=new File(orphan,name+suffix);
+    if(!Files.exists(stray.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
+    if(!regular(stray))throw new IOException("복구함 부속정보가 안전하지 않습니다.");
+    File destination=new File(owner,stray.getName());
+    if(Files.exists(destination.toPath(),LinkOption.NOFOLLOW_LINKS))
+     throw new IOException("중복 GPS 부속정보가 있어 덮어쓰지 않습니다: "+name+suffix);
+    Files.move(stray.toPath(),destination.toPath(),StandardCopyOption.ATOMIC_MOVE);
+    repaired++;
+   }
+   if(inLive){
+    File[] leftover=folder.listFiles();
+    if(leftover!=null&&leftover.length==0&&!folder.delete())
+     throw new IOException("GPS 복원 후 빈 복구함 정리 실패");
+   }
+  }
+  return repaired;
+ }
  static synchronized void move(File files,File selected)throws IOException{
   File rides=TrackFile.directory(files);
   if(selected==null||!selected.getName().matches(BackupFormat.TRACK)||

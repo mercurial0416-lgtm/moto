@@ -30,8 +30,8 @@ assert 'target.scrollTo(0,restoreY)' in main
 assert 'if(java.util.Arrays.equals(ids,lastWidgetIds)&&navigator.equals(lastNavigationChoice))return;' in widget
 assert 'manager.updateAppWidget(id,build(context))' in widget
 assert 'void basicBackup(){' in settings and 'void advancedBackup(){' in settings
-assert '전체 ZIP 백업 만들기' in settings and 'a::importBundle' in settings
-assert '다른 백업 방식 · 검사' in settings and 'void backupMore(){' in settings and 'this::advancedBackup' in settings
+assert '전체 ZIP 백업' in settings and 'a::importBundle' in settings
+assert '추가 도구 · 대용량 백업 · GPS' in settings and 'void backupMore(){' in settings and 'this::advancedBackup' in settings
 assert 'RestoreArchive' in settings or 'BackupDeepCheck' in settings
 assert 'a.toast("GPS 기록 시작됨 · 첫 위치 수신 대기")' not in ride or 'GPS 기록 시작됨' in ride
 assert '12_000L' in ride and 'GPS 기록 시작을 확인하지 못했어요.' in ride

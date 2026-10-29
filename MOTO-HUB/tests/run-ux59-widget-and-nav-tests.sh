@@ -38,7 +38,7 @@ assert "NavigationApps.choose(a)" in (src/"RideUi.java").read_text()
 pin=(src/"MotoWidgetPin.java").read_text()
 assert "isRequestPinAppWidgetSupported()" in pin
 assert "requestPinAppWidget(" in pin
-assert "line(\"초소형 위젯 추가\"" in (src/"HubScreens.java").read_text()
+assert 'a.action(p,"초소형 위젯 추가 (2×1)"' in (src/"HubScreens.java").read_text()
 assert "if(focused)return 5000;" in (src/"RideScreenRefreshPolicy.java").read_text()
 print("PASS UX59 icon, adaptive widget 2x1/4x1, immutable shortcuts, nav, focus, pinning, privacy")
 PY

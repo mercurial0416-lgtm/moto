@@ -16,7 +16,7 @@ report=read("RideTypeComparison.java")
 assert 'setItems(options,' in nav and '.putString(KEY,selectedApp.id).commit()' in nav
 assert 'NavigationApps.choose(a)' in ui and 'NavigationApps.openPreferred(a)' in ui
 assert ui.index('NavigationApps.choose(a)')<ui.index('if(focus&&RideService.running)return;')
-assert 'line("기본 내비 선택"' in settings and 'line("선택한 내비 실행"' in settings
+assert 'line("기본 내비 선택"' in settings and 'a.action(p,"선택한 내비 실행"' in settings
 assert 'for(ArrayList<GeoPoint> section:sections)' in mapui
 assert 'MapPathContinuity.validFix' in mapui and 'MapPathContinuity.validLink' in mapui
 assert 'sectionIndices.get(i-1).equals(sectionIndices.get(i))' in mapui

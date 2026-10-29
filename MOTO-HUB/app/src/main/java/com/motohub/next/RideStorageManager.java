@@ -11,29 +11,54 @@ final class RideStorageManager {
  private RideStorageManager(){}
  static void show(MainActivity a){
   if(RestoreRideGate.blocked(RideService.running,RideService.autoArmed)){a.toast("GPS 기록·복원·백업 중에는 파일을 정리하지 않아요.");return;}
-  a.toast("GPS 파일 크기 확인 중…");
+  a.toast("GPS 기록 확인 중…");
   new Thread(()->{
    try{
     List<File> tracks=TrackFile.tracks(a.getFilesDir());
-    long bytes=0;for(File f:tracks)bytes+=f.length();
-    final long total=bytes;
+    String[] labels=new String[tracks.size()];
+    long total=0;
+    for(int i=0;i<tracks.size();i++){
+     File f=tracks.get(i);
+     total+=f.length();
+     labels[i]=RideHistoryLabel.title(f,java.time.ZoneId.systemDefault())+
+      " · "+String.format(Locale.KOREA,"%.2f MB",f.length()/1_000_000.0);
+    }
+    final long bytes=total;
     a.runOnUiThread(()->{
-     if(a.isFinishing()||a.isDestroyed())return;
-     String[] labels=new String[Math.min(30,tracks.size())];
-     for(int i=0;i<labels.length;i++){
-      File f=tracks.get(i);labels[i]=RideHistoryLabel.title(f,java.time.ZoneId.systemDefault())+
-       " · "+String.format(Locale.KOREA,"%.2f MB",f.length()/1_000_000.0);
-     }
-     new AlertDialog.Builder(a).setTitle("GPS 원본 저장공간")
-      .setMessage("기록 "+tracks.size()+"건 · 합계 약 "+String.format(Locale.KOREA,"%.1f MB",total/1_000_000.0)+
-       "\n최근 "+labels.length+"건을 확인할 수 있어요. 자동 삭제는 없습니다."+
-       "\n삭제는 전체 ZIP 백업을 만들고 정상 검증한 후, 해당 기록을 직접 선택할 때만 가능합니다.")
-      .setItems(labels,(d,index)->confirm(a,tracks.get(index)))
-      .setNeutralButton("GPS 복구함", (d,w)->showTrash(a))
-      .setNegativeButton("닫기",null).show();
+     if(!a.isFinishing()&&!a.isDestroyed())showPage(a,tracks,labels,0,"",bytes);
     });
    }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 저장공간 점검 실패: "+e.getMessage());});}
   },"moto-gps-storage-list").start();
+ }
+ private static void showPage(MainActivity a,List<File> tracks,String[] labels,int page,String filter,long bytes){
+  if(a.isFinishing()||a.isDestroyed())return;
+  List<Integer> matches=new ArrayList<>();
+  String query=filter.trim().toLowerCase(Locale.KOREA);
+  for(int i=0;i<labels.length;i++)if(labels[i].toLowerCase(Locale.KOREA).contains(query))matches.add(i);
+  int from=Math.max(0,Math.min(page*30,Math.max(0,matches.size()-1)/30*30));
+  int to=Math.min(from+30,matches.size());
+  String[] items=new String[to-from+2];
+  items[0]="기록 검색"+(query.isEmpty()?"":" · "+query);
+  items[1]="GPS 복구함 보기";
+  for(int i=from;i<to;i++)items[i-from+2]=labels[matches.get(i)];
+  AlertDialog.Builder dialog=new AlertDialog.Builder(a)
+   .setTitle("GPS 원본 · "+matches.size()+"건")
+   .setMessage("약 "+String.format(Locale.KOREA,"%.1f MB",bytes/1_000_000.0)+
+     " · "+(from+1)+"–"+to+" / "+matches.size()+"건\\n자동 영구 삭제 없음 · 검증된 ZIP 백업 후 복구함 이동 가능")
+   .setItems(items,(d,index)->{
+    if(index==0){
+     android.widget.EditText input=new android.widget.EditText(a);
+     input.setSingleLine(true);input.setHint("예: 2026.10.29");input.setText(query);
+     new AlertDialog.Builder(a).setTitle("GPS 날짜 검색")
+      .setMessage("연·월·일 일부로 검색할 수 있습니다.")
+      .setView(input).setNegativeButton("취소",null)
+      .setPositiveButton("검색",(x,y)->showPage(a,tracks,labels,0,input.getText().toString(),bytes)).show();
+    }else if(index==1)showTrash(a);
+    else confirm(a,tracks.get(matches.get(from+index-2)));
+   }).setNegativeButton("닫기",null);
+  if(to<matches.size())dialog.setPositiveButton("다음 30건",(d,w)->showPage(a,tracks,labels,from/30+1,query,bytes));
+  if(from>0)dialog.setNeutralButton("이전 30건",(d,w)->showPage(a,tracks,labels,from/30-1,query,bytes));
+  dialog.show();
  }
  private static void showTrash(MainActivity a){
   new Thread(()->{
@@ -58,6 +83,8 @@ final class RideStorageManager {
          File restored;
          try{restored=RideTrash.restore(a.getFilesDir(),entries.get(index));}
          finally{RestoreRideGate.end();}
+         // Recreate the offline summary for the recovered complete route.
+         RideCompletionInbox.record(a,restored);
          a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){
           a.toast("GPS 원본 복원 완료");a.render();
          }});
@@ -79,7 +106,7 @@ final class RideStorageManager {
   }
   new AlertDialog.Builder(a).setTitle("이 GPS 원본을 복구함으로 옮길까요?")
    .setMessage(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault())+
-    "\n검증된 ZIP에 동일 GPS가 포함된 경우에만 30일 복구함으로 이동합니다. 원본은 즉시 영구 삭제되지 않습니다.")
+    "\n검증된 ZIP에 동일 GPS가 포함된 경우에만 수동 복구함으로 이동합니다. 원본은 즉시 영구 삭제되지 않습니다.")
    .setNegativeButton("취소",null)
    .setPositiveButton("복구함 이동 확인",(d,w)->new AlertDialog.Builder(a)
     .setTitle("GPS 복구함 이동 · 최종 확인")

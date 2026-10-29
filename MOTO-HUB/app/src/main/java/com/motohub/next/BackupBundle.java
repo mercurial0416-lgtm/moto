@@ -27,6 +27,26 @@ public final class BackupBundle {
     (Files.isSymbolicLink(dir.toPath())||!Files.isDirectory(dir.toPath(),LinkOption.NOFOLLOW_LINKS)))
    throw new IOException("백업 폴더가 안전하지 않습니다: "+dir.getName());
  }
+ private static final String[] TRASH_SIDECARS={".done",".imported",".recovered",".unmerged",".category",".bike",".favorite",".mergedinto"};
+ /** Explicitly enumerate quarantined sessions without Android dependencies; incomplete folders block export. */
+ private static List<File> trashTracks(File internal)throws IOException{
+  File root=new File(internal,"rides-trash");
+  requireDirectoryIfPresent(root);
+  List<File> list=new ArrayList<>();
+  File[] folders=root.listFiles();
+  if(folders==null)return list;
+  for(File folder:folders){
+   if(!folder.getName().matches(BackupFormat.TRACK)||
+      !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS)||
+      Files.isSymbolicLink(folder.toPath()))
+    throw new IOException("GPS 복구함 폴더를 확인할 수 없습니다.");
+   File track=new File(folder,folder.getName());
+   requireRegular(track);
+   list.add(track);
+  }
+  list.sort(Comparator.comparing(File::getName));
+  return list;
+ }
  private static byte[] readSidecar(File file,long maxBytes)throws IOException{
   requireRegular(file);
   if(file.length()>maxBytes)throw new IOException("라이딩 부속 파일 크기가 너무 큽니다: "+file.getName());
@@ -76,6 +96,9 @@ public final class BackupBundle {
  }
  /** Archive-only GPS or media partitions. Each has a full JSON snapshot for manual recovery. */
  static int export(String json,File internal,OutputStream target,String part)throws Exception{
+  return export(json,internal,target,part,"");
+ }
+ static int export(String json,File internal,OutputStream target,String part,String uiPreferences)throws Exception{
   if(!Arrays.asList("FULL","GPS","MEDIA").contains(part))throw new IOException("알 수 없는 백업 분할");
   boolean gps=!"MEDIA".equals(part),media=!"GPS".equals(part);
   if(internal==null||!regularDirectory(internal))throw new IOException("앱 백업 폴더를 확인하지 못했어요.");
@@ -84,6 +107,12 @@ public final class BackupBundle {
   long total=data.length;int count=0;
   ZipOutputStream zip=new ZipOutputStream(new BufferedOutputStream(target),StandardCharsets.UTF_8);
   zip.putNextEntry(new ZipEntry("MOTO-HUB-data.json"));zip.write(data);zip.closeEntry();count++;
+  if(uiPreferences!=null&&!uiPreferences.isEmpty()&&"FULL".equals(part)){
+   byte[] ui=uiPreferences.getBytes(StandardCharsets.UTF_8);
+   if(ui.length>4096)throw new IOException("설정 백업 크기 제한");
+   zip.putNextEntry(new ZipEntry("MOTO-HUB-preferences.json"));zip.write(ui);zip.closeEntry();
+   total+=ui.length;count++;
+  }
   String readme=("FULL".equals(part)?"MOTO HUB 전체 백업 - 개인 위치정보 포함 가능\n":"MOTO-HUB-PART:"+part+"\n분할 복구 파일: 전체 복원으로 다른 자료를 덮어쓰지 마세요. 분할 ZIP 추가 복원 메뉴를 사용하세요.\n")+
    "MOTO-HUB-data.json은 앱 설정 > JSON 백업 가져오기로 복원합니다.\n"+
    "rides 폴더는 원본 기록, gpx 폴더는 가져오기로 복원 가능한 GPX 경로입니다.\n"+
@@ -181,6 +210,26 @@ public final class BackupBundle {
       requireRegular(marker);
       if(marker.length()!=0)throw new IOException("라이딩 상태 표시가 손상됐습니다: "+marker.getName());
       zip.putNextEntry(new ZipEntry("rides/"+marker.getName()));zip.closeEntry();
+     }
+    }
+   }
+  }
+  // Preserve quarantined GPS inside its own namespace; refuse incomplete trash structures.
+  if(gps){
+   List<File> retired=trashTracks(internal);
+   if(retired.size()+(tracks==null?0:tracks.length)>BackupFormat.MAX_TRACKS)
+    throw new IOException("GPS와 복구함 기록 합계가 백업 한도를 넘었어요.");
+   for(File track:retired){
+    String name=track.getName(),prefix="rides-trash/"+name+"/";
+    if(track.length()==0)throw new IOException("복구함 GPS가 비어 있습니다: "+name);
+    total=writeFile(zip,track,prefix+name,total);count++;
+    for(String suffix:TRASH_SIDECARS){
+     File marker=new File(track.getPath()+suffix);
+     if(Files.exists(marker.toPath(),LinkOption.NOFOLLOW_LINKS)){
+      requireRegular(marker);
+      if(marker.length()>BackupFormat.entryLimit(prefix+name+suffix))
+       throw new IOException("복구함 GPS 메타데이터 크기 초과");
+      total=writeFile(zip,marker,prefix+name+suffix,total);count++;
      }
     }
    }
