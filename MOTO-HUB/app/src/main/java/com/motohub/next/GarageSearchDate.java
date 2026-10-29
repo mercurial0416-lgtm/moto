@@ -1,7 +1,6 @@
 package com.motohub.next;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
 
 /** Format search range dates; never infer a year from a partial search term. */
 final class GarageSearchDate {
@@ -15,7 +14,7 @@ final class GarageSearchDate {
    throw new IllegalArgumentException("연도·월·일을 모두 입력해 주세요.");
   try{
    return LocalDate.of(Integer.parseInt(p[0]),Integer.parseInt(p[1]),Integer.parseInt(p[2])).toString();
-  }catch(DateTimeParseException|java.time.DateTimeException bad){
+  }catch(java.time.DateTimeException bad){
    throw new IllegalArgumentException("올바른 날짜가 아닙니다.",bad);
   }
  }
