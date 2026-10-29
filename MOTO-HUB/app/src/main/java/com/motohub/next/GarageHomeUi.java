@@ -49,7 +49,23 @@ final class GarageHomeUi {
   if(!bike.optString("insuranceDate").isEmpty())details.append("보험 만료: ").append(bike.optString("insuranceDate")).append("\n");
   if(details.length()==0)details.append("예정된 정비가 없어요. 차고에서 정비주기를 등록할 수 있습니다.");
   new AlertDialog.Builder(a).setTitle("정비 알림").setMessage(details.toString().trim())
-   .setNegativeButton("닫기",null).setPositiveButton("정비 관리",(d,w)->a.navigate("차고")).show();
+   .setNegativeButton("닫기",null).setNeutralButton("정비 완료",(d,w)->chooseCompletion(bike))
+   .setPositiveButton("정비 관리",(d,w)->a.navigate("차고")).show();
+ }
+
+ /** Home reminder flows into the existing validated service completion editor. */
+ void chooseCompletion(JSONObject bike){
+  if(a.readOnly||RideService.running){a.toast("GPS 기록이 끝나고 저장할 수 있을 때 정비 완료를 입력해 주세요.");return;}
+  List<JSONObject> options=latestServices(bike);
+  options.removeIf(item->item.optDouble("nextKm")<=0&&item.optString("nextDate").isEmpty());
+  if(options.isEmpty()){a.toast("완료할 정비주기가 없어요. 먼저 주기를 등록해 주세요.");return;}
+  String[] names=new String[options.size()];
+  for(int i=0;i<options.size();i++)
+   names[i]=options.get(i).optString("type")+" · "+
+    MaintenancePlanner.caption(MaintenanceAlertWindow.status(options.get(i),a.today(),bike.optDouble("odo")));
+  new AlertDialog.Builder(a).setTitle("완료한 정비 항목 선택")
+   .setItems(names,(d,i)->new ServiceStatusUi(a).complete(options.get(i)))
+   .setNegativeButton("취소",null).show();
  }
 
  void render(){
@@ -76,6 +92,11 @@ final class GarageHomeUi {
   if(RideService.autoArmed&&!RideService.running){TextView arm=a.text("OBD2 자동 감지 대기 · 출발하면 기록 시작",13,orange,true);arm.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));arm.setBackground(a.shape(surface,stroke,13));a.content.addView(arm);a.gap(a.content,10);}
   if(RideService.running){TextView live=a.text("GPS 기록 중 · "+RideService.status,13,orange,true);live.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));live.setBackground(a.shape(surface,stroke,13));a.content.addView(live);a.gap(a.content,10);}
   interruptedRideShortcut();a.gap(a.content,8);
+  a.action(a.content,ParkingSpotUi.stored(b)?"주차 위치 보기·갱신":"주차 위치 저장",false,
+    ()->new ParkingSpotUi(a).show(b));
+  a.action(a.content,"최근 주유·정비 수정",false,()->quickRecentEdit(b));
+  a.action(a.content,"소모품 정비 현황",false,()->showConsumables(b));
+  a.gap(a.content,6);
   // Recent activity is optional rather than always visible on the first screen.
   // Keep daily home focused on navigation and maintenance; secondary cards opt-in.
   boolean extra=a.getSharedPreferences("garage_home",0).getBoolean("extra_cards",false);
@@ -397,6 +418,58 @@ final class GarageHomeUi {
   button.setMinHeight(a.dp(50));
   button.setBackground(a.shape(fuel?orange:surface,fuel?0:stroke,8));
   a.content.addView(button,new LinearLayout.LayoutParams(-1,-2));
+ }
+ /** Edit the latest existing ledger entry without creating a duplicate record. */
+ void quickRecentEdit(JSONObject bike){
+  java.util.List<JSONObject> recent=new java.util.ArrayList<>();
+  java.util.List<String> kinds=new java.util.ArrayList<>();
+  for(String key:new String[]{"services","expenses"})for(JSONObject item:a.items(key))
+   if(bike.optString("id").equals(item.optString("vehicleId"))){
+    recent.add(item);kinds.add(key);
+   }
+  java.util.List<Integer> order=new java.util.ArrayList<>();
+  for(int i=0;i<recent.size();i++)order.add(i);
+  order.sort((x,y)->{
+   JSONObject left=recent.get(x),right=recent.get(y);
+   int day=right.optString("date").compareTo(left.optString("date"));
+   return day!=0?day:Double.compare(right.optDouble("mileage"),left.optDouble("mileage"));
+  });
+  if(order.isEmpty()){a.toast("수정할 기록이 없어요.");return;}
+  int count=Math.min(order.size(),5);String[] choices=new String[count];
+  for(int i=0;i<count;i++){
+   JSONObject item=recent.get(order.get(i));String kind=kinds.get(order.get(i));
+   choices[i]=item.optString("date")+" · "+item.optString("type",kind.equals("services")?"정비":"비용")
+     +" · "+a.won(item.optDouble(kind.equals("services")?"cost":"amount"));
+  }
+  new AlertDialog.Builder(a).setTitle("최근 기록 바로 수정")
+   .setItems(choices,(d,i)->{
+    int row=order.get(i);
+    if(a.readOnly){a.toast("원본 보호 상태라 수정할 수 없어요.");return;}
+    a.edit(kinds.get(row),recent.get(row));
+   }).setNegativeButton("닫기",null).show();
+ }
+ /** Four useful consumables only, from latest maintenance records. No guessed wear. */
+ void showConsumables(JSONObject bike){
+  java.util.Map<String,JSONObject> latest=LatestServiceByType.latest(a.items("services"),bike.optString("id"));
+  java.util.List<JSONObject> list=new java.util.ArrayList<>(latest.values());
+  list.sort((x,y)->Integer.compare(
+    MaintenancePlanner.order(MaintenanceAlertWindow.status(x,a.today(),bike.optDouble("odo"))),
+    MaintenancePlanner.order(MaintenanceAlertWindow.status(y,a.today(),bike.optDouble("odo")))));
+  if(list.isEmpty()){a.toast("정비 기록이 아직 없어요.");return;}
+  StringBuilder text=new StringBuilder();int shown=0;
+  for(JSONObject item:list){
+   if(shown++>=8)break;
+   text.append(item.optString("type")).append(" · ");
+   if(item.optDouble("nextKm")>0||!item.optString("nextDate").isEmpty()){
+    text.append(MaintenancePlanner.caption(MaintenanceAlertWindow.status(item,a.today(),bike.optDouble("odo"))));
+    text.append(" · ").append(MaintenanceNoticeText.detail(item.optString("nextDate"),item.optDouble("nextKm"),a.today(),bike.optDouble("odo")));
+   }else text.append("최근 기록 ").append(item.optString("date","날짜 없음"))
+    .append(" · ").append(a.num(item.optDouble("mileage"))).append(" km");
+   text.append("\\n");
+  }
+  new AlertDialog.Builder(a).setTitle("소모품 현황 · "+bike.optString("name"))
+   .setMessage(text.toString().trim()+"\\n\\n수명 추정이 아닌 실제 입력 기록 기준입니다.")
+   .setNegativeButton("닫기",null).setPositiveButton("정비 관리",(d,w)->a.navigate("차고")).show();
  }
  void sectionTitle(String title,String action,Runnable click){LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
   TextView t=a.text(title,17,light,true);row.addView(t,new LinearLayout.LayoutParams(0,-2,1));if(action!=null){TextView more=a.text(action,12,soft,true);more.setPadding(a.dp(8),a.dp(9),a.dp(3),a.dp(9));more.setOnClickListener(v->click.run());row.addView(more);}a.content.addView(row);a.gap(a.content,10);
