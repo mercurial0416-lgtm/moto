@@ -329,9 +329,10 @@ final class HubScreens {
    JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";
    if(!month.equals(last)){a.section(month);last=month;}
    boolean receipt=a.receiptCount(x.optString("id"))>0;
+   final String collection=visibleLedgerCollections.getOrDefault(x,"services");
    line(x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km"+(receipt?" · 영수증":""),
-    a.won(x.optDouble("expenses".equals(visibleLedgerCollections.get(x))?"amount":"cost")),
-    ()->a.edit(visibleLedgerCollections.getOrDefault(x,"services"),x));
+    a.won(x.optDouble("expenses".equals(collection)?"amount":"cost")),
+    ()->a.edit(collection,x));
   }
   if(ListPageLimit.canPrevious(list.size(),a.recordPageOffset))a.action(a.content,"◀ 최근 기록",false,()->{a.recordPageOffset=ListPageLimit.previous(list.size(),a.recordPageOffset);a.render();});
   if(ListPageLimit.canNext(list.size(),a.recordPageOffset))a.action(a.content,"이전 기록 ▶ · "+ListPageLimit.end(list.size(),a.recordPageOffset)+"/"+list.size(),false,()->{a.recordPageOffset=ListPageLimit.next(list.size(),a.recordPageOffset);a.render();});
