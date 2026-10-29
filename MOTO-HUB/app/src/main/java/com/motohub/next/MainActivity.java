@@ -52,8 +52,11 @@ public class MainActivity extends Activity {
  interface Choice{void pick(String value);}
  @Override public void onCreate(Bundle state){super.onCreate(state);PrivateCacheCleanup.atProcessStart(getCacheDir(),getFilesDir(),System.currentTimeMillis());ReceiptCameraFiles.cleanOld(getCacheDir(),System.currentTimeMillis());new Thread(()->{synchronized(MotorcyclePhoto.class){AutoPhotoCache.trim(new File(getFilesDir(),"moto-year-photos"),System.currentTimeMillis());}},"moto-photo-cache-maintenance").start();if(!RideService.running)Sharing.stop();disk=new AtomicFile(new File(getFilesDir(),"motohub-v3.json"));
   boolean crashedRestoreRecovered=false,crashedRestoreNeedsHelp=false;
-  try{crashedRestoreRecovered=RestoreArchive.CrashJournal.recoverAll(getFilesDir(),bytes->atomic(disk,bytes))>0;}
-  catch(Exception e){readOnly=true;crashedRestoreNeedsHelp=true;}
+  try{
+   crashedRestoreRecovered=RestoreArchive.CrashJournal.recoverAll(getFilesDir(),bytes->atomic(disk,bytes))>0;
+   // Recover any interrupted GPS trash move before a new ride or backup sees partial files.
+   if(RideTrash.recoverInterrupted(getFilesDir())>0)crashedRestoreRecovered=true;
+  }catch(Exception e){readOnly=true;crashedRestoreNeedsHelp=true;}
   try{db=disk.getBaseFile().exists()||new File(disk.getBaseFile()+".bak").exists()?Store.parse(new String(disk.readFully(),StandardCharsets.UTF_8)):Store.empty();}
   catch(Exception e){try{db=Store.empty();}catch(Exception ignored){}readOnly=true;}
   // Restore local list preference across process death; rotation state wins when available.
