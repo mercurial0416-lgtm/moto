@@ -204,12 +204,18 @@ final class QuickEntryUi {
      liters.setText(previouslyTyped.optString("liters"));
      unitPrice.setText(previouslyTyped.optString("unitPrice"));
      odo.setText(previouslyTyped.optString("odo"));
-     date.setText(previouslyTyped.optString("date",a.today()));
+     String draftDate=previouslyTyped.optString("date",a.today());
+     date.setText(draftDate);
      full.setChecked(previouslyTyped.optBoolean("full"));
-     if(full.isChecked())extra.setVisibility(View.VISIBLE);
+     if(full.isChecked()||!a.today().equals(draftDate))extra.setVisibility(View.VISIBLE);
      odoConfirmed.setChecked(false);
+     if(!a.today().equals(draftDate))
+      new AlertDialog.Builder(a).setTitle("이전 주유 날짜 확인")
+       .setMessage("작성 중이던 기록 날짜는 "+draftDate+"입니다. 실제로 주유한 날짜가 맞나요?")
+       .setNegativeButton("오늘 날짜로 변경",(d,w)->date.setText(a.today()))
+       .setPositiveButton("이전 날짜 유지",null).show();
     }finally{restoring[0]=false;}
-    a.toast("임시기록을 불러왔어요. 금액·날짜·계기판을 확인하고 저장하세요.");
+    a.toast("임시기록을 불러왔어요. 금액·계기판·주유 날짜를 확인하세요.");
    });
    a.action(body,"임시 주유 기록 삭제",false,()->{
     FuelDraft.clear(a,bikeId);
@@ -237,12 +243,23 @@ final class QuickEntryUi {
     UndoLastSave.offer(a,beforeSave,a.db.toString(),"주유");
    });
    boolean exact=QuickLogDuplicate.exists(a.items("expenses"),record,"expenses");
-   if(exact||FuelNearDuplicate.near(a.items("expenses"),record)){
-    new AlertDialog.Builder(a).setTitle(exact?"같은 주유 기록이 있어요":"비슷한 주유 기록 확인")
-     .setMessage(exact?"금액·리터·날짜·주행거리가 같은 기록이 이미 있습니다. 그래도 저장할까요?":
-      "오늘 같은 바이크에 주행거리·주유량·금액이 비슷한 기록이 있어요. 실제로 다시 주유한 게 맞나요?")
-     .setNegativeButton("취소",null).setPositiveButton("별도 주유 맞아요",(dialog,which)->persist.run()).show();
-   }else persist.run();
+   boolean near=FuelNearDuplicate.near(a.items("expenses"),record);
+   StringBuilder warnings=new StringBuilder();
+   if(FuelAnomalyPolicy.lowOdometer(bike.optDouble("odo"),record.optDouble("mileage")))
+    warnings.append("• 계기판이 현재 차고 값보다 작아요.\\n");
+   if(FuelAnomalyPolicy.unusualLiters(record.optDouble("liters")))
+    warnings.append("• 주유량이 25L를 초과해요. 입력 단위를 확인하세요.\\n");
+   if(recentFuel!=null&&FuelAnomalyPolicy.unusualAmount(recentFuel.optDouble("amount"),record.optDouble("amount")))
+    warnings.append("• 직전 주유 금액과 차이가 매우 커요.\\n");
+   if(FuelAnomalyPolicy.staleDate(record.optString("date"),a.today()))
+    warnings.append("• 주유 날짜가 오늘이 아닌 "+record.optString("date")+"입니다.\\n");
+   if(exact||near)warnings.append(exact?"• 동일한 주유 기록이 있어요.\\n":"• 비슷한 주유 기록이 있어요.\\n");
+   if(warnings.length()>0)
+    new AlertDialog.Builder(a).setTitle("주유 기록 최종 확인")
+     .setMessage(warnings.toString().replace("\\\\n","\\n")+"\\n실제 주유 기록이 맞으면 저장해 주세요. 자동으로 숫자를 바꾸지는 않습니다.")
+     .setNegativeButton("다시 수정",null)
+     .setPositiveButton("내용 확인하고 저장",(dialog,which)->persist.run()).show();
+   else persist.run();
   }));
   // The primary save button is already in the dialog footer; keyboard Done invokes it.
   liters.setOnEditorActionListener((view,actionId,event)->{

@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
  final java.util.concurrent.atomic.AtomicBoolean recoveryReminderChecking=new java.util.concurrent.atomic.AtomicBoolean();
  volatile long suppressUpdatePromptUntilElapsed=0;
  boolean suppressUpdatePrompt(){return android.os.SystemClock.elapsedRealtime()<suppressUpdatePromptUntilElapsed||interruptedRecoveryPromptVisible||recoveryReminderChecking.get()||rideStartConsent.pending();}
+ String approvedRideBikeId="";
  String garageMode="전체", previousTab="홈", rideHistoryFilter=RideHistoryFilter.ALL, rideHistorySort=RideHistorySort.NEWEST, rideHistoryPeriod=RideHistoryPeriod.ALL, rideHistoryBike=RideHistoryBikeFilter.ALL, rideHistoryQuery="";
  final String[] tabs={"홈","라이딩","차고","더보기"};
  int lastRenderedRideState=-1;
@@ -94,13 +95,35 @@ public class MainActivity extends Activity {
   String snapshot=db.toString();
   new Thread(()->{
    String result;
-   try{result=GarageIntegrity.report(Store.parse(snapshot));}
-   catch(Exception e){result="데이터 검사 실패 · 저장 파일과 백업을 확인해 주세요.";}
-   String text=result;
+   java.util.List<GarageIntegrity.Finding> findings=new java.util.ArrayList<>();
+   try{
+    JSONObject checked=Store.parse(snapshot);
+    result=GarageIntegrity.report(checked);
+    if(showAll)findings=GarageIntegrity.findings(checked);
+   }catch(Exception e){result="데이터 검사 실패 · 저장 파일과 백업을 확인해 주세요.";}
+   final String text=result;
+   final java.util.List<GarageIntegrity.Finding> matched=findings;
    runOnUiThread(()->{
     if(isFinishing()||isDestroyed())return;
-    if(showAll)error(text);
-    else if(GarageIntegrity.hasIssue(text))toast("주유·정비 연결 점검에서 이상 징후가 있어요. 설정 → 데이터 검사에서 확인하세요.");
+    if(showAll){
+     if(matched.isEmpty()){error(text);return;}
+     String[] labels=new String[matched.size()];
+     for(int i=0;i<matched.size();i++)labels[i]=(i+1)+". "+matched.get(i).reason;
+     new AlertDialog.Builder(this).setTitle("데이터 점검 · 의심 기록 "+matched.size()+"건")
+      .setMessage("원본은 수정하지 않았습니다. 상세 기록을 직접 확인할 수 있어요. 삭제 전 전체 백업을 권장합니다.")
+      .setItems(labels,(dlg,choice)->{
+       if(readOnly||!snapshot.equals(db.toString())){error("검사 후 기록이 변경됐어요. 검사를 다시 실행해 주세요.");return;}
+       GarageIntegrity.Finding found=matched.get(choice);
+       try{
+        JSONObject record=Store.find(db,found.collection,found.id);
+        JSONObject owner=Store.find(db,"vehicles",found.bikeId);
+        if(record==null||owner==null){error("연결된 바이크가 없어 직접 수정할 수 없어요. 백업과 차고 기록을 확인하세요.");return;}
+        selected=found.bikeId;
+        edit(found.collection,record);
+       }catch(Exception e){error("해당 기록을 열지 못했어요: "+e.getMessage());}
+      }).setNegativeButton("닫기",null).show();
+    }else if(GarageIntegrity.hasIssue(text))
+     toast("주유·정비 연결 점검에서 이상 징후가 있어요. 설정 → 데이터 검사에서 확인하세요.");
    });
   },"moto-garage-integrity").start();
  }
@@ -756,10 +779,25 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       new AlertDialog.Builder(this).setTitle("이 라이딩을 삭제할까요?")
       .setMessage("GPX 파일을 백업했다면 보관해 주세요. 이미 반영한 계기판 주행거리는 자동으로 줄어들지 않습니다.")
       .setNegativeButton("취소",null).setPositiveButton("삭제",(d,w)->{
-       if(!track.delete()){toast("기록 파일 삭제 실패");return;}
-       new File(track.getPath()+".done").delete();new File(track.getPath()+".imported").delete();new File(track.getPath()+".recovered").delete();
-       new File(track.getPath()+".category").delete();new File(track.getPath()+".bike").delete();new File(track.getPath()+".unmerged").delete();
-       close();render();toast("주행 기록을 삭제했어요.");
+       attempt(()->{
+        if(readOnly||RideService.running&&track.getName().equals(RideService.active))
+         throw new IOException("기록 중이거나 원본 보호 중에는 삭제할 수 없어요.");
+        if(!RideTrackMerge.canDelete(getFilesDir(),track))throw new IOException("통합된 라이딩은 삭제할 수 없어요.");
+        JSONObject next=new JSONObject(db.toString());
+        RideNotes.clearDeleted(next,track.getName());
+        if(!track.delete())throw new IOException("GPS 원본 삭제 실패. 기록을 유지했어요.");
+        int missingMarkers=0;
+        for(String suffix:new String[]{".done",".imported",".recovered",".category",".bike",".unmerged",".favorite"}){
+         File marker=new File(track.getPath()+suffix);
+         if(marker.exists()&&!marker.delete())missingMarkers++;
+        }
+        try{write(next);}catch(Exception saved){
+         throw new IOException("GPS 파일은 삭제했지만 제목·메모 정리에 실패했습니다. 설정에서 백업 점검을 실행하세요.",saved);
+        }
+        close();render();
+        if(missingMarkers>0)toast("GPS 삭제 완료 · 관련 표시 "+missingMarkers+"개 정리 실패. 데이터 검사를 권장해요.");
+        else toast("GPS·즐겨찾기·메모까지 정리했어요.");
+       });
       }).show();});
      show();
     });
@@ -1322,7 +1360,28 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    List<ServiceBatch.Item> rows=new ArrayList<>();
    for(int i=0;i<choices.size();i++)if(choices.get(i).isChecked())rows.add(new ServiceBatch.Item(ServiceBatch.COMMON[i],costs.get(i).getText().toString(),""));
    ServiceBatch.Result result=ServiceBatch.build(bikeId,date.getText().toString().trim(),mileage.getText().toString().trim(),rows,items("services"),intervals.isChecked());
-   // Always snapshot current storage again before confirming; one write commits all records.
+   // Preview and individually adjust the due date/km of EACH chosen maintenance item.
+   // The main entry form stays compact; only the final confirmation expands these fields.
+   LinearLayout dueRows=col();dueRows.setPadding(dp(12),dp(8),dp(12),dp(8));
+   List<EditText> dueKms=new ArrayList<>(),dueDates=new ArrayList<>();
+   for(JSONObject row:result.records){
+    label(dueRows,row.optString("type")+" · 다음 정비 목표",14,fg,true);
+    EditText nextKm=new EditText(this);nextKm.setSingleLine(true);nextKm.setTextColor(fg);
+    nextKm.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+    nextKm.setHint("다음 정비 km · 0=미설정");
+    nextKm.setText(String.valueOf((long)row.optDouble("nextKm",0)));
+    dueRows.addView(nextKm,new LinearLayout.LayoutParams(-1,dp(47)));dueKms.add(nextKm);
+    EditText nextDate=new EditText(this);nextDate.setSingleLine(true);nextDate.setTextColor(fg);
+    nextDate.setInputType(android.text.InputType.TYPE_CLASS_DATETIME|android.text.InputType.TYPE_DATETIME_VARIATION_DATE);
+    nextDate.setHint("다음 정비일 YYYY-MM-DD · 비워두면 없음");
+    nextDate.setText(row.optString("nextDate",""));
+    dueRows.addView(nextDate,new LinearLayout.LayoutParams(-1,dp(47)));dueDates.add(nextDate);
+    gap(dueRows,10);
+   }
+   ScrollView dueScroll=new ScrollView(this);
+   dueScroll.setFillViewport(false);dueScroll.addView(dueRows);
+   int previewHeight=dp(Math.min(340,Math.max(140,result.records.size()*125)));
+   dueScroll.setLayoutParams(new LinearLayout.LayoutParams(-1,previewHeight));
    int duplicated=ServiceBatch.duplicates(items("services"),result.records);
    StringBuilder detail=new StringBuilder();for(JSONObject row:result.records){
     detail.append("\n · ").append(row.optString("type")).append("  ").append(won(row.optDouble("cost")));
@@ -1330,9 +1389,13 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    String message=result.records.size()+"개 항목 · 총 "+won(result.totalCost)+detail+"\n"+
     date.getText().toString()+" · "+mileage.getText().toString()+" km"+
     (duplicated>0?"\n\n⚠ 기존 기록과 유사한 항목 "+duplicated+"개가 있어요.":"")+
-    "\n\n모든 정비 기록을 한 번에 저장할까요?";
-   new AlertDialog.Builder(this).setTitle("정비 내용 확인").setMessage(message)
-    .setNegativeButton("계속 수정",null).setPositiveButton("모두 저장",(d,w)->attempt(()->{
+    "\n\n아래에서 항목별 다음 거리·날짜를 확인하고 수정할 수 있어요.";
+   AlertDialog confirm=new AlertDialog.Builder(this).setTitle("정비 내용 확인").setMessage(message)
+    .setView(dueScroll).setNegativeButton("계속 수정",null).setPositiveButton("모두 저장",null).create();
+   confirm.setOnShowListener(ignored->confirm.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->attempt(()->{
+     for(int i=0;i<result.records.size();i++)
+      MaintenanceDueOverrides.apply(result.records.get(i),dueKms.get(i).getText().toString(),
+       dueDates.get(i).getText().toString());
      if(!bikeId.equals(bike()==null?"":bike().optString("id")))throw new IOException("선택 바이크가 변경됐습니다. 다시 확인하세요.");
      JSONObject next=new JSONObject(db.toString());
      if(Store.find(next,"vehicles",bikeId)==null)throw new IOException("바이크가 삭제됐습니다.");
@@ -1342,8 +1405,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      JSONObject updated=Store.find(next,"vehicles",bikeId);
      double km=Double.parseDouble(mileage.getText().toString().trim());
      if(km>updated.optDouble("odo",0))updated.put("odo",km);
-     write(next);batchPrefs.edit().remove(batchKey).apply();DailyMaintenanceJob.checkSoon(this);close();render();toast("정비 "+result.records.size()+"건을 저장했어요.");
-    })).show();
+     write(next);batchPrefs.edit().remove(batchKey).apply();DailyMaintenanceJob.checkSoon(this);
+     confirm.dismiss();close();render();toast("정비 "+result.records.size()+"건을 저장했어요.");
+    })));
+   confirm.show();
   }));
   show();
  }
