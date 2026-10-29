@@ -153,7 +153,7 @@ public class MainActivity extends Activity {
    if(linked==null)throw new java.io.IOException("라이딩과 연결된 바이크가 차고에 없어요.");
    if(!bound.equals(ride.optString("bikeId",bound)))throw new java.io.IOException("라이딩과 저장 요약의 바이크 정보가 일치하지 않아요.");
    new AlertDialog.Builder(this).setTitle("라이딩 바이크 확인")
-    .setMessage("기록에 연결된 바이크: "+linked.optString("name")+"\\nGPS 거리는 자동 반영하지 않습니다. 실제 계기판을 직접 입력할까요?")
+    .setMessage("기록에 연결된 바이크: "+linked.optString("name")+"\nGPS 거리는 자동 반영하지 않습니다. 실제 계기판을 직접 입력할까요?")
     .setNegativeButton("취소",null)
     .setPositiveButton("계기판 입력",(d,w)->new ServiceStatusUi(this).updateOdo(linked)).show();
   }catch(Exception invalid){error(invalid.getMessage()==null?"라이딩 바이크 연결을 확인하지 못했어요.":invalid.getMessage());}
@@ -1964,7 +1964,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       final int rides=prepared.rides,photos=prepared.photos;
       runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())
        new AlertDialog.Builder(this).setTitle("ZIP 복구 사전 검증 통과")
-       .setMessage("백업 내용·데이터 JSON·GPS 및 사진 구조 검사 통과\\nGPS "+rides+"건 · 사진 "+photos+"장\\n검사 중 기존 기록은 변경하지 않았습니다. 실제 복원 시 여유공간과 기기 상태를 다시 확인합니다.")
+       .setMessage("백업 내용·데이터 JSON·GPS 및 사진 구조 검사 통과\nGPS "+rides+"건 · 사진 "+photos+"장\n검사 중 기존 기록은 변경하지 않았습니다. 실제 복원 시 여유공간과 기기 상태를 다시 확인합니다.")
        .setPositiveButton("확인",null).show();
       });
      }
