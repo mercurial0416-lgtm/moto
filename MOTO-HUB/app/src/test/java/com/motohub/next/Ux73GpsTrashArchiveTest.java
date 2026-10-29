@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 import static org.junit.Assert.*;
 public final class Ux73GpsTrashArchiveTest {
- private static File source(File root)throws IOException{
+ private static File source(File root)throws Exception{
   File f=new File(root,"1761600000000-123e4567-e89b-12d3-a456-0000000000cd.track");
   Files.write(f.toPath(),(TrackFile.point(37.0,127.0,5,1761600000000L)+
    TrackFile.point(37.001,127.001,5,1761600003000L)).getBytes(StandardCharsets.UTF_8));
