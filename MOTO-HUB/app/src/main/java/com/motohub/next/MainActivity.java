@@ -133,7 +133,7 @@ public class MainActivity extends Activity {
   if(pending==null)return;
   String id=pending.optString("id"),summary=pending.optString("summary");
   if(summary.isEmpty())return;
-  new AlertDialog.Builder(this).setTitle("라이딩 저장 완료").setMessage(summary)
+  new AlertDialog.Builder(this).setTitle("라이딩 저장 완료").setMessage(rideBikeCaption(pending)+"\n\n"+summary)
    .setNegativeButton("닫기",null)
    .setNeutralButton("주행 내역 보기",(d,w)->{tab="라이딩";render();})
    .setPositiveButton("계기판 갱신",(d,w)->promptRideOdometer(pending))
@@ -158,6 +158,12 @@ public class MainActivity extends Activity {
     .setPositiveButton("계기판 입력",(d,w)->new ServiceStatusUi(this).updateOdo(linked)).show();
   }catch(Exception invalid){error(invalid.getMessage()==null?"라이딩 바이크 연결을 확인하지 못했어요.":invalid.getMessage());}
  }
+ String rideBikeCaption(JSONObject ride){
+  String bikeId=ride==null?"":ride.optString("bikeId");
+  if(!RideBikeBinding.valid(bikeId))return "바이크 미지정";
+  JSONObject vehicle=Store.find(db,"vehicles",bikeId);
+  return vehicle==null?"삭제된 바이크의 라이딩":vehicle.optString("name","이름 없는 바이크");
+ }
  /** A summary can always be reopened, even if another dialog blocked its popup. */
  void showRideCompletionHistory(){
   java.util.List<JSONObject> entries=RideCompletionInbox.entries(this);
@@ -167,7 +173,7 @@ public class MainActivity extends Activity {
    JSONObject item=entries.get(i);
    String label=RideHistoryLabel.title(
     new File(item.optString("id","")),java.time.ZoneId.systemDefault());
-   options[i]=(item.optBoolean("seen")?"":"● ")+label;
+   options[i]=(item.optBoolean("seen")?"":"● ")+rideBikeCaption(item)+" · "+label;
   }
   new AlertDialog.Builder(this).setTitle("최근 완료 라이딩 · 최대 10건")
    .setItems(options,(d,which)->{
@@ -175,7 +181,7 @@ public class MainActivity extends Activity {
     String id=item.optString("id");
     RideCompletionInbox.seen(this,id);
     new AlertDialog.Builder(this).setTitle("저장된 GPS 요약")
-     .setMessage(item.optString("summary","")).setNegativeButton("닫기",null)
+     .setMessage(rideBikeCaption(item)+"\n\n"+item.optString("summary","")).setNegativeButton("닫기",null)
      .setNeutralButton("라이딩 내역",(dd,w)->{tab="라이딩";render();})
      .setPositiveButton("계기판 갱신",(dd,w)->promptRideOdometer(item)).show();
    }).setNegativeButton("닫기",null).show();
