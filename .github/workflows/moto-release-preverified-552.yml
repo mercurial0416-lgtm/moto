@@ -1,0 +1,99 @@
+name: Publish preverified MOTO HUB v552 OTA (public signature only)
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/release-signature-public/v552-apk-v2.block.b64
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: moto-signed-ota-v552
+  cancel-in-progress: false
+jobs:
+  publish-552:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: release-meta
+          ref: main
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          ref: release/moto-hub-apk
+          persist-credentials: false
+      - name: Require precise approved source and upgrade
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release-meta/.github/release-signature-public/v552-apk-v2.block.b64
+          test "$(git -C source rev-parse HEAD)" = 240a7630696a863cfd05089886ab0c7952625ca6
+          test "$(python3 -c 'import json;print(json.load(open("release-meta/updates/manifest.json"))["versionCode"])')" = 551
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 40931948844
+          github-token: ${{ github.token }}
+          repository: mercurial0416-lgtm/moto
+          name: moto-ux76-unsigned-release-and-play-aab-af0527f5bf7e7d6c2d9627bbedd9c9ecb475c921
+          path: unsigned
+      - name: Reconstruct audited APK from its already-created public v2 signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,hashlib,struct
+          from pathlib import Path
+          unsigned=Path("unsigned/apk/release/app-release-unsigned.apk").read_bytes()
+          assert hashlib.sha256(unsigned).hexdigest()=="fc94f84bc589ac2405152dbdd5462a5edd056b009855a66a1162220c862ff057"
+          sigblock=base64.b64decode(Path("release-meta/.github/release-signature-public/v552-apk-v2.block.b64").read_text().strip())
+          assert len(sigblock)==2016 and sigblock[-16:]==b"APK Sig Block 42"
+          eocd=unsigned.rfind(b"PK\x05\x06")
+          assert eocd>=0
+          old_offset=struct.unpack_from("<I",unsigned,eocd+16)[0]
+          assert old_offset==47294092
+          signed=bytearray(unsigned[:old_offset]+sigblock+unsigned[old_offset:])
+          struct.pack_into("<I",signed,eocd+len(sigblock)+16,old_offset+len(sigblock))
+          assert len(signed)==47333562
+          assert hashlib.sha256(signed).hexdigest()=="4350395afe2c85ab34215d92a01e0036c77f26954ce81411f00bdb3989b59e20"
+          Path("MOTO-HUB.apk").write_bytes(signed)
+          print("EXACT signed v552 bytes reconstructed from public APK signature (no private key)")
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install official APK validators
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;36.0.0"'
+      - name: Verify original certificate, APK version, ZIP structure and hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs MOTO-HUB.apk > signature.txt
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' signature.txt | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+          test "$CERT" = 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging MOTO-HUB.apk > badging.txt
+          grep -q "package: name='com.motohub.next'" badging.txt
+          grep -q "versionCode='552'" badging.txt
+          echo "4350395afe2c85ab34215d92a01e0036c77f26954ce81411f00bdb3989b59e20  MOTO-HUB.apk" | sha256sum -c --status
+          unzip -tq MOTO-HUB.apk >/dev/null
+      - name: Release exact verified signed APK and advance OTA manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=moto-hub-v552
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing release"; exit 1
+          fi
+          gh release create "$TAG" "MOTO-HUB.apk#MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" --title "MOTO HUB 552 (fixed signed)" --notes "552 stabilization: searchable ride notes, safe GPS metadata cleanup, fuel and draft date warnings, item-specific maintenance due targets, actionable garage data audit and GPS bike consent pinning. Original signing identity; existing data preserved."
+          URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
+          python3 source/MOTO-HUB/tools/make_update_manifest.py --apk MOTO-HUB.apk --apk-url "$URL" --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" --output release-meta/updates/manifest.json
+          git -C release-meta config user.name "github-actions[bot]"
+          git -C release-meta config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C release-meta add updates/manifest.json
+          git -C release-meta commit -m "Publish MOTO HUB v552 OTA manifest"
+          git -C release-meta push origin HEAD:main
