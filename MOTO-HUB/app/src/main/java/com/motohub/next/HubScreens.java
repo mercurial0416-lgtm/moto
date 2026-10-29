@@ -84,7 +84,7 @@ final class HubScreens {
   for(JSONObject vehicle:a.items("vehicles"))
    bikeNames.put(vehicle.optString("id"),vehicle.optString("name"));
   LinearLayout body=a.col();body.setPadding(a.dp(16),a.dp(6),a.dp(16),a.dp(8));
-  EditText input=new EditText(a);input.setSingleLine(true);input.setHint("바이크 · 주유 · 정비 · 날짜 · 금액");
+  EditText input=new EditText(a);input.setSingleLine(true);input.setHint("바이크 · 주유 · 정비 · 라이딩 · 날짜");
   input.setTextColor(a.fg);input.setHintTextColor(a.muted);
   input.setContentDescription("모든 바이크 기록 검색어");
   body.addView(input,new LinearLayout.LayoutParams(-1,a.dp(52)));
@@ -92,8 +92,9 @@ final class HubScreens {
   ScrollView scroll=new ScrollView(a);LinearLayout results=a.col();scroll.addView(results);
   body.addView(scroll,new LinearLayout.LayoutParams(-1,a.dp(340)));
   AlertDialog dialog=new AlertDialog.Builder(a).setTitle("주유 · 정비 · 비용 통합 검색")
-   .setView(body).setNegativeButton("닫기",null).create();
+    .setView(body).setNegativeButton("닫기",null).create();
   final int[] page={0};final Runnable[] redraw={null};
+  final List<String> gpsLabels=new ArrayList<>();final boolean[] gpsReady={false};
   redraw[0]=()->{
    if(a.isFinishing()||a.isDestroyed()||!dialog.isShowing())return;
    String q=input.getText().toString().trim().toLowerCase(Locale.KOREA);
@@ -115,14 +116,24 @@ final class HubScreens {
     }
     found++;
    }
-   if(found==0)results.addView(a.text("검색 결과가 없어요.",13,a.muted,false));
+   for(String title:gpsLabels){
+    if(!q.isEmpty()&&!title.toLowerCase(Locale.KOREA).contains(q))continue;
+    if(found>=from&&shown<30){
+     shown++;
+     line(results,"GPS 라이딩",title,"",()->{
+      dialog.dismiss();RideStorageManager.show(a,title);
+     });
+    }
+    found++;
+   }
+   if(found==0)results.addView(a.text(gpsReady[0]?"검색 결과가 없어요.":"GPS 라이딩 기록 확인 중…",13,a.muted,false));
    if(from+shown<found)results.addView(a.button("다음 30건 보기",false,()->{
     page[0]++;redraw[0].run();scroll.scrollTo(0,0);
    }));
    if(page[0]>0)results.addView(a.button("처음 30건으로",false,()->{
     page[0]=0;redraw[0].run();scroll.scrollTo(0,0);
    }));
-   count.setText("검색 결과 "+found+"건 · "+(found==0?0:Math.min(found,from+1))+"–"+Math.min(found,from+shown)+"건");
+   count.setText("검색 결과 "+found+"건 · "+(found==0?0:Math.min(found,from+1))+"–"+Math.min(found,from+shown)+"건"+(gpsReady[0]?"":" · GPS 확인 중"));
   };
   input.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
@@ -131,6 +142,17 @@ final class HubScreens {
   });
   a.action(body,"GPS 라이딩 원본도 검색",false,()->{dialog.dismiss();RideStorageManager.show(a);});
   dialog.show();redraw[0].run();
+  new Thread(()->{
+   List<String> loaded=new ArrayList<>();
+   try{
+    for(java.io.File track:TrackFile.tracks(a.getFilesDir()))
+     loaded.add(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault()));
+   }catch(Exception ignored){} // Existing garage records remain searchable if GPS is unavailable.
+   a.runOnUiThread(()->{
+    if(a.isFinishing()||a.isDestroyed()||!dialog.isShowing())return;
+    gpsLabels.addAll(loaded);gpsReady[0]=true;redraw[0].run();
+   });
+  },"moto-unified-gps-search").start();
  }
  void searchMaintenanceHistory(){
   JSONObject bike=a.bike();
