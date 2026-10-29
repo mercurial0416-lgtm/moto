@@ -26,7 +26,8 @@ final class ServiceStatusUi {
   a.gap(target,9);
   java.util.Map<String,JSONObject> serviceMap=LatestServiceByType.latest(a.items("services"),bike.optString("id"));
   JSONObject engineOil=serviceMap.get("엔진오일"),oilFilter=serviceMap.get("오일필터");
-  if(engineOil!=null&&oilFilter!=null){
+  if(engineOil!=null&&oilFilter!=null&&(engineOil.optDouble("nextKm")>0||!engineOil.optString("nextDate").isEmpty())
+     &&(oilFilter.optDouble("nextKm")>0||!oilFilter.optString("nextDate").isEmpty())){
    a.action(target,"엔진오일 + 오일필터 함께 완료",false,()->completeOilPair(bike,engineOil,oilFilter));
   }
   if(entries.isEmpty()){
@@ -127,9 +128,9 @@ final class ServiceStatusUi {
     if(!oil.optString("id").equals(latest.containsKey("엔진오일")?latest.get("엔진오일").optString("id"):"")||
        !filter.optString("id").equals(latest.containsKey("오일필터")?latest.get("오일필터").optString("id"):""))
      throw new java.io.IOException("정비주기가 바뀌었어요. 화면을 다시 열어 주세요.");
-    if(QuickLogDuplicate.exists(a.items("services"),oilDone,"services")||
-       QuickLogDuplicate.exists(a.items("services"),filterDone,"services"))
-     throw new java.io.IOException("같은 정비 기록이 이미 존재해요.");
+    for(JSONObject existing:a.items("services"))if(!existing.optBoolean("scheduleOnly") &&
+      (QuickLogDuplicate.same(existing,oilDone,"services")||QuickLogDuplicate.same(existing,filterDone,"services")))
+      throw new java.io.IOException("같은 완료 정비 기록이 있어요. 기존 기록부터 확인해 주세요.");
     Store.upsert(next,"services",oilDone);Store.upsert(next,"services",filterDone);
     if(km>current.optDouble("odo"))current.put("odo",km);
     a.write(next);DailyMaintenanceJob.clearReminderState(a);DailyMaintenanceJob.checkSoon(a);
