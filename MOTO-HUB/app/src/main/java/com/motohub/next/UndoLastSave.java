@@ -26,10 +26,8 @@ final class UndoLastSave {
  static void offer(MainActivity a,String before,String after,String label,Runnable onConfirmed){
   if(before==null||after==null||before.equals(after))return;
   last=new State(before,after,label);
-  new AlertDialog.Builder(a).setTitle(label+" 저장 완료")
-   .setMessage("방금 저장한 기록을 되돌릴 수 있어요. 2분 이내에만 가능하며 다른 변경이 있으면 취소가 차단됩니다.")
-   .setNegativeButton("확인",(d,w)->{if(onConfirmed!=null)onConfirmed.run();})
-   .setPositiveButton("저장 취소",(d,w)->undo(a)).show();
+  a.toast(label+" 저장 완료 · 홈의 실행 취소에서 2분 내 복원 가능");
+  if(onConfirmed!=null)onConfirmed.run();
  }
  static void undo(MainActivity a){
   State state=last;
