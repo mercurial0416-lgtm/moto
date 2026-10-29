@@ -57,13 +57,13 @@ final class RideStorageManager {
       .setView(input).setNegativeButton("취소",null)
       .setPositiveButton("검색",(x,y)->showPage(a,tracks,labels,indexed,0,input.getText().toString(),bytes)).show();
     }else if(index==1)showTrash(a);
-    else confirm(a,tracks.get(matches.get(from+index-2)));
+    else confirmTrack(a,tracks.get(matches.get(from+index-2)));
    }).setNegativeButton("닫기",null);
   if(to<matches.size())dialog.setPositiveButton("다음 30건",(d,w)->showPage(a,tracks,labels,indexed,from/30+1,query,bytes));
   if(from>0)dialog.setNeutralButton("이전 30건",(d,w)->showPage(a,tracks,labels,indexed,from/30-1,query,bytes));
   dialog.show();
  }
- private static void showTrash(MainActivity a){
+ static void showTrash(MainActivity a){
   new Thread(()->{
    try{
     List<File> entries=RideTrash.entries(a.getFilesDir());
@@ -129,7 +129,7 @@ final class RideStorageManager {
   if(page>0)dialog.setNeutralButton("이전 30건",(d,w)->showTrashPage(a,entries,labels,page-1,query));
   dialog.show();
  }
- private static void confirm(MainActivity a,File track){
+ static void confirmTrack(MainActivity a,File track){
   if(a.readOnly||RideService.running||RideService.autoArmed){
    new AlertDialog.Builder(a).setTitle("GPS 원본 삭제 불가")
     .setMessage("해당 기록 생성 이후 검증 완료된 전체 ZIP 백업이 필요합니다. GPS 기록이 진행 중이거나 원본 보호 상태에서도 삭제할 수 없습니다.")
