@@ -92,6 +92,11 @@ final class GarageHomeUi {
   if(RideService.autoArmed&&!RideService.running){TextView arm=a.text("OBD2 자동 감지 대기 · 출발하면 기록 시작",13,orange,true);arm.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));arm.setBackground(a.shape(surface,stroke,13));a.content.addView(arm);a.gap(a.content,10);}
   if(RideService.running){TextView live=a.text("GPS 기록 중 · "+RideService.status,13,orange,true);live.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));live.setBackground(a.shape(surface,stroke,13));a.content.addView(live);a.gap(a.content,10);}
   interruptedRideShortcut();a.gap(a.content,8);
+  if(UndoLastSave.available(a)){
+   Button undo=a.button("↶ 마지막 저장 실행 취소 · 2분",false,()->UndoLastSave.undo(a));
+   undo.setContentDescription("방금 저장한 기록 실행 취소");
+   a.content.addView(undo);a.gap(a.content,5);
+  }
   a.action(a.content,UndoLastSave.available(a)?"빠른 도구 · 저장 취소 가능":"빠른 도구 · 주차·기록·소모품",false,()->showQuickTools(b));
   a.gap(a.content,6);
   // Recent activity is optional rather than always visible on the first screen.
@@ -447,8 +452,11 @@ final class GarageHomeUi {
   int count=Math.min(order.size(),5);String[] choices=new String[count];
   for(int i=0;i<count;i++){
    JSONObject item=recent.get(order.get(i));String kind=kinds.get(order.get(i));
-   choices[i]=item.optString("date")+" · "+item.optString("type",kind.equals("services")?"정비":"비용")
-     +" · "+a.won(item.optDouble(kind.equals("services")?"cost":"amount"));
+   boolean service="services".equals(kind);
+   String category=service?(item.optBoolean("scheduleOnly")?"정비 예정":"정비 완료"):
+    ("주유".equals(item.optString("type"))?"주유":"기타 비용");
+   choices[i]=category+" · "+item.optString("type",service?"정비":"비용")
+     +" · "+item.optString("date")+" · "+a.won(item.optDouble(service?"cost":"amount"));
   }
   new AlertDialog.Builder(a).setTitle("최근 기록 바로 수정")
    .setItems(choices,(d,i)->{
