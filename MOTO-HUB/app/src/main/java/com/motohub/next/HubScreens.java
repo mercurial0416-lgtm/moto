@@ -13,7 +13,7 @@ final class HubScreens {
   GpsSearchRow(String title,String filename,String bikeId){
    this.title=title;this.filename=filename;this.bikeId=bikeId;
    this.date=title.length()>=10&&title.charAt(4)=='.'?title.substring(0,10).replace('.','-'):"";
-   this.index=(title+" "+filename).toLowerCase(Locale.KOREA);
+   this.index=RideHistorySearch.index(title+" "+filename,"");
   }
  }
  static final class LedgerSearchRow {
@@ -83,7 +83,7 @@ final class HubScreens {
   for(String key:new String[]{"services","expenses"})for(JSONObject record:a.items(key)){
    if(!bikeId.equals(record.optString("vehicleId")))continue;
    boolean service=key.equals("services"),fuel="주유".equals(record.optString("type"));
-   if(mode.equals("정비")&&!service||mode.equals("주유")&&!fuel||mode.equals("기타")&&(service||fuel))continue;
+   if(mode.equals("정비")&&!service||mode.equals("주유")&&(!fuel||service)||mode.equals("기타")&&(service||fuel))continue;
    result.add(record);visibleLedgerCollections.put(record,key);
   }
   result.sort((x,y)->{int date=y.optString("date").compareTo(x.optString("date"));
@@ -111,7 +111,7 @@ final class HubScreens {
    String note=item.optString("memo")+" "+item.optString("note")+" "+item.optString("description");
    String amount=a.won(item.optDouble(key.equals("expenses")?"amount":"cost"));
    indexed.add(new LedgerSearchRow(item,key,type,detail,amount,
-    (type+" "+detail+" "+note+" "+amount).toLowerCase(Locale.KOREA)));
+    RideHistorySearch.index(type+" "+detail+" "+note+" "+amount,"")));
   }
   LinearLayout body=a.col();body.setPadding(a.dp(16),a.dp(6),a.dp(16),a.dp(8));
   EditText input=new EditText(a);input.setSingleLine(true);input.setHint("바이크 · 주유 · 정비 · 라이딩 · 날짜");
@@ -146,17 +146,25 @@ final class HubScreens {
      from.setText(since[0]);dates.addView(from);
      EditText to=new EditText(a);to.setSingleLine(true);to.setHint("종료일 YYYY-MM-DD");
      to.setText(until[0]);dates.addView(to);
-     new AlertDialog.Builder(a).setTitle("날짜 범위 · 비우면 제한 없음").setView(dates)
-      .setNegativeButton("취소",null).setPositiveButton("적용",(dd,w)->{
-       String start=from.getText().toString().trim(),end=to.getText().toString().trim();
+     AlertDialog datesDialog=new AlertDialog.Builder(a)
+      .setTitle("날짜 범위 · 비우면 제한 없음").setView(dates)
+      .setNegativeButton("취소",null).setPositiveButton("적용",null).create();
+     datesDialog.setOnShowListener(shown->datesDialog.getButton(AlertDialog.BUTTON_POSITIVE)
+      .setOnClickListener(tapped->{
+       String startDate,endDate;
        try{
-        if(!start.isEmpty())Store.validateDate(start);
-        if(!end.isEmpty())Store.validateDate(end);
-        if(!start.isEmpty()&&!end.isEmpty()&&start.compareTo(end)>0)
+        startDate=GarageSearchDate.iso(from.getText().toString());
+        endDate=GarageSearchDate.iso(to.getText().toString());
+        if(!startDate.isEmpty()&&!endDate.isEmpty()&&startDate.compareTo(endDate)>0)
          throw new IllegalArgumentException("시작일이 종료일보다 늦어요.");
-       }catch(Exception bad){a.toast("날짜 형식을 확인해 주세요 (YYYY-MM-DD).");return;}
-       since[0]=start;until[0]=end;page[0]=0;redraw[0].run();
-      }).show();
+       }catch(IllegalArgumentException bad){
+        from.setError("날짜를 확인해 주세요");
+        a.toast(bad.getMessage());return; // Keep dialog open until corrected.
+       }
+       since[0]=startDate;until[0]=endDate;page[0]=0;redraw[0].run();
+       datesDialog.dismiss();
+      }));
+     datesDialog.show();
     }else{kind[0]="전체";bikeScope[0]=RideHistoryBikeFilter.ALL;since[0]="";until[0]="";page[0]=0;redraw[0].run();}
    }).show();
   });
@@ -168,7 +176,7 @@ final class HubScreens {
   final List<GpsSearchRow> gpsLabels=new ArrayList<>();final boolean[] gpsReady={false},gpsFailed={false};
   redraw[0]=()->{
    if(a.isFinishing()||a.isDestroyed()||!dialog.isShowing())return;
-   String q=input.getText().toString().trim().toLowerCase(Locale.KOREA);
+   String[] terms=RideHistorySearch.terms(input.getText().toString());
    filterControl[0].setText("필터 · "+kind[0]+" / "+(RideHistoryBikeFilter.ALL.equals(bikeScope[0])?"전체 바이크":bikeNames.getOrDefault(bikeScope[0],"선택 바이크"))+
     (since[0].isEmpty()&&until[0].isEmpty()?"":" / 날짜 적용"));
    results.removeAllViews();int found=0,shown=0;
@@ -180,8 +188,8 @@ final class HubScreens {
       "비용".equals(kind[0])&&(fuel||service))continue;
     if(!RideHistoryBikeFilter.ALL.equals(bikeScope[0])&&!bikeScope[0].equals(row.item.optString("vehicleId")))continue;
     String day=row.item.optString("date");
-    if(!since[0].isEmpty()&&day.compareTo(since[0])<0||!until[0].isEmpty()&&day.compareTo(until[0])>0)continue;
-    if(!q.isEmpty()&&!row.search.contains(q))continue;
+    if(!GarageSearchDate.within(day,since[0],until[0]))continue;
+    if(!RideHistorySearch.matchesIndex(row.search,terms))continue;
     if(found>=from&&shown<30){
      shown++;
      line(results,row.type,row.detail,row.amount,()->{
@@ -193,9 +201,8 @@ final class HubScreens {
    for(GpsSearchRow ride:gpsLabels){
     if(!"전체".equals(kind[0])&&!"GPS".equals(kind[0]))continue;
     if(!RideHistoryBikeFilter.ALL.equals(bikeScope[0])&&!bikeScope[0].equals(ride.bikeId))continue;
-    if(!since[0].isEmpty()&&(ride.date.isEmpty()||ride.date.compareTo(since[0])<0)||
-      !until[0].isEmpty()&&(ride.date.isEmpty()||ride.date.compareTo(until[0])>0))continue;
-    if(!q.isEmpty()&&!ride.index.contains(q))continue;
+    if(!GarageSearchDate.within(ride.date,since[0],until[0]))continue;
+    if(!RideHistorySearch.matchesIndex(ride.index,terms))continue;
     if(found>=from&&shown<30){
      shown++;
      line(results,"GPS 라이딩",ride.title,"",()->{

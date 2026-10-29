@@ -142,6 +142,7 @@ final class DeveloperObdScreen {
      RideService.obdConnectionAttempts,RideService.obdConnectionSuccesses);
    String quality=ObdLinkQuality.label(qualityScore,(int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples));
    telemetry.setText("상태: "+RideService.obdLink+" · 재접속 "+RideService.obdReconnects+"회 · 정상 속도 샘플 "+RideService.obdSpeedSamples+"건\n"+
+    "OBD 세부 상태: "+ObdConnectionState.label(RideService.autoArmed,RideService.obdLastSampleElapsed, android.os.SystemClock.elapsedRealtime(),RideService.obdConnectionAttempts,RideService.obdConnectionSuccesses,RideService.obdReconnects,RideService.obdLastError,RideService.obdPidSupport)+"\n"+
     "통신 품질: "+quality+" · 실패 "+RideService.obdQueryFailures+"회"+
     (RideService.obdSpeedSamples>=3&&qualityScore<55?"\n주의: OBD 신호가 불안정합니다. GPS 기록은 유지됩니다.":"")+"\n"+
      "ECU 실제 수신: "+ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,
