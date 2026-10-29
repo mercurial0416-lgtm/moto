@@ -8,9 +8,9 @@ final class HubScreens {
  });
  final MainActivity a;
  static final class LedgerSearchRow {
-  final JSONObject item;final String type,detail,amount,search;
-  LedgerSearchRow(JSONObject item,String type,String detail,String amount,String search){
-   this.item=item;this.type=type;this.detail=detail;this.amount=amount;this.search=search;
+  final JSONObject item;final String collection,type,detail,amount,search;
+  LedgerSearchRow(JSONObject item,String collection,String type,String detail,String amount,String search){
+   this.item=item;this.collection=collection;this.type=type;this.detail=detail;this.amount=amount;this.search=search;
   }
  }
  HubScreens(MainActivity activity){a=activity;}
@@ -84,7 +84,9 @@ final class HubScreens {
   * Render at most 30 matching rows per page to keep the dialog usable on older devices. */
  void searchAllRecords(){
   List<JSONObject> all=new ArrayList<>();
-  all.addAll(a.items("services"));all.addAll(a.items("expenses"));
+  Map<JSONObject,String> collection=new IdentityHashMap<>();
+  for(JSONObject record:a.items("services")){all.add(record);collection.put(record,"services");}
+  for(JSONObject record:a.items("expenses")){all.add(record);collection.put(record,"expenses");}
   all.sort((x,y)->y.optString("date").compareTo(x.optString("date")));
   Map<String,String> bikeNames=new HashMap<>();
   for(JSONObject vehicle:a.items("vehicles"))
@@ -92,12 +94,13 @@ final class HubScreens {
   // Index text once. Fast typing must not format 10,000 JSON records every keystroke.
   List<LedgerSearchRow> indexed=new ArrayList<>(all.size());
   for(JSONObject item:all){
-   String type=item.optString("type","기타");
+   String key=collection.get(item);
+   String type=(key.equals("services")?"정비":"주유".equals(item.optString("type"))?"주유":"비용")+" · "+item.optString("type","기타");
    String name=bikeNames.getOrDefault(item.optString("vehicleId"),"등록되지 않은 바이크");
    String detail=name+" · "+item.optString("date")+" · "+a.num(item.optDouble("mileage"))+" km";
    String note=item.optString("memo")+" "+item.optString("note")+" "+item.optString("description");
-   String amount=a.won(item.optDouble(item.has("amount")?"amount":"cost"));
-   indexed.add(new LedgerSearchRow(item,type,detail,amount,
+   String amount=a.won(item.optDouble(key.equals("expenses")?"amount":"cost"));
+   indexed.add(new LedgerSearchRow(item,key,type,detail,amount,
     (type+" "+detail+" "+note+" "+amount).toLowerCase(Locale.KOREA)));
   }
   LinearLayout body=a.col();body.setPadding(a.dp(16),a.dp(6),a.dp(16),a.dp(8));
@@ -122,7 +125,7 @@ final class HubScreens {
     if(found>=from&&shown<30){
      shown++;
      line(results,row.type,row.detail,row.amount,()->{
-      dialog.dismiss();a.edit(row.item.has("amount")?"expenses":"services",row.item);
+      dialog.dismiss();a.edit(row.collection,row.item);
      });
     }
     found++;
