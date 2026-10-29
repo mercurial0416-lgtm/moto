@@ -746,7 +746,29 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
   input.setSingleLine(true);input.setMinimumHeight(dp(52));input.setPadding(dp(12),dp(8),dp(12),dp(8));input.setBackground(shape(panel,line,10));
   input.setContentDescription(title);
-  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(16);parent.addView(input,lp);return input;
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(10);parent.addView(input,lp);
+  if(title.equals("새 바이크 구매가")||title.equals("기존 바이크 예상 판매가"))moneyStepButtons(parent,input);
+  return input;
+ }
+ void moneyStepButtons(LinearLayout parent,EditText input){
+  LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);
+  HorizontalScrollView scroll=new HorizontalScrollView(this);
+  scroll.setHorizontalScrollBarEnabled(false);
+  final long[] changes={-1000000,-100000,-100000,100000,500000,1000000};
+  final String[] labels={"−100만","−10만","−10만","+10만","+50만","+100만"};
+  // Repeated negative adjustments would be confusing; use one −50만 step instead.
+  changes[2]=-500000;labels[2]="−50만";
+  for(int i=0;i<labels.length;i++){
+   final long delta=changes[i];
+   Button button=button(labels[i],false,()->attempt(()->{
+    long next=MoneyStep.apply(input.getText().toString(),delta);
+    input.setText(String.valueOf(next));input.setSelection(input.length());
+   }));
+   button.setTextSize(12);button.setMinHeight(dp(42));
+   LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,-2);p.rightMargin=dp(5);bar.addView(button,p);
+  }
+  scroll.addView(bar);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);
+  p.bottomMargin=dp(10);parent.addView(scroll,p);
  }
  long money(EditText e){String value=e.getText().toString().trim();return value.isEmpty()?0:Long.parseLong(value);}
  void tradeIn(){
@@ -833,10 +855,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    new String[]{"1만원","2만원","3만원","5만원","10만원"},new String[]{"10000","20000","30000","50000","100000"},e);
   if(key.equals("cost")&&form.equals("services"))chips(parent,
    new String[]{"1만원","3만원","5만원","10만원","20만원"},new String[]{"10000","30000","50000","100000","200000"},e);
-  if(key.equals("purchase")&&form.equals("vehicles"))chips(parent,
-   new String[]{"100만","300만","500만","700만","1000만"},new String[]{"1000000","3000000","5000000","7000000","10000000"},e);
-  if(key.equals("price")&&form.equals("listings"))chips(parent,
-   new String[]{"100만","300만","500만","700만","1000만"},new String[]{"1000000","3000000","5000000","7000000","10000000"},e);
+  if(key.equals("purchase")&&form.equals("vehicles"))moneyStepButtons(parent,e);
+  if(key.equals("price")&&form.equals("listings"))moneyStepButtons(parent,e);
   if(key.equals("date")&&(form.equals("expenses")||form.equals("services")))label(parent,"저장 전 날짜와 계기판을 확인하세요. 이전 기록 불러오기는 이 두 항목을 바꾸지 않아요.",12,muted,false);
   if(key.equals("liters")&&form.equals("expenses"))chips(parent,
    new String[]{"2L","3L","4L","5L","6L","10L"},new String[]{"2","3","4","5","6","10"},e);
