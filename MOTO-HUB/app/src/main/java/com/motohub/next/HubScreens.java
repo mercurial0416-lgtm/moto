@@ -7,6 +7,12 @@ final class HubScreens {
   Thread t=new Thread(r,"moto-local-backup-io");t.setDaemon(true);return t;
  });
  final MainActivity a;
+ static final class LedgerSearchRow {
+  final JSONObject item;final String type,detail,amount,search;
+  LedgerSearchRow(JSONObject item,String type,String detail,String amount,String search){
+   this.item=item;this.type=type;this.detail=detail;this.amount=amount;this.search=search;
+  }
+ }
  HubScreens(MainActivity activity){a=activity;}
  void title(String name,String detail){a.heading(name,detail);}
  void go(String tab){a.navigate(tab);}
@@ -83,6 +89,17 @@ final class HubScreens {
   Map<String,String> bikeNames=new HashMap<>();
   for(JSONObject vehicle:a.items("vehicles"))
    bikeNames.put(vehicle.optString("id"),vehicle.optString("name"));
+  // Index text once. Fast typing must not format 10,000 JSON records every keystroke.
+  List<LedgerSearchRow> indexed=new ArrayList<>(all.size());
+  for(JSONObject item:all){
+   String type=item.optString("type","기타");
+   String name=bikeNames.getOrDefault(item.optString("vehicleId"),"등록되지 않은 바이크");
+   String detail=name+" · "+item.optString("date")+" · "+a.num(item.optDouble("mileage"))+" km";
+   String note=item.optString("memo")+" "+item.optString("note")+" "+item.optString("description");
+   String amount=a.won(item.optDouble(item.has("amount")?"amount":"cost"));
+   indexed.add(new LedgerSearchRow(item,type,detail,amount,
+    (type+" "+detail+" "+note+" "+amount).toLowerCase(Locale.KOREA)));
+  }
   LinearLayout body=a.col();body.setPadding(a.dp(16),a.dp(6),a.dp(16),a.dp(8));
   EditText input=new EditText(a);input.setSingleLine(true);input.setHint("바이크 · 주유 · 정비 · 라이딩 · 날짜");
   input.setTextColor(a.fg);input.setHintTextColor(a.muted);
@@ -100,18 +117,12 @@ final class HubScreens {
    String q=input.getText().toString().trim().toLowerCase(Locale.KOREA);
    results.removeAllViews();int found=0,shown=0;
    int from=page[0]*30;
-   for(JSONObject item:all){
-    String type=item.optString("type","기타");
-    String name=bikeNames.getOrDefault(item.optString("vehicleId"),"등록되지 않은 바이크");
-    String detail=name+" · "+item.optString("date")+" · "+a.num(item.optDouble("mileage"))+" km";
-    String note=item.optString("memo")+" "+item.optString("note")+" "+item.optString("description");
-    String amount=a.won(item.optDouble(item.has("amount")?"amount":"cost"));
-    String search=(type+" "+detail+" "+note+" "+amount).toLowerCase(Locale.KOREA);
-    if(!q.isEmpty()&&!search.contains(q))continue;
+   for(LedgerSearchRow row:indexed){
+    if(!q.isEmpty()&&!row.search.contains(q))continue;
     if(found>=from&&shown<30){
      shown++;
-     line(results,type,detail,amount,()->{
-      dialog.dismiss();a.edit(item.has("amount")?"expenses":"services",item);
+     line(results,row.type,row.detail,row.amount,()->{
+      dialog.dismiss();a.edit(row.item.has("amount")?"expenses":"services",row.item);
      });
     }
     found++;
