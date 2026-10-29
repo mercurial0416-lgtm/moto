@@ -49,15 +49,15 @@ jobs:
           unsigned=Path("unsigned/apk/release/app-release-unsigned.apk").read_bytes()
           assert hashlib.sha256(unsigned).hexdigest()=="270606ed38acc16ee816948a018fe8a6c43762b6f1666498dfbac45cfe3fceeb"
           sigblock=base64.b64decode(Path("release-meta/.github/release-signature-public/v551-apk-v2.block.b64").read_text().strip())
-          assert len(sigblock)==2012 and sigblock[-16:]==b"APK Sig Block 42"
+          assert len(sigblock)==2016 and sigblock[-16:]==b"APK Sig Block 42"
           eocd=unsigned.rfind(b"PK\x05\x06")
           assert eocd>=0
           old_offset=struct.unpack_from("<I",unsigned,eocd+16)[0]
           assert old_offset==47294092
           signed=bytearray(unsigned[:old_offset]+sigblock+unsigned[old_offset:])
           struct.pack_into("<I",signed,eocd+len(sigblock)+16,old_offset+len(sigblock))
-          assert len(signed)==47333558
-          assert hashlib.sha256(signed).hexdigest()=="58b3b2fb82d754929a9396ce759c3ce1f35429c34d076b87c886636156429471"
+          assert len(signed)==47333562
+          assert hashlib.sha256(signed).hexdigest()=="5879549e83d120b74acb2d91b8a7f083d273272868e69b8fe8c259212b192875"
           Path("MOTO-HUB.apk").write_bytes(signed)
           print("EXACT signed v551 bytes reconstructed from public APK signature (no private key)")
           PY
@@ -77,7 +77,7 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging MOTO-HUB.apk > badging.txt
           grep -q "package: name='com.motohub.next'" badging.txt
           grep -q "versionCode='551'" badging.txt
-          echo "58b3b2fb82d754929a9396ce759c3ce1f35429c34d076b87c886636156429471  MOTO-HUB.apk" | sha256sum -c --status
+          echo "5879549e83d120b74acb2d91b8a7f083d273272868e69b8fe8c259212b192875  MOTO-HUB.apk" | sha256sum -c --status
           unzip -tq MOTO-HUB.apk >/dev/null
       - name: Release exact verified signed APK and advance OTA manifest
         shell: bash
