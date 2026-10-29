@@ -74,7 +74,9 @@ final class RideCompletionInbox {
    for(int i=0;i<current.length();i++)
     if(id.equals(current.optJSONObject(i)==null?"":current.optJSONObject(i).optString("id")))return;
    JSONObject row=new JSONObject();
+   String boundBike=RideBikeBinding.readStrict(track);
    row.put("id",id).put("summary",recap).put("seen",false)
+    .put("bikeId",boundBike)
     .put("time",System.currentTimeMillis());
    next.put(row);
    for(int i=0;i<current.length()&&next.length()<LIMIT;i++)next.put(current.getJSONObject(i));
