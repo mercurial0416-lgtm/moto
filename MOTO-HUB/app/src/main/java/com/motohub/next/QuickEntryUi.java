@@ -235,6 +235,7 @@ final class QuickEntryUi {
    body.addView(restoreDraftButton,restoreDraftLp);
    a.action(body,"주유 · 임시기록 삭제",false,()->{
     FuelDraft.clear(a,bikeId);
+    draftTouched[0]=false; // Explicit discard must not be undone by lifecycle flush.
     // The previous draft cannot be resurrected by a stale click handler.
     restoreDraftButton.setVisibility(View.GONE);
     a.toast("임시 주유 기록만 삭제했어요. 현재 입력칸은 그대로 유지됩니다.");
