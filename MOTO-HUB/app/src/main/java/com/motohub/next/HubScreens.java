@@ -452,9 +452,11 @@ final class HubScreens {
   a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
- void settings(){title("설정","기록·내비·정비·백업만 간편하게 관리");a.section("데이터 및 복구");line("백업 · 복원","바이크·주유·정비·GPS·사진 전체 백업","열기",this::basicBackup);
+ void settings(){title("설정","기록·내비·정비·백업만 간편하게 관리");a.section("데이터 및 복구");line("백업 · 복원",BackupGpsProof.fullCurrentStatus(a,a.db.toString()),"열기",this::basicBackup);
  line("데이터 연결 검사","주유·정비 기록의 바이크 연결, 계기판, 중복 점검","검사",()->a.auditGarageSoon(true));
-  line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":"최신 버전 확인 및 설치","열기",()->new AppUpdater(a).show());
+  line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":
+    "현재 "+BuildConfig.VERSION_CODE+" · "+(UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256)?
+    "서명 확인 · 업데이트 확인 가능":"서명 불일치 · 기존 앱 삭제 금지"),"열기",()->new AppUpdater(a).show());
 
   a.section("내비 · 알림");
 
@@ -604,7 +606,8 @@ final class HubScreens {
  void basicBackup(){
   LinearLayout p=a.page("백업 · 복원");
   a.label(p,"전체 ZIP에는 주행 기록·GPS 복구함·사진·기본 홈 설정과 유효한 주유 임시초안도 포함됩니다. 앱 삭제 전에 휴대폰 밖에 보관하세요.",14,a.muted,false);
-  a.label(p,BackupGpsProof.fullStatus(a)+"\n바이크 영구 삭제는 현재 데이터와 일치하는 검증된 전체 ZIP이 있어야 가능합니다.",13,a.muted,false);
+  a.label(p,BackupGpsProof.fullStatus(a)+"\n"+BackupGpsProof.fullCurrentStatus(a,a.db.toString())+
+   "\n바이크 영구 삭제는 현재 데이터와 일치하는 검증된 전체 ZIP이 있어야 가능합니다.",13,a.muted,false);
   a.action(p,"전체 ZIP 백업",true,a::exportBundle);
   a.action(p,"전체 ZIP 복원",false,a::importBundle);
   a.action(p,"추가 도구 · 대용량 백업 · GPS",false,this::backupMore);
