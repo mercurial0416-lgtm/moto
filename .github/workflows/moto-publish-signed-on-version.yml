@@ -103,7 +103,8 @@ jobs:
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Refusing to replace previously published APK"; exit 1
           fi
-          gh release create "$TAG" "$APK#MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" \
+          cp "$APK" "$RUNNER_TEMP/MOTO-HUB.apk"
+          gh release create "$TAG" "$RUNNER_TEMP/MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" \
             --target "$SOURCE" --title "MOTO HUB $CODE (fixed signed)" \
             --notes "Original certificate verified; offline records retained on top-of-app upgrade."
           URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
