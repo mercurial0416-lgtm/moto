@@ -205,9 +205,15 @@ final class RideUi {
   final Set<String> appliedNames=new HashSet<>();
   final org.json.JSONObject ledger=a.settings().optJSONObject("appliedRides");
   if(ledger!=null)for(java.util.Iterator<String> keys=ledger.keys();keys.hasNext();)appliedNames.add(keys.next());
+  // Freeze only ride notes, not the whole database, while the Activity still owns JSON mutations.
+  final org.json.JSONObject liveNotes=a.settings().optJSONObject("rideNotes");
+  final String rideNotesSnapshot=liveNotes==null?"{}":liveNotes.toString();
   HISTORY_EXECUTOR.execute(()->{
    if(generation!=HISTORY_GENERATION.get())return;
    try{
+    org.json.JSONObject stableNotes=new org.json.JSONObject(rideNotesSnapshot);
+    org.json.JSONObject stableDb=new org.json.JSONObject()
+      .put("settings",new org.json.JSONObject().put("rideNotes",stableNotes));
     List<File> rides=TrackFile.tracks(files);
     List<File> bikeRides=RideHistoryBikeFilter.select(rides,scope);
     int damagedBindings=RideHistoryBikeFilter.damaged(rides);
@@ -222,8 +228,8 @@ final class RideUi {
     for(File file:visible){
      if(generation!=HISTORY_GENERATION.get())return;
      String category=RideCategory.read(file);
-     String savedTitle=RideNotes.title(a.db,file);
-     String savedMemo=RideNotes.memo(a.db,file);
+     String savedTitle=RideNotes.title(stableDb,file);
+     String savedMemo=RideNotes.memo(stableDb,file);
      String label=(savedTitle.isEmpty()?"":savedTitle+" · ")+RideHistoryLabel.title(file,java.time.ZoneId.systemDefault())+
       (RideTrackMerge.mergedSource(file)?" · 통합 원본":"")+
       (RideTrackMerge.archived(file)?" · 통합 취소 보관본":"")+
