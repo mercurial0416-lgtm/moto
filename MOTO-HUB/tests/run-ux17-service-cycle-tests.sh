@@ -26,7 +26,9 @@ assert 'kmBeforeChoices={100,300,500}' in quick and 'daysBeforeChoices={7,15,30}
 assert 'ServiceCycle.completed(' in dashboard
 assert 'Store.upsert(next,"services",done)' in dashboard
 assert 'DailyMaintenanceJob.checkSoon(a)' in dashboard
-assert 'Store.find(next,"vehicles",bike.optString("id")).put("odo",km)' in dashboard
+assert 'JSONObject updated=Store.find(next,"vehicles",bike.optString("id"))' in dashboard
+assert 'if(updated!=null&&current>updated.optDouble("odo"))updated.put("odo",current)' in dashboard
+assert 'if(Store.find(next,"vehicles",bike.optString("id"))==null||' in dashboard, 'stale bike must not be updated'
 assert 'QuickLogDuplicate.same(x,done,"services")' in dashboard
 assert 'MaintenanceAlertWindow.status(item,a.today(),bike.optDouble("odo"))' in dashboard
 assert 'new ServiceStatusUi(a).render(a.content)' in garage
