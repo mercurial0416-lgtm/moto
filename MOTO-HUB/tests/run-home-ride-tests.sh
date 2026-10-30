@@ -9,9 +9,9 @@ ride=Path('app/src/main/java/com/motohub/next/RideUi.java').read_text()
 service=Path('app/src/main/java/com/motohub/next/RideService.java').read_text()
 activity=Path('app/src/main/java/com/motohub/next/MainActivity.java').read_text()
 checks={
- 'home navigates to ride tab before consent': bool(re.search(r'else\s*\{\s*a\.navigate\("라이딩"\);\s*new RideUi\(a\)\.requestStart\(\);\s*\}',home)),
+ 'home navigates to ride tab before consent': 'a.navigate("라이딩");' in home and 'new RideUi(a).requestStart(true);' in home,
  'ride start requires ride tab': 'if(!a.rideStartConsent.pending()||!"라이딩".equals(a.tab))return;' in ride,
- 'start consent still explicit': 'setPositiveButton("동의하고 시작"' in ride,
+ 'start consent still explicit and bike-fixed': 'setPositiveButton("이 바이크로 기록 시작"' in ride and 'if(!approvedBike.equals(liveBike))' in ride and 'putExtra(RideService.EXTRA_BIKE_ID,fixedBikeId)' in ride,
  'home stop sends completed STOP command': 'new RideUi(a).finishWithSummary()' in home and 'a.startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in ride,
  'ride tab stop sends completed STOP command': 'a.startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in ride,
  'no direct stopService for ride anywhere': all(not re.search(r'\.stopService\(\s*new Intent\([^;]*RideService\.class',p.read_text()) for p in Path('app/src/main/java').rglob('*.java')),

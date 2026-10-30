@@ -78,6 +78,33 @@ jobs:
           bash tests/run-ux81-everyday-fixes-tests.sh
           bash tests/run-ux82-practical-upgrades.sh
           bash tests/run-ux83-stabilization-tests.sh
+      - name: Full legacy and current pure Java regression gate
+        working-directory: MOTO-HUB
+        run: |
+          set -euo pipefail
+          JSON_PATH="org/json/json/20240303/json-20240303.jar"
+          if ! curl --fail --location --retry 3 --retry-all-errors -o "$RUNNER_TEMP/json.jar" "https://repo.maven.apache.org/maven2/$JSON_PATH"; then
+            curl --fail --location --retry 3 --retry-all-errors -o "$RUNNER_TEMP/json.jar" "https://repo1.maven.org/maven2/$JSON_PATH"
+          fi
+          test -s "$RUNNER_TEMP/json.jar"
+          export JSON_JAR="$RUNNER_TEMP/json.jar"
+          failures=0
+          for script in tests/run-*.sh; do
+            echo "::group::$script"
+            if bash "$script"; then
+              echo "PASS $script"
+            else
+              echo "::error title=Regression failed::$script"
+              failures=$((failures+1))
+            fi
+            echo "::endgroup::"
+          done
+          if ! python3 tests/test_alpha6_dc_integration.py; then
+            echo "::error title=Regression failed::tests/test_alpha6_dc_integration.py"
+            failures=$((failures+1))
+          fi
+          echo "Total failed suites: $failures"
+          test "$failures" -eq 0
       - name: Compile Android application and run lint and unit tests
         working-directory: MOTO-HUB
         run: |

@@ -1539,6 +1539,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     new AlertDialog.Builder(this).setTitle("중복으로 보이는 기록")
      .setMessage("이 바이크에 같은 날짜·거리·항목·금액의 기록이 이미 있어요. 두 번 저장할까요?")
      .setNegativeButton("취소",null).setPositiveButton("그래도 저장",(d,which)->attempt(()->{
+      if(!db.toString().equals(beforeSave))throw new java.io.IOException("확인하는 사이 기록이 변경됐어요. 입력을 다시 확인한 후 저장해 주세요.");
       write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();UndoLastSave.offer(this,beforeSave,db.toString(),title,attachAfterSave.isChecked()?()->offerReceiptForSavedRecord(key,item):null);
      })).show();return;
    }write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();UndoLastSave.offer(this,beforeSave,db.toString(),title,attachAfterSave.isChecked()?()->offerReceiptForSavedRecord(key,item):null);}));if(existing!=null&&!key.equals("vehicles"))action(p,"기록 삭제",false,()->{close();remove(key,old);});show();

@@ -619,7 +619,10 @@ final class RideUi {
    .setNegativeButton("취소",(d,w)->{a.launchNavigationAfterRide=false;a.approvedRideBikeId="";})
    .setPositiveButton("이 바이크로 기록 시작",(d,w)->{
     String liveBike=a.bike()==null?"":a.bike().optString("id");
-    if(!approvedBike.equals(liveBike)){a.toast("바이크 선택이 변경됐어요. 다시 확인해 주세요.");return;}
+    if(!approvedBike.equals(liveBike)){
+     a.rideStartConsent.cancel();a.approvedRideBikeId="";a.launchNavigationAfterRide=false;
+     a.toast("바이크 선택이 변경됐어요. 다시 확인해 주세요.");return;
+    }
     a.approvedRideBikeId=approvedBike;
     a.launchNavigationAfterRide=openNavigatorAfterStart;a.rideStartConsent.approve();start();
    }).show();
