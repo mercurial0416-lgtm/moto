@@ -238,18 +238,31 @@ final class QuickEntryUi {
     throw new IllegalArgumentException("가득 주유는 실제 계기판 km를 확인한 뒤 체크해 주세요.");
    JSONObject record=QuickRecordDraft.fuel(bike.optString("id"),date.getText().toString().trim(),
     numeric(odo,"계기판",true),numeric(amount,"주유 금액",true),numeric(liters,"주유량",true),full.isChecked());
+   // The user may leave the warning dialog open while another action changes the garage.
+   // A confirmed fuel record may only commit against the exact state that was reviewed.
+   final String reviewedSnapshot=a.db.toString();
+   final boolean exact=QuickLogDuplicate.exists(a.items("expenses"),record,"expenses");
+   final boolean near=FuelNearDuplicate.near(a.items("expenses"),record);
    Runnable persist=()->a.attempt(()->{
+    if(a.readOnly||a.bike()==null||!bikeId.equals(a.bike().optString("id")))
+     throw new java.io.IOException("바이크 또는 저장 상태가 변경됐어요. 주유 화면을 다시 확인해 주세요.");
     String beforeSave=a.db.toString();
+    if(!reviewedSnapshot.equals(beforeSave))
+     throw new java.io.IOException("주유 확인 중 기록이 변경됐어요. 중복 여부를 다시 확인하고 저장해 주세요.");
+    if(!exact&&QuickLogDuplicate.exists(a.items("expenses"),record,"expenses"))
+     throw new java.io.IOException("새로 저장된 동일 주유 기록이 있습니다. 다시 확인해 주세요.");
+    if(!near&&FuelNearDuplicate.near(a.items("expenses"),record))
+     throw new java.io.IOException("새로 저장된 비슷한 주유 기록이 있습니다. 다시 확인해 주세요.");
     JSONObject next=new JSONObject(beforeSave);
+    JSONObject vehicle=Store.find(next,"vehicles",bikeId);
+    if(vehicle==null||!bikeId.equals(record.optString("vehicleId")))
+     throw new java.io.IOException("등록된 바이크 연결이 없어 주유 기록을 저장하지 않았어요.");
     Store.upsert(next,"expenses",record);
-    JSONObject vehicle=Store.find(next,"vehicles",bike.optString("id"));
-    if(vehicle!=null&&record.optDouble("mileage")>vehicle.optDouble("odo"))vehicle.put("odo",record.optDouble("mileage"));
+    if(record.optDouble("mileage")>vehicle.optDouble("odo"))vehicle.put("odo",record.optDouble("mileage"));
     a.write(next);FuelDraft.clear(a,bikeId);
     a.close();a.render();DailyMaintenanceJob.checkSoon(a);
     UndoLastSave.offer(a,beforeSave,a.db.toString(),"주유");
    });
-   boolean exact=QuickLogDuplicate.exists(a.items("expenses"),record,"expenses");
-   boolean near=FuelNearDuplicate.near(a.items("expenses"),record);
    StringBuilder warnings=new StringBuilder();
    if(FuelAnomalyPolicy.lowOdometer(bike.optDouble("odo"),record.optDouble("mileage")))
     warnings.append("• 계기판이 현재 차고 값보다 작아요.\\n");
