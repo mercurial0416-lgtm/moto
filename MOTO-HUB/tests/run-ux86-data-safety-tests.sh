@@ -36,7 +36,7 @@ assert 'else if(original.startsWith("schema5;"))after=UpdateDataFootprint.captur
 assert 'static String captureLegacy(Context context,JSONObject data)' in footprint
 assert 'StringBuilder value=new StringBuilder("schema"+schema+";dataSha256=")' in footprint
 assert 'static String captureLegacy5(Context context,JSONObject data)' in footprint
-assert 'JsonCanonicalDigest.hash(FuelDraftBackup.snapshot(context))' in footprint
+assert 'FuelDraftBackup.auditFingerprint(context)' in footprint
 assert 'oldInstallBaselineHasIdenticalScopeAcrossFootprintUpgrade' in unit
 assert 'favoriteAndCategoryAreIncludedInFingerprint' in unit
 assert 'quarantineBytesAndBindingAreIncludedInFingerprint' in unit
