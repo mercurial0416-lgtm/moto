@@ -20,6 +20,11 @@ final class GarageHomeUi {
   Thread t=new Thread(r,"moto-home-status");t.setDaemon(true);return t;
  });
  private static final java.util.concurrent.atomic.AtomicLong HOME_SCAN=new java.util.concurrent.atomic.AtomicLong();
+ // At most 8 MiB of decoded, sized-down photos; never decode full camera images on UI.
+ private static final android.util.LruCache<String,android.graphics.Bitmap> HERO_CACHE=
+  new android.util.LruCache<String,android.graphics.Bitmap>(8*1024*1024){
+   @Override protected int sizeOf(String key,android.graphics.Bitmap value){return value.getByteCount();}
+  };
  final MainActivity a;
  final int orange,light,soft,surface,card,stroke;
  GarageHomeUi(MainActivity a){this.a=a;
@@ -257,15 +262,28 @@ final class GarageHomeUi {
  }
  boolean loadBikePhoto(ImageView iv,JSONObject bike){
   File custom=a.garagePhotoFile(bike.optString("id"));
-  if(custom!=null&&custom.isFile()){
-   android.graphics.BitmapFactory.Options options=new android.graphics.BitmapFactory.Options();options.inJustDecodeBounds=true;android.graphics.BitmapFactory.decodeFile(custom.getAbsolutePath(),options);
-   options.inJustDecodeBounds=false;options.inSampleSize=1;while(options.outWidth/options.inSampleSize>1024||options.outHeight/options.inSampleSize>1024)options.inSampleSize*=2;
-   android.graphics.Bitmap photo;
-   try{photo=android.graphics.BitmapFactory.decodeFile(custom.getAbsolutePath(),options);}
-   catch(OutOfMemoryError memory){photo=null;}
-   if(photo!=null){iv.setImageBitmap(photo);return true;}
-  }
-  iv.setImageResource(BikeVisual.superCub(bike.optString("name"))?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);return false;
+  boolean cub=BikeVisual.superCub(bike.optString("name"));
+  iv.setImageResource(cub?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
+  if(custom==null||!custom.isFile())return false;
+  // A user photo takes priority even while it is decoding asynchronously.
+  // Binding this request to one image and bike stops rapid switching from showing a stale photo.
+  final String bikeId=bike.optString("id");
+  final String key=custom.getAbsolutePath()+":"+custom.length()+":"+custom.lastModified();
+  iv.setTag(key);
+  android.graphics.Bitmap cached=HERO_CACHE.get(key);
+  if(cached!=null&&!cached.isRecycled()){iv.setImageBitmap(cached);return true;}
+  HOME_IO.execute(()->{
+   android.graphics.Bitmap loaded=MotorcyclePhoto.decodeLocalSampled(custom,1024);
+   if(loaded!=null)HERO_CACHE.put(key,loaded);
+   a.runOnUiThread(()->{
+    if(a.isFinishing()||a.isDestroyed()||!iv.isAttachedToWindow()||
+       !key.equals(iv.getTag())||a.bike()==null||
+       !bikeId.equals(a.bike().optString("id")))return;
+    if(loaded!=null)iv.setImageBitmap(loaded);
+    else iv.setImageResource(cub?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
+   });
+  });
+  return true;
  }
  List<JSONObject> latestServices(JSONObject b){
   // One consistent policy for home, notifications and the cost dashboard.
