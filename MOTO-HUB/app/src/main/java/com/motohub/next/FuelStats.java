@@ -12,9 +12,10 @@ final class FuelStats {
   averageWonPerLiter=avg;this.kmPerLiter=kmPerLiter;
  }
  static FuelStats forBike(List<JSONObject> records,String bikeId){
+  if(bikeId==null||bikeId.isEmpty())return new FuelStats(0,0,0,0,0,Double.NaN);
   List<JSONObject> filtered=new ArrayList<>();
   if(records!=null)for(JSONObject x:records){
-   if(!bikeId.equals(x.optString("vehicleId"))||!"주유".equals(x.optString("type")))continue;
+   if(x==null||!bikeId.equals(x.optString("vehicleId"))||!"주유".equals(x.optString("type")))continue;
    double amount=x.optDouble("amount",Double.NaN),liters=x.optDouble("liters",Double.NaN);
    if(!Double.isFinite(amount)||!Double.isFinite(liters)||amount<=0||liters<=0||amount>1e9||liters>1000)continue;
    filtered.add(x);
