@@ -182,6 +182,13 @@ final class QuickEntryUi {
    FuelDraft.save(a,bikeId,amount.getText().toString(),liters.getText().toString(),
     unitPrice.getText().toString(),odo.getText().toString(),date.getText().toString(),full.isChecked());
   };
+  // Keep typing responsive with apply(), then synchronously commit the latest
+  // state when this dialog closes or Android backgrounds the activity.
+  a.quickFuelDraftFlush=()->{
+   if(!FuelDraft.saveDurable(a,bikeId,amount.getText().toString(),liters.getText().toString(),
+     unitPrice.getText().toString(),odo.getText().toString(),date.getText().toString(),full.isChecked()))
+    a.toast("주유 임시저장을 완료하지 못했어요. 저장공간을 확인해 주세요.");
+  };
   android.text.TextWatcher draftWatcher=new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence v,int st,int c,int after){}
    public void onTextChanged(CharSequence v,int st,int before,int count){persistDraft.run();}
@@ -259,7 +266,7 @@ final class QuickEntryUi {
      throw new java.io.IOException("등록된 바이크 연결이 없어 주유 기록을 저장하지 않았어요.");
     Store.upsert(next,"expenses",record);
     if(record.optDouble("mileage")>vehicle.optDouble("odo"))vehicle.put("odo",record.optDouble("mileage"));
-    a.write(next);FuelDraft.clear(a,bikeId);
+    a.write(next);a.quickFuelDraftFlush=null;FuelDraft.clear(a,bikeId);
     a.close();a.render();DailyMaintenanceJob.checkSoon(a);
     UndoLastSave.offer(a,beforeSave,a.db.toString(),"주유");
    });
