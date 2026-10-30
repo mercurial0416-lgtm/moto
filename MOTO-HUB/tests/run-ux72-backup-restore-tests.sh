@@ -13,7 +13,7 @@ safety=get("RideStorageManager.java")
 restorer=get("RestoreArchive.java")
 activity=get("MainActivity.java")
 assert 'MessageDigest.getInstance("SHA-256")' in backup and 'trackHashes.put' in backup
-assert 'BackupGpsProof.record(this,checkedBackup.trackSha256,snapshot,"FULL".equals(part))' in activity
+assert 'BackupGpsProof.record(this,checkedBackup.trackSha256,checkedBackup.sidecarSha256,snapshot,"FULL".equals(part))' in activity
 assert 'RideMileageIntegrity.fingerprint(track)' in proof
 assert 'BackupGpsProof.requireExact(a,track);' in safety
 assert 'RideTrash.move(a.getFilesDir(),track)' in safety and 'RideTrash.restore(a.getFilesDir()' in safety
