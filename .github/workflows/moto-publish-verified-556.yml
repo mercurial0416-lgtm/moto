@@ -36,7 +36,7 @@ jobs:
           if gh release view moto-hub-v556 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "v556 already published; refusing overwrite"; exit 1
           fi
-          gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/actions/artifacts/12983018956/zip" > unsigned-archive.zip
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/12983018956/zip" > unsigned-archive.zip
           unzip -tq unsigned-archive.zip
           unzip -q unsigned-archive.zip 'app-release-unsigned.apk'
           echo 'f1fd06c971038c01de017b40c7fbfcaa2a7f42a39b6f144c8450a22ba8e029d2  app-release-unsigned.apk' | sha256sum -c -
