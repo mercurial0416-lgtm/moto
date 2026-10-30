@@ -26,7 +26,7 @@ checks=[
  ('widget selected bike', 'WidgetBikeSnapshot.label(context)' in widget and 'WidgetBikeSnapshot.label(context)' in quickWidget),
  ('widget cache updates after bike switch', 'WidgetBikeSnapshot.update(this)' in main),
  ('garage audit non destructive', 'GarageIntegrity.report' in main and '데이터 연결 검사' in src("HubScreens.java")),
- ('Android 552', '-PmotoReleaseCode=552' in Path("../.github/workflows/moto-ux-validation.yml").read_text())
+ ('Android current release', '-PmotoReleaseCode=$CODE' in Path("../.github/workflows/moto-ux-validation.yml").read_text())
 ]
 for title,ok in checks:
  if not ok: raise AssertionError(title)
