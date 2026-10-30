@@ -48,7 +48,8 @@ final class UpdateDataFootprint {
    verifyRegular(file);
    if(file.length()>TrackFile.MAX_BYTES)throw new IOException("GPS 파일이 허용 범위를 초과했습니다.");
    count++;bytes+=file.length();toHash.add(file);
-   if(Files.exists(new File(file.getPath()+".done").toPath(),LinkOption.NOFOLLOW_LINKS))complete++;
+   File completedMarker=new File(file.getPath()+".done");
+   if(expanded?Files.exists(completedMarker.toPath(),LinkOption.NOFOLLOW_LINKS):completedMarker.exists())complete++;
    if(expanded)sidecarCount+=collectSidecars(file,toHash);
    else for(String suffix:new String[]{".done",".bike",".recovered"}){
     File sidecar=new File(file.getPath()+suffix);
