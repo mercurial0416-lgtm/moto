@@ -12,11 +12,12 @@ final class BackupIntegrity {
  private BackupIntegrity(){}
  static final class Result {
   final int tracks,photos;
-  final Map<String,String> trackSha256;
+  final Map<String,String> trackSha256,sidecarSha256;
   final Set<String> entryNames;
-  Result(int tracks,int photos,Map<String,String> hashes,Set<String> names){
+  Result(int tracks,int photos,Map<String,String> hashes,Map<String,String> sidecars,Set<String> names){
    this.tracks=tracks;this.photos=photos;
    this.trackSha256=Collections.unmodifiableMap(new HashMap<>(hashes));
+   this.sidecarSha256=Collections.unmodifiableMap(new HashMap<>(sidecars));
    this.entryNames=Collections.unmodifiableSet(new HashSet<>(names));
   }
  }
@@ -24,7 +25,7 @@ final class BackupIntegrity {
   if(source==null)throw new IOException("백업 파일을 열 수 없어요.");
   Set<String> names=new HashSet<>();Map<String,String> small=new HashMap<>();byte[] buffer=new byte[32768];
   int entries=0,tracks=0,photos=0,receipts=0;long total=0;boolean hasData=false;
-  Map<String,String> trackHashes=new HashMap<>();
+  Map<String,String> trackHashes=new HashMap<>(),sidecarHashes=new HashMap<>();
   try(ZipInputStream zip=new ZipInputStream(new BufferedInputStream(source),StandardCharsets.UTF_8)){
    ZipEntry entry;
    while((entry=zip.getNextEntry())!=null){
@@ -38,7 +39,7 @@ final class BackupIntegrity {
     if("MOTO-HUB-data.json".equals(name))hasData=true;
     long size=0,limit=BackupFormat.entryLimit(name);
     MessageDigest digest=null;
-    if(BackupFormat.isTrack(name)){
+    if(BackupFormat.isTrack(name)||BackupFormat.isSidecar(name)){
      try{digest=MessageDigest.getInstance("SHA-256");}
      catch(NoSuchAlgorithmException unavailable){throw new IOException("GPS SHA-256 검증을 실행할 수 없습니다.",unavailable);}
     }
@@ -57,7 +58,8 @@ final class BackupIntegrity {
     if(digest!=null){
      StringBuilder hex=new StringBuilder();
      for(byte part:digest.digest())hex.append(String.format(Locale.ROOT,"%02x",part&255));
-     trackHashes.put(name.substring("rides/".length()),hex.toString());
+     if(BackupFormat.isTrack(name))trackHashes.put(name.substring("rides/".length()),hex.toString());
+     else sidecarHashes.put(name,hex.toString());
     }
     if(name.equals("MOTO-HUB-data.json")&&size==0)throw new IOException("백업 기록이 비어 있습니다.");
     if(value!=null)small.put(name,value.toString("UTF-8"));
@@ -98,6 +100,6 @@ final class BackupIntegrity {
       !Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(small.get(name)))
     throw new IOException("라이딩 분류가 손상됐습니다.");
   }
-  return new Result(tracks,photos,trackHashes,names);
+  return new Result(tracks,photos,trackHashes,sidecarHashes,names);
  }
 }
