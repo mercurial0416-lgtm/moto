@@ -11,7 +11,7 @@ ui=Path('app/src/main/java/com/motohub/next/RideUi.java').read_text()
 main=Path('app/src/main/java/com/motohub/next/MainActivity.java').read_text()
 assert 'a.launchNavigationAfterRide=openNavigatorAfterStart;a.rideStartConsent.approve();start();' in ui
 assert 'setNegativeButton("취소",(d,w)->{a.launchNavigationAfterRide=false;a.approvedRideBikeId="";})' in ui
-assert 'if(!approvedBike.equals(liveBike))' in ui
+assert 'if(!approvedBike.equals(liveBike))' in ui and 'a.rideStartConsent.cancel();a.approvedRideBikeId="";a.launchNavigationAfterRide=false;' in ui
 assert 'if(!a.approvedRideBikeId.equals(liveBike))' in ui
 assert 'a.rideStartConsent.consume("라이딩".equals(a.tab),true)' in ui
 assert 'if(readiness()!=RideReadiness.State.READY){a.rideStartConsent.cancel()' in ui
