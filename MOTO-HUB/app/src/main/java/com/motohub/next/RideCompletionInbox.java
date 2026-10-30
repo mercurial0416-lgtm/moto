@@ -65,9 +65,9 @@ final class RideCompletionInbox {
    if(result.points<=0)return;
    String id=track.getName();
    String recap=String.format(Locale.KOREA,
-    "저장된 GPS 좌표 %d개\n분석 이동거리 %.2f km\nGPS 첫·마지막 수신 간격 %d분\n관측 이동 %d분\nGPS 상태: %s\n\nGPS 수신 공백은 계산하지 않았으며 실제 계기판과 차이가 날 수 있습니다.",
+    "저장된 GPS 좌표 %d개\n분석 이동거리 %.2f km\nGPS 첫·마지막 수신 간격 %d분\n관측 이동 %d분\nGPS 상태: %s\nGPS 수신 공백: %d회 · 관측 구간 %d분\n\nGPS 수신 공백은 이동거리에 합산하지 않았으며 실제 계기판과 차이가 날 수 있습니다.",
     result.points,result.distanceKm,result.durationMillis/60000,
-    result.movingMillis/60000,result.gpsQuality());
+    result.movingMillis/60000,result.gpsQuality(),result.gpsGaps,result.gpsObservedMillis/60000);
    SharedPreferences p=prefs(context);
    JSONArray current=read(context),next=new JSONArray();
    // Do not post another popup for an already recorded track.
