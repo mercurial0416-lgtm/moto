@@ -22,15 +22,19 @@ final class UpdateDataFootprint {
  private static final long MAX_HASH_BYTES=1_500_000_000L;
  private UpdateDataFootprint(){}
  static String capture(Context context,JSONObject data)throws Exception{
-  return capture(context,data,true);
+  return capture(context,data,6);
  }
- /** Compatibility with pre-UX86 update snapshots: compare precisely the old covered bytes. */
+ /** Keep exact old footprints when upgrading across app versions. */
  static String captureLegacy(Context context,JSONObject data)throws Exception{
-  return capture(context,data,false);
+  return capture(context,data,4);
  }
- private static String capture(Context context,JSONObject data,boolean expanded)throws Exception{
+ static String captureLegacy5(Context context,JSONObject data)throws Exception{
+  return capture(context,data,5);
+ }
+ private static String capture(Context context,JSONObject data,int schema)throws Exception{
+  boolean expanded=schema>=5;
   JSONObject checked=Store.parse(data.toString());
-  StringBuilder value=new StringBuilder(expanded?"schema5;dataSha256=":"schema4;dataSha256=")
+  StringBuilder value=new StringBuilder("schema"+schema+";dataSha256=")
    .append(JsonCanonicalDigest.hash(checked));
   for(String collection:Store.COLLECTIONS){
    JSONArray records=checked.getJSONArray(collection);
@@ -109,8 +113,12 @@ final class UpdateDataFootprint {
   value.append(";tracks=").append(count).append(";trackBytes=").append(bytes)
    .append(";complete=").append(complete);
   if(expanded)value.append(";trashTracks=").append(trashCount).append(";gpsSidecars=").append(sidecarCount);
-  return value.append(";garagePhotos=").append(photoCount)
-   .append(";garagePhotoBytes=").append(photoBytes).append(";contentSha256=").append(hash).toString();
+  value.append(";garagePhotos=").append(photoCount)
+   .append(";garagePhotoBytes=").append(photoBytes).append(";contentSha256=").append(hash);
+  // Schema6 audits unsent quick-fuel drafts without persisting their contents.
+  if(schema>=6)value.append(";fuelDraftSha256=")
+    .append(JsonCanonicalDigest.hash(FuelDraftBackup.snapshot(context)));
+  return value.toString();
  }
  private static final String[] TRACK_SIDECARS={
   ".done",".imported",".recovered",".unmerged",".category",".bike",".favorite",".mergedinto"
