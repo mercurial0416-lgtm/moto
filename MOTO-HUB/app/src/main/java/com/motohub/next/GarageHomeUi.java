@@ -161,7 +161,9 @@ final class GarageHomeUi {
   int photoHeight=displayWidth<a.dp(390)?190:211;
   imageArea.setLayoutParams(new LinearLayout.LayoutParams(-1,a.dp(photoHeight)));
   ImageView visual=new ImageView(a);visual.setScaleType(ImageView.ScaleType.FIT_CENTER);
-  boolean own=loadBikePhoto(visual,bike);
+  // Credit text exists before the asynchronous load so a failed personal image can fall back safely.
+  TextView example=a.text("사진 확인 중…",11,0xFFF6F7F7,false);
+  boolean own=loadBikePhoto(visual,bike,example);
   imageArea.addView(visual,new FrameLayout.LayoutParams(-1,-1));
   View shade=new View(a);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
    new int[]{0x00000000,0x00000000,0x58000000}));imageArea.addView(shade,new FrameLayout.LayoutParams(-1,-1));
@@ -178,7 +180,7 @@ final class GarageHomeUi {
    }
   }
   TextView photo=a.text("사진 변경",12,Color.WHITE,true);photo.setGravity(Gravity.CENTER);photo.setPadding(a.dp(12),a.dp(9),a.dp(12),a.dp(9));photo.setBackground(a.shape(0xB51B1C1F,0,6));photo.setContentDescription("내 바이크 사진 선택");FrameLayout.LayoutParams pp=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT);pp.setMargins(0,a.dp(15),a.dp(15),0);imageArea.addView(photo,pp);photo.setClickable(true);photo.setFocusable(true);photo.setOnClickListener(v->changeHeroPhoto(bike,own));
-  TextView example=a.text(BikeVisual.caption(bike.optString("name"),own),11,0xFFF6F7F7,false);example.setPadding(a.dp(5),a.dp(3),a.dp(5),a.dp(3));example.setBackground(a.shape(0xB21B1E22,0,4));example.setMaxLines(2);FrameLayout.LayoutParams ep=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.RIGHT);ep.setMargins(0,0,a.dp(15),a.dp(9));imageArea.addView(example,ep);
+  example.setText(BikeVisual.caption(bike.optString("name"),own));example.setPadding(a.dp(5),a.dp(3),a.dp(5),a.dp(3));example.setBackground(a.shape(0xB21B1E22,0,4));example.setMaxLines(2);FrameLayout.LayoutParams ep=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.RIGHT);ep.setMargins(0,0,a.dp(15),a.dp(9));imageArea.addView(example,ep);
   if(!own){
    JSONObject known=MotorcycleCatalog.search(a,bike.optString("name"));
    String brand=bike.optString("catalogBrand",known==null?"":known.optString("brand"));
@@ -260,7 +262,7 @@ final class GarageHomeUi {
      }).show();
    }).setNegativeButton("닫기",null).show();
  }
- boolean loadBikePhoto(ImageView iv,JSONObject bike){
+ boolean loadBikePhoto(ImageView iv,JSONObject bike,TextView credit){
   File custom=a.garagePhotoFile(bike.optString("id"));
   boolean cub=BikeVisual.superCub(bike.optString("name"));
   iv.setImageResource(cub?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
@@ -279,8 +281,17 @@ final class GarageHomeUi {
     if(a.isFinishing()||a.isDestroyed()||!iv.isAttachedToWindow()||
        !key.equals(iv.getTag())||a.bike()==null||
        !bikeId.equals(a.bike().optString("id")))return;
-    if(loaded!=null)iv.setImageBitmap(loaded);
-    else iv.setImageResource(cub?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
+    if(loaded!=null){iv.setImageBitmap(loaded);return;}
+    // Keep the user's unreadable image untouched; show a matched model-photo candidate instead.
+    JSONObject known=MotorcycleCatalog.search(a,bike.optString("name"));
+    String brand=bike.optString("catalogBrand",known==null?"":known.optString("brand"));
+    String model=bike.optString("catalogModel",known==null?"":known.optString("model"));
+    if(!brand.isEmpty()&&!model.isEmpty()){
+     MotorcyclePhoto.showFallback(a,iv,credit,brand,model,bike.optInt("year"),bikeId);
+    }else{
+     iv.setImageResource(cub?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
+     credit.setText("내 사진 손상 · 사진 변경에서 다시 선택");
+    }
    });
   });
   return true;
