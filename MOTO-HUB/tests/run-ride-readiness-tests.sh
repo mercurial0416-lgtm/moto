@@ -16,7 +16,9 @@ assert 'Settings.ACTION_LOCATION_SOURCE_SETTINGS' in ui
 assert 'Settings.ACTION_APPLICATION_DETAILS_SETTINGS' in ui
 assert 'RideService.status' in ui
 assert 'if(state==RideReadiness.State.GPS_DISABLED||state==RideReadiness.State.NOTIFICATIONS_DISABLED)' in ui
-assert 'setPositiveButton("동의하고 시작"' in ui
+assert 'setPositiveButton("이 바이크로 기록 시작"' in ui
+assert 'String liveBike=a.bike()==null?"":a.bike().optString("id");' in ui
+assert 'RideReadiness.State state=readiness();' in ui
 activity=Path('app/src/main/java/com/motohub/next/MainActivity.java').read_text()
 assert 'onResume(){super.onResume();' in activity
 assert '"라이딩".equals(tab)' in activity
