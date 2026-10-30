@@ -10,8 +10,9 @@ final class HubScreens {
  final Map<JSONObject,String> visibleLedgerCollections=new IdentityHashMap<>();
  static final class GpsSearchRow {
   final String title,filename,bikeId,date,index;
-  GpsSearchRow(String title,String filename,String bikeId){
-   this.title=title;this.filename=filename;this.bikeId=bikeId;
+  final long startedAt;
+  GpsSearchRow(String title,String filename,String bikeId,long startedAt){
+   this.title=title;this.filename=filename;this.bikeId=bikeId;this.startedAt=startedAt;
    this.date=title.length()>=10&&title.charAt(4)=='.'?title.substring(0,10).replace('.','-'):"";
    this.index=RideHistorySearch.index(title+" "+filename,"");
   }
@@ -24,13 +25,35 @@ final class HubScreens {
  }
  /** One shared date-ordered timeline, regardless of whether a hit is GPS or ledger. */
  static final class UnifiedSearchHit {
-  final String date,type,detail,amount;final Runnable open;
+  final String date,type,detail,amount;final Runnable open;final long sortTime;
   UnifiedSearchHit(String date,String type,String detail,String amount,Runnable open){
+   this(date,type,detail,amount,open,0);
+  }
+  UnifiedSearchHit(String date,String type,String detail,String amount,Runnable open,long time){
    this.date=date;this.type=type;this.detail=detail;this.amount=amount;this.open=open;
+   this.sortTime=time;
   }
  }
+ /** Old ledger entries without true time-of-day keep their original order. */
+ static long ledgerSortTime(JSONObject record,String day){
+  if(day==null||!day.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}"))return 0;
+  for(String field:new String[]{"recordedAt","createdAt","created"}){
+   String raw=record.optString(field,"");
+   if(raw.isEmpty())continue;
+   try{
+    java.time.Instant instant=java.time.Instant.parse(raw);
+    String local=java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
+      .withZone(java.time.ZoneId.systemDefault()).format(instant);
+    if(day.equals(local))return instant.toEpochMilli();
+   }catch(Exception ignored){}
+  }
+  return 0;
+ }
  static void newestFirst(List<UnifiedSearchHit> hits){
-  hits.sort((left,right)->right.date.compareTo(left.date));
+  hits.sort((left,right)->{
+   int date=right.date.compareTo(left.date);
+   return date!=0?date:Long.compare(right.sortTime,left.sortTime);
+  });
  }
  HubScreens(MainActivity activity){a=activity;}
  void title(String name,String detail){a.heading(name,detail);}
@@ -202,7 +225,7 @@ final class HubScreens {
     if(!RideHistorySearch.matchesIndex(row.search,terms))continue;
     hits.add(new UnifiedSearchHit(day,row.type,row.detail,row.amount,()->{
      dialog.dismiss();a.edit(row.collection,row.item);
-    }));
+    },ledgerSortTime(row.item,day)));
    }
    for(GpsSearchRow ride:gpsLabels){
     if(!"전체".equals(kind[0])&&!"GPS".equals(kind[0]))continue;
@@ -211,7 +234,7 @@ final class HubScreens {
     if(!RideHistorySearch.matchesIndex(ride.index,terms))continue;
     hits.add(new UnifiedSearchHit(ride.date,"GPS 라이딩",ride.title,"",()->{
      dialog.dismiss();RideStorageManager.show(a,ride.filename);
-    }));
+    },ride.startedAt));
    }
    // Previously GPS records were appended after all fuel/service entries,
    // which was not a true newest-first search.
@@ -232,11 +255,17 @@ final class HubScreens {
    }));
    count.setText("검색 결과 "+found+"건 · "+(found==0?0:from+1)+"–"+to+"건"+(gpsFailed[0]?" · GPS 검색 실패":gpsReady[0]?"":" · GPS 확인 중"));
   };
+  // Coalesce Korean IME composition callbacks before sorting up to 10k records.
+  final Runnable searchRefresh=()->{if(dialog.isShowing()){page[0]=0;redraw[0].run();}};
   input.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
-   public void onTextChanged(CharSequence text,int start,int before,int count){page[0]=0;redraw[0].run();}
+   public void onTextChanged(CharSequence text,int start,int before,int count){
+    input.removeCallbacks(searchRefresh);
+    input.postDelayed(searchRefresh,180);
+   }
    public void afterTextChanged(android.text.Editable text){}
   });
+  dialog.setOnDismissListener(d->input.removeCallbacks(searchRefresh));
   a.action(body,"GPS 라이딩 원본도 검색",false,()->{dialog.dismiss();RideStorageManager.show(a);});
   dialog.show();redraw[0].run();
   new Thread(()->{
@@ -245,7 +274,8 @@ final class HubScreens {
     for(java.io.File track:TrackFile.tracks(a.getFilesDir())){
      String binding;
      try{binding=RideBikeBinding.readStrict(track);}catch(java.io.IOException invalid){binding="__corrupt__";}
-     loaded.add(new GpsSearchRow(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault()),track.getName(),binding));
+     Long started=RideHistoryLabel.startTime(track);
+     loaded.add(new GpsSearchRow(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault()),track.getName(),binding,started==null?0:started));
     }
    }catch(Exception unavailable){success=false;}
    final boolean complete=success;
