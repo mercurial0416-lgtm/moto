@@ -34,67 +34,77 @@
     {
       "id": "UX92-RELEASE-PREFLIGHT",
       "title": "Version 557 candidate and signer/version status in app",
-      "status": "implemented",
+      "status": "merged",
       "pr": 114,
-      "blocker": "Original-key signing and release manifest for v557 not yet verified"
+      "blocker": "Original-key signing and release manifest for v557 not yet verified",
+      "ciStatus": "passed_on_PR_114"
     },
     {
       "id": "UX92-OBD-RETRY",
       "title": "Manual reattempt only when GPS and auto-arm off; stale speed hidden",
-      "status": "implemented",
+      "status": "merged",
       "pr": 114,
-      "blocker": "Duke 390 physical ECU test remains necessary"
+      "blocker": "Duke 390 physical ECU test remains necessary",
+      "ciStatus": "passed_on_PR_114"
     },
     {
       "id": "UX92-GPS-GAPS",
       "title": "Show GPS missing segments and observed time in final recap",
-      "status": "implemented",
+      "status": "merged",
       "pr": 114,
-      "blocker": "Android 16 locked screen and long ride physical test remains necessary"
+      "blocker": "Android 16 locked screen and long ride physical test remains necessary",
+      "ciStatus": "passed_on_PR_114"
     },
     {
       "id": "UX92-PHOTO-ASYNC",
       "title": "Decode local garage photos on background worker with 8MiB cache and bike binding",
-      "status": "implemented",
-      "pr": 114
+      "status": "merged",
+      "pr": 114,
+      "ciStatus": "passed_on_PR_114"
     },
     {
       "id": "UX92-FUEL-ENTRY",
       "title": "Collapse recent fuel recall and show values before anomalous save",
-      "status": "implemented",
-      "pr": 114
+      "status": "merged",
+      "pr": 114,
+      "ciStatus": "passed_on_PR_114"
     },
     {
       "id": "UX92-SETTINGS-BACKUP",
       "title": "Live SHA mismatch, version and signer status in settings",
-      "status": "implemented",
-      "pr": 114
+      "status": "merged",
+      "pr": 114,
+      "ciStatus": "passed_on_PR_114"
     },
     {
       "id": "UX93-FUEL-WARNINGS",
       "title": "Fix literal newline fragments in fuel anomaly dialog",
-      "status": "implemented",
-      "pr": null
+      "status": "merged",
+      "pr": 115,
+      "ciStatus": "queued"
     },
     {
       "id": "UX93-GPS-SPACE",
       "title": "Fail closed under low internal storage at ride consent and OBD/manual track file creation",
-      "status": "implemented",
-      "pr": null
+      "status": "merged",
+      "pr": 115,
+      "ciStatus": "queued"
     },
     {
       "id": "UX93-CORRUPT-PHOTO",
       "title": "Fallback to public model-photo candidates without deleting user's undecodable local image",
-      "status": "implemented",
-      "pr": null
+      "status": "merged",
+      "pr": 115,
+      "ciStatus": "queued"
     },
     {
       "id": "UX93-RIDE-NOTES-SNAPSHOT",
       "title": "Copy ride notes before concurrent background GPS history scan",
-      "status": "implemented",
-      "pr": null
+      "status": "merged",
+      "pr": 115,
+      "ciStatus": "queued"
     }
   ],
   "policy": "Never suggest implemented or merged items again as if they were newly discovered; instead test or finish their specific outstanding blocker. Never claim installed-device or signed release complete from source-only checks.",
-  "signingStatus": "Automatic signed v557 release blocked: GitHub Actions fixed signing credentials absent on 2026-10-31. Keystore must never enter committed source."
+  "signingStatus": "Source version 557 merged; fixed-key signed release blocked by absent GitHub Actions signing credentials. Public OTA still 556."
 }
