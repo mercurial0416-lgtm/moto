@@ -54,7 +54,7 @@ final class JsonOrphanRepair {
   JSONObject staged=new JSONObject(candidate.toString());
   JSONArray stagedBikes=staged.getJSONArray("vehicles");
   for(String missing:orphanIds)
-   stagedBikes.put(new JSONObject().put("id",missing).put("name","수동 연결 대기 차량"));
+   stagedBikes.put(new JSONObject().put("id",missing).put("name","수동 연결 대기 차량").put("_manualRelinkPlaceholder",true));
   return new Staged(Store.parse(staged.toString()),new ArrayList<>(orphanIds));
  }
 }
