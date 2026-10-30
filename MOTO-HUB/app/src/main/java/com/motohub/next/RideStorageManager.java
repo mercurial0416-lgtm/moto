@@ -129,7 +129,8 @@ final class RideStorageManager {
   if(page>0)dialog.setNeutralButton("이전 30건",(d,w)->showTrashPage(a,entries,labels,page-1,query));
   dialog.show();
  }
- private static void confirm(MainActivity a,File track){
+ static void confirm(MainActivity a,File track){confirm(a,track,null);}
+ static void confirm(MainActivity a,File track,Runnable afterSuccess){
   if(a.readOnly||RideService.running||RideService.autoArmed){
    new AlertDialog.Builder(a).setTitle("GPS 원본 삭제 불가")
     .setMessage("해당 기록 생성 이후 검증 완료된 전체 ZIP 백업이 필요합니다. GPS 기록이 진행 중이거나 원본 보호 상태에서도 삭제할 수 없습니다.")
@@ -140,15 +141,15 @@ final class RideStorageManager {
   }
   new AlertDialog.Builder(a).setTitle("이 GPS 원본을 복구함으로 옮길까요?")
    .setMessage(RideHistoryLabel.title(track,java.time.ZoneId.systemDefault())+
-    "\n검증된 ZIP에 동일 GPS가 포함된 경우에만 수동 복구함으로 이동합니다. 원본은 즉시 영구 삭제되지 않습니다.")
+    "\n"+BackupGpsProof.status(a,track)+"\n\n확인된 ZIP에 동일 GPS가 포함된 경우에만 복구함으로 이동합니다. 최종 이동 시 파일 SHA를 다시 확인합니다.")
    .setNegativeButton("취소",null)
    .setPositiveButton("복구함 이동 확인",(d,w)->new AlertDialog.Builder(a)
     .setTitle("GPS 복구함 이동 · 최종 확인")
     .setMessage("원본 GPS를 앱 내부 복구함으로 옮겨 라이딩 내역에서 숨깁니다. 나중에 직접 복원할 수 있습니다.")
     .setNegativeButton("돌아가기",null)
-    .setPositiveButton("선택한 파일 보관",(dd,ww)->removeInBackground(a,track)).show()).show();
+    .setPositiveButton("선택한 파일 보관",(dd,ww)->removeInBackground(a,track,afterSuccess)).show()).show();
  }
- private static void removeInBackground(MainActivity a,File track){
+ private static void removeInBackground(MainActivity a,File track,Runnable afterSuccess){
   new Thread(()->{
    boolean held=false;
    try{
@@ -178,7 +179,7 @@ final class RideStorageManager {
     }
     RideTrash.move(a.getFilesDir(),track);
     RideCompletionInbox.remove(a,track.getName());
-    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){a.toast("GPS 원본을 복구함으로 옮겼습니다.");a.render();}});
+    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){if(afterSuccess!=null)afterSuccess.run();a.toast("GPS 원본을 복구함으로 옮겼습니다.");a.render();}});
    }catch(Exception error){
     a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 보관 취소: "+error.getMessage());});
    }finally{if(held)RestoreRideGate.end();}

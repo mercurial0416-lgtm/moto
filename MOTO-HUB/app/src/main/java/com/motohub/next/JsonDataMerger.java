@@ -87,6 +87,17 @@ final class JsonDataMerger {
    for(int j=0;j<input.length();j++){
     JSONObject entry=input.getJSONObject(j);
     String id=entry.getString("id");
+    if("vehicles".equals(collection)&&entry.optBoolean("_manualRelinkPlaceholder",false)&&
+       (confirmed==null||!confirmed.containsKey(id)))
+     throw new JSONException("미연결 원본 바이크의 수동 연결 선택이 필요합니다.");
+    // Staged orphan-repair placeholders only exist to validate source references.
+    // Never add them as fake bikes: an explicit destination must be chosen.
+    if("vehicles".equals(collection)&&confirmed!=null&&confirmed.containsKey(id)){
+     String targetBike=confirmed.get(id);
+     if(targetBike==null||!byId.containsKey(targetBike))
+      throw new JSONException("연결 대상 바이크가 현재 차고에 없습니다.");
+     skipped++;continue;
+    }
     String url="listings".equals(collection)?entry.optString("url",""):"";
     String normalized=url.isEmpty()?"":Store.canonicalUrl(url);
     // Matching IDs (all collections) or identical listing URLs are NOT overwritten.

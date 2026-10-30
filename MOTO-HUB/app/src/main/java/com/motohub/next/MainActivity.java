@@ -772,33 +772,14 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
        action(p,"주행거리 확인 후 정비주기 반영",false,()->confirmRideMileage(track,info,sourceHash));
       else label(p,"통합 원본·보관본 또는 미완료 기록은 누적 주행거리에 반영할 수 없어요.",13,muted,false);
      }
-     action(p,"기록 삭제",false,()->{
+     action(p,"GPS 복구함으로 이동",false,()->{
       if(!RideTrackMerge.canDelete(getFilesDir(),track)){
-       error("통합된 기록입니다. 먼저 통합을 취소한 뒤 삭제해 주세요.");return;
+       error("통합된 기록입니다. 먼저 통합을 취소한 뒤 보관해 주세요.");return;
       }
-      new AlertDialog.Builder(this).setTitle("이 라이딩을 삭제할까요?")
-      .setMessage("GPX 파일을 백업했다면 보관해 주세요. 이미 반영한 계기판 주행거리는 자동으로 줄어들지 않습니다.")
-      .setNegativeButton("취소",null).setPositiveButton("삭제",(d,w)->{
-       attempt(()->{
-        if(readOnly||RideService.running&&track.getName().equals(RideService.active))
-         throw new IOException("기록 중이거나 원본 보호 중에는 삭제할 수 없어요.");
-        if(!RideTrackMerge.canDelete(getFilesDir(),track))throw new IOException("통합된 라이딩은 삭제할 수 없어요.");
-        JSONObject next=new JSONObject(db.toString());
-        RideNotes.clearDeleted(next,track.getName());
-        if(!track.delete())throw new IOException("GPS 원본 삭제 실패. 기록을 유지했어요.");
-        int missingMarkers=0;
-        for(String suffix:new String[]{".done",".imported",".recovered",".category",".bike",".unmerged",".favorite"}){
-         File marker=new File(track.getPath()+suffix);
-         if(marker.exists()&&!marker.delete())missingMarkers++;
-        }
-        try{write(next);}catch(Exception saved){
-         throw new IOException("GPS 파일은 삭제했지만 제목·메모 정리에 실패했습니다. 설정에서 백업 점검을 실행하세요.",saved);
-        }
-        close();render();
-        if(missingMarkers>0)toast("GPS 삭제 완료 · 관련 표시 "+missingMarkers+"개 정리 실패. 데이터 검사를 권장해요.");
-        else toast("GPS·즐겨찾기·메모까지 정리했어요.");
-       });
-      }).show();});
+      // Reuse the backup-proof, crash-recoverable, sidecar-preserving quarantine.
+      // Keeping rideNotes in the JSON allows title/memo to reappear on restore.
+      RideStorageManager.confirm(this,track,()->close());
+     });
      show();
     });
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("분석에 실패했어요: "+e.getMessage());});}
@@ -1167,6 +1148,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   EditText name=fields.get(activeForm.equals("vehicles")?"name":"model");EditText y=fields.get("year");
   if(name!=null)name.setText(show);if(y!=null)y.setText(String.valueOf(year));
   hideKeyboard();renderCatalogPhoto(photo,status,brand,model,year);
+  status.setText("✓ 모델명·연식 자동 입력 완료 · "+show+" · "+year+"년식\n아래 입력칸은 확인용이야. 직접 바꿀 때만 수정하면 돼.");
+  status.setContentDescription("선택한 바이크 "+show+" "+year+"년식, 이름과 연식 자동 입력 완료");
  }
  void pickCatalogYear(String brand,String model,Map<String,EditText> fields,ImageView photo,TextView status){
   int now=LocalDate.now().getYear();
@@ -1331,7 +1314,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   });
   String savedBatch=batchPrefs.getString(batchKey,"");
   if(!savedBatch.isEmpty()){
-   action(p,"이전에 작성하던 묶음 정비 불러오기",false,()->{
+   Button restoreBatchDraftButton=button("묶음 정비 · 이전 임시기록 불러오기",false,()->{
     try{
      JSONObject draft=new JSONObject(savedBatch);
      if(!BatchDraftPolicy.recoverable(bikeId,draft.optString("vehicleId"),draft.optLong("time",0),System.currentTimeMillis()))
@@ -1349,13 +1332,17 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      saveBatchDraft.run();toast("작성 중이던 정비를 불러왔어요. 저장 전 금액을 확인해 주세요.");
     }catch(Exception e){error("임시 기록을 불러오지 못했어요: "+e.getMessage());}
    });
-   action(p,"묶음 정비 임시 기록 삭제",false,()->new AlertDialog.Builder(this).setTitle("임시 기록을 삭제할까요?")
+   LinearLayout.LayoutParams batchRestoreLp=new LinearLayout.LayoutParams(-1,-2);
+   batchRestoreLp.bottomMargin=dp(8);p.addView(restoreBatchDraftButton,batchRestoreLp);
+   action(p,"묶음 정비 · 임시기록 삭제",false,()->new AlertDialog.Builder(this).setTitle("임시 기록을 삭제할까요?")
     .setMessage("저장된 정비 내역은 그대로 유지됩니다.")
     .setNegativeButton("취소",null).setPositiveButton("임시 기록 삭제",(d,w)->{
-     batchPrefs.edit().remove(batchKey).apply();toast("임시 기록만 지웠어요.");
+     if(!batchPrefs.edit().remove(batchKey).commit()){error("임시 기록 삭제 실패. 다시 시도해 주세요.");return;}
+     restoreBatchDraftButton.setVisibility(View.GONE);
+     toast("임시 기록만 지웠어요. 현재 작성 중인 내용은 그대로입니다.");
     }).show());
   }
-  action(p,"선택 항목 임시저장",false,()->{saveBatchDraft.run();toast("이 바이크의 묶음 정비를 임시저장했어요.");});
+  action(p,"묶음 정비 · 지금 임시저장",false,()->{saveBatchDraft.run();toast("이 바이크의 묶음 정비를 임시저장했어요.");});
   action(p,"선택 항목 한 번에 저장",true,()->attempt(()->{
    List<ServiceBatch.Item> rows=new ArrayList<>();
    for(int i=0;i<choices.size();i++)if(choices.get(i).isChecked())rows.add(new ServiceBatch.Item(ServiceBatch.COMMON[i],costs.get(i).getText().toString(),""));
@@ -1597,7 +1584,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   int margin=dp(20);confirmation.setPadding(margin,dp(12),margin,dp(12));
   new AlertDialog.Builder(this).setTitle("바이크와 기록 영구 삭제")
    .setMessage("정비 "+serviceCount+"건 · 주유/비용 "+expenseCount+"건과 사진이 삭제됩니다.\n"+
-     "백업을 보관한 경우에만 아래 칸에 '삭제'를 입력하세요.")
+     BackupGpsProof.fullStatus(this)+"\n전체 ZIP 백업이 현재 기록과 일치해야 삭제할 수 있습니다.\n\n아래 칸에 '삭제'를 입력하세요.")
    .setView(confirmation)
    .setNegativeButton("취소",null)
    .setPositiveButton("확인",(d,w)->{
@@ -1610,6 +1597,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  .setNegativeButton("유지",null).setPositiveButton("영구 삭제",(d,w)->attempt(()->{JSONObject next=new JSONObject(db.toString());String id=item.getString("id");List<String> childReceipts=new ArrayList<>();
   if(readOnly||RestoreRideGate.blocked(RideService.running,RideService.autoArmed))throw new java.io.IOException("라이딩 중 또는 데이터 보호 모드에서는 삭제할 수 없어요.");
   if(Store.find(db,key,id)==null)throw new java.io.IOException("이미 삭제된 기록이에요.");
+   if(key.equals("vehicles"))BackupGpsProof.requireFullCurrent(this,db.toString(2));
   if(key.equals("vehicles"))for(String collection:new String[]{"services","expenses"})for(JSONObject oldEntry:items(collection))if(id.equals(oldEntry.optString("vehicleId")))childReceipts.add(oldEntry.optString("id"));
   Store.remove(next,key,id);if(key.equals("vehicles")){for(String k:new String[]{"services","expenses"}){JSONArray a=next.getJSONArray(k);for(int i=a.length()-1;i>=0;i--)if(a.getJSONObject(i).optString("vehicleId").equals(id))a.remove(i);}if(next.getJSONObject("settings").optString("primary").equals(id))next.getJSONObject("settings").remove("primary");selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();}write(next);if(key.equals("vehicles"))for(String childId:childReceipts)clearReceiptFiles(childId);if(key.equals("services")||key.equals("expenses")){clearReceiptFiles(id);}render();})).show();}
  boolean restoreIsBlocked(){return RestoreRideGate.blocked(RideService.running,RideService.autoArmed);}
@@ -1923,7 +1911,23 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       if(bytes.size()+n>8_000_000)throw new IOException("JSON 파일 최대 크기는 8MB입니다.");
       bytes.write(chunk,0,n);
      }
-     source=Store.parse(bytes.toString("UTF-8"));
+     String raw=bytes.toString("UTF-8");
+     try{source=Store.parse(raw);}
+     catch(org.json.JSONException invalid){
+      JsonOrphanRepair.Staged staged=JsonOrphanRepair.stage(raw);
+      runOnUiThread(()->{
+       if(isFinishing()||isDestroyed())return;
+       if(readOnly||restoreIsBlocked()||!previewSnapshot.equals(db.toString())){
+        error("복구 미리보기 중 데이터가 변경됐어요. 다시 가져와 주세요.");return;
+       }
+       new AlertDialog.Builder(this).setTitle("연결되지 않은 바이크 기록 발견")
+        .setMessage("원본 JSON에 없는 바이크 ID "+staged.missing.size()+"개를 사용하는 정비·주유 기록이 있습니다.\n\n원본 파일과 현재 기록은 수정하지 않았습니다. 각 원본 ID에 해당하는 실제 바이크를 직접 선택하면 연결된 기록을 추가할 수 있습니다. 자동 연결하지 않습니다.")
+        .setNegativeButton("취소",null)
+        .setPositiveButton("바이크 직접 연결",(d,w)->selectOrphanJsonMergeBikes(previewSnapshot,staged.source,staged.missing,new java.util.LinkedHashMap<>(),0))
+        .show();
+      });
+      return;
+     }
     }
     final JsonDataMerger.Result preview=JsonDataMerger.merge(Store.parse(previewSnapshot),source);
     runOnUiThread(()->{
@@ -1946,6 +1950,39 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     });
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("JSON 병합 불가: "+e.getMessage());});}
   },"moto-json-merge-preview").start();
+ }
+
+
+ /** No automatic repair: the destination of every missing original bike ID is explicit. */
+ void selectOrphanJsonMergeBikes(String snapshot,JSONObject staged,java.util.List<String> missing,
+   java.util.Map<String,String> choices,int index){
+  if(readOnly||restoreIsBlocked()||!snapshot.equals(db.toString())){
+   error("복구 도중 기록이 변경됐어요. 파일을 다시 선택해 주세요.");return;
+  }
+  if(index>=missing.size()){
+   try{
+    JsonDataMerger.Result preview=JsonDataMerger.merge(Store.parse(snapshot),staged,choices);
+    new AlertDialog.Builder(this).setTitle("미연결 기록 수동 복구 · 최종 확인")
+     .setMessage("직접 연결한 원본 차량 ID "+choices.size()+"개 · 새 기록 "+preview.added+"개 · 중복 제외 "+preview.skipped+"개 · 다른 차량 연결 충돌 보류 "+preview.blocked+"개.\n\n현재 기록은 덮어쓰지 않습니다. 원본 JSON의 임시 차량은 저장하지 않으며 병합 직전에 로컬 복구 사본을 생성합니다.")
+     .setNegativeButton("취소",null)
+     .setPositiveButton("확인하고 추가",(d,w)->commitJsonMerge(staged,new java.util.HashMap<>(choices))).show();
+   }catch(Exception e){error("연결 결과 검사 실패: "+e.getMessage());}
+   return;
+  }
+  String orphanId=missing.get(index);
+  java.util.List<JSONObject> destinations=items("vehicles");
+  if(destinations.isEmpty()){error("연결할 등록 바이크가 없습니다. 먼저 바이크를 등록해 주세요.");return;}
+  String[] names=new String[destinations.size()];
+  for(int i=0;i<destinations.size();i++){
+   JSONObject bike=destinations.get(i);
+   names[i]=bike.optString("name")+" · "+bike.optInt("year")+"년 · "+num(bike.optDouble("odo"))+" km";
+  }
+  new AlertDialog.Builder(this).setTitle("미연결 차량 "+(index+1)+"/"+missing.size())
+   .setMessage("원본 차량 ID: "+orphanId+"\n"+JsonConflictPreview.text(staged,orphanId)+"\n\n정비·주유 기록에 해당하는 실제 바이크를 선택하세요. 목록에 없으면 취소하세요.")
+   .setItems(names,(d,selectedIndex)->{
+    choices.put(orphanId,destinations.get(selectedIndex).optString("id"));
+    selectOrphanJsonMergeBikes(snapshot,staged,missing,choices,index+1);
+   }).setNegativeButton("전체 취소",null).show();
  }
 
  /** A quick-log odometer is suggested from a locally chosen photo and applied only after approval. */
@@ -2189,7 +2226,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      }
     }finally{if(authenticated!=null)java.nio.file.Files.deleteIfExists(authenticated.toPath());}
     // Allow safe trash only for exact GPS bytes actually found in the verified user-owned ZIP.
-    if(!"MEDIA".equals(part))BackupGpsProof.record(this,checkedBackup.trackSha256);
+    if(!"MEDIA".equals(part))BackupGpsProof.record(this,checkedBackup.trackSha256,snapshot,"FULL".equals(part));
     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast((password==null?("FULL".equals(part)?"전체 백업":part+" 분할 백업"):"암호화 백업")+" ZIP 검증 완료 · "+count+"개 항목");});
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 백업 실패: "+e.getMessage());});}
     finally{if(password!=null)Arrays.fill(password,'\0');if(reserved)RestoreRideGate.endExport();}

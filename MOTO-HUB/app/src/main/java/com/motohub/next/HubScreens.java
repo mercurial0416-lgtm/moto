@@ -562,6 +562,7 @@ final class HubScreens {
  void basicBackup(){
   LinearLayout p=a.page("백업 · 복원");
   a.label(p,"전체 ZIP에는 주행 기록·GPS 복구함·사진·기본 홈 설정이 포함됩니다. 앱 삭제 전에 휴대폰 밖에 보관하세요.",14,a.muted,false);
+  a.label(p,BackupGpsProof.fullStatus(a)+"\n바이크 영구 삭제는 현재 데이터와 일치하는 검증된 전체 ZIP이 있어야 가능합니다.",13,a.muted,false);
   a.action(p,"전체 ZIP 백업",true,a::exportBundle);
   a.action(p,"전체 ZIP 복원",false,a::importBundle);
   a.action(p,"추가 도구 · 대용량 백업 · GPS",false,this::backupMore);
@@ -655,7 +656,7 @@ LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·�
  i.setType("application/zip");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
  i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,new String[]{"application/zip","application/x-zip-compressed","application/octet-stream"});
  a.startActivityForResult(i,60);
-});a.action(p,"JSON 백업만 내보내기",false,a::exportData);a.action(p,"JSON 백업 가져오기",false,()->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);a.startActivityForResult(i,42);});a.action(p,"JSON 기록 중복 없이 합치기",false,a::importJsonMerge);a.action(p,"병합 이전 JSON 되돌리기",false,()->a.attempt(()->{android.util.AtomicFile backup=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-json-merge.json"));a.confirmImport(Store.parse(new String(backup.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.action(p,"이전 JSON 되돌리기 (사진·GPS 제외)",false,()->a.attempt(()->{android.util.AtomicFile f=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-import.json"));a.confirmImport(Store.parse(new String(f.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.show();
+});a.action(p,"JSON 백업만 내보내기",false,a::exportData);a.action(p,"JSON 백업 가져오기",false,()->{android.content.Intent i=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(android.content.Intent.CATEGORY_OPENABLE);a.startActivityForResult(i,42);});a.action(p,"JSON 기록 합치기 · 누락된 바이크 수동 연결",false,a::importJsonMerge);a.action(p,"병합 이전 JSON 되돌리기",false,()->a.attempt(()->{android.util.AtomicFile backup=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-json-merge.json"));a.confirmImport(Store.parse(new String(backup.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.action(p,"이전 JSON 되돌리기 (사진·GPS 제외)",false,()->a.attempt(()->{android.util.AtomicFile f=new android.util.AtomicFile(new java.io.File(a.getFilesDir(),"before-import.json"));a.confirmImport(Store.parse(new String(f.readFully(),java.nio.charset.StandardCharsets.UTF_8)));}));a.show();
  }
  void legacyGearManager(){
   LinearLayout p=a.page("보관된 보호장구 기록");
