@@ -54,6 +54,23 @@ final class FuelDraftBackup {
    }catch(JSONException failure){throw new IOException("주유 초안 JSON 내용 오류",failure);}
   }
  }
+ /** Restore exactly previous allowlisted per-bike draft strings on an interrupted
+  * UI-preference transaction; never mutate unrelated app preferences. */
+ static boolean rollback(Context c,Map<String,?> previous){
+  SharedPreferences prefs=c.getSharedPreferences("fuel_drafts",0);
+  SharedPreferences.Editor editor=prefs.edit();
+  for(String key:prefs.getAll().keySet()){
+   if(key.startsWith("fuel_")&&RideBikeBinding.valid(key.substring(5))&&!previous.containsKey(key))
+    editor.remove(key);
+  }
+  for(Map.Entry<String,?> entry:previous.entrySet()){
+   String key=entry.getKey();
+   if(!key.startsWith("fuel_")||!RideBikeBinding.valid(key.substring(5)))continue;
+   if(!(entry.getValue() instanceof String))return false;
+   editor.putString(key,(String)entry.getValue());
+  }
+  return editor.commit();
+ }
  /** Restore ONLY if its motorcycle exists in the restored database; never
   * overwrite a newer in-device draft, and never clear unrelated local drafts. */
  static int restore(Context c,JSONObject drafts,JSONObject restoredDb)throws IOException{
