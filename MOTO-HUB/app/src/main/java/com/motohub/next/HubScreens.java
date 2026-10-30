@@ -22,6 +22,16 @@ final class HubScreens {
    this.item=item;this.collection=collection;this.type=type;this.detail=detail;this.amount=amount;this.search=search;
   }
  }
+ /** One shared date-ordered timeline, regardless of whether a hit is GPS or ledger. */
+ static final class UnifiedSearchHit {
+  final String date,type,detail,amount;final Runnable open;
+  UnifiedSearchHit(String date,String type,String detail,String amount,Runnable open){
+   this.date=date;this.type=type;this.detail=detail;this.amount=amount;this.open=open;
+  }
+ }
+ static void newestFirst(List<UnifiedSearchHit> hits){
+  hits.sort((left,right)->right.date.compareTo(left.date));
+ }
  HubScreens(MainActivity activity){a=activity;}
  void title(String name,String detail){a.heading(name,detail);}
  void go(String tab){a.navigate(tab);}
@@ -179,8 +189,8 @@ final class HubScreens {
    String[] terms=RideHistorySearch.terms(input.getText().toString());
    filterControl[0].setText("필터 · "+kind[0]+" / "+(RideHistoryBikeFilter.ALL.equals(bikeScope[0])?"전체 바이크":bikeNames.getOrDefault(bikeScope[0],"선택 바이크"))+
     (since[0].isEmpty()&&until[0].isEmpty()?"":" / 날짜 적용"));
-   results.removeAllViews();int found=0,shown=0;
-   int from=page[0]*30;
+   results.removeAllViews();
+   List<UnifiedSearchHit> hits=new ArrayList<>();
    for(LedgerSearchRow row:indexed){
     if("GPS".equals(kind[0]))continue;
     boolean service="services".equals(row.collection),fuel="주유".equals(row.item.optString("type"));
@@ -190,35 +200,37 @@ final class HubScreens {
     String day=row.item.optString("date");
     if(!GarageSearchDate.within(day,since[0],until[0]))continue;
     if(!RideHistorySearch.matchesIndex(row.search,terms))continue;
-    if(found>=from&&shown<30){
-     shown++;
-     line(results,row.type,row.detail,row.amount,()->{
-      dialog.dismiss();a.edit(row.collection,row.item);
-     });
-    }
-    found++;
+    hits.add(new UnifiedSearchHit(day,row.type,row.detail,row.amount,()->{
+     dialog.dismiss();a.edit(row.collection,row.item);
+    }));
    }
    for(GpsSearchRow ride:gpsLabels){
     if(!"전체".equals(kind[0])&&!"GPS".equals(kind[0]))continue;
     if(!RideHistoryBikeFilter.ALL.equals(bikeScope[0])&&!bikeScope[0].equals(ride.bikeId))continue;
     if(!GarageSearchDate.within(ride.date,since[0],until[0]))continue;
     if(!RideHistorySearch.matchesIndex(ride.index,terms))continue;
-    if(found>=from&&shown<30){
-     shown++;
-     line(results,"GPS 라이딩",ride.title,"",()->{
-      dialog.dismiss();RideStorageManager.show(a,ride.filename);
-     });
-    }
-    found++;
+    hits.add(new UnifiedSearchHit(ride.date,"GPS 라이딩",ride.title,"",()->{
+     dialog.dismiss();RideStorageManager.show(a,ride.filename);
+    }));
+   }
+   // Previously GPS records were appended after all fuel/service entries,
+   // which was not a true newest-first search.
+   newestFirst(hits);
+   int found=hits.size(),from=page[0]*30;
+   if(from>=found&&page[0]>0){page[0]=0;from=0;}
+   int to=Math.min(found,from+30);
+   for(int i=from;i<to;i++){
+    UnifiedSearchHit hit=hits.get(i);
+    line(results,hit.type,hit.detail,hit.amount,hit.open);
    }
    if(found==0)results.addView(a.text(gpsFailed[0]?"GPS 기록 검색 실패 · 주유/정비 결과만 표시":gpsReady[0]?"검색 결과가 없어요.":"GPS 라이딩 기록 확인 중…",13,a.muted,false));
-   if(from+shown<found)results.addView(a.button("다음 30건 보기",false,()->{
+   if(to<found)results.addView(a.button("다음 30건 보기",false,()->{
     page[0]++;redraw[0].run();scroll.scrollTo(0,0);
    }));
    if(page[0]>0)results.addView(a.button("처음 30건으로",false,()->{
     page[0]=0;redraw[0].run();scroll.scrollTo(0,0);
    }));
-   count.setText("검색 결과 "+found+"건 · "+(found==0?0:Math.min(found,from+1))+"–"+Math.min(found,from+shown)+"건"+(gpsFailed[0]?" · GPS 검색 실패":gpsReady[0]?"":" · GPS 확인 중"));
+   count.setText("검색 결과 "+found+"건 · "+(found==0?0:from+1)+"–"+to+"건"+(gpsFailed[0]?" · GPS 검색 실패":gpsReady[0]?"":" · GPS 확인 중"));
   };
   input.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence s,int start,int count,int after){}
