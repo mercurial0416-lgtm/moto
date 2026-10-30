@@ -1911,7 +1911,23 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       if(bytes.size()+n>8_000_000)throw new IOException("JSON 파일 최대 크기는 8MB입니다.");
       bytes.write(chunk,0,n);
      }
-     source=Store.parse(bytes.toString("UTF-8"));
+     String raw=bytes.toString("UTF-8");
+     try{source=Store.parse(raw);}
+     catch(org.json.JSONException invalid){
+      JsonOrphanRepair.Staged staged=JsonOrphanRepair.stage(raw);
+      runOnUiThread(()->{
+       if(isFinishing()||isDestroyed())return;
+       if(readOnly||restoreIsBlocked()||!previewSnapshot.equals(db.toString())){
+        error("복구 미리보기 중 데이터가 변경됐어요. 다시 가져와 주세요.");return;
+       }
+       new AlertDialog.Builder(this).setTitle("연결되지 않은 바이크 기록 발견")
+        .setMessage("원본 JSON에 없는 바이크 ID "+staged.missing.size()+"개를 사용하는 정비·주유 기록이 있습니다.\n\n원본 파일과 현재 기록은 수정하지 않았습니다. 각 원본 ID에 해당하는 실제 바이크를 직접 선택하면 연결된 기록을 추가할 수 있습니다. 자동 연결하지 않습니다.")
+        .setNegativeButton("취소",null)
+        .setPositiveButton("바이크 직접 연결",(d,w)->selectOrphanJsonMergeBikes(previewSnapshot,staged.source,staged.missing,new java.util.LinkedHashMap<>(),0))
+        .show();
+      });
+      return;
+     }
     }
     final JsonDataMerger.Result preview=JsonDataMerger.merge(Store.parse(previewSnapshot),source);
     runOnUiThread(()->{
@@ -1934,6 +1950,39 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     });
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("JSON 병합 불가: "+e.getMessage());});}
   },"moto-json-merge-preview").start();
+ }
+
+
+ /** No automatic repair: the destination of every missing original bike ID is explicit. */
+ void selectOrphanJsonMergeBikes(String snapshot,JSONObject staged,java.util.List<String> missing,
+   java.util.Map<String,String> choices,int index){
+  if(readOnly||restoreIsBlocked()||!snapshot.equals(db.toString())){
+   error("복구 도중 기록이 변경됐어요. 파일을 다시 선택해 주세요.");return;
+  }
+  if(index>=missing.size()){
+   try{
+    JsonDataMerger.Result preview=JsonDataMerger.merge(Store.parse(snapshot),staged,choices);
+    new AlertDialog.Builder(this).setTitle("미연결 기록 수동 복구 · 최종 확인")
+     .setMessage("직접 연결한 원본 차량 ID "+choices.size()+"개 · 새 기록 "+preview.added+"개 · 중복 제외 "+preview.skipped+"개 · 다른 차량 연결 충돌 보류 "+preview.blocked+"개.\n\n현재 기록은 덮어쓰지 않습니다. 원본 JSON의 임시 차량은 저장하지 않으며 병합 직전에 로컬 복구 사본을 생성합니다.")
+     .setNegativeButton("취소",null)
+     .setPositiveButton("확인하고 추가",(d,w)->commitJsonMerge(staged,new java.util.HashMap<>(choices))).show();
+   }catch(Exception e){error("연결 결과 검사 실패: "+e.getMessage());}
+   return;
+  }
+  String orphanId=missing.get(index);
+  java.util.List<JSONObject> destinations=items("vehicles");
+  if(destinations.isEmpty()){error("연결할 등록 바이크가 없습니다. 먼저 바이크를 등록해 주세요.");return;}
+  String[] names=new String[destinations.size()];
+  for(int i=0;i<destinations.size();i++){
+   JSONObject bike=destinations.get(i);
+   names[i]=bike.optString("name")+" · "+bike.optInt("year")+"년 · "+num(bike.optDouble("odo"))+" km";
+  }
+  new AlertDialog.Builder(this).setTitle("미연결 차량 "+(index+1)+"/"+missing.size())
+   .setMessage("원본 차량 ID: "+orphanId+"\n"+JsonConflictPreview.text(staged,orphanId)+"\n\n정비·주유 기록에 해당하는 실제 바이크를 선택하세요. 목록에 없으면 취소하세요.")
+   .setItems(names,(d,selectedIndex)->{
+    choices.put(orphanId,destinations.get(selectedIndex).optString("id"));
+    selectOrphanJsonMergeBikes(snapshot,staged,missing,choices,index+1);
+   }).setNegativeButton("전체 취소",null).show();
  }
 
  /** A quick-log odometer is suggested from a locally chosen photo and applied only after approval. */
