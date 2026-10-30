@@ -117,7 +117,7 @@ final class UpdateDataFootprint {
    .append(";garagePhotoBytes=").append(photoBytes).append(";contentSha256=").append(hash);
   // Schema6 audits unsent quick-fuel drafts without persisting their contents.
   if(schema>=6)value.append(";fuelDraftSha256=")
-    .append(JsonCanonicalDigest.hash(FuelDraftBackup.snapshot(context)));
+    .append(FuelDraftBackup.auditFingerprint(context));
   return value.toString();
  }
  private static final String[] TRACK_SIDECARS={
