@@ -22,7 +22,7 @@ checks=[
  ('batch service action', 'a::batchServiceEntry' in service and '여러 정비 항목' in service),
  ('batch preserves service next date', 'intervalMonths' in batch and 'nextDate' in batch),
  ('ride metadata in regular backup JSON', 'rideNotes' in src("RideNotes.java") and 'RideNotes.update' in main),
- ('ride metadata shown on list', 'RideNotes.title(a.db,file)' in ride),
+ ('ride metadata shown on list from stable snapshot', 'RideNotes.title(stableDb,file)' in ride and 'rideNotesSnapshot=liveNotes==null?' in ride and 'RideNotes.title(a.db,file)' not in ride),
  ('widget selected bike', 'WidgetBikeSnapshot.label(context)' in widget and 'WidgetBikeSnapshot.label(context)' in quickWidget),
  ('widget cache updates after bike switch', 'WidgetBikeSnapshot.update(this)' in main),
  ('garage audit non destructive', 'GarageIntegrity.report' in main and '데이터 연결 검사' in src("HubScreens.java")),

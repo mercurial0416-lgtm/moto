@@ -16,9 +16,12 @@ final class GpsStorageSpacePolicy {
  }
  static void require(File filesDir)throws IOException{
   if(filesDir==null||!filesDir.isDirectory())throw new IOException(message(-1));
-  long bytes;
+  long bytes=-1;
+  // Some Android device/OS implementations may not provide usable StatFs data.
+  // Fallback uses the same internal-files partition and still fails closed if unknown.
   try{bytes=new StatFs(filesDir.getAbsolutePath()).getAvailableBytes();}
-  catch(RuntimeException error){throw new IOException(message(-1),error);}
+  catch(RuntimeException ignored){}
+  if(bytes<=0)bytes=filesDir.getUsableSpace();
   if(!sufficient(bytes))throw new IOException(message(bytes));
  }
 }
