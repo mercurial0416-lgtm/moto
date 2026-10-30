@@ -17,7 +17,7 @@ checks={
  "draft rollback is scoped to fuel IDs":'static boolean rollback(Context c,Map<String,?> previous)' in drafts and 'RideBikeBinding.valid(key.substring(5))' in drafts,
  "draft rollback invoked on any settings failure":'boolean fuelOk=FuelDraftBackup.rollback(c,oldFuel);' in prefs,
  "draft rollback failure is reported":'!homeOk||!navOk||!notifyOk||!fuelOk' in prefs,
- "update schema6 fingerprints draft values":'JsonCanonicalDigest.hash(FuelDraftBackup.snapshot(context))' in audit and 'fuelDraftSha256=' in audit,
+ "update schema6 fingerprints draft values":'FuelDraftBackup.auditFingerprint(context)' in audit and 'System.currentTimeMillis()' not in drafts.split('static String auditFingerprint(Context c)')[1].split('static boolean rollback(')[0] and 'fuelDraftSha256=' in audit,
  "old schema4 baseline handled unchanged":'if(original.startsWith("schema4;"))after=UpdateDataFootprint.captureLegacy(context,current);' in install,
  "old schema5 baseline handled unchanged":'else if(original.startsWith("schema5;"))after=UpdateDataFootprint.captureLegacy5(context,current);' in install,
  "new schema6 compares draft hash":'else if(original.startsWith("schema6;"))after=UpdateDataFootprint.capture(context,current);' in install,
