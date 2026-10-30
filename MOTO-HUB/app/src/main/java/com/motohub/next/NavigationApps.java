@@ -75,12 +75,19 @@ final class NavigationApps {
   new AlertDialog.Builder(activity).setTitle("설치된 다른 내비 실행")
    .setItems(labels,(d,which)->{
     NavigationChoice target=installed.get(which);
+    // A navigator can appear installed yet fail to launch. Keep the old default
+    // unless Android accepted the actual launch.
+    Intent launch=installedLaunchIntent(activity,target);
+    if(launch==null){open(activity,target);return;}
+    try{
+     activity.suppressUpdatePromptUntilElapsed=android.os.SystemClock.elapsedRealtime()+120_000L;
+     activity.startActivity(launch);
+    }catch(RuntimeException failed){open(activity,target);return;}
     if(!activity.getSharedPreferences(PREF,Context.MODE_PRIVATE)
         .edit().putString(KEY,target.id).commit()){
      activity.toast("기본 내비 저장에 실패했어요.");return;
     }
     MotoWidgetProvider.refresh(activity);RideService.refreshNotification();
-    open(activity,target);
    }).setNegativeButton("취소",null).show();
  }
  static void openPreferred(MainActivity activity){open(activity,preferred(activity));}
