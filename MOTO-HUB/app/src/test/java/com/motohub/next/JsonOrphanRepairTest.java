@@ -3,10 +3,15 @@ package com.motohub.next;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 import java.util.Collections;
 import java.util.Map;
 import static org.junit.Assert.*;
 
+@RunWith(RobolectricTestRunner.class)
+@Config(manifest=Config.NONE,sdk=28)
 public class JsonOrphanRepairTest {
  private static JSONObject bike(String id,String name)throws Exception{
   return new JSONObject().put("id",id).put("name",name).put("year",2024).put("odo",1200);
