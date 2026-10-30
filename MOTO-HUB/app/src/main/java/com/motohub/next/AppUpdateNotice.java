@@ -11,7 +11,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** Automatic *check*, never an automatic install; only shows a notice when safe. */
 final class AppUpdateNotice {
  private static final AtomicBoolean ACTIVE=new AtomicBoolean();
- private static final long CHECK_INTERVAL=6L*60*60*1000;
  private AppUpdateNotice(){}
  static void checkOnResume(MainActivity a) {
   if(BuildConfig.STORE_DISTRIBUTION||BuildConfig.UPDATE_MANIFEST_URL.isEmpty()||a.readOnly
@@ -21,10 +20,10 @@ final class AppUpdateNotice {
   long now=System.currentTimeMillis();
   android.content.SharedPreferences prefs=a.getSharedPreferences("update_notice",Context.MODE_PRIVATE);
   long last=prefs.getLong("last_check",0);
-  if(now>last&&now-last<CHECK_INTERVAL)return;
+  if(!UpdatePromptPolicy.checkDue(now,last,prefs.getBoolean("last_check_succeeded",true)))return;
   if(!ACTIVE.compareAndSet(false,true))return;
   // Failure also gets a short retry window: avoid a network request on every resume.
-  prefs.edit().putLong("last_check",now).apply();
+  prefs.edit().putLong("last_check",now).putBoolean("last_check_succeeded",false).apply();
   new Thread(()->{
    HttpURLConnection connection=null;
    try{
@@ -34,6 +33,8 @@ final class AppUpdateNotice {
      manifest=new UpdateManifest(new String(UpdateManifest.bounded(in,65536),
            StandardCharsets.UTF_8),a.getPackageName());
     }
+    // Only a parsed, package-matched manifest counts as a successful check.
+    prefs.edit().putBoolean("last_check_succeeded",true).apply();
     if(manifest.minSdk>Build.VERSION.SDK_INT||
        !UpdateVersionPolicy.isUpgrade(manifest.versionCode,BuildConfig.VERSION_CODE))return;
     final long newest=manifest.versionCode;

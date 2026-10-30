@@ -40,7 +40,10 @@ assert 'AppUpdateNotice.checkOnResume(this)' in main
 assert 'new AppUpdater(a).show()' in notice
 assert 'setPositiveButton("앱 업데이트"' in notice
 assert 'if(RideService.running||RideService.autoArmed)NavigationApps.openPreferred(this)' in main
-assert 'private static final long CHECK_INTERVAL=6L*60*60*1000' in notice
+assert 'UpdatePromptPolicy.checkDue(now,last,prefs.getBoolean("last_check_succeeded",true))' in notice
+policy=(base/'java/com/motohub/next/UpdatePromptPolicy.java').read_text(encoding='utf-8')
+assert 'CHECK_INTERVAL_MS=6L*60*60*1000' in policy
+assert 'FAILURE_RETRY_MS=15L*60*1000' in policy
 assert 'STORE_DISTRIBUTION' in notice
 assert 'MotoWidgetProvider.refresh(this)' in service
 print('PASS UX54 native launcher, widget actions, privacy, idle notifications, update notice (25 assertions)')
