@@ -37,6 +37,24 @@ public class UX89FinalHardeningTest {
    assertNotEquals(s6,UpdateDataFootprint.capture(c,Store.empty()));
   }finally{FuelDraft.clear(c,bike);}
  }
+ @Test public void expiredButStoredDraftRemainsInUpdateIntegrityAudit()throws Exception{
+  Context c=RuntimeEnvironment.getApplication();
+  String bike=UUID.randomUUID().toString(),key="fuel_"+bike;
+  c.getSharedPreferences("fuel_drafts",0).edit().remove(key).commit();
+  try{
+   String before=UpdateDataFootprint.capture(c,Store.empty());
+   JSONObject stale=new JSONObject().put("bikeId",bike)
+    .put("savedAt",System.currentTimeMillis()-FuelDraft.MAX_AGE-60_000)
+    .put("amount","9000").put("liters","4").put("unitPrice","2250")
+    .put("odo","100").put("date","2026-10-20").put("full",false);
+   c.getSharedPreferences("fuel_drafts",0).edit().putString(key,stale.toString()).commit();
+   assertNull("normal form should not reopen an expired draft",FuelDraft.read(c,bike));
+   String present=UpdateDataFootprint.capture(c,Store.empty());
+   assertNotEquals("stored stale data still belongs in the OTA integrity audit",before,present);
+   assertEquals(present,UpdateDataFootprint.capture(c,Store.empty()));
+   assertTrue(FuelDraftBackup.snapshot(c).length()==0);
+  }finally{c.getSharedPreferences("fuel_drafts",0).edit().remove(key).commit();}
+ }
  @Test public void rollbackRestoresOldFuelWithoutTouchingUnrelatedPrefs()throws Exception{
   Context c=RuntimeEnvironment.getApplication();
   String original=UUID.randomUUID().toString(),added=UUID.randomUUID().toString();
