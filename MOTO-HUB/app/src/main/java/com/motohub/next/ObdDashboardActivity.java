@@ -35,7 +35,8 @@ public final class ObdDashboardActivity extends Activity {
   speed.setTextColor(speedFresh?Color.WHITE:0xffffc78d);
   speed.setContentDescription(speedFresh?"차량 속도 "+RideService.obdSpeedKmh+"킬로미터 매시":"OBD2 속도 지연, 마지막 값 숨김");
   linkStatus.setText(ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,speedFresh)
-   +" · "+RideService.obdLink+" · "+ObdSignalAge.label(RideService.obdLastSampleElapsed,now));
+   +" · "+RideService.obdLink+" · "+ObdSignalAge.label(RideService.obdLastSampleElapsed,now)
+   +(speedFresh?"":"\\n최신 ECU 응답이 없으므로 마지막 속도는 숨깁니다."));
   boolean rpmFresh=RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdRpmAt,now);
   rpm.setText(rpmFresh?format(RideService.obdRpm,"%.0f"):"—");
   rpmMeter.setProgress(rpmFresh?ObdGaugeWarnings.rpmBar(RideService.obdRpm):0);
