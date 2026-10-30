@@ -137,7 +137,7 @@ final class QuickEntryUi {
   CheckBox full=new CheckBox(a);full.setText("가득 주유했어요 (연비 계산용)");
   full.setTextColor(a.fg);full.setTextSize(14);full.setMinHeight(a.dp(50));body.addView(full);
   LinearLayout extra=a.col();extra.setVisibility(View.GONE);
-  EditText odo=number(extra,"현재 계기판 (km)",String.valueOf((long)bike.optDouble("odo")),"현재 주행거리");
+  EditText odo=number(extra,"현재 계기판 (km)",java.math.BigDecimal.valueOf(bike.optDouble("odo")).stripTrailingZeros().toPlainString(),"현재 주행거리");
   // Reuse the bundled offline OCR model; nothing is sent to a server or saved before confirmation.
   a.quickOdoField=odo;
   a.action(extra,"갤러리에서 계기판 사진 선택",false,()->a.chooseQuickOdometerPhoto(odo));
@@ -177,14 +177,19 @@ final class QuickEntryUi {
   // Keep an isolated draft while switching to navigation or after Android process restart.
   final String bikeId=bike.optString("id");
   final boolean[] restoring={false};
+  final boolean[] draftTouched={false};
   Runnable persistDraft=()->{
    if(restoring[0])return;
+   draftTouched[0]=true;
    FuelDraft.save(a,bikeId,amount.getText().toString(),liters.getText().toString(),
     unitPrice.getText().toString(),odo.getText().toString(),date.getText().toString(),full.isChecked());
   };
   // Keep typing responsive with apply(), then synchronously commit the latest
   // state when this dialog closes or Android backgrounds the activity.
   a.quickFuelDraftFlush=()->{
+   // Opening an existing unsent draft without editing must never replace it
+   // with the new form's intentionally blank defaults.
+   if(!draftTouched[0])return;
    if(!FuelDraft.saveDurable(a,bikeId,amount.getText().toString(),liters.getText().toString(),
      unitPrice.getText().toString(),odo.getText().toString(),date.getText().toString(),full.isChecked()))
     a.toast("주유 임시저장을 완료하지 못했어요. 저장공간을 확인해 주세요.");
@@ -354,7 +359,7 @@ final class QuickEntryUi {
    ()->alertOptions.setVisibility(alertOptions.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
   body.addView(alerts);body.addView(alertOptions);
   LinearLayout advanced=a.col();advanced.setVisibility(View.GONE);
-  EditText mileage=number(advanced,"현재 계기판 (km)",String.valueOf((long)bike.optDouble("odo")),"km");
+  EditText mileage=number(advanced,"현재 계기판 (km)",java.math.BigDecimal.valueOf(bike.optDouble("odo")).stripTrailingZeros().toPlainString(),"km");
   EditText nextKm=number(advanced,"직접 지정하는 다음 정비 거리 (km)","","예: 14000");
   a.label(advanced,"직접 지정하는 다음 정비일",14,a.fg,true);
   EditText nextDate=new EditText(a);nextDate.setText(LocalDate.parse(a.today()).plusMonths(1).toString());nextDate.setTextColor(a.fg);nextDate.setSingleLine(true);
