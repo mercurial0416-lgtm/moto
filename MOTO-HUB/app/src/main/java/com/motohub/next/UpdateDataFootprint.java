@@ -22,14 +22,22 @@ final class UpdateDataFootprint {
  private static final long MAX_HASH_BYTES=1_500_000_000L;
  private UpdateDataFootprint(){}
  static String capture(Context context,JSONObject data)throws Exception{
+  return capture(context,data,true);
+ }
+ /** Compatibility with pre-UX86 update snapshots: compare precisely the old covered bytes. */
+ static String captureLegacy(Context context,JSONObject data)throws Exception{
+  return capture(context,data,false);
+ }
+ private static String capture(Context context,JSONObject data,boolean expanded)throws Exception{
   JSONObject checked=Store.parse(data.toString());
-  StringBuilder value=new StringBuilder("schema4;dataSha256=").append(JsonCanonicalDigest.hash(checked));
+  StringBuilder value=new StringBuilder(expanded?"schema5;dataSha256=":"schema4;dataSha256=")
+   .append(JsonCanonicalDigest.hash(checked));
   for(String collection:Store.COLLECTIONS){
    JSONArray records=checked.getJSONArray(collection);
    value.append(';').append(collection).append('=').append(records.length());
   }
   File rides=new File(context.getFilesDir(),"rides");
-  requireDirectoryIfPresent(rides);
+  if(expanded)requireDirectoryIfPresent(rides);
   File[] tracks=rides.isDirectory()?rides.listFiles():null;
   long count=0,bytes=0,complete=0,photoCount=0,photoBytes=0,trashCount=0;
   int sidecarCount=0;
@@ -41,13 +49,18 @@ final class UpdateDataFootprint {
    if(file.length()>TrackFile.MAX_BYTES)throw new IOException("GPS 파일이 허용 범위를 초과했습니다.");
    count++;bytes+=file.length();toHash.add(file);
    if(Files.exists(new File(file.getPath()+".done").toPath(),LinkOption.NOFOLLOW_LINKS))complete++;
-   sidecarCount+=collectSidecars(file,toHash);
+   if(expanded)sidecarCount+=collectSidecars(file,toHash);
+   else for(String suffix:new String[]{".done",".bike",".recovered"}){
+    File sidecar=new File(file.getPath()+suffix);
+    // Keep EXACT pre-UX86 semantics for legacy installation-snapshot comparisons.
+    if(sidecar.exists()){verifyRegular(sidecar);toHash.add(sidecar);}
+   }
   }
   // Quarantined GPS and every backed-up companion marker are also user data.
   // This is a read-only audit: never move or restore files while hashing.
   File trash=new File(context.getFilesDir(),"rides-trash");
-  requireDirectoryIfPresent(trash);
-  if(trash.isDirectory()){
+  if(expanded)requireDirectoryIfPresent(trash);
+  if(expanded&&trash.isDirectory()){
    File[] folders=trash.listFiles();
    if(folders==null)throw new IOException("GPS 복구함을 검사할 수 없습니다.");
    for(File folder:folders){
@@ -87,9 +100,10 @@ final class UpdateDataFootprint {
   }
   StringBuilder hash=new StringBuilder();
   for(byte b:digest.digest())hash.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
-  return value.append(";tracks=").append(count).append(";trackBytes=").append(bytes)
-   .append(";complete=").append(complete).append(";trashTracks=").append(trashCount)
-   .append(";gpsSidecars=").append(sidecarCount).append(";garagePhotos=").append(photoCount)
+  value.append(";tracks=").append(count).append(";trackBytes=").append(bytes)
+   .append(";complete=").append(complete);
+  if(expanded)value.append(";trashTracks=").append(trashCount).append(";gpsSidecars=").append(sidecarCount);
+  return value.append(";garagePhotos=").append(photoCount)
    .append(";garagePhotoBytes=").append(photoBytes).append(";contentSha256=").append(hash).toString();
  }
  private static final String[] TRACK_SIDECARS={
