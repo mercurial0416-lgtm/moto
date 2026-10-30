@@ -3,7 +3,7 @@
   "project": "MOTO HUB",
   "lastReviewed": "2026-10-31",
   "sourceBranch": "release/moto-hub-apk",
-  "sourceCandidateVersion": 557,
+  "sourceCandidateVersion": 558,
   "publicSignedVersionAtReview": 556,
   "definition": {
     "implemented": "Source and regression code created",
@@ -103,8 +103,32 @@
       "status": "merged",
       "pr": 115,
       "ciStatus": "queued"
+    },
+    {
+      "id": "UX95-BACKUP-GPS-INVENTORY",
+      "title": "Track GPS filename inventory in full-zip freshness indicator",
+      "status": "implemented",
+      "releaseCandidate": 558
+    },
+    {
+      "id": "UX95-GPS-LOW-SPACE-RUNTIME",
+      "title": "Once-per-minute GPS storage warning at 32 MiB and recoverable stop below 8 MiB",
+      "status": "implemented",
+      "releaseCandidate": 558
+    },
+    {
+      "id": "UX95-MODEL-PHOTO-BG-DECODE",
+      "title": "Bounded asynchronous model-photo cache decode with stale request guard",
+      "status": "implemented",
+      "releaseCandidate": 558
+    },
+    {
+      "id": "UX95-OTA-SOURCE-GATE",
+      "title": "Signed OTA publishing waits for exact commit Android CI and validates safety checks",
+      "status": "implemented",
+      "releaseCandidate": 558
     }
   ],
   "policy": "Never suggest implemented or merged items again as if they were newly discovered; instead test or finish their specific outstanding blocker. Never claim installed-device or signed release complete from source-only checks.",
-  "signingStatus": "Source version 557 merged; fixed-key signed release blocked by absent GitHub Actions signing credentials. Public OTA still 556."
+  "signingStatus": "Local original-key PKCS#12 certificate fingerprint verified 2026-10-31. User key never committed. Attempt offline apksigner-produced fixed-key v558 APK separately from OTA publication; GitHub signing secrets still unconfigured."
 }

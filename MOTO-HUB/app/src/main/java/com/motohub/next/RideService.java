@@ -90,6 +90,8 @@ public final class RideService extends Service implements LocationListener {
  HandlerThread gpsIoThread;
  Handler gpsWriteHandler;
  boolean gpsSyncScheduled=false;
+ long lastStorageCheckElapsed=-60_000L;
+ boolean lowStorageWarned=false;
  final GpsSyncPolicy gpsSync=new GpsSyncPolicy();
  final Runnable syncPendingGps=new Runnable(){@Override public void run(){
   synchronized(RideService.this){
@@ -211,6 +213,7 @@ public final class RideService extends Service implements LocationListener {
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
   catch(IOException error){output.close();output=null;track.delete();throw error;}
   count=0;lastTime=0;lastFixElapsed=0;lastGood=null;gpsSync.reset();
+  lastStorageCheckElapsed=-60_000L;lowStorageWarned=false;
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);gpsSyncScheduled=false;
   startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;liveMovingMillis=0;liveStationaryMillis=0;lastWidgetRefreshElapsed=0;gpsOnlyAfterObd=false;
   active=track.getName();running=true;notificationRate.reset();status="GPS 신호 대기";
@@ -432,8 +435,24 @@ public final class RideService extends Service implements LocationListener {
   }
   return builder.build();
  }
+ /** Runs on the GPS worker, not UI; the first check is immediate, then at most once a minute. */
+ private boolean checkRuntimeStorage(){
+  long now=SystemClock.elapsedRealtime();
+  if(now-lastStorageCheckElapsed<60_000L)return running;
+  lastStorageCheckElapsed=now;
+  long free=GpsStorageSpacePolicy.available(getFilesDir());
+  if(GpsStorageSpacePolicy.critical(free)){
+   stopWith("GPS 저장공간 8MB 미만 · 기록 중지 · 원본은 복구 화면에 보존",false);
+   return false;
+  }
+  if(GpsStorageSpacePolicy.warn(free)&&!lowStorageWarned){
+   lowStorageWarned=true;
+   notifySafely("GPS 저장공간 부족 · 남은 공간 "+(free/(1024L*1024L))+"MB · 저장공간 확보 필요");
+  }else if(!GpsStorageSpacePolicy.warn(free))lowStorageWarned=false;
+  return running;
+ }
  @Override public synchronized void onLocationChanged(Location location){
-  if(!running||output==null)return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
+  if(!running||output==null||!checkRuntimeStorage())return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
   if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
   try{if(track.length()>TrackFile.MAX_BYTES-512)throw new IOException("경로 최대 크기에 도달했습니다.");output.write(TrackFile.point(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime()).getBytes(StandardCharsets.UTF_8));output.flush();

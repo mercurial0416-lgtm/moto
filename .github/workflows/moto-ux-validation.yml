@@ -34,6 +34,18 @@ jobs:
         run: |
           set -euo pipefail
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Stage Android SDK apksigner for owner-operated fixed-key offline builds
+        run: |
+          set -euo pipefail
+          test -s "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar"
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" "$RUNNER_TEMP/apksigner.jar"
+      - name: Archive public signing tool only (never include private key)
+        uses: actions/upload-artifact@v4
+        with:
+          name: moto-apksigner-tool-${{ github.sha }}
+          path: ${{ runner.temp }}/apksigner.jar
+          if-no-files-found: error
+          retention-days: 3
       - name: Run all UX pure Java and source regressions
         working-directory: MOTO-HUB
         run: |

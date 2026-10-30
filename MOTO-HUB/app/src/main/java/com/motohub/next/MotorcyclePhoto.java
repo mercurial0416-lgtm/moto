@@ -14,6 +14,12 @@ import java.util.*;
 /** Candidate photographs from Wikimedia Commons. Exact-year in file title is a search signal, not model-year certification. */
 final class MotorcyclePhoto {
  private MotorcyclePhoto(){}
+ // Model-photo disk decode is bounded and never blocks scrolling on the Android main thread.
+ private static final java.util.concurrent.ThreadPoolExecutor PHOTO_DISK=
+  new java.util.concurrent.ThreadPoolExecutor(1,1,0L,java.util.concurrent.TimeUnit.MILLISECONDS,
+   new java.util.concurrent.ArrayBlockingQueue<Runnable>(12),r->{
+    Thread t=new Thread(r,"moto-photo-cache");t.setDaemon(true);return t;
+   },new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
  static String key(String brand,String model,int year){return MotorcycleCatalog.norm(brand)+"_"+MotorcycleCatalog.norm(model)+"_"+year;}
  static String tinyName(String k){try{byte[] b=MessageDigest.getInstance("SHA-256").digest(k.getBytes("UTF-8"));StringBuilder s=new StringBuilder();for(byte x:b)s.append(String.format(Locale.ROOT,"%02x",x));return s.substring(0,24);}catch(Exception e){return Integer.toHexString(k.hashCode());}}
  static File photoFile(Context c,String brand,String model,int year){File folder=new File(c.getFilesDir(),"moto-year-photos");return new File(folder,tinyName(key(brand,model,year))+".jpg");}
@@ -119,13 +125,13 @@ final class MotorcyclePhoto {
  }
  /** Main thread only. Each lookup owns a generation token, so stale responses cannot overwrite newer selections. */
  static void show(MainActivity a,ImageView target,TextView credit,String brand,String model,int year,String garageBikeId){
-  showInternal(a,target,credit,brand,model,year,garageBikeId,false);
+  showInternal(a,target,credit,brand,model,year,garageBikeId,false,false);
  }
  /** Called after the owner's local photo failed image decoding. Never delete/overwrite that file. */
  static void showFallback(MainActivity a,ImageView target,TextView credit,String brand,String model,int year,String garageBikeId){
-  showInternal(a,target,credit,brand,model,year,garageBikeId,true);
+  showInternal(a,target,credit,brand,model,year,garageBikeId,true,false);
  }
- private static void showInternal(MainActivity a,ImageView target,TextView credit,String brand,String model,int year,String garageBikeId,boolean skipInvalidLocal){
+ private static void showInternal(MainActivity a,ImageView target,TextView credit,String brand,String model,int year,String garageBikeId,boolean skipInvalidLocal,boolean skipModelCache){
   // Only a garage card is allowed to load or change its owner's manually chosen photo.
   // Catalog previews must not silently display or overwrite the currently selected bike.
   final boolean garageMode=PhotoViewPolicy.hasGarageOwner(garageBikeId);
@@ -146,17 +152,38 @@ final class MotorcyclePhoto {
   JSONObject meta=new JSONObject();
   if(attribution.isFile())try{meta=new JSONObject(readSmall(attribution));}catch(Exception ignored){}
   boolean cacheAllowed=PhotoCacheYearPolicy.canShow(meta.optString("label"),brand,model,year,meta.optBoolean("userSelected"));
-  if(file.isFile()&&cacheAllowed){
-   Bitmap cached=null;
-   try{cached=decodeLocalSampled(file,1200);}catch(Exception ignored){}
-   if(cached!=null){
-    // Missing/truncated legacy attribution remains available for offline use.
-    String source=meta.optString("pageUrl");
-    credit.setText(source.isEmpty()?(garageMode?"저장된 바이크 사진 · 사진 변경 버튼 사용":"저장된 모델 사진"):(meta.optBoolean("userSelected")?"내가 고른 모델 사진 · ":"저장된 모델 사진 · ")+meta.optString("license","Wikimedia Commons")+" · 출처 보기");
-    target.setImageBitmap(cached);
-    if(!source.isEmpty())credit.setOnClickListener(v->a.open(source));
-    else if(garageMode)credit.setOnClickListener(v->a.chooseGaragePhoto());
+  if(file.isFile()&&cacheAllowed&&!skipModelCache){
+   final JSONObject cachedMeta=meta;
+   final long cachedSize=file.length(),cachedModified=file.lastModified();
+   credit.setText("저장된 모델 사진 불러오는 중…");
+   try{
+    PHOTO_DISK.execute(()->{
+     android.graphics.Bitmap cached=decodeLocalSampled(file,1200);
+     final android.graphics.Bitmap loaded=cached;
+     a.runOnUiThread(()->{
+      if(a.isFinishing()||a.isDestroyed()||target.getParent()==null||
+         !PhotoRequestGuard.isCurrent(target,requestToken)){
+       if(loaded!=null&&!loaded.isRecycled())loaded.recycle();
+       return;
+      }
+      if(loaded!=null&&file.length()==cachedSize&&file.lastModified()==cachedModified){
+       String source=cachedMeta.optString("pageUrl");
+       credit.setText(source.isEmpty()?(garageMode?"저장된 바이크 사진 · 사진 변경 버튼 사용":"저장된 모델 사진"):
+        (cachedMeta.optBoolean("userSelected")?"내가 고른 모델 사진 · ":"저장된 모델 사진 · ")+
+        cachedMeta.optString("license","Wikimedia Commons")+" · 출처 보기");
+       target.setImageBitmap(loaded);
+       if(!source.isEmpty())credit.setOnClickListener(v->a.open(source));
+       else if(garageMode)credit.setOnClickListener(v->a.chooseGaragePhoto());
+       return;
+      }
+      if(loaded!=null&&!loaded.isRecycled())loaded.recycle();
+      // Corrupt or replaced cache cannot loop back through disk decoding forever.
+      showInternal(a,target,credit,brand,model,year,garageBikeId,skipInvalidLocal,true);
+     });
+    });
     return;
+   }catch(java.util.concurrent.RejectedExecutionException busy){
+    // A saturated image queue falls back to a bounded online lookup; never block the UI.
    }
   }
   credit.setText(garageMode?"사진 검색 중… · 탭해서 직접 등록 가능":"모델 사진 검색 중…");if(garageMode)credit.setOnClickListener(v->a.chooseGaragePhoto());
