@@ -4,9 +4,14 @@ import java.io.IOException;
 import java.io.File;
 import org.json.JSONObject;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
 import static org.junit.Assert.*;
 
 /** UX93: fail-closed recording preflight and immutable ride-note snapshot semantics. */
+@RunWith(RobolectricTestRunner.class)
+@Config(manifest=Config.NONE,sdk=28)
 public final class UX93IntegrityTest {
  @Test public void storageThresholdRejectsLowSpaceAndAcceptsLarge(){
   assertFalse(GpsStorageSpacePolicy.sufficient(-1));
