@@ -11,16 +11,31 @@ final class BackupGpsProof {
  private BackupGpsProof(){}
  static void record(Context context,Map<String,String> hashes)throws IOException{record(context,hashes,null,false);}
  static void record(Context context,Map<String,String> hashes,String currentJson,boolean full)throws IOException{
-  JSONObject json=new JSONObject();
+  record(context,hashes,null,currentJson,full);
+ }
+ /** Hashes must come from reopening and verifying the completed ZIP. */
+ static void record(Context context,Map<String,String> hashes,Map<String,String> sidecars,
+                   String currentJson,boolean full)throws IOException{
+  JSONObject json=new JSONObject(),metadata=new JSONObject();
   try{
    for(Map.Entry<String,String> row:hashes.entrySet()){
     if(!row.getKey().matches(BackupFormat.TRACK)||!row.getValue().matches("[a-f0-9]{64}"))
      throw new IOException("백업 GPS 검증값이 유효하지 않습니다.");
     json.put(row.getKey(),row.getValue());
+    if(sidecars!=null)metadata.put(row.getKey(),new JSONObject());
+   }
+   if(sidecars!=null)for(Map.Entry<String,String> row:sidecars.entrySet()){
+    String path=row.getKey(),suffix=BackupFormat.sidecarSuffix(path);
+    if(!BackupFormat.isSidecar(path)||!row.getValue().matches("[a-f0-9]{64}"))
+     throw new IOException("GPS 부속 파일 검증값 오류");
+    String track=path.substring("rides/".length(),path.length()-suffix.length());
+    if(!hashes.containsKey(track))throw new IOException("GPS 원본 없는 부속 파일");
+    metadata.getJSONObject(track).put(suffix,row.getValue());
    }
   }catch(org.json.JSONException e){throw new IOException("백업 검증값 기록 실패",e);}
   SharedPreferences.Editor editor=context.getSharedPreferences(PREFS,0).edit()
-    .putString(KEY,json.toString()).putLong("completed_at",System.currentTimeMillis())
+    .putString(KEY,json.toString()).putString("sidecar_sha256",sidecars==null?"":metadata.toString())
+    .putLong("completed_at",System.currentTimeMillis())
     .putString("last_gps_zip_kind",full?"전체 ZIP":"GPS 분할 ZIP");
   if(full){
    if(currentJson==null||currentJson.isEmpty())throw new IOException("전체 백업 원본을 확인하지 못했습니다.");
@@ -29,9 +44,11 @@ final class BackupGpsProof {
   if(!editor.commit())throw new IOException("검증한 백업 GPS 정보를 저장하지 못했습니다.");
  }
  private static String digest(String value)throws IOException{
+  return digestBytes(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+ }
+ private static String digestBytes(byte[] bytes)throws IOException{
   try{
-   byte[] bytes=java.security.MessageDigest.getInstance("SHA-256")
-      .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+   bytes=java.security.MessageDigest.getInstance("SHA-256").digest(bytes);
    StringBuilder hex=new StringBuilder(64);
    for(byte b:bytes)hex.append(String.format(java.util.Locale.ROOT,"%02x",b&0xff));
    return hex.toString();
@@ -72,6 +89,32 @@ final class BackupGpsProof {
   try{hash=new JSONObject(context.getSharedPreferences(PREFS,0).getString(KEY,"{}")).optString(track.getName());}
   catch(org.json.JSONException e){throw new IOException("검증된 ZIP 내보내기 정보가 없습니다.",e);}
   if(!hash.matches("[a-f0-9]{64}"))throw new IOException("최근 검증된 ZIP에 이 GPS 원본이 포함됐다는 증거가 없습니다. 전체 ZIP이나 GPS 분할 ZIP을 새로 내보내세요.");
+  final JSONObject expectedSidecars;
+  try{
+   String raw=context.getSharedPreferences(PREFS,0).getString("sidecar_sha256","");
+   if(raw==null||raw.isEmpty())throw new IOException("GPS 부속 파일 검증값이 없습니다. 전체 ZIP 또는 GPS 분할 ZIP을 새로 만드세요.");
+   expectedSidecars=new JSONObject(raw).optJSONObject(track.getName());
+   if(expectedSidecars==null)throw new IOException("GPS 부속 파일 검증값이 없습니다. ZIP을 다시 백업하세요.");
+  }catch(org.json.JSONException malformed){throw new IOException("GPS 부속 파일 검증 정보 오류",malformed);}
+  for(String suffix:RideTrash.SIDECARS){
+   File sidecar=new File(track.getPath()+suffix);
+   String expected=expectedSidecars.optString(suffix,"");
+   boolean present=java.nio.file.Files.exists(sidecar.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS);
+   if(!present){
+    if(!expected.isEmpty())throw new IOException("백업된 GPS 부속 파일이 사라졌습니다: "+suffix);
+    continue;
+   }
+   if(!java.nio.file.Files.isRegularFile(sidecar.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS)||
+      java.nio.file.Files.isSymbolicLink(sidecar.toPath()))
+    throw new IOException("안전하지 않은 GPS 부속 파일");
+   if(expected.isEmpty())throw new IOException("GPS 부속 파일이 백업 후 추가됐습니다: "+suffix);
+   long limit=suffix.equals(".mergedinto")?100:suffix.equals(".bike")||suffix.equals(".category")?64:0;
+   if(sidecar.length()>limit)throw new IOException("GPS 부속 파일 크기 초과: "+suffix);
+   String actual=digestBytes(java.nio.file.Files.readAllBytes(sidecar.toPath()));
+   if(!java.security.MessageDigest.isEqual(expected.getBytes(java.nio.charset.StandardCharsets.US_ASCII),
+      actual.getBytes(java.nio.charset.StandardCharsets.US_ASCII)))
+    throw new IOException("GPS 부속 파일이 백업 이후 변경됐습니다: "+suffix);
+  }
   String current=RideMileageIntegrity.fingerprint(track);
   if(!java.security.MessageDigest.isEqual(hash.getBytes(java.nio.charset.StandardCharsets.US_ASCII),
      current.getBytes(java.nio.charset.StandardCharsets.US_ASCII)))
