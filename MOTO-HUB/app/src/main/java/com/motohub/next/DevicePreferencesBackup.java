@@ -14,12 +14,13 @@ final class DevicePreferencesBackup {
    for(String key:new String[]{"ride","nav","fuel","service"})json.put(key,home.getBoolean(key,true));
    json.put("navigator",NavigationApps.preferred(c).id);
    json.put("maintenanceNotifications",DailyMaintenanceJob.remindersEnabled(c));
+   json.put("fuelDrafts",FuelDraftBackup.snapshot(c));
    return json.toString();
   }catch(Exception failure){throw new IOException("홈·내비 설정 백업을 읽을 수 없습니다.",failure);}
  }
  static void validate(String input)throws IOException{
   if(input==null||input.isEmpty())return; // Old ZIPs have no UI snapshot.
-  if(input.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>4096)
+  if(input.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>32_768)
    throw new IOException("설정 백업 크기가 유효하지 않습니다.");
   try{
    JSONObject json=new JSONObject(input);
@@ -37,6 +38,10 @@ final class DevicePreferencesBackup {
       !nav.equals(NavigationChoice.NAVER.id)&&!nav.equals(NavigationChoice.TMAP.id))
     throw new IOException("지원하지 않는 내비 설정입니다.");
    json.getBoolean("maintenanceNotifications");
+   if(json.has("fuelDrafts")){
+    if(!(json.opt("fuelDrafts") instanceof JSONObject))throw new IOException("주유 임시초안 ZIP 형식 오류");
+    FuelDraftBackup.validate(json.getJSONObject("fuelDrafts"));
+   }
   }catch(org.json.JSONException invalid){throw new IOException("설정 백업 JSON이 유효하지 않습니다.",invalid);}
  }
  private static boolean restoreKeys(SharedPreferences prefs,
@@ -51,7 +56,8 @@ final class DevicePreferencesBackup {
   }
   return editor.commit();
  }
- static void restore(Context c,String input)throws IOException{
+ static void restore(Context c,String input)throws IOException{restore(c,input,null);}
+ static void restore(Context c,String input,JSONObject restoredDb)throws IOException{
   if(input==null||input.isEmpty())return;
   validate(input);
   final JSONObject json;
@@ -84,6 +90,7 @@ final class DevicePreferencesBackup {
     throw new IOException("기본 내비 복원 실패");
    if(!notifyPrefs.edit().putBoolean("maintenance_opt_in",notices).commit())
     throw new IOException("정비 알림 설정 복원 실패");
+   if(restoredDb!=null&&json.has("fuelDrafts"))FuelDraftBackup.restore(c,json.getJSONObject("fuelDrafts"),restoredDb);
   }catch(Exception failure){
    // A commit returning false can still have changed in-memory values.
    // Undo only the allowlisted keys; unrelated local settings are untouched.
