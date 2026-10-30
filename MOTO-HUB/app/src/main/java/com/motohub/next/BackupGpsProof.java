@@ -74,7 +74,9 @@ final class BackupGpsProof {
    if(!hash.matches("[a-f0-9]{64}"))return "백업 상태: 이 GPS는 검증된 ZIP에 없음";
    String date=new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm",java.util.Locale.KOREA).format(new java.util.Date(timestamp));
    String kind=p.getString("last_gps_zip_kind","검증 ZIP");
-   return "백업 상태: "+date+" "+kind+"에 GPS 포함 (원본 SHA 최종 재검사 필요)";
+   String metadata=p.getString("sidecar_sha256","");
+   if(metadata==null||metadata.isEmpty())return "백업 상태: GPS 원본 검증만 완료 · 부속 파일 검증을 위해 새 ZIP 필요";
+   return "백업 상태: "+date+" "+kind+"에 GPS·부속 파일 포함 (이동 전 SHA 재검사)";
   }catch(Exception e){return "백업 상태: 검증 정보 확인 불가";}
  }
  static String fullStatus(Context context){
