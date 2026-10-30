@@ -118,9 +118,11 @@ final class RideStorageManager {
        File restored;
        try{restored=RideTrash.restore(a.getFilesDir(),target);}
        finally{RestoreRideGate.end();}
-       RideCompletionInbox.record(a,restored);
+       // A restored OLD GPS is not a newly completed ride. Do not enqueue a
+       // fresh completion summary or post a misleading saved-ride notification.
+       RideCompletionInbox.remove(a,restored.getName());
        a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){
-        a.toast("GPS 원본 복원 완료");a.render();
+        a.toast("GPS 원본 복원 완료 · 기존 기록에서 확인할 수 있어요");a.render();
        }});
       }catch(Exception error){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("복원 실패: "+error.getMessage());});}
      },"moto-gps-trash-restore").start()).show();
@@ -133,7 +135,7 @@ final class RideStorageManager {
  static void confirm(MainActivity a,File track,Runnable afterSuccess){
   if(a.readOnly||RideService.running||RideService.autoArmed){
    new AlertDialog.Builder(a).setTitle("GPS 원본 삭제 불가")
-    .setMessage("해당 기록 생성 이후 검증 완료된 전체 ZIP 백업이 필요합니다. GPS 기록이 진행 중이거나 원본 보호 상태에서도 삭제할 수 없습니다.")
+    .setMessage("GPS 원본을 복구함으로 옮기려면 검증된 전체 ZIP 또는 GPS 분할 ZIP에 동일 원본이 있어야 합니다. 기록 진행 중이나 원본 보호 상태에서는 이동할 수 없습니다.")
     .setPositiveButton("확인",null).show();return;
   }
   if(RideTrackMerge.mergedSource(track)||RideTrackMerge.archived(track)){

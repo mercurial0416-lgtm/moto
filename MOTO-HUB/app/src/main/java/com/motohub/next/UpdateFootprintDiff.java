@@ -17,6 +17,7 @@ final class UpdateFootprintDiff {
    if("contentSha256".equals(key))changed.add("GPS·사진 파일 내용");
    else if("dataSha256".equals(key))changed.add("바이크·주유·정비·설정 내용");
    else if("tracks".equals(key)||"trackBytes".equals(key)||"complete".equals(key))changed.add("GPS 파일");
+   else if("trashTracks".equals(key)||"gpsSidecars".equals(key))changed.add("GPS 복구함·분류·즐겨찾기 정보");
    else if(key.startsWith("garagePhoto"))changed.add("바이크 사진");
    else changed.add("저장 기록 "+key);
   }
