@@ -289,11 +289,11 @@ final class QuickEntryUi {
    if(warnings.length()>0)
     new AlertDialog.Builder(a).setTitle("주유 기록 최종 확인")
      .setMessage("바이크: "+bike.optString("name")+
-      "\\n날짜: "+record.optString("date")+
-      "\\n주유: "+String.format(java.util.Locale.KOREA,"%.2f L · %,.0f원",record.optDouble("liters"),record.optDouble("amount"))+
-      "\\n계기판: "+String.format(java.util.Locale.KOREA,"%.1f km",record.optDouble("mileage"))+
-      "\\n\\n"+warnings.toString().replace("\\\\n","\\n")+
-      "\\n실제 주유 기록이 맞으면 저장해 주세요. 숫자는 자동 수정되지 않습니다.")
+      "\n날짜: "+record.optString("date")+
+      "\n주유: "+String.format(java.util.Locale.KOREA,"%.2f L · %,.0f원",record.optDouble("liters"),record.optDouble("amount"))+
+      "\n계기판: "+String.format(java.util.Locale.KOREA,"%.1f km",record.optDouble("mileage"))+
+      "\n\n"+warnings.toString().replace("\\\\n","\\n")+
+      "\n실제 주유 기록이 맞으면 저장해 주세요. 숫자는 자동 수정되지 않습니다.")
      .setNegativeButton("다시 수정",null)
      .setPositiveButton("내용 확인하고 저장",(dialog,which)->persist.run()).show();
    else persist.run();
