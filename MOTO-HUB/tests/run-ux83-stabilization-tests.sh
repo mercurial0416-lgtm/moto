@@ -11,7 +11,9 @@ p=Path('app/src/main/java/com/motohub/next')
 def s(file):return (p/file).read_text()
 main=s('MainActivity.java');ride=s('RideUi.java');notes=s('RideNotes.java')
 fuel=s('QuickEntryUi.java');batch=s('ServiceBatch.java');audit=s('GarageIntegrity.java')
-assert 'String savedMemo=RideNotes.memo(a.db,file)' in ride
+assert 'String savedMemo=RideNotes.memo(stableDb,file)' in ride
+assert 'rideNotesSnapshot=liveNotes==null?' in ride
+assert 'RideNotes.memo(a.db,file)' not in ride
 assert 'date+" "+memo' in ride
 assert 'RideStorageManager.confirm(this,track,()->close())' in main
 assert 'RideNotes.clearDeleted(next,track.getName())' not in main
