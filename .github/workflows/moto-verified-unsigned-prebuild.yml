@@ -34,9 +34,15 @@ jobs:
           # by several releases; CURRENT+1 would silently build the WRONG APK.
           CODE="$(tr -d '[:space:]' < MOTO-HUB/release-code.txt)"
           [[ "$CODE" =~ ^[1-9][0-9]{2,3}$ ]] || { echo 'Invalid source release-code.txt'; exit 1; }
-          test "$CODE" -gt "$CURRENT" || { echo "No newer source release to prebuild"; exit 1; }
-          echo "RELEASE_CODE=$CODE" >> "$GITHUB_ENV"
+          if (( CODE <= CURRENT )); then
+            echo "Source code $CODE is already published at version $CURRENT; no unsigned candidate needed."
+            echo "NEEDS_PREBUILD=false" >> "$GITHUB_ENV"
+          else
+            echo "NEEDS_PREBUILD=true" >> "$GITHUB_ENV"
+            echo "RELEASE_CODE=$CODE" >> "$GITHUB_ENV"
+          fi
       - name: Full offline-source regressions
+        if: env.NEEDS_PREBUILD == 'true'
         working-directory: MOTO-HUB
         run: |
           set -euo pipefail
@@ -56,6 +62,7 @@ jobs:
           python3 tests/test_readable_ui.py || failures=$((failures+1))
           test "$failures" -eq 0
       - name: Compile, lint, test and produce unsigned APK
+        if: env.NEEDS_PREBUILD == 'true'
         working-directory: MOTO-HUB
         run: |
           set -euo pipefail
@@ -68,6 +75,7 @@ jobs:
             grep -F "package: name='com.motohub.next'" | grep -F "versionCode='$RELEASE_CODE'"
           sha256sum "$APK" > app/build/outputs/apk/release/unsigned.sha256
       - name: Publish source-pinned unsigned candidate (NOT installable)
+        if: env.NEEDS_PREBUILD == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: moto-hub-unsigned-${{ github.sha }}
