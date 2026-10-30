@@ -417,17 +417,33 @@ final class QuickEntryUi {
     Math.max(0,kmInterval),Math.max(0,monthsInterval));
    record.put("alertKmBefore",kmBeforeChoices[kmAlert.getSelectedItemPosition()]);
    record.put("alertDaysBefore",daysBeforeChoices[dateAlert.getSelectedItemPosition()]);
+   // Snapshot the exact data reviewed before opening the duplicate-confirmation
+   // dialog. A stale dialog must never silently overwrite a changed garage.
+   final String reviewedServiceSnapshot=a.db.toString();
+   final String maintenanceBikeId=bike.optString("id");
+   final boolean reviewedDuplicate=QuickLogDuplicate.exists(a.items("services"),record,"services");
    Runnable save=()->a.attempt(()->{
+    if(a.readOnly||a.bike()==null||!maintenanceBikeId.equals(a.bike().optString("id")))
+     throw new java.io.IOException("바이크 또는 저장 상태가 변경됐어요. 정비주기를 다시 확인해 주세요.");
     String beforeSave=a.db.toString();
-    JSONObject next=new JSONObject(beforeSave);Store.upsert(next,"services",record);
-    JSONObject vehicle=Store.find(next,"vehicles",bike.optString("id"));
-    if(vehicle!=null&&odo>vehicle.optDouble("odo"))vehicle.put("odo",odo);
+    if(!reviewedServiceSnapshot.equals(beforeSave))
+     throw new java.io.IOException("정비주기를 확인하는 동안 기록이 변경됐어요. 다시 열어서 확인해 주세요.");
+    if(!reviewedDuplicate&&QuickLogDuplicate.exists(a.items("services"),record,"services"))
+     throw new java.io.IOException("같은 정비주기가 새로 저장됐어요. 중복 여부를 다시 확인해 주세요.");
+    JSONObject next=new JSONObject(beforeSave);
+    JSONObject vehicle=Store.find(next,"vehicles",maintenanceBikeId);
+    if(vehicle==null||!maintenanceBikeId.equals(record.optString("vehicleId")))
+     throw new java.io.IOException("정비주기를 연결할 바이크를 찾지 못했어요.");
+    if(odo<vehicle.optDouble("odo"))
+     throw new java.io.IOException("차고의 현재 계기판보다 이전 값이에요. 정비주기를 다시 확인해 주세요.");
+    Store.upsert(next,"services",record);
+    if(odo>vehicle.optDouble("odo"))vehicle.put("odo",odo);
     a.write(next);a.close();a.render();DailyMaintenanceJob.checkSoon(a);
     UndoLastSave.offer(a,beforeSave,a.db.toString(),"정비주기",()->{
      if(!DailyMaintenanceJob.remindersEnabled(a))askEnableNotifications();
     });
    });
-   if(QuickLogDuplicate.exists(a.items("services"),record,"services")){
+   if(reviewedDuplicate){
     new AlertDialog.Builder(a).setTitle("이미 등록된 정비주기")
      .setMessage("같은 날짜와 계기판의 정비 기록이 있습니다. 추가로 저장할까요?")
      .setNegativeButton("취소",null).setPositiveButton("추가",(d,w)->save.run()).show();
