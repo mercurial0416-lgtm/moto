@@ -3,7 +3,7 @@ j=Path('app/src/main/java/com/motohub/next')
 a=(j/'MainActivity.java').read_text();fmt=(j/'BackupFormat.java').read_text();hub=(j/'HubScreens.java').read_text()
 checks={
  'draft private per bike':'"service_batch_drafts"' in a and '"batch_"+bikeId' in a,
- 'draft restored by action':'이전에 작성하던 묶음 정비 불러오기' in a,
+ 'draft restored by action':'Button restoreBatchDraftButton=button("묶음 정비 · 이전 임시기록 불러오기"' in a and 'BatchDraftPolicy.recoverable(bikeId' in a and 'restoreBatchDraftButton.setVisibility(View.GONE)' in a,
  'draft stored only separately':'batchPrefs.edit().putString(batchKey' in a and 'batchPrefs.edit().remove(batchKey)' in a,
  'receipt slot on recreate':'out.putInt("receiptPhotoSlot"' in a and 'state.getInt("receiptPhotoSlot",1)' in a,
  'old filename still usable':'return receiptPhotoFile(id,1)' in a,
