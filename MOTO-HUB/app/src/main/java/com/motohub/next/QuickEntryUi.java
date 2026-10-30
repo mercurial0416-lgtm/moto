@@ -195,9 +195,10 @@ final class QuickEntryUi {
    if(!checked)odoConfirmed.setChecked(false);
    persistDraft.run();
   });
+  a.label(body,"입력하는 동안 자동으로 임시저장합니다. 저장 전 바이크·금액·날짜를 확인하세요.",12,a.muted,false);
   JSONObject previouslyTyped=FuelDraft.read(a,bikeId);
   if(previouslyTyped!=null){
-   Button restoreDraftButton=a.button("작성 중이던 이 바이크 주유 기록 불러오기",false,()->{
+   Button restoreDraftButton=a.button("주유 · 이전 임시기록 불러오기",false,()->{
     restoring[0]=true;
     try{
      amount.setText(previouslyTyped.optString("amount"));
@@ -220,7 +221,7 @@ final class QuickEntryUi {
    LinearLayout.LayoutParams restoreDraftLp=new LinearLayout.LayoutParams(-1,-2);
    restoreDraftLp.bottomMargin=a.dp(8);
    body.addView(restoreDraftButton,restoreDraftLp);
-   a.action(body,"임시 주유 기록 삭제",false,()->{
+   a.action(body,"주유 · 임시기록 삭제",false,()->{
     FuelDraft.clear(a,bikeId);
     // The previous draft cannot be resurrected by a stale click handler.
     restoreDraftButton.setVisibility(View.GONE);
