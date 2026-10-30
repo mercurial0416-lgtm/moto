@@ -2230,7 +2230,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      }
     }finally{if(authenticated!=null)java.nio.file.Files.deleteIfExists(authenticated.toPath());}
     // Allow safe trash only for exact GPS bytes actually found in the verified user-owned ZIP.
-    if(!"MEDIA".equals(part))BackupGpsProof.record(this,checkedBackup.trackSha256,snapshot,"FULL".equals(part));
+    if(!"MEDIA".equals(part))BackupGpsProof.record(this,checkedBackup.trackSha256,checkedBackup.sidecarSha256,snapshot,"FULL".equals(part));
     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast((password==null?("FULL".equals(part)?"전체 백업":part+" 분할 백업"):"암호화 백업")+" ZIP 검증 완료 · "+count+"개 항목");});
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 백업 실패: "+e.getMessage());});}
     finally{if(password!=null)Arrays.fill(password,'\0');if(reserved)RestoreRideGate.endExport();}
