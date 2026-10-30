@@ -4,6 +4,7 @@ on:
     branches: ['release/moto-hub-apk']
     paths:
       - '.github/verified-release/556.patch.xz.b64'
+      - '.github/workflows/moto-publish-verified-556.yml'
 permissions:
   contents: write
 concurrency:
@@ -17,6 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: release/moto-hub-apk
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
