@@ -1312,7 +1312,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   });
   String savedBatch=batchPrefs.getString(batchKey,"");
   if(!savedBatch.isEmpty()){
-   action(p,"이전에 작성하던 묶음 정비 불러오기",false,()->{
+   Button restoreBatchDraftButton=button("묶음 정비 · 이전 임시기록 불러오기",false,()->{
     try{
      JSONObject draft=new JSONObject(savedBatch);
      if(!BatchDraftPolicy.recoverable(bikeId,draft.optString("vehicleId"),draft.optLong("time",0),System.currentTimeMillis()))
@@ -1330,13 +1330,17 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      saveBatchDraft.run();toast("작성 중이던 정비를 불러왔어요. 저장 전 금액을 확인해 주세요.");
     }catch(Exception e){error("임시 기록을 불러오지 못했어요: "+e.getMessage());}
    });
-   action(p,"묶음 정비 임시 기록 삭제",false,()->new AlertDialog.Builder(this).setTitle("임시 기록을 삭제할까요?")
+   LinearLayout.LayoutParams batchRestoreLp=new LinearLayout.LayoutParams(-1,-2);
+   batchRestoreLp.bottomMargin=dp(8);p.addView(restoreBatchDraftButton,batchRestoreLp);
+   action(p,"묶음 정비 · 임시기록 삭제",false,()->new AlertDialog.Builder(this).setTitle("임시 기록을 삭제할까요?")
     .setMessage("저장된 정비 내역은 그대로 유지됩니다.")
     .setNegativeButton("취소",null).setPositiveButton("임시 기록 삭제",(d,w)->{
-     batchPrefs.edit().remove(batchKey).apply();toast("임시 기록만 지웠어요.");
+     if(!batchPrefs.edit().remove(batchKey).commit()){error("임시 기록 삭제 실패. 다시 시도해 주세요.");return;}
+     restoreBatchDraftButton.setVisibility(View.GONE);
+     toast("임시 기록만 지웠어요. 현재 작성 중인 내용은 그대로입니다.");
     }).show());
   }
-  action(p,"선택 항목 임시저장",false,()->{saveBatchDraft.run();toast("이 바이크의 묶음 정비를 임시저장했어요.");});
+  action(p,"묶음 정비 · 지금 임시저장",false,()->{saveBatchDraft.run();toast("이 바이크의 묶음 정비를 임시저장했어요.");});
   action(p,"선택 항목 한 번에 저장",true,()->attempt(()->{
    List<ServiceBatch.Item> rows=new ArrayList<>();
    for(int i=0;i<choices.size();i++)if(choices.get(i).isChecked())rows.add(new ServiceBatch.Item(ServiceBatch.COMMON[i],costs.get(i).getText().toString(),""));
