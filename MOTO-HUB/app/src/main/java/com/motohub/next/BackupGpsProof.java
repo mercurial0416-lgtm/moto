@@ -20,7 +20,8 @@ final class BackupGpsProof {
    }
   }catch(org.json.JSONException e){throw new IOException("백업 검증값 기록 실패",e);}
   SharedPreferences.Editor editor=context.getSharedPreferences(PREFS,0).edit()
-    .putString(KEY,json.toString()).putLong("completed_at",System.currentTimeMillis());
+    .putString(KEY,json.toString()).putLong("completed_at",System.currentTimeMillis())
+    .putString("last_gps_zip_kind",full?"전체 ZIP":"GPS 분할 ZIP");
   if(full){
    if(currentJson==null||currentJson.isEmpty())throw new IOException("전체 백업 원본을 확인하지 못했습니다.");
    editor.putString("full_db_sha256",digest(currentJson)).putLong("full_completed_at",System.currentTimeMillis());
@@ -55,7 +56,8 @@ final class BackupGpsProof {
    String hash=new JSONObject(p.getString(KEY,"{}")).optString(track.getName());
    if(!hash.matches("[a-f0-9]{64}"))return "백업 상태: 이 GPS는 검증된 ZIP에 없음";
    String date=new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm",java.util.Locale.KOREA).format(new java.util.Date(timestamp));
-   return "백업 상태: "+date+" 검증 ZIP에 GPS 포함 (원본 SHA 최종 재검사 필요)";
+   String kind=p.getString("last_gps_zip_kind","검증 ZIP");
+   return "백업 상태: "+date+" "+kind+"에 GPS 포함 (원본 SHA 최종 재검사 필요)";
   }catch(Exception e){return "백업 상태: 검증 정보 확인 불가";}
  }
  static String fullStatus(Context context){
@@ -69,7 +71,7 @@ final class BackupGpsProof {
   String hash;
   try{hash=new JSONObject(context.getSharedPreferences(PREFS,0).getString(KEY,"{}")).optString(track.getName());}
   catch(org.json.JSONException e){throw new IOException("검증된 ZIP 내보내기 정보가 없습니다.",e);}
-  if(!hash.matches("[a-f0-9]{64}"))throw new IOException("최근에 검증된 ZIP에 이 GPS 원본이 포함됐다는 증거가 없습니다. 전체 ZIP을 새로 내보내세요.");
+  if(!hash.matches("[a-f0-9]{64}"))throw new IOException("최근 검증된 ZIP에 이 GPS 원본이 포함됐다는 증거가 없습니다. 전체 ZIP이나 GPS 분할 ZIP을 새로 내보내세요.");
   String current=RideMileageIntegrity.fingerprint(track);
   if(!java.security.MessageDigest.isEqual(hash.getBytes(java.nio.charset.StandardCharsets.US_ASCII),
      current.getBytes(java.nio.charset.StandardCharsets.US_ASCII)))
