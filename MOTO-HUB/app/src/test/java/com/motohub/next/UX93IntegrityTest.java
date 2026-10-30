@@ -21,6 +21,12 @@ public final class UX93IntegrityTest {
   assertTrue(GpsStorageSpacePolicy.sufficient(GpsStorageSpacePolicy.MIN_FREE_BYTES+1));
   assertTrue(GpsStorageSpacePolicy.message(42L*1024*1024).contains("42MB"));
  }
+ @Test public void normalAppStorageCanStartRecording()throws Exception{
+  File filesDir=org.robolectric.RuntimeEnvironment.getApplication().getFilesDir();
+  assertTrue(filesDir.isDirectory());
+  assertTrue("Test device must have local storage",filesDir.getUsableSpace()>=GpsStorageSpacePolicy.MIN_FREE_BYTES);
+  GpsStorageSpacePolicy.require(filesDir);
+ }
  @Test public void unknownStorageDirectoryFailsClosed(){
   try{GpsStorageSpacePolicy.require(null);fail("null storage must fail");}
   catch(IOException expected){assertTrue(expected.getMessage().contains("확인"));}
