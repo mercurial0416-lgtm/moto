@@ -77,7 +77,8 @@ final class RideTrash {
     File[] loose=folder.listFiles();
     if(loose!=null&&loose.length==0){
      // Crash immediately after creating the quarantine folder, before moving sidecars.
-     if(!folder.delete())throw new IOException("빈 GPS 복구함 폴더 정리 실패");
+     // Empty cleanup is best-effort; never put an otherwise healthy garage in read-only mode.
+     folder.delete();
      continue;
     }
     throw new IOException("GPS 원본이 양쪽 모두 없어 자동 복구할 수 없습니다: "+name);
@@ -95,8 +96,9 @@ final class RideTrash {
    }
    if(inLive){
     File[] leftover=folder.listFiles();
-    if(leftover!=null&&leftover.length==0&&!folder.delete())
-     throw new IOException("GPS 복원 후 빈 복구함 정리 실패");
+    if(leftover==null)throw new IOException("GPS 복구함 남은 파일을 확인하지 못했습니다.");
+    if(leftover.length==0)folder.delete(); // Cleanup failure is not a corrupt GPS move.
+    else throw new IOException("GPS 복원 후 복구함에 알 수 없는 잔여 파일이 있습니다.");
    }
   }
   return repaired;
