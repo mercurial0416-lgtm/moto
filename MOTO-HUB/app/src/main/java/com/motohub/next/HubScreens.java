@@ -573,7 +573,7 @@ final class HubScreens {
  }
  void basicBackup(){
   LinearLayout p=a.page("백업 · 복원");
-  a.label(p,"전체 ZIP에는 주행 기록·GPS 복구함·사진·기본 홈 설정이 포함됩니다. 앱 삭제 전에 휴대폰 밖에 보관하세요.",14,a.muted,false);
+  a.label(p,"전체 ZIP에는 주행 기록·GPS 복구함·사진·기본 홈 설정과 유효한 주유 임시초안도 포함됩니다. 앱 삭제 전에 휴대폰 밖에 보관하세요.",14,a.muted,false);
   a.label(p,BackupGpsProof.fullStatus(a)+"\n바이크 영구 삭제는 현재 데이터와 일치하는 검증된 전체 ZIP이 있어야 가능합니다.",13,a.muted,false);
   a.action(p,"전체 ZIP 백업",true,a::exportBundle);
   a.action(p,"전체 ZIP 복원",false,a::importBundle);
