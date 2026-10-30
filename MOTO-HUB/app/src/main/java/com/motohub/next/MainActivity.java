@@ -1681,7 +1681,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          });
          // Settings are imported only after database/assets commit. Legacy ZIPs retain current settings.
          boolean preferencesOk=true,rollbackNeedsAttention=false;
-         try{DevicePreferencesBackup.restore(this,ready.preferences);}
+         try{DevicePreferencesBackup.restore(this,ready.preferences,db);}
          catch(Exception failure){
           preferencesOk=false;
           // A failed preferences rollback is explicitly surfaced instead of silently swallowed.
