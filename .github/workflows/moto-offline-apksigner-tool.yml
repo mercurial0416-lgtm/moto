@@ -1,0 +1,29 @@
+name: Prepare Android signing verification tools (no private keys)
+on:
+  push:
+    paths:
+      - '.github/workflows/moto-offline-apksigner-tool.yml'
+permissions:
+  contents: read
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Install official Android Build Tools
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;36.0.0"'
+      - name: Prepare non-secret SDK tools for offline use
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p offline-signing-tools
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" offline-signing-tools/
+          cp "$ANDROID_HOME/build-tools/36.0.0/aapt" offline-signing-tools/
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" offline-signing-tools/
+          test -s offline-signing-tools/apksigner.jar
+          sha256sum offline-signing-tools/* > offline-signing-tools/sdk-tool-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moto-local-offline-apk-toolkit
+          path: offline-signing-tools/
+          retention-days: 1
