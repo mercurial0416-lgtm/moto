@@ -1,0 +1,82 @@
+name: Publish verified fixed-signed MOTO HUB 556 (no keystore on server)
+on:
+  push:
+    branches: ['release/moto-hub-apk']
+    paths:
+      - '.github/verified-release/556.patch.xz.b64'
+permissions:
+  contents: write
+concurrency:
+  group: moto-fixed-signed-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/moto-hub-apk
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: release-meta
+          persist-credentials: true
+      - name: Pin verified source and candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(tr -d '[:space:]' < MOTO-HUB/release-code.txt)" = 556
+          git diff --quiet 2ac9f1b2c959eb865f8aa53514708bea5a4cdbb2 HEAD -- MOTO-HUB/app MOTO-HUB/tests MOTO-HUB/release-code.txt
+          test "$(python3 -c 'import json;print(json.load(open("release-meta/updates/manifest.json"))["versionCode"])')" = 552
+          if gh release view moto-hub-v556 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "v556 already published; refusing overwrite"; exit 1
+          fi
+          gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/actions/artifacts/12983018956/zip" > unsigned-archive.zip
+          unzip -tq unsigned-archive.zip
+          unzip -q unsigned-archive.zip 'app-release-unsigned.apk'
+          echo 'f1fd06c971038c01de017b40c7fbfcaa2a7f42a39b6f144c8450a22ba8e029d2  app-release-unsigned.apk' | sha256sum -c -
+      - name: Reconstruct pinned signed APK from non-secret version-specific delta
+        run: |
+          set -euo pipefail
+          base64 --decode < .github/verified-release/556.patch.xz.b64 | xz -dc > patch.zst
+          echo '92fd5dadeac9cdc6cbe5e83d4f904995c43adfe70ff8d481de5ba0a2dec2c495  patch.zst' | sha256sum -c -
+          zstd -q -f -d --patch-from=app-release-unsigned.apk patch.zst -o MOTO-HUB.apk
+          echo '02511314f50983e0b18cd7afdcdb36123ef5754ea3eb62c4aa59074567a28926  MOTO-HUB.apk' | sha256sum -c -
+      - name: Verify exact original signer, package, version and APK integrity
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0'
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$SIGNER" verify --verbose --print-certs MOTO-HUB.apk > verified-signature.txt
+          grep -Fqx 'Verified using v2 scheme (APK Signature Scheme v2): true' verified-signature.txt
+          grep -Fqx 'Verified using v3 scheme (APK Signature Scheme v3): true' verified-signature.txt
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' verified-signature.txt | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+          test "$CERT" = 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b
+          "$AAPT" dump badging MOTO-HUB.apk > verified-badging.txt
+          grep -F "package: name='com.motohub.next' versionCode='556'" verified-badging.txt
+          unzip -tq MOTO-HUB.apk
+      - name: Publish official release and OTA manifest only after all checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create moto-hub-v556 MOTO-HUB.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --target 2ac9f1b2c959eb865f8aa53514708bea5a4cdbb2 \
+            --title 'MOTO HUB 556 (original fixed signature)' \
+            --notes 'Verified original certificate, package com.motohub.next, v556. Signed APK reconstructed from verified local original-key signing, no private keystore stored on GitHub. Back up before in-place upgrade.'
+          python3 MOTO-HUB/tools/make_update_manifest.py \
+            --apk MOTO-HUB.apk \
+            --apk-url "https://github.com/$GITHUB_REPOSITORY/releases/download/moto-hub-v556/MOTO-HUB.apk" \
+            --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" \
+            --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            --output release-meta/updates/manifest.json
+          git -C release-meta config user.name 'github-actions[bot]'
+          git -C release-meta config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C release-meta add updates/manifest.json
+          git -C release-meta commit -m 'Publish original-fixed-signed MOTO HUB 556 OTA'
+          git -C release-meta push origin HEAD:main
