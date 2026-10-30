@@ -33,6 +33,6 @@ assert 'FuelNearDuplicate.near(' in quick and 'lastSaveClick' in quick
 assert 'DailyMaintenanceJob.clearReminderState(a)' in service
 assert 'parkedInfo(' in parking and 'parkingAccuracyM' in parking
 assert 'moto-hub-v"+versionCode+"/"' in updater
-assert '-PmotoReleaseCode=552' in ci and "versionCode='552'" in ci
+assert '-PmotoReleaseCode=$CODE' in ci and "versionCode='$CODE'" in ci
 print("PASS UX80 purchase adjustments, saved-ride identity, undo, warnings, simplified home and OTA consistency")
 PY
