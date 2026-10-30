@@ -29,6 +29,6 @@ assert 'BatchArchiveExport.write(part,snapshot,id,output)' in main
 assert 'verified.entryNames.equals(part.expectedEntries())' in main
 assert 'DevicePreferencesBackup.restore(this,ready.preferences)' in main
 assert 'MOTO-HUB-preferences.json' in export and 'MOTO-HUB-preferences.json' in rest
-assert 'motoReleaseCode=552' in Path("../.github/workflows/moto-ux-validation.yml").read_text()
+assert 'motoReleaseCode=$CODE' in Path("../.github/workflows/moto-ux-validation.yml").read_text()
 print("PASS UX73 simplified settings, backup data retention, batch validation and GPS recovery guards")
 PY
