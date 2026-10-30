@@ -19,7 +19,9 @@ base=hub[hub.index('void basicBackup(){'):hub.index('void backupMore(){')]
 assert base.count('a.action(')==3 and '전체 ZIP 백업' in base and '전체 ZIP 복원' in base
 assert '홈 버튼 편집 · 순서' not in home and 'new GarageHomeUi(a).editHomeShortcuts()' in hub
 assert 'recoverInterrupted(File files)' in ride and 'RideTrash.recoverInterrupted(getFilesDir())' in main
-assert 'RideCompletionInbox.record(a,restored)' in store
+assert 'RideCompletionInbox.record(a,restored)' not in store
+assert 'RideCompletionInbox.remove(a,restored.getName());' in store
+assert 'RideTrash.restore(a.getFilesDir(),target)' in store
 assert 'void showPage(MainActivity a,' in store and 'GPS 날짜 검색' in store
 assert '30일 복구함' not in store
 assert 'BackupFormat.isTrashAsset(name)' in rest
