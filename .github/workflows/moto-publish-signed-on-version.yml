@@ -4,9 +4,6 @@ on:
     branches: [release/moto-hub-apk]
     paths:
       - 'MOTO-HUB/release-code.txt'
-      # A user-requested, single-version signed release can be explicitly triggered
-      # by a tagged workflow change without enabling all future auto-publishing.
-      - '.github/workflows/moto-publish-signed-on-version.yml'
   workflow_dispatch:
 permissions:
   contents: write
@@ -15,10 +12,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    # Default OFF for normal pushes. A specifically marked release commit
-    # triggers one signed-only attempt without opening all future version pushes.
-    # The original keystore secrets and original APK certificate remain REQUIRED.
-    if: github.event_name == 'workflow_dispatch' || vars.MOTO_AUTO_PUBLISH == 'true' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-fixed-556]'))
+    # Default OFF until the owner explicitly enables this repository variable and
+    # installs the four fixed signing secrets. Manual dispatch is always available.
+    if: github.event_name == 'workflow_dispatch' || vars.MOTO_AUTO_PUBLISH == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
