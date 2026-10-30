@@ -109,7 +109,7 @@ public final class BackupBundle {
   zip.putNextEntry(new ZipEntry("MOTO-HUB-data.json"));zip.write(data);zip.closeEntry();count++;
   if(uiPreferences!=null&&!uiPreferences.isEmpty()&&"FULL".equals(part)){
    byte[] ui=uiPreferences.getBytes(StandardCharsets.UTF_8);
-   if(ui.length>4096)throw new IOException("설정 백업 크기 제한");
+   if(ui.length>32_768)throw new IOException("설정·주유 임시초안 백업 크기 제한");
    zip.putNextEntry(new ZipEntry("MOTO-HUB-preferences.json"));zip.write(ui);zip.closeEntry();
    total+=ui.length;count++;
   }
@@ -119,6 +119,7 @@ public final class BackupBundle {
    "photos에는 바이크 사진, receipts에는 정비·주유 영수증 사진이 있습니다.\n"+
    "model-photos에는 온라인 갤러리에서 직접 고른 모델 사진과 출처 정보가 포함됩니다.\n"+
    "현재 버전에서는 설정 > 백업·복원 > 전체 ZIP 백업 복원으로 사진과 GPS도 한 번에 불러올 수 있습니다.\n"+
+   "FULL/암호화 ZIP에는 7일 이내의 저장되지 않은 주유 임시초안도 포함될 수 있습니다.\n"+
    "친구 로그인 토큰/인증키는 포함되지 않습니다. 위치가 포함될 수 있으니 공유하지 마세요.\n";
   zip.putNextEntry(new ZipEntry("README-KO.txt"));zip.write(readme.getBytes(StandardCharsets.UTF_8));zip.closeEntry();
   File photos=internal;File[] files=photos.listFiles((dir,name)->name.matches("garage-photo-[a-fA-F0-9-]{36}\\.jpg"));
