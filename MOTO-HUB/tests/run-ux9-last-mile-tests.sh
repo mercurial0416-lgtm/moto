@@ -36,7 +36,9 @@ assert 'if(!RideService.running){a.renderPreservingPosition();return;}' in ride
 assert 'Bitmap bitmap=null;' in gallery and 'finally{if(bitmap!=null&&!bitmap.isRecycled())bitmap.recycle();}' in gallery
 assert 'if(ready!=null&&!ready.isRecycled())ready.recycle();' in gallery
 assert 'PhotoCacheYearPolicy.canShow(' in photo
-assert 'if(file.isFile()&&cacheAllowed)' in photo
+assert 'if(file.isFile()&&cacheAllowed&&!skipModelCache)' in photo
+assert 'PHOTO_DISK.execute' in photo and 'PhotoRequestGuard.isCurrent(target,requestToken)' in photo
+assert 'target.setImageBitmap(loaded);' in photo
 assert 'meta.optBoolean("userSelected")' in photo
 print('PASS UX9 GPS stop ordering, user override, UI state, bitmap cleanup and cached-year policy')
 PY
