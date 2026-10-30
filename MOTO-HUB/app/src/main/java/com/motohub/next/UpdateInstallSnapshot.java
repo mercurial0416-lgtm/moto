@@ -88,7 +88,8 @@ final class UpdateInstallSnapshot {
     // Compare it using the original scope to avoid a false data-loss warning.
     String after;
     if(original.startsWith("schema4;"))after=UpdateDataFootprint.captureLegacy(context,current);
-    else if(original.startsWith("schema5;"))after=UpdateDataFootprint.capture(context,current);
+    else if(original.startsWith("schema5;"))after=UpdateDataFootprint.captureLegacy5(context,current);
+    else if(original.startsWith("schema6;"))after=UpdateDataFootprint.capture(context,current);
     else throw new IOException("알 수 없는 업데이트 검사 형식");
     match=original.equals(after);
     if(!match)changed=UpdateFootprintDiff.describe(original,after);
