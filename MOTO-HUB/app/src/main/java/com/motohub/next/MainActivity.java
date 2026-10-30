@@ -1148,6 +1148,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   EditText name=fields.get(activeForm.equals("vehicles")?"name":"model");EditText y=fields.get("year");
   if(name!=null)name.setText(show);if(y!=null)y.setText(String.valueOf(year));
   hideKeyboard();renderCatalogPhoto(photo,status,brand,model,year);
+  status.setText("✓ 모델명·연식 자동 입력 완료 · "+show+" · "+year+"년식\n아래 입력칸은 확인용이야. 직접 바꿀 때만 수정하면 돼.");
+  status.setContentDescription("선택한 바이크 "+show+" "+year+"년식, 이름과 연식 자동 입력 완료");
  }
  void pickCatalogYear(String brand,String model,Map<String,EditText> fields,ImageView photo,TextView status){
   int now=LocalDate.now().getYear();
