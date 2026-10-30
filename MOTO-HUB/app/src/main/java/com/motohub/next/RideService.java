@@ -204,6 +204,8 @@ public final class RideService extends Service implements LocationListener {
   else startForeground(404,n);
  }
  private synchronized void openRideTrack()throws Exception{
+  // Must be checked here as well as the UI: OBD auto-start has no foreground confirmation screen.
+  GpsStorageSpacePolicy.require(getFilesDir());
   track=new File(TrackFile.directory(getFilesDir()),System.currentTimeMillis()+"-"+UUID.randomUUID()+".track");
   output=new FileOutputStream(track);
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
