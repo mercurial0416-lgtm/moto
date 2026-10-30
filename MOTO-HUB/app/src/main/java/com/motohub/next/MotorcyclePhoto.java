@@ -119,6 +119,13 @@ final class MotorcyclePhoto {
  }
  /** Main thread only. Each lookup owns a generation token, so stale responses cannot overwrite newer selections. */
  static void show(MainActivity a,ImageView target,TextView credit,String brand,String model,int year,String garageBikeId){
+  showInternal(a,target,credit,brand,model,year,garageBikeId,false);
+ }
+ /** Called after the owner's local photo failed image decoding. Never delete/overwrite that file. */
+ static void showFallback(MainActivity a,ImageView target,TextView credit,String brand,String model,int year,String garageBikeId){
+  showInternal(a,target,credit,brand,model,year,garageBikeId,true);
+ }
+ private static void showInternal(MainActivity a,ImageView target,TextView credit,String brand,String model,int year,String garageBikeId,boolean skipInvalidLocal){
   // Only a garage card is allowed to load or change its owner's manually chosen photo.
   // Catalog previews must not silently display or overwrite the currently selected bike.
   final boolean garageMode=PhotoViewPolicy.hasGarageOwner(garageBikeId);
@@ -128,7 +135,7 @@ final class MotorcyclePhoto {
   // A reused preview must not keep displaying the previous motorcycle during lookup/failure.
   target.setImageResource(BikeVisual.superCub(model)?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
   if(brand.isEmpty()||model.isEmpty()) {credit.setText(garageMode?"모델 정보 확인 필요 · 탭해서 사진 직접 등록":"모델 정보를 선택하면 사진을 검색해요");if(garageMode)credit.setOnClickListener(v->a.chooseGaragePhoto());return;}
-  if(garageMode){File manual=a.garagePhotoFile(garageBikeId);
+  if(garageMode&&!skipInvalidLocal){File manual=a.garagePhotoFile(garageBikeId);
    if(manual!=null&&manual.isFile())try{Bitmap user=decodeLocalSampled(manual,1200);
     if(user!=null){target.setImageBitmap(user);credit.setText("내가 선택한 사진 · 탭해서 변경");credit.setOnClickListener(v->a.chooseGaragePhoto());return;}}
    catch(Exception ignored){}

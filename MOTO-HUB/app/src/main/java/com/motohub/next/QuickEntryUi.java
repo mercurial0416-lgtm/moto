@@ -278,21 +278,21 @@ final class QuickEntryUi {
    });
    StringBuilder warnings=new StringBuilder();
    if(FuelAnomalyPolicy.lowOdometer(bike.optDouble("odo"),record.optDouble("mileage")))
-    warnings.append("• 계기판이 현재 차고 값보다 작아요.\\n");
+    warnings.append("• 계기판이 현재 차고 값보다 작아요.\n");
    if(FuelAnomalyPolicy.unusualLiters(record.optDouble("liters")))
-    warnings.append("• 주유량이 25L를 초과해요. 입력 단위를 확인하세요.\\n");
+    warnings.append("• 주유량이 25L를 초과해요. 입력 단위를 확인하세요.\n");
    if(recentFuel!=null&&FuelAnomalyPolicy.unusualAmount(recentFuel.optDouble("amount"),record.optDouble("amount")))
-    warnings.append("• 직전 주유 금액과 차이가 매우 커요.\\n");
+    warnings.append("• 직전 주유 금액과 차이가 매우 커요.\n");
    if(FuelAnomalyPolicy.staleDate(record.optString("date"),a.today()))
-    warnings.append("• 주유 날짜가 오늘이 아닌 "+record.optString("date")+"입니다.\\n");
-   if(exact||near)warnings.append(exact?"• 동일한 주유 기록이 있어요.\\n":"• 비슷한 주유 기록이 있어요.\\n");
+    warnings.append("• 주유 날짜가 오늘이 아닌 "+record.optString("date")+"입니다.\n");
+   if(exact||near)warnings.append(exact?"• 동일한 주유 기록이 있어요.\n":"• 비슷한 주유 기록이 있어요.\n");
    if(warnings.length()>0)
     new AlertDialog.Builder(a).setTitle("주유 기록 최종 확인")
      .setMessage("바이크: "+bike.optString("name")+
       "\n날짜: "+record.optString("date")+
       "\n주유: "+String.format(java.util.Locale.KOREA,"%.2f L · %,.0f원",record.optDouble("liters"),record.optDouble("amount"))+
       "\n계기판: "+String.format(java.util.Locale.KOREA,"%.1f km",record.optDouble("mileage"))+
-      "\n\n"+warnings.toString().replace("\\\\n","\\n")+
+      "\n\n"+warnings.toString()+
       "\n실제 주유 기록이 맞으면 저장해 주세요. 숫자는 자동 수정되지 않습니다.")
      .setNegativeButton("다시 수정",null)
      .setPositiveButton("내용 확인하고 저장",(dialog,which)->persist.run()).show();

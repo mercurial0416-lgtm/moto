@@ -205,9 +205,15 @@ final class RideUi {
   final Set<String> appliedNames=new HashSet<>();
   final org.json.JSONObject ledger=a.settings().optJSONObject("appliedRides");
   if(ledger!=null)for(java.util.Iterator<String> keys=ledger.keys();keys.hasNext();)appliedNames.add(keys.next());
+  // Freeze only ride notes, not the whole database, while the Activity still owns JSON mutations.
+  final org.json.JSONObject liveNotes=a.settings().optJSONObject("rideNotes");
+  final String rideNotesSnapshot=liveNotes==null?"{}":liveNotes.toString();
   HISTORY_EXECUTOR.execute(()->{
    if(generation!=HISTORY_GENERATION.get())return;
    try{
+    org.json.JSONObject stableNotes=new org.json.JSONObject(rideNotesSnapshot);
+    org.json.JSONObject stableDb=new org.json.JSONObject()
+      .put("settings",new org.json.JSONObject().put("rideNotes",stableNotes));
     List<File> rides=TrackFile.tracks(files);
     List<File> bikeRides=RideHistoryBikeFilter.select(rides,scope);
     int damagedBindings=RideHistoryBikeFilter.damaged(rides);
@@ -222,8 +228,8 @@ final class RideUi {
     for(File file:visible){
      if(generation!=HISTORY_GENERATION.get())return;
      String category=RideCategory.read(file);
-     String savedTitle=RideNotes.title(a.db,file);
-     String savedMemo=RideNotes.memo(a.db,file);
+     String savedTitle=RideNotes.title(stableDb,file);
+     String savedMemo=RideNotes.memo(stableDb,file);
      String label=(savedTitle.isEmpty()?"":savedTitle+" · ")+RideHistoryLabel.title(file,java.time.ZoneId.systemDefault())+
       (RideTrackMerge.mergedSource(file)?" · 통합 원본":"")+
       (RideTrackMerge.archived(file)?" · 통합 취소 보관본":"")+
@@ -639,6 +645,10 @@ final class RideUi {
    a.rideStartConsent.cancel();a.launchNavigationAfterRide=false;
    a.toast("바이크가 변경돼 GPS 시작을 취소했어요. 다시 확인해 주세요.");return;
   }
+  // A fresh storage check precedes consent consumption; service repeats the check at file creation.
+  try{GpsStorageSpacePolicy.require(a.getFilesDir());}
+  catch(IOException storage){a.rideStartConsent.cancel();a.approvedRideBikeId="";a.launchNavigationAfterRide=false;
+   a.toast(storage.getMessage());return;}
   if(!a.rideStartConsent.consume("라이딩".equals(a.tab),true))return;
   final String fixedBikeId=a.approvedRideBikeId;
   a.approvedRideBikeId="";

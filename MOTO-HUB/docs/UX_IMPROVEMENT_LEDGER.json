@@ -69,7 +69,32 @@
       "title": "Live SHA mismatch, version and signer status in settings",
       "status": "implemented",
       "pr": 114
+    },
+    {
+      "id": "UX93-FUEL-WARNINGS",
+      "title": "Fix literal newline fragments in fuel anomaly dialog",
+      "status": "implemented",
+      "pr": null
+    },
+    {
+      "id": "UX93-GPS-SPACE",
+      "title": "Fail closed under low internal storage at ride consent and OBD/manual track file creation",
+      "status": "implemented",
+      "pr": null
+    },
+    {
+      "id": "UX93-CORRUPT-PHOTO",
+      "title": "Fallback to public model-photo candidates without deleting user's undecodable local image",
+      "status": "implemented",
+      "pr": null
+    },
+    {
+      "id": "UX93-RIDE-NOTES-SNAPSHOT",
+      "title": "Copy ride notes before concurrent background GPS history scan",
+      "status": "implemented",
+      "pr": null
     }
   ],
-  "policy": "Never suggest implemented or merged items again as if they were newly discovered; instead test or finish their specific outstanding blocker. Never claim installed-device or signed release complete from source-only checks."
+  "policy": "Never suggest implemented or merged items again as if they were newly discovered; instead test or finish their specific outstanding blocker. Never claim installed-device or signed release complete from source-only checks.",
+  "signingStatus": "Automatic signed v557 release blocked: GitHub Actions fixed signing credentials absent on 2026-10-31. Keystore must never enter committed source."
 }
