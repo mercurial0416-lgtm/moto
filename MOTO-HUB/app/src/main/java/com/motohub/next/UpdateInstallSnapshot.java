@@ -84,7 +84,12 @@ final class UpdateInstallSnapshot {
    try{
     android.util.AtomicFile live=new android.util.AtomicFile(new File(context.getFilesDir(),"motohub-v3.json"));
     JSONObject current=Store.parse(new String(live.readFully(),StandardCharsets.UTF_8));
-    String after=UpdateDataFootprint.capture(context,current);
+    // An old installed APK writes a schema4 baseline before the new APK launches.
+    // Compare it using the original scope to avoid a false data-loss warning.
+    String after;
+    if(original.startsWith("schema4;"))after=UpdateDataFootprint.captureLegacy(context,current);
+    else if(original.startsWith("schema5;"))after=UpdateDataFootprint.capture(context,current);
+    else throw new IOException("알 수 없는 업데이트 검사 형식");
     match=original.equals(after);
     if(!match)changed=UpdateFootprintDiff.describe(original,after);
    }catch(Exception e){match=false;changed="저장 데이터 또는 GPS·사진 파일 읽기 실패";}
