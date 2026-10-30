@@ -114,6 +114,13 @@ final class DeveloperObdScreen {
     setStatus("기억한 장치를 삭제했습니다. 다음부터 다시 선택해 주세요.");
    });
   }
+  activity.action(p,"OBD2 연결 실패 후 다시 시도",false,()->{
+   if(RideService.autoArmed||RideService.running){
+    setStatus("현재 기록 또는 자동 감지가 켜져 있습니다. 기록 보존을 위해 중지한 뒤 재연결하세요.");
+    return;
+   }
+   loadPairedAuto();
+  });
   activity.action(p,"OBD2 자동 라이딩 감지 켜기 · 장치 선택",true,this::loadPairedAuto);
   activity.action(p,"OBD2 자동 라이딩 감지 끄기",false,()->{
    activity.startService(new Intent(activity,RideService.class).setAction(RideService.AUTO_DISARM));

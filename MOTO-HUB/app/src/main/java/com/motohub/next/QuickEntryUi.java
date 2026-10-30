@@ -102,7 +102,7 @@ final class QuickEntryUi {
     if(typicalPrice>0)unitPrice.setText(String.valueOf(typicalPrice));
     a.toast("지난 주유량과 단가를 참고값으로 채웠어요. 실제 결제 금액은 직접 확인하세요.");
    });
-   body.addView(lastFuel);
+   tools.addView(lastFuel);
   }
   if(recentFuel!=null){
    final JSONObject previous=recentFuel;
@@ -288,7 +288,12 @@ final class QuickEntryUi {
    if(exact||near)warnings.append(exact?"• 동일한 주유 기록이 있어요.\\n":"• 비슷한 주유 기록이 있어요.\\n");
    if(warnings.length()>0)
     new AlertDialog.Builder(a).setTitle("주유 기록 최종 확인")
-     .setMessage(warnings.toString().replace("\\\\n","\\n")+"\\n실제 주유 기록이 맞으면 저장해 주세요. 자동으로 숫자를 바꾸지는 않습니다.")
+     .setMessage("바이크: "+bike.optString("name")+
+      "\n날짜: "+record.optString("date")+
+      "\n주유: "+String.format(java.util.Locale.KOREA,"%.2f L · %,.0f원",record.optDouble("liters"),record.optDouble("amount"))+
+      "\n계기판: "+String.format(java.util.Locale.KOREA,"%.1f km",record.optDouble("mileage"))+
+      "\n\n"+warnings.toString().replace("\\\\n","\\n")+
+      "\n실제 주유 기록이 맞으면 저장해 주세요. 숫자는 자동 수정되지 않습니다.")
      .setNegativeButton("다시 수정",null)
      .setPositiveButton("내용 확인하고 저장",(dialog,which)->persist.run()).show();
    else persist.run();
