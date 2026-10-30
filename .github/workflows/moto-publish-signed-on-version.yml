@@ -12,9 +12,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    # Default OFF until the owner explicitly enables this repository variable and
-    # installs the four fixed signing secrets. Manual dispatch is always available.
-    if: github.event_name == 'workflow_dispatch' || vars.MOTO_AUTO_PUBLISH == 'true'
+    # Automatically attempt new release-code versions after signing secrets are configured.
+    # Set MOTO_AUTO_PUBLISH=false to pause. NEVER use a new signing identity.
+    if: github.event_name == 'workflow_dispatch' || vars.MOTO_AUTO_PUBLISH != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -101,12 +101,25 @@ jobs:
           APK=source/MOTO-HUB/app/build/outputs/apk/release/app-release.apk
           TAG="moto-hub-v$CODE"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Refusing to replace previously published APK"; exit 1
+            # Recover from a release-created-but-manifest-not-updated crash.
+            # Never replace a published APK; verify its original signer and version.
+            mkdir -p "$RUNNER_TEMP/existing-release"
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern MOTO-HUB.apk --dir "$RUNNER_TEMP/existing-release"
+            APK="$RUNNER_TEMP/existing-release/MOTO-HUB.apk"
+            test -s "$APK"
+            SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+            AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+            "$SIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/resumed-signature.txt"
+            CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/resumed-signature.txt" | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+            test "$CERT" = "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b"
+            "$AAPT" dump badging "$APK" | grep -F "package: name='com.motohub.next'" | grep -F "versionCode='$CODE'"
+          else
+            cp "$APK" "$RUNNER_TEMP/MOTO-HUB.apk"
+            gh release create "$TAG" "$RUNNER_TEMP/MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" \
+              --target "$SOURCE" --title "MOTO HUB $CODE (fixed signed)" \
+              --notes "Original certificate verified; offline records retained on top-of-app upgrade."
           fi
-          cp "$APK" "$RUNNER_TEMP/MOTO-HUB.apk"
-          gh release create "$TAG" "$RUNNER_TEMP/MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" \
-            --target "$SOURCE" --title "MOTO HUB $CODE (fixed signed)" \
-            --notes "Original certificate verified; offline records retained on top-of-app upgrade."
           URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
           python3 source/MOTO-HUB/tools/make_update_manifest.py \
             --apk "$APK" --apk-url "$URL" \
@@ -116,8 +129,11 @@ jobs:
           git -C release-meta config user.name 'github-actions[bot]'
           git -C release-meta config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git -C release-meta add updates/manifest.json
-          git -C release-meta commit -m "Publish fixed-signed MOTO HUB $CODE OTA"
-          git -C release-meta push origin HEAD:main
+          if ! git -C release-meta diff --cached --quiet; then
+            git -C release-meta commit -m "Publish fixed-signed MOTO HUB $CODE OTA"
+            git -C release-meta pull --rebase origin main
+            git -C release-meta push origin HEAD:main
+          fi
       - name: Erase temporary keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/moto-fixed.p12"
