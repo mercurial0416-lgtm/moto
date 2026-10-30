@@ -1713,7 +1713,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  void exportBundle(){
   if(!BackupExportGate.canExport(RideService.running,RideService.autoArmed,RestoreRideGate.isRestoring())){error(BackupExportGate.MESSAGE);return;}
   new AlertDialog.Builder(this).setTitle("모든 기록 ZIP 내보내기")
-   .setMessage("바이크·정비·매물·GPS 경로·직접 찍은 사진을 한 파일로 저장해요. 이 ZIP은 암호화되지 않습니다. 공유에 주의하세요.\n\n위치정보가 민감하면 '암호화 전체 백업'을 사용하세요.")
+   .setMessage("바이크·정비·매물·GPS 경로·사진 및 저장하지 않은 주유 임시초안을 한 파일로 저장해요. 이 ZIP은 암호화되지 않습니다. 공유에 주의하세요.\n\n위치정보가 민감하면 '암호화 전체 백업'을 사용하세요.")
    .setNegativeButton("취소",null).setPositiveButton("내보내기",(d,w)->launchBackupDocument(null)).show();
  }
  void exportBatchedBackup(){
