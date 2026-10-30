@@ -39,7 +39,9 @@ final class BackupGpsProof {
     .putString("last_gps_zip_kind",full?"전체 ZIP":"GPS 분할 ZIP");
   if(full){
    if(currentJson==null||currentJson.isEmpty())throw new IOException("전체 백업 원본을 확인하지 못했습니다.");
-   editor.putString("full_db_sha256",digest(currentJson)).putLong("full_completed_at",System.currentTimeMillis());
+   editor.putString("full_db_sha256",digest(currentJson))
+    .putString("full_track_names",json.toString())
+    .putLong("full_completed_at",System.currentTimeMillis());
   }
   if(!editor.commit())throw new IOException("검증한 백업 GPS 정보를 저장하지 못했습니다.");
  }
@@ -89,9 +91,26 @@ final class BackupGpsProof {
    String current=digest(currentJson);
    return java.security.MessageDigest.isEqual(saved.getBytes(java.nio.charset.StandardCharsets.US_ASCII),
       current.getBytes(java.nio.charset.StandardCharsets.US_ASCII))
-    ?"현재 데이터와 일치하는 전체 ZIP 검증 기록 있음 · 외부 파일 보관은 별도 확인"
+    ?fullGpsStatus(context,prefs)
     :"마지막 전체 ZIP 이후 데이터 변경됨 · 새 전체 백업 권장";
   }catch(IOException error){return "전체 백업 검증 상태 확인 실패 · 원본 유지";}
+ }
+ /** File-name inventory only: cheap enough for settings, never claims GPS contents match by hash. */
+ private static String fullGpsStatus(Context context,SharedPreferences prefs){
+  String inventory=prefs.getString("full_track_names",null);
+  if(inventory==null)return "DB 백업 일치 · 이전 전체 ZIP의 GPS 목록 검증 정보 없음 · 새 전체 백업 권장";
+  try{
+   JSONObject exported=new JSONObject(inventory);
+   File rides=new File(context.getFilesDir(),"rides");
+   if(rides.exists()&&!rides.isDirectory())return "GPS 저장 폴더 확인 불가 · 전체 백업 확인 필요";
+   if(rides.isDirectory()){
+    File[] local=rides.listFiles((dir,name)->name.matches(BackupFormat.TRACK));
+    if(local==null)return "GPS 목록 확인 실패 · 전체 백업 확인 필요";
+    for(File file:local)if(file.isFile()&&!java.nio.file.Files.isSymbolicLink(file.toPath())&&!exported.has(file.getName()))
+     return "마지막 전체 ZIP 이후 새 GPS 기록 있음 · 전체 백업 다시 권장";
+   }
+   return "현재 DB·GPS 파일 목록이 전체 ZIP 검증 기록과 일치 · GPS 내용 변경과 외부 파일 보관은 별도 확인";
+  }catch(org.json.JSONException invalid){return "GPS 백업 목록 검증 정보 손상 · 전체 백업 다시 권장";}
  }
  static String fullStatus(Context context){
   long timestamp=context.getSharedPreferences(PREFS,0).getLong("full_completed_at",0);
