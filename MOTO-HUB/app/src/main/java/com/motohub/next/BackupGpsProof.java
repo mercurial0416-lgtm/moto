@@ -79,6 +79,20 @@ final class BackupGpsProof {
    return "백업 상태: "+date+" "+kind+"에 GPS·부속 파일 포함 (이동 전 SHA 재검사)";
   }catch(Exception e){return "백업 상태: 검증 정보 확인 불가";}
  }
+ /** Does not prove the exported ZIP was saved outside the phone. */
+ static String fullCurrentStatus(Context context,String currentJson){
+  SharedPreferences prefs=context.getSharedPreferences(PREFS,0);
+  String saved=prefs.getString("full_db_sha256","");
+  if(saved==null||!saved.matches("[a-f0-9]{64}"))return "전체 백업 미검증 · ZIP 내보내기 필요";
+  if(currentJson==null)return "현재 기록 확인 불가 · 외부 백업 확인 필요";
+  try{
+   String current=digest(currentJson);
+   return java.security.MessageDigest.isEqual(saved.getBytes(java.nio.charset.StandardCharsets.US_ASCII),
+      current.getBytes(java.nio.charset.StandardCharsets.US_ASCII))
+    ?"현재 데이터와 일치하는 전체 ZIP 검증 기록 있음 · 외부 파일 보관은 별도 확인"
+    :"마지막 전체 ZIP 이후 데이터 변경됨 · 새 전체 백업 권장";
+  }catch(IOException error){return "전체 백업 검증 상태 확인 실패 · 원본 유지";}
+ }
  static String fullStatus(Context context){
   long timestamp=context.getSharedPreferences(PREFS,0).getLong("full_completed_at",0);
   if(timestamp<=0)return "검증된 전체 ZIP 백업 없음";
