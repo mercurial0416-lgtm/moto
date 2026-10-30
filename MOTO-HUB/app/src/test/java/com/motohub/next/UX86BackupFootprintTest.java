@@ -68,6 +68,33 @@ public class UX86BackupFootprintTest {
    Files.deleteIfExists(folder.toPath());
   }
  }
+ @Test public void oldInstallBaselineHasIdenticalScopeAcrossFootprintUpgrade()throws Exception{
+  Context app=RuntimeEnvironment.getApplication();
+  File track=new File(new File(app.getFilesDir(),"rides"),name());
+  File binding=new File(track.getPath()+".bike");
+  File favorite=new File(track.getPath()+".favorite");
+  File category=new File(track.getPath()+".category");
+  try{
+   write(track,"committed gps");
+   write(binding,"original bike ID");
+   String legacy=UpdateDataFootprint.captureLegacy(app,Store.empty());
+   assertTrue(legacy.startsWith("schema4;"));
+   assertFalse(legacy.contains("trashTracks="));
+   write(favorite,"");
+   write(category,"와인딩");
+   assertEquals("old baseline must not count NEW sidecars",
+      legacy,UpdateDataFootprint.captureLegacy(app,Store.empty()));
+   String expanded=UpdateDataFootprint.capture(app,Store.empty());
+   assertTrue(expanded.startsWith("schema5;"));
+   assertNotEquals(legacy,expanded);
+   write(binding,"different bike ID");
+   assertNotEquals("previously audited sidecars MUST stay protected",
+       legacy,UpdateDataFootprint.captureLegacy(app,Store.empty()));
+  }finally{
+   Files.deleteIfExists(category.toPath());Files.deleteIfExists(favorite.toPath());
+   Files.deleteIfExists(binding.toPath());Files.deleteIfExists(track.toPath());
+  }
+ }
  @Test public void gpsOnlyProofIsClearlyLabeledAndDoesNotGrantBikeCascadeDeletion()throws Exception{
   Context app=RuntimeEnvironment.getApplication();
   app.getSharedPreferences("verified_full_export",0).edit().clear().commit();
