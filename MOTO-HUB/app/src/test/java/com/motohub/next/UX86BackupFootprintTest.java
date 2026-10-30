@@ -85,7 +85,8 @@ public class UX86BackupFootprintTest {
    assertEquals("old baseline must not count NEW sidecars",
       legacy,UpdateDataFootprint.captureLegacy(app,Store.empty()));
    String expanded=UpdateDataFootprint.capture(app,Store.empty());
-   assertTrue(expanded.startsWith("schema5;"));
+   assertTrue(expanded.startsWith("schema6;"));
+   assertTrue(UpdateDataFootprint.captureLegacy5(app,Store.empty()).startsWith("schema5;"));
    assertNotEquals(legacy,expanded);
    write(binding,"different bike ID");
    assertNotEquals("previously audited sidecars MUST stay protected",
