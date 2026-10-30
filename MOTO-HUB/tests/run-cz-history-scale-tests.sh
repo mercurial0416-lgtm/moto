@@ -20,7 +20,8 @@ src=Path('app/src/main/java/com/motohub/next/RideUi.java').read_text()
 assert src.index('bikeRides.removeIf(file->!RideHistoryPeriod.include(file,now,period))') < src.index('RideHistoryFilter.counts(bikeRides,activeName,recording)')
 assert 'final String[] terms=RideHistorySearch.terms(a.rideHistoryQuery)' in src
 assert 'RideHistorySearch.matchesIndex(entry.searchKey,terms)' in src
-assert 'this.searchKey=RideHistorySearch.index(date,status)' in src
+assert 'this.searchKey=RideHistorySearch.index(date+" "+memo,status)' in src
+assert 'String savedMemo=RideNotes.memo(a.db,file)' in src
 assert 'Sharing.start(' not in src
 print('PASS: date-scoped counts, indexed multi-term UI search and local-only safety checks')
 PY
