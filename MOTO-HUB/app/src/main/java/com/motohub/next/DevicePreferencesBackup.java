@@ -79,6 +79,7 @@ final class DevicePreferencesBackup {
   java.util.Map<String,?> oldHome=new java.util.HashMap<>(homePrefs.getAll());
   java.util.Map<String,?> oldNav=new java.util.HashMap<>(navPrefs.getAll());
   java.util.Map<String,?> oldNotice=new java.util.HashMap<>(notifyPrefs.getAll());
+  java.util.Map<String,?> oldFuel=new java.util.HashMap<>(c.getSharedPreferences("fuel_drafts",0).getAll());
   // A restore from another phone may name a navigator not installed here.
   boolean navAvailable=NavigationApps.installedLaunchIntent(c,requested)!=null;
   try{
@@ -97,8 +98,9 @@ final class DevicePreferencesBackup {
    boolean homeOk=restoreKeys(homePrefs,oldHome,"order","ride","nav","fuel","service");
    boolean navOk=restoreKeys(navPrefs,oldNav,"preferred");
    boolean notifyOk=restoreKeys(notifyPrefs,oldNotice,"maintenance_opt_in");
+   boolean fuelOk=FuelDraftBackup.rollback(c,oldFuel);
    IOException error=new IOException("기기 설정 일부를 저장하지 못해 이전 값을 복원했습니다.",failure);
-   if(!homeOk||!navOk||!notifyOk)
+   if(!homeOk||!navOk||!notifyOk||!fuelOk)
     error.addSuppressed(new IOException("이전 설정 자동 복구도 일부 실패했습니다. 설정 화면에서 확인하세요."));
    throw error;
   }
