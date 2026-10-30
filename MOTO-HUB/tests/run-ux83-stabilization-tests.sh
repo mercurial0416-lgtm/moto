@@ -41,8 +41,14 @@ assert 'GarageIntegrity.findings(checked)' in main and 'edit(found.collection,re
 assert 'approvedRideBikeId' in main and 'final String fixedBikeId=a.approvedRideBikeId;' in ride
 assert '기록할 바이크:' in ride and '이 바이크로 기록 시작' in ride
 assert 'apksigner' in Path('../.github/workflows/moto-fixed-signed.yml').read_text()
+publisher=Path('../.github/workflows/moto-publish-signed-on-version.yml').read_text()
+assert 'cp "$APK" "$RUNNER_TEMP/MOTO-HUB.apk"' in publisher
+assert 'gh release create "$TAG" "$RUNNER_TEMP/MOTO-HUB.apk"' in publisher
+assert 'releases/download/$TAG/MOTO-HUB.apk' in publisher
 ci=Path('../.github/workflows/moto-ux-validation.yml').read_text()
-assert '-PmotoReleaseCode=552' in ci and "versionCode='552'" in ci
+assert 'CODE="$(tr -d \'[:space:]\' < release-code.txt)"' in ci
+assert '-PmotoReleaseCode="$CODE"' in ci and "versionCode='$CODE'" in ci
+assert int(Path('release-code.txt').read_text().strip())>=553
 assert 'bash tests/run-ux83-stabilization-tests.sh' in ci
 print("PASS UX84: GPS reversible quarantine, full-backup guard, manual JSON relink, bike autofill, draft consistency; UX83 fuel/date warnings, per-item service overrides, audit drilldown and fixed GPS bike")
 PY

@@ -31,7 +31,7 @@ assert 'new QuickEntryUi(this).fuel()' in main
 assert '작은 위젯 버튼 선택' in hub and 'QuickWidgetChoices.configure(a)' in hub
 assert 'static String normalize(' in choices and 'static void refresh(' in choices
 assert 'showConsumables(bike)' in home and 'LatestServiceByType.latest(' in home
-assert '-PmotoReleaseCode=552' in ci
-assert "versionCode='552'" in ci
+assert '-PmotoReleaseCode="$CODE"' in ci
+assert "versionCode='$CODE'" in ci
 print("PASS UX79 seven convenience features and fail-safe source guards")
 PY

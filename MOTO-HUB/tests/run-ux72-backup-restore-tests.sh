@@ -28,6 +28,6 @@ assert 'void prepareSplitRestore(Uri uri)' in activity
 assert 'void listings(){' not in get("HubScreens.java")
 assert 'void listings(){' not in activity
 assert 'ObdOnBikeVerification.show(activity)' in get("DeveloperObdScreen.java")
-assert 'motoReleaseCode=552' in Path("../.github/workflows/moto-ux-validation.yml").read_text()
+assert 'motoReleaseCode="$CODE"' in Path("../.github/workflows/moto-ux-validation.yml").read_text()
 print("PASS UX72 full JSON digest, exact ZIP GPS SHA, reversible trash, GPS/media split and read-only OBD checklist")
 PY

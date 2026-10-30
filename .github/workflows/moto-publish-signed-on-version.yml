@@ -1,0 +1,123 @@
+name: MOTO HUB repeatable fixed-signature OTA release
+on:
+  push:
+    branches: [release/moto-hub-apk]
+    paths:
+      - 'MOTO-HUB/release-code.txt'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: moto-fixed-signed-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    # Default OFF until the owner explicitly enables this repository variable and
+    # installs the four fixed signing secrets. Manual dispatch is always available.
+    if: github.event_name == 'workflow_dispatch' || vars.MOTO_AUTO_PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: release-meta
+      - uses: actions/checkout@v4
+        with:
+          ref: release/moto-hub-apk
+          path: source
+          persist-credentials: false
+      - name: Verify version and freeze source
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          CODE="$(tr -d '[:space:]' < source/MOTO-HUB/release-code.txt)"
+          [[ "$CODE" =~ ^[0-9]{3,4}$ ]] || { echo 'Invalid release-code.txt'; exit 1; }
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            test "$(git -C source rev-parse HEAD)" = "$GITHUB_SHA" || { echo 'Source changed after trigger'; exit 1; }
+          fi
+          CURRENT="$(python3 -c 'import json;print(json.load(open("release-meta/updates/manifest.json"))["versionCode"])')"
+          test "$CODE" -gt "$CURRENT" || { echo 'Release code is not newer than public manifest'; exit 1; }
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "source=$(git -C source rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Android build tools
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Require fixed keystore secrets (never print or publish them)
+        env:
+          STORE_B64: ${{ secrets.MOTO_SIGNING_STORE_B64 }}
+          STORE_PASS: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$STORE_B64" && test -n "$STORE_PASS" && test -n "$KEY_ALIAS" && test -n "$KEY_PASS" ||
+            { echo 'Fixed signing credentials not configured; no release published'; exit 1; }
+          umask 077
+          printf %s "$STORE_B64" | base64 --decode > "$RUNNER_TEMP/moto-fixed.p12"
+          test -s "$RUNNER_TEMP/moto-fixed.p12"
+      - name: Build, lint and test with original signing identity
+        working-directory: source/MOTO-HUB
+        env:
+          MOTO_SIGNING_STORE_FILE: ${{ runner.temp }}/moto-fixed.p12
+          MOTO_SIGNING_STORE_PASSWORD: ${{ secrets.MOTO_SIGNING_STORE_PASSWORD }}
+          MOTO_SIGNING_KEY_ALIAS: ${{ secrets.MOTO_SIGNING_KEY_ALIAS }}
+          MOTO_SIGNING_KEY_PASSWORD: ${{ secrets.MOTO_SIGNING_KEY_PASSWORD }}
+          CODE: ${{ steps.release.outputs.code }}
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease :app:lintRelease :app:testReleaseUnitTest -PmotoReleaseCode="$CODE" --no-daemon
+      - name: Verify official package and original signing certificate
+        shell: bash
+        env:
+          CODE: ${{ steps.release.outputs.code }}
+        run: |
+          set -euo pipefail
+          APK=source/MOTO-HUB/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$SIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/signature.txt"
+          CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/signature.txt" | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')"
+          test "$CERT" = "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b"
+          "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/badging.txt"
+          grep -q "package: name='com.motohub.next'" "$RUNNER_TEMP/badging.txt"
+          grep -q "versionCode='$CODE'" "$RUNNER_TEMP/badging.txt"
+          unzip -tq "$APK" >/dev/null
+          sha256sum "$APK" > "$RUNNER_TEMP/apk-sha256.txt"
+      - name: Publish validated release and manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODE: ${{ steps.release.outputs.code }}
+          SOURCE: ${{ steps.release.outputs.source }}
+        run: |
+          set -euo pipefail
+          APK=source/MOTO-HUB/app/build/outputs/apk/release/app-release.apk
+          TAG="moto-hub-v$CODE"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refusing to replace previously published APK"; exit 1
+          fi
+          cp "$APK" "$RUNNER_TEMP/MOTO-HUB.apk"
+          gh release create "$TAG" "$RUNNER_TEMP/MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE" --title "MOTO HUB $CODE (fixed signed)" \
+            --notes "Original certificate verified; offline records retained on top-of-app upgrade."
+          URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
+          python3 source/MOTO-HUB/tools/make_update_manifest.py \
+            --apk "$APK" --apk-url "$URL" \
+            --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" \
+            --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            --output release-meta/updates/manifest.json
+          git -C release-meta config user.name 'github-actions[bot]'
+          git -C release-meta config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C release-meta add updates/manifest.json
+          git -C release-meta commit -m "Publish fixed-signed MOTO HUB $CODE OTA"
+          git -C release-meta push origin HEAD:main
+      - name: Erase temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/moto-fixed.p12"
