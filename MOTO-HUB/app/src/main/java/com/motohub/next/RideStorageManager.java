@@ -122,7 +122,10 @@ final class RideStorageManager {
        // fresh completion summary or post a misleading saved-ride notification.
        RideCompletionInbox.remove(a,restored.getName());
        a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){
-        a.toast("GPS 원본 복원 완료 · 기존 기록에서 확인할 수 있어요");a.render();
+        File leftover=new File(new File(a.getFilesDir(),"rides-trash"),restored.getName());
+        a.toast(leftover.exists()?
+         "GPS 복원 완료 · 빈 복구함 폴더는 다음 실행 때 정리됩니다.":
+         "GPS 원본 복원 완료 · 기존 기록에서 확인할 수 있어요");a.render();
        }});
       }catch(Exception error){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("복원 실패: "+error.getMessage());});}
      },"moto-gps-trash-restore").start()).show();
