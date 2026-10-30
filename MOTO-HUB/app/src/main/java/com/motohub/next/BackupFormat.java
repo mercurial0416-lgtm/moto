@@ -195,7 +195,7 @@ final class BackupFormat {
  }
  static long entryLimit(String name){
   if("MOTO-HUB-data.json".equals(name))return MAX_JSON_BYTES;
-  if("MOTO-HUB-preferences.json".equals(name))return 4096;
+  if("MOTO-HUB-preferences.json".equals(name))return 32_768;
   if("MOTO-HUB-batch.txt".equals(name))return 256;
   if("README-KO.txt".equals(name))return 8192;
   if(isGpx(name))return MAX_GPX_BYTES;
