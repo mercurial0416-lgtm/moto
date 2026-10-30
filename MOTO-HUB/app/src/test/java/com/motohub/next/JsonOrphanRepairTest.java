@@ -36,10 +36,12 @@ public class JsonOrphanRepairTest {
   JSONObject incoming=Store.empty();
   incoming.getJSONArray("services").put(service("service-1","lost-id"));
   JsonOrphanRepair.Staged stage=JsonOrphanRepair.stage(incoming.toString());
-  // The UI never offers this action; still prove no auto-linking to actual-bike.
-  JsonDataMerger.Result result=JsonDataMerger.merge(current,stage.source,Collections.emptyMap());
-  assertEquals("lost-id",result.data.getJSONArray("services").getJSONObject(0).getString("vehicleId"));
-  assertNotEquals("actual-bike",result.data.getJSONArray("services").getJSONObject(0).getString("vehicleId"));
+  try{
+   JsonDataMerger.merge(current,stage.source,Collections.emptyMap());
+   fail("Unmapped staged placeholder must never be imported");
+  }catch(org.json.JSONException expected){
+   assertTrue(expected.getMessage().contains("수동 연결"));
+  }
  }
  @Test public void missingOrBlankIdsAreNotGuessed()throws Exception{
   JSONObject incoming=Store.empty();
