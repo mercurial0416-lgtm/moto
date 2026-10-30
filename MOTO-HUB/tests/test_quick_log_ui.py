@@ -11,7 +11,7 @@ checks={
  'manual interval recalculation': 'RecentRecordReuse.nextServiceKm(' in s,
  'duplicate confirmation': 'QuickLogDuplicate.exists(items(key),item,key)' in s and '그래도 저장' in s,
  'fresh vehicle ID preserved': 'item.put("vehicleId",old.optString("vehicleId",b.optString("id")))' in s,
- 'same saved backup mechanism': 'write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();UndoLastSave.offer(this,beforeSave,db.toString(),title,' in s and 'new JSONObject(db.toString())' in s,
+ 'same saved backup mechanism': 'write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();UndoLastSave.offer(this,beforeSave,db.toString(),title,' in s and 'JSONObject next=new JSONObject(beforeSave);Store.upsert(next,key,item)' in s,
  'draft recovery unaffected': 'void resumeDraft(){' in s,
  'fuel full tank opt-in': 'full.setChecked(old.optBoolean("fullTank"))' in s,
  'top-level shortcuts': 'a.pair(actions,"간편 주유",()->new QuickEntryUi(a).fuel(),"정비주기 설정",()->new QuickEntryUi(a).maintenance())' in h and 'a::batchServiceEntry' in h,
