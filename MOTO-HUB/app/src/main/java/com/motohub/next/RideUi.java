@@ -639,6 +639,10 @@ final class RideUi {
    a.rideStartConsent.cancel();a.launchNavigationAfterRide=false;
    a.toast("바이크가 변경돼 GPS 시작을 취소했어요. 다시 확인해 주세요.");return;
   }
+  // A fresh storage check precedes consent consumption; service repeats the check at file creation.
+  try{GpsStorageSpacePolicy.require(a.getFilesDir());}
+  catch(IOException storage){a.rideStartConsent.cancel();a.approvedRideBikeId="";a.launchNavigationAfterRide=false;
+   a.toast(storage.getMessage());return;}
   if(!a.rideStartConsent.consume("라이딩".equals(a.tab),true))return;
   final String fixedBikeId=a.approvedRideBikeId;
   a.approvedRideBikeId="";
