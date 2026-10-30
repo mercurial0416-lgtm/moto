@@ -95,6 +95,40 @@ public class UX86BackupFootprintTest {
    Files.deleteIfExists(binding.toPath());Files.deleteIfExists(track.toPath());
   }
  }
+ @Test public void orphanLiveSidecarIsDetectedWithoutDeletingIt()throws Exception{
+  Context app=RuntimeEnvironment.getApplication();
+  File orphan=new File(new File(app.getFilesDir(),"rides"),name()+".favorite");
+  try{
+   write(orphan,"");
+   String legacy=UpdateDataFootprint.captureLegacy(app,Store.empty());
+   assertTrue(legacy.startsWith("schema4;"));
+   try{
+    UpdateDataFootprint.capture(app,Store.empty());
+    fail("stray favorite without GPS original must be reported");
+   }catch(java.io.IOException expected){assertTrue(expected.getMessage().contains("GPS 원본 없이"));}
+   assertTrue("audit must not delete recovery evidence",Files.exists(orphan.toPath()));
+  }finally{Files.deleteIfExists(orphan.toPath());}
+ }
+ @Test public void orphanTrashSidecarIsDetectedAndPreserved()throws Exception{
+  Context app=RuntimeEnvironment.getApplication();
+  String main=name(),stray=name();
+  File folder=new File(new File(app.getFilesDir(),"rides-trash"),main);
+  File source=new File(folder,main), orphan=new File(folder,stray+".bike");
+  try{
+   write(source,"quarantined GPS");
+   write(orphan,UUID.randomUUID().toString());
+   try{
+    UpdateDataFootprint.capture(app,Store.empty());
+    fail("stray binding without source GPS must be reported");
+   }catch(java.io.IOException expected){assertTrue(expected.getMessage().contains("GPS 원본 없이"));}
+   assertTrue(Files.exists(source.toPath()));
+   assertTrue(Files.exists(orphan.toPath()));
+  }finally{
+   Files.deleteIfExists(orphan.toPath());
+   Files.deleteIfExists(source.toPath());
+   Files.deleteIfExists(folder.toPath());
+  }
+ }
  @Test public void gpsOnlyProofIsClearlyLabeledAndDoesNotGrantBikeCascadeDeletion()throws Exception{
   Context app=RuntimeEnvironment.getApplication();
   app.getSharedPreferences("verified_full_export",0).edit().clear().commit();

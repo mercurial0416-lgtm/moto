@@ -43,6 +43,8 @@ final class UpdateDataFootprint {
   int sidecarCount=0;
   List<File> toHash=new ArrayList<>();
   if(rides.isDirectory()&&tracks==null)throw new IOException("GPS 폴더를 검사할 수 없습니다.");
+  // Expanded audits must not silently skip orphan GPS sidecars.
+  if(expanded&&tracks!=null)requireNoOrphanMarkers(rides,tracks);
   if(tracks!=null)for(File file:tracks){
    if(!file.getName().matches(BackupFormat.TRACK))continue;
    verifyRegular(file);
@@ -68,6 +70,9 @@ final class UpdateDataFootprint {
     if(Files.isSymbolicLink(folder.toPath())||!Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS)
        ||!folder.getName().matches(BackupFormat.TRACK))
      throw new IOException("GPS 복구함에 잘못된 항목이 있습니다.");
+    File[] entries=folder.listFiles();
+    if(entries==null)throw new IOException("GPS 복구함 파일을 검사할 수 없습니다.");
+    requireNoOrphanMarkers(folder,entries);
     File source=new File(folder,folder.getName());
     verifyRegular(source);
     if(source.length()>TrackFile.MAX_BYTES)throw new IOException("복구함 GPS 크기 초과");
@@ -110,6 +115,25 @@ final class UpdateDataFootprint {
  private static final String[] TRACK_SIDECARS={
   ".done",".imported",".recovered",".unmerged",".category",".bike",".favorite",".mergedinto"
  };
+ /** Detect an orphan committed sidecar, preserving all evidence for recovery.
+  * .writing is an uncommitted temporary marker and is deliberately ignored.
+  * Legacy schema4 comparison never calls this expanded check. */
+ private static void requireNoOrphanMarkers(File directory,File[] listed)throws IOException{
+  for(File candidate:listed){
+   String name=candidate.getName();
+   for(String suffix:TRACK_SIDECARS){
+    if(!name.endsWith(suffix))continue;
+    String stem=name.substring(0,name.length()-suffix.length());
+    if(!stem.matches(BackupFormat.TRACK))continue;
+    verifyRegular(candidate);
+    File original=new File(directory,stem);
+    if(Files.isSymbolicLink(original.toPath())||
+       !Files.isRegularFile(original.toPath(),LinkOption.NOFOLLOW_LINKS))
+     throw new IOException("GPS 원본 없이 부속 파일만 남아 있습니다: 복구·백업 상태를 확인해 주세요.");
+    break;
+   }
+  }
+ }
  private static int collectSidecars(File source,List<File> toHash)throws IOException{
   int found=0;
   for(String suffix:TRACK_SIDECARS){

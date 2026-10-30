@@ -137,7 +137,7 @@ final class QuickEntryUi {
   CheckBox full=new CheckBox(a);full.setText("가득 주유했어요 (연비 계산용)");
   full.setTextColor(a.fg);full.setTextSize(14);full.setMinHeight(a.dp(50));body.addView(full);
   LinearLayout extra=a.col();extra.setVisibility(View.GONE);
-  EditText odo=number(extra,"현재 계기판 (km)",String.valueOf((long)bike.optDouble("odo")),"현재 주행거리");
+  EditText odo=number(extra,"현재 계기판 (km)",java.math.BigDecimal.valueOf(bike.optDouble("odo")).stripTrailingZeros().toPlainString(),"현재 주행거리");
   // Reuse the bundled offline OCR model; nothing is sent to a server or saved before confirmation.
   a.quickOdoField=odo;
   a.action(extra,"갤러리에서 계기판 사진 선택",false,()->a.chooseQuickOdometerPhoto(odo));
@@ -177,10 +177,22 @@ final class QuickEntryUi {
   // Keep an isolated draft while switching to navigation or after Android process restart.
   final String bikeId=bike.optString("id");
   final boolean[] restoring={false};
+  final boolean[] draftTouched={false};
   Runnable persistDraft=()->{
    if(restoring[0])return;
+   draftTouched[0]=true;
    FuelDraft.save(a,bikeId,amount.getText().toString(),liters.getText().toString(),
     unitPrice.getText().toString(),odo.getText().toString(),date.getText().toString(),full.isChecked());
+  };
+  // Keep typing responsive with apply(), then synchronously commit the latest
+  // state when this dialog closes or Android backgrounds the activity.
+  a.quickFuelDraftFlush=()->{
+   // Opening an existing unsent draft without editing must never replace it
+   // with the new form's intentionally blank defaults.
+   if(!draftTouched[0])return;
+   if(!FuelDraft.saveDurable(a,bikeId,amount.getText().toString(),liters.getText().toString(),
+     unitPrice.getText().toString(),odo.getText().toString(),date.getText().toString(),full.isChecked()))
+    a.toast("주유 임시저장을 완료하지 못했어요. 저장공간을 확인해 주세요.");
   };
   android.text.TextWatcher draftWatcher=new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence v,int st,int c,int after){}
@@ -223,6 +235,7 @@ final class QuickEntryUi {
    body.addView(restoreDraftButton,restoreDraftLp);
    a.action(body,"주유 · 임시기록 삭제",false,()->{
     FuelDraft.clear(a,bikeId);
+    draftTouched[0]=false; // Explicit discard must not be undone by lifecycle flush.
     // The previous draft cannot be resurrected by a stale click handler.
     restoreDraftButton.setVisibility(View.GONE);
     a.toast("임시 주유 기록만 삭제했어요. 현재 입력칸은 그대로 유지됩니다.");
@@ -259,7 +272,7 @@ final class QuickEntryUi {
      throw new java.io.IOException("등록된 바이크 연결이 없어 주유 기록을 저장하지 않았어요.");
     Store.upsert(next,"expenses",record);
     if(record.optDouble("mileage")>vehicle.optDouble("odo"))vehicle.put("odo",record.optDouble("mileage"));
-    a.write(next);FuelDraft.clear(a,bikeId);
+    a.write(next);a.quickFuelDraftFlush=null;FuelDraft.clear(a,bikeId);
     a.close();a.render();DailyMaintenanceJob.checkSoon(a);
     UndoLastSave.offer(a,beforeSave,a.db.toString(),"주유");
    });
@@ -347,7 +360,7 @@ final class QuickEntryUi {
    ()->alertOptions.setVisibility(alertOptions.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
   body.addView(alerts);body.addView(alertOptions);
   LinearLayout advanced=a.col();advanced.setVisibility(View.GONE);
-  EditText mileage=number(advanced,"현재 계기판 (km)",String.valueOf((long)bike.optDouble("odo")),"km");
+  EditText mileage=number(advanced,"현재 계기판 (km)",java.math.BigDecimal.valueOf(bike.optDouble("odo")).stripTrailingZeros().toPlainString(),"km");
   EditText nextKm=number(advanced,"직접 지정하는 다음 정비 거리 (km)","","예: 14000");
   a.label(advanced,"직접 지정하는 다음 정비일",14,a.fg,true);
   EditText nextDate=new EditText(a);nextDate.setText(LocalDate.parse(a.today()).plusMonths(1).toString());nextDate.setTextColor(a.fg);nextDate.setSingleLine(true);
@@ -417,17 +430,33 @@ final class QuickEntryUi {
     Math.max(0,kmInterval),Math.max(0,monthsInterval));
    record.put("alertKmBefore",kmBeforeChoices[kmAlert.getSelectedItemPosition()]);
    record.put("alertDaysBefore",daysBeforeChoices[dateAlert.getSelectedItemPosition()]);
+   // Snapshot the exact data reviewed before opening the duplicate-confirmation
+   // dialog. A stale dialog must never silently overwrite a changed garage.
+   final String reviewedServiceSnapshot=a.db.toString();
+   final String maintenanceBikeId=bike.optString("id");
+   final boolean reviewedDuplicate=QuickLogDuplicate.exists(a.items("services"),record,"services");
    Runnable save=()->a.attempt(()->{
+    if(a.readOnly||a.bike()==null||!maintenanceBikeId.equals(a.bike().optString("id")))
+     throw new java.io.IOException("바이크 또는 저장 상태가 변경됐어요. 정비주기를 다시 확인해 주세요.");
     String beforeSave=a.db.toString();
-    JSONObject next=new JSONObject(beforeSave);Store.upsert(next,"services",record);
-    JSONObject vehicle=Store.find(next,"vehicles",bike.optString("id"));
-    if(vehicle!=null&&odo>vehicle.optDouble("odo"))vehicle.put("odo",odo);
+    if(!reviewedServiceSnapshot.equals(beforeSave))
+     throw new java.io.IOException("정비주기를 확인하는 동안 기록이 변경됐어요. 다시 열어서 확인해 주세요.");
+    if(!reviewedDuplicate&&QuickLogDuplicate.exists(a.items("services"),record,"services"))
+     throw new java.io.IOException("같은 정비주기가 새로 저장됐어요. 중복 여부를 다시 확인해 주세요.");
+    JSONObject next=new JSONObject(beforeSave);
+    JSONObject vehicle=Store.find(next,"vehicles",maintenanceBikeId);
+    if(vehicle==null||!maintenanceBikeId.equals(record.optString("vehicleId")))
+     throw new java.io.IOException("정비주기를 연결할 바이크를 찾지 못했어요.");
+    if(odo<vehicle.optDouble("odo"))
+     throw new java.io.IOException("차고의 현재 계기판보다 이전 값이에요. 정비주기를 다시 확인해 주세요.");
+    Store.upsert(next,"services",record);
+    if(odo>vehicle.optDouble("odo"))vehicle.put("odo",odo);
     a.write(next);a.close();a.render();DailyMaintenanceJob.checkSoon(a);
     UndoLastSave.offer(a,beforeSave,a.db.toString(),"정비주기",()->{
      if(!DailyMaintenanceJob.remindersEnabled(a))askEnableNotifications();
     });
    });
-   if(QuickLogDuplicate.exists(a.items("services"),record,"services")){
+   if(reviewedDuplicate){
     new AlertDialog.Builder(a).setTitle("이미 등록된 정비주기")
      .setMessage("같은 날짜와 계기판의 정비 기록이 있습니다. 추가로 저장할까요?")
      .setNegativeButton("취소",null).setPositiveButton("추가",(d,w)->save.run()).show();

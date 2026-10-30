@@ -26,6 +26,9 @@ public class MainActivity extends Activity {
   boolean launchNavigationAfterRide=false;
  DeveloperObdScreen developerObd;
  String draftKey="",draftId="",draftVehicle="";Map<String,EditText> draftFields;Map<String,Spinner> draftSelectors;CheckBox fullTankBox;boolean formDirty=false;
+ // Only quick fuel owns this callback; sync-flush latest input at background/dismiss.
+ Runnable quickFuelDraftFlush;
+ void flushQuickFuelDraft(){if(quickFuelDraftFlush!=null)quickFuelDraftFlush.run();}
  LinearLayout formOptionalSection;Button formOptionalToggle;Set<String> formOptionalKeys=new HashSet<>();
  String activeForm="";JSONObject activeOld=new JSONObject();
  String garagePhotoTarget="",receiptPhotoTarget="",receiptPhotoKey="";int receiptPhotoSlot=1;
@@ -893,9 +896,9 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  void more(){new HubScreens(this).settings();}
  void choose(String title,String[] values,Choice c){new AlertDialog.Builder(this).setTitle(title).setItems(values,(d,i)->c.pick(values[i])).show();}
  void open(String url){if(!Store.safeUrl(url)){error("올바른 웹 주소가 아닙니다.");return;}attempt(()->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url))));}
- void close(){hideKeyboard();boolean dirty=formDirty;if(dialog!=null){persistDraft();dialog.dismiss();dialog=null;}draftFields=null;draftSelectors=null;fullTankBox=null;ocrFields=null;ocrKind="";quickOdoField=null;ocrDateMileageFields=null;ocrMetaSummary=null;formOptionalSection=null;formOptionalToggle=null;formOptionalKeys.clear();formDirty=false;if(dirty)render();}
+ void close(){hideKeyboard();boolean dirty=formDirty;if(dialog!=null){flushQuickFuelDraft();quickFuelDraftFlush=null;persistDraft();dialog.dismiss();dialog=null;}draftFields=null;draftSelectors=null;fullTankBox=null;ocrFields=null;ocrKind="";quickOdoField=null;ocrDateMileageFields=null;ocrMetaSummary=null;formOptionalSection=null;formOptionalToggle=null;formOptionalKeys.clear();formDirty=false;if(dirty)render();}
  LinearLayout page(String title){close();dialog=new Dialog(this);LinearLayout outer=col();outer.setBackgroundColor(bg);outer.setPadding(dp(20),dp(14),dp(20),dp(14));LinearLayout bar=new LinearLayout(this);bar.setGravity(Gravity.CENTER_VERTICAL);TextView caption=text(title,24,fg,true);bar.addView(caption,new LinearLayout.LayoutParams(0,-2,1));Button done=button("닫기",false,this::close);done.setMinHeight(dp(42));done.setTextSize(13);done.setBackground(shape(panel,0,12));bar.addView(done);outer.addView(bar);View separator=new View(this);separator.setBackgroundColor(line);LinearLayout.LayoutParams sep=new LinearLayout.LayoutParams(-1,dp(1));sep.topMargin=dp(15);outer.addView(separator,sep);ScrollView scroll=new ScrollView(this);formBody=col();formBody.setPadding(0,dp(20),0,dp(20));scroll.addView(formBody);outer.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));formFooter=col();outer.addView(formFooter);dialog.setContentView(outer);outer.setOnApplyWindowInsetsListener((v,i)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets in=i.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());v.setPadding(dp(20)+in.left,dp(12)+in.top,dp(20)+in.right,dp(12)+in.bottom);}return i;});return formBody;}
- void show(){dialog.setOnDismissListener(d->{persistDraft();if(formDirty)render();});dialog.show();Window w=dialog.getWindow();w.setLayout(-1,-1);w.setStatusBarColor(bg);w.setNavigationBarColor(bg);w.getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);w.getDecorView().requestApplyInsets();}
+ void show(){dialog.setOnDismissListener(d->{flushQuickFuelDraft();quickFuelDraftFlush=null;persistDraft();if(formDirty)render();});dialog.show();Window w=dialog.getWindow();w.setLayout(-1,-1);w.setStatusBarColor(bg);w.setNavigationBarColor(bg);w.getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);w.getDecorView().requestApplyInsets();}
  final Set<String> numbers=new HashSet<>(Arrays.asList("odo","year","purchase","price","mileage","cost","amount","liters","nextKm","distance"));
  // Low-friction entry: common values are explicitly selected; no silent guesses or remote lookups.
  void chips(LinearLayout parent,String[] labels,String[] values,EditText target){
@@ -2301,7 +2304,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  void back(){if(dialog!=null&&dialog.isShowing()){close();return;}if(tab.equals("더보기")){tab=previousTab;render();}else if(!tab.equals("홈")){tab="홈";render();}else finish();}
 
  @Override protected void onDestroy(){if(developerObd!=null){developerObd.stop();developerObd=null;}super.onDestroy();}
- @Override protected void onPause(){persistDraft();super.onPause();}
+ @Override protected void onPause(){flushQuickFuelDraft();persistDraft();super.onPause();}
  void clearDraft(){formDirty=false;getSharedPreferences("draft",MODE_PRIVATE).edit().remove("active").apply();}
  void confirmDiscardDraft(){
   if(!getSharedPreferences("draft",MODE_PRIVATE).contains("active")){render();return;}

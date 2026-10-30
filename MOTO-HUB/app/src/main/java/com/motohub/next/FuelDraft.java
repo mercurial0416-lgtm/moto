@@ -22,17 +22,34 @@ final class FuelDraft {
    return j;
   }catch(Exception invalid){return null;}
  }
+ private static String encoded(String bike,String amount,String liters,String unitPrice,
+                               String odo,String date,boolean full)throws Exception{
+  if(amount==null||liters==null||unitPrice==null||odo==null||date==null||
+     amount.length()>30||liters.length()>30||unitPrice.length()>30||odo.length()>30||date.length()>30)
+   throw new IllegalArgumentException("임시 주유 기록의 입력이 너무 깁니다.");
+  JSONObject j=new JSONObject().put("bikeId",bike).put("savedAt",System.currentTimeMillis())
+    .put("amount",amount).put("liters",liters).put("unitPrice",unitPrice)
+    .put("odo",odo).put("date",date).put("full",full);
+  return j.toString();
+ }
+ /** Non-blocking save on each keystroke; commit durably on pause or form dismissal. */
  static void save(Context c,String bike,String amount,String liters,String unitPrice,
                   String odo,String date,boolean full){
   try{
-   if(amount.length()>30||liters.length()>30||unitPrice.length()>30||odo.length()>30||date.length()>30)return;
-   JSONObject j=new JSONObject().put("bikeId",bike).put("savedAt",System.currentTimeMillis())
-     .put("amount",amount).put("liters",liters).put("unitPrice",unitPrice)
-     .put("odo",odo).put("date",date).put("full",full);
-   c.getSharedPreferences("fuel_drafts",0).edit().putString(key(bike),j.toString()).apply();
+   String raw=encoded(bike,amount,liters,unitPrice,odo,date,full);
+   c.getSharedPreferences("fuel_drafts",0).edit().putString(key(bike),raw).apply();
   }catch(Exception ignored){}
  }
+ /** Synchronous last-value flush for Android process loss while app is backgrounded. */
+ static boolean saveDurable(Context c,String bike,String amount,String liters,String unitPrice,
+                            String odo,String date,boolean full){
+  try{
+   String raw=encoded(bike,amount,liters,unitPrice,odo,date,full);
+   return c.getSharedPreferences("fuel_drafts",0).edit().putString(key(bike),raw).commit();
+  }catch(Exception invalid){return false;}
+ }
  static void clear(Context c,String bike){
-  c.getSharedPreferences("fuel_drafts",0).edit().remove(key(bike)).apply();
+  // A successful form submission must not resurrect an already-saved draft.
+  c.getSharedPreferences("fuel_drafts",0).edit().remove(key(bike)).commit();
  }
 }
