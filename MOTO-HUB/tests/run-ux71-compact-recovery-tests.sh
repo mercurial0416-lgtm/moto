@@ -21,7 +21,7 @@ assert 'items("listings")' in hub, "legacy data must be kept accessible in backu
 assert 'HomeShortcutOrder.parse' in home and 'changeHomeShortcutOrder()' in home
 assert 'Collections.swap' in order
 assert 'RideSavedNotification.post(context)' in inbox and 'manager.notify(406' in notify
-assert 'BackupGpsProof.record(this,checkedBackup.trackSha256,snapshot,"FULL".equals(part))' in main
+assert 'BackupGpsProof.record(this,checkedBackup.trackSha256,checkedBackup.sidecarSha256,snapshot,"FULL".equals(part))' in main
 assert 'BackupIntegrity.verify(check);' in main
 assert 'RideStorageManager.show(a)' in hub
 assert 'RideMileageIntegrity.validCompleted(track)' in storage

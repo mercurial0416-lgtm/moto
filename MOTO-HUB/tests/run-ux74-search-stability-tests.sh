@@ -16,7 +16,8 @@ assert 'IdentityHashMap<>' in hub and 'a.edit(row.collection,row.item)' in hub
 assert 'moto-unified-gps-search' in hub and 'TrackFile.tracks(a.getFilesDir())' in hub
 assert 'RideStorageManager.show(a,ride.filename)' in hub
 assert 'final String title,filename,bikeId,date,index;' in hub
-assert 'shown<30' in hub and 'page[0]++' in hub
+assert 'int to=Math.min(found,from+30);' in hub and 'page[0]++' in hub
+assert 'newestFirst(hits);' in hub and 'UnifiedSearchHit hit=hits.get(i);' in hub
 assert 'void showPage(MainActivity a,' in storage
 assert 'static void show(MainActivity a,String initialFilter)' in storage
 assert 'indexed[i]=(labels[i]+' in storage

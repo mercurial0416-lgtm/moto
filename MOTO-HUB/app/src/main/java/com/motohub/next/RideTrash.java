@@ -141,7 +141,10 @@ final class RideTrash {
   for(File source:items)if(Files.exists(new File(rides,source.getName()).toPath(),LinkOption.NOFOLLOW_LINKS))
     throw new IOException("이미 같은 GPS가 라이딩 내역에 있습니다. 덮어쓰지 않습니다.");
   relocate(items,rides);
-  if(!folder.delete())throw new IOException("GPS는 복원됐으나 빈 복구함 정리에 실패했습니다.");
+  // GPS and every sidecar have ALREADY moved successfully. Failure to delete
+  // the now-empty folder is cleanup only, never a failed GPS restore.
+  // recoverInterrupted() removes leftover empty folders on a later startup.
+  folder.delete();
   return new File(rides,selected.getName());
  }
 }

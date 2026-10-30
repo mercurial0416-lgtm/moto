@@ -135,13 +135,16 @@ public class UX86BackupFootprintTest {
   File track=new File(app.getFilesDir(),name());
   Map<String,String> hashes=Map.of(track.getName(),"a".repeat(64));
   BackupGpsProof.record(app,hashes,null,false);
+  assertTrue("legacy-only proof must request fresh ZIP",
+    BackupGpsProof.status(app,track).contains("새 ZIP"));
+  BackupGpsProof.record(app,hashes,Map.of(),null,false);
   assertTrue(BackupGpsProof.status(app,track).contains("GPS 분할 ZIP"));
   try{
    BackupGpsProof.requireFullCurrent(app,Store.empty().toString());
    fail("GPS partition may not authorize vehicle cascade delete");
   }catch(java.io.IOException expected){assertTrue(expected.getMessage().contains("전체 ZIP"));}
   String current=Store.empty().toString();
-  BackupGpsProof.record(app,hashes,current,true);
+  BackupGpsProof.record(app,hashes,Map.of(),current,true);
   assertTrue(BackupGpsProof.status(app,track).contains("전체 ZIP"));
   BackupGpsProof.requireFullCurrent(app,current);
   try{

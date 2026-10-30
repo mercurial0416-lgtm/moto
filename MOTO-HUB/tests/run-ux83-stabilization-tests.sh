@@ -21,7 +21,7 @@ assert 'RideTrash.move(a.getFilesDir(),track)' in storage
 assert 'restoreDraftButton.setVisibility(View.GONE)' in fuel
 assert 'restoreBatchDraftButton.setVisibility(View.GONE)' in main
 assert 'BackupGpsProof.requireFullCurrent(this,db.toString(2))' in main
-assert 'BackupGpsProof.record(this,checkedBackup.trackSha256,snapshot,"FULL".equals(part))' in main
+assert 'BackupGpsProof.record(this,checkedBackup.trackSha256,checkedBackup.sidecarSha256,snapshot,"FULL".equals(part))' in main
 assert 'afterSuccess.run()' in storage
 assert 'BackupGpsProof.status(a,track)' in storage
 backup=s('BackupGpsProof.java')

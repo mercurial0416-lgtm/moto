@@ -25,7 +25,7 @@ public final class GpsBackupProofAndTrashTest {
    BackupBundle.export(Store.empty().toString(),root,bytes,"GPS");
    BackupIntegrity.Result verified=BackupIntegrity.verify(new ByteArrayInputStream(bytes.toByteArray()));
    assertTrue(verified.trackSha256.containsKey(track.getName()));
-   BackupGpsProof.record(c,verified.trackSha256);
+   BackupGpsProof.record(c,verified.trackSha256,verified.sidecarSha256,null,false);
    BackupGpsProof.requireExact(c,track);
    byte[] tampered=Arrays.copyOf(original,original.length);
    tampered[3]=tampered[3]==(byte)'0'?(byte)'1':(byte)'0';

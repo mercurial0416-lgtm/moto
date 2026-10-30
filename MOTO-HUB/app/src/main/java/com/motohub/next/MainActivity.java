@@ -1681,7 +1681,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          });
          // Settings are imported only after database/assets commit. Legacy ZIPs retain current settings.
          boolean preferencesOk=true,rollbackNeedsAttention=false;
-         try{DevicePreferencesBackup.restore(this,ready.preferences);}
+         try{DevicePreferencesBackup.restore(this,ready.preferences,db);}
          catch(Exception failure){
           preferencesOk=false;
           // A failed preferences rollback is explicitly surfaced instead of silently swallowed.
@@ -1713,7 +1713,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  void exportBundle(){
   if(!BackupExportGate.canExport(RideService.running,RideService.autoArmed,RestoreRideGate.isRestoring())){error(BackupExportGate.MESSAGE);return;}
   new AlertDialog.Builder(this).setTitle("모든 기록 ZIP 내보내기")
-   .setMessage("바이크·정비·매물·GPS 경로·직접 찍은 사진을 한 파일로 저장해요. 이 ZIP은 암호화되지 않습니다. 공유에 주의하세요.\n\n위치정보가 민감하면 '암호화 전체 백업'을 사용하세요.")
+   .setMessage("바이크·정비·매물·GPS 경로·사진 및 저장하지 않은 주유 임시초안을 한 파일로 저장해요. 이 ZIP은 암호화되지 않습니다. 공유에 주의하세요.\n\n위치정보가 민감하면 '암호화 전체 백업'을 사용하세요.")
    .setNegativeButton("취소",null).setPositiveButton("내보내기",(d,w)->launchBackupDocument(null)).show();
  }
  void exportBatchedBackup(){
@@ -2230,7 +2230,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      }
     }finally{if(authenticated!=null)java.nio.file.Files.deleteIfExists(authenticated.toPath());}
     // Allow safe trash only for exact GPS bytes actually found in the verified user-owned ZIP.
-    if(!"MEDIA".equals(part))BackupGpsProof.record(this,checkedBackup.trackSha256,snapshot,"FULL".equals(part));
+    if(!"MEDIA".equals(part))BackupGpsProof.record(this,checkedBackup.trackSha256,checkedBackup.sidecarSha256,snapshot,"FULL".equals(part));
     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast((password==null?("FULL".equals(part)?"전체 백업":part+" 분할 백업"):"암호화 백업")+" ZIP 검증 완료 · "+count+"개 항목");});
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 백업 실패: "+e.getMessage());});}
     finally{if(password!=null)Arrays.fill(password,'\0');if(reserved)RestoreRideGate.endExport();}
