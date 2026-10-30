@@ -29,6 +29,6 @@ assert 'a.formFooter.getChildAt(' in fuel and 'IME_ACTION_DONE' in fuel
 assert 'amount.requestFocus()' in fuel
 assert '서명 인증서 불일치' in updater and '저장공간 부족' in updater
 assert '파일 무결성 실패' in updater and '배포 파일 미공개' in updater
-assert '-PmotoReleaseCode=$CODE' in ci and "versionCode='$CODE'" in ci
+assert '-PmotoReleaseCode="$CODE"' in ci and "versionCode='$CODE'" in ci
 print('PASS UX81 eight practical refinements and destructive-operation guardrails')
 PY
