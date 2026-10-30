@@ -81,6 +81,7 @@ jobs:
           bash tests/run-ux86-data-safety-tests.sh
           bash tests/run-ux87-data-recovery-tests.sh
           bash tests/run-ux88-backup-search-restore-tests.sh
+          bash tests/run-ux89-release-stability-tests.sh
       - name: Full legacy and current pure Java regression gate
         working-directory: MOTO-HUB
         run: |

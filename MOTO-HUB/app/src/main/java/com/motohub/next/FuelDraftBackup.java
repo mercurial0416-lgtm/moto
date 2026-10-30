@@ -54,6 +54,52 @@ final class FuelDraftBackup {
    }catch(JSONException failure){throw new IOException("주유 초안 JSON 내용 오류",failure);}
   }
  }
+ /** Time-independent installer audit of the exact stored draft bytes. A draft
+  * crossing the seven-day UI expiry threshold must not signal data loss. */
+ static String auditFingerprint(Context c)throws IOException{
+  try{
+   java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256");
+   Map<String,?> all=c.getSharedPreferences("fuel_drafts",0).getAll();
+   java.util.ArrayList<String> keys=new java.util.ArrayList<>();
+   for(String key:all.keySet())if(key.startsWith("fuel_"))keys.add(key);
+   if(keys.size()>512)throw new IOException("저장된 임시 주유 기록 개수가 검사 한도를 초과했습니다.");
+   java.util.Collections.sort(keys);
+   long total=0;
+   for(String key:keys){
+    Object stored=all.get(key);
+    if(!(stored instanceof String)||key.length()>128)
+     throw new IOException("저장된 임시 주유 기록 형식 오류");
+    byte[] name=key.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    byte[] value=((String)stored).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    total+=name.length+value.length;
+    if(value.length>4096||total>1_000_000)throw new IOException("임시 주유 기록 검사 크기 초과");
+    digest.update(name);digest.update((byte)0);
+    digest.update(value);digest.update((byte)0);
+   }
+   StringBuilder hex=new StringBuilder(64);
+   for(byte b:digest.digest())hex.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
+   return hex.toString();
+  }catch(java.security.NoSuchAlgorithmException unavailable){
+   throw new IOException("임시 주유 기록 검증 알고리즘 오류",unavailable);
+  }
+ }
+ /** Restore exactly previous allowlisted per-bike draft strings on an interrupted
+  * UI-preference transaction; never mutate unrelated app preferences. */
+ static boolean rollback(Context c,Map<String,?> previous){
+  SharedPreferences prefs=c.getSharedPreferences("fuel_drafts",0);
+  SharedPreferences.Editor editor=prefs.edit();
+  for(String key:prefs.getAll().keySet()){
+   if(key.startsWith("fuel_")&&RideBikeBinding.valid(key.substring(5))&&!previous.containsKey(key))
+    editor.remove(key);
+  }
+  for(Map.Entry<String,?> entry:previous.entrySet()){
+   String key=entry.getKey();
+   if(!key.startsWith("fuel_")||!RideBikeBinding.valid(key.substring(5)))continue;
+   if(!(entry.getValue() instanceof String))return false;
+   editor.putString(key,(String)entry.getValue());
+  }
+  return editor.commit();
+ }
  /** Restore ONLY if its motorcycle exists in the restored database; never
   * overwrite a newer in-device draft, and never clear unrelated local drafts. */
  static int restore(Context c,JSONObject drafts,JSONObject restoredDb)throws IOException{

@@ -32,9 +32,11 @@ assert 'verifyRegular(source)' in footprint
 assert 'Files.isSymbolicLink(folder.toPath())' in footprint
 snapshot=(root/"UpdateInstallSnapshot.java").read_text()
 assert 'if(original.startsWith("schema4;"))after=UpdateDataFootprint.captureLegacy(context,current);' in snapshot
-assert 'else if(original.startsWith("schema5;"))after=UpdateDataFootprint.capture(context,current);' in snapshot
+assert 'else if(original.startsWith("schema5;"))after=UpdateDataFootprint.captureLegacy5(context,current);' in snapshot
 assert 'static String captureLegacy(Context context,JSONObject data)' in footprint
-assert 'expanded?"schema5;dataSha256=":"schema4;dataSha256="' in footprint
+assert 'StringBuilder value=new StringBuilder("schema"+schema+";dataSha256=")' in footprint
+assert 'static String captureLegacy5(Context context,JSONObject data)' in footprint
+assert 'FuelDraftBackup.auditFingerprint(context)' in footprint
 assert 'oldInstallBaselineHasIdenticalScopeAcrossFootprintUpgrade' in unit
 assert 'favoriteAndCategoryAreIncludedInFingerprint' in unit
 assert 'quarantineBytesAndBindingAreIncludedInFingerprint' in unit
