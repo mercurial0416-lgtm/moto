@@ -20,6 +20,7 @@ jobs:
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" offline-signing-tools/
           cp "$ANDROID_HOME/build-tools/36.0.0/aapt" offline-signing-tools/
           cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" offline-signing-tools/
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib64/libc++.so" offline-signing-tools/
           test -s offline-signing-tools/apksigner.jar
           sha256sum offline-signing-tools/* > offline-signing-tools/sdk-tool-sha256.txt
       - uses: actions/upload-artifact@v4
