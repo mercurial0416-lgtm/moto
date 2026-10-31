@@ -17,7 +17,7 @@ assert 'BackupGpsProof.fullCurrentStatus(this,snapshot).contains("일치")' in m
 assert "static void recordVerifiedZip(Context context" in backup
 assert 'hashLocalFile(track,TrackFile.MAX_BYTES)' in backup
 assert 'hashLocalFile(sidecar,limit)' in backup
-assert "if(local==null||local.length!=hashes.size())" in backup
+assert "if(included!=hashes.size())" in backup and "noCompletionMarker(file)" in backup
 assert 'static void requireFullDeepCurrent(Context context,String currentJson)' in backup
 assert 'retryManualPhotoQueue(a,target,credit,requestToken,manualDecode' in photo
 assert 'remaining<=0' in photo and 'PhotoRequestGuard.isCurrent(target,requestToken)' in photo
