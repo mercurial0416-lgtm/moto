@@ -85,7 +85,8 @@ final class LocalSafetyBackup {
    if(!folder.exists()&&!java.nio.file.Files.isSymbolicLink(folder.toPath()))continue;
    if(!LocalBackupFilePolicy.safeFolder(folder))
     return "자동 복원 폴더가 손상되었거나 접근할 수 없습니다. 원본 파일을 지우지 마세요.";
-   File[] listed=folder.listFiles((dir,name)->name.matches(patterns[i]));
+   final String pattern=patterns[i];
+   File[] listed=folder.listFiles((dir,name)->name.matches(pattern));
    if(listed==null)return "자동 복원 파일 목록을 읽지 못했습니다. 앱 저장공간 상태를 확인하세요.";
    if(listed.length>0)candidates=true;
   }
