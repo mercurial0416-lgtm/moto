@@ -679,7 +679,7 @@ LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·�
     try{
      LocalSafetyBackup.snapshot(a,Store.parse(current));
      java.io.File[] snapshots=LocalSafetyBackup.recoveryPoints(a);
-     if(snapshots.length==0)result="백업을 확인하지 못했어요. 전체 ZIP으로 내보내 주세요.";
+     if(snapshots.length==0)result=LocalSafetyBackup.recoveryAvailabilityMessage(a);
      else{
       LocalSafetyBackup.read(snapshots[0]);
       result="정상 확인한 안전 백업: "+snapshots[0].getName()+"\n\n앱 삭제 전 전체 ZIP을 별도로 내보내세요.";
@@ -713,7 +713,7 @@ LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·�
     final java.io.File[] snapshots=LocalSafetyBackup.recoveryPoints(a);
     a.runOnUiThread(()->{
      if(a.isFinishing()||a.isDestroyed())return;
-     if(snapshots.length==0){a.toast("정상 확인된 자동 백업이 없습니다.");return;}
+     if(snapshots.length==0){a.error(LocalSafetyBackup.recoveryAvailabilityMessage(a));return;}
      String[] choices=new String[snapshots.length];
      for(int i=0;i<snapshots.length;i++){
       String kind=snapshots[i].getParentFile().getName().equals("updates")?"변경 후":"편집 전";
