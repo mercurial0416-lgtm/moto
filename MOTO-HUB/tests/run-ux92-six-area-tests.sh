@@ -23,7 +23,7 @@ checks={
  "recent fuel suggestion tucked away": 'tools.addView(lastFuel);' in fuel,
  "fuel anomaly warning shows actual values": 'String.format(java.util.Locale.KOREA,"%.2f L · %,.0f원"' in fuel and 'record.optString("date")' in fuel,
  "backup matches current JSON not merely timestamp": 'fullCurrentStatus(Context context,String currentJson)' in backup and 'MessageDigest.isEqual' in backup,
- "backup state visible in simple settings": 'line("백업 · 복원",BackupGpsProof.fullCurrentStatus(a,a.db.toString())' in settings,
+ "backup state visible in simple settings": 'line("백업 · 복원","GPS 백업 상태를 백그라운드에서 검사합니다"' in settings and 'backupState.setText(status)' in settings,
  "signature and version state in settings": 'UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256)' in settings,
  "unchanged Android application identity": "applicationId 'com.motohub.next'" in manifest,
 }
