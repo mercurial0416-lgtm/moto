@@ -20,8 +20,8 @@ import java.util.*;
 /** Native recovery of the prior P0 implementation. No WebView or network SDK. */
 public class MainActivity extends Activity {
  JSONObject db;AtomicFile disk;LinearLayout root,content,formFooter;Dialog dialog;LinearLayout formBody;
- String tab="홈",selected="",query="",filter="전체",sort="최신순",pendingExport="";
- String pendingTrack="";String pendingBundleJson="";char[] pendingSecurePassword;
+ String tab="홈",selected="",query="",filter="전체",sort="최신순";
+ String pendingTrack="";
  final RideStartConsent rideStartConsent=new RideStartConsent();
   boolean launchNavigationAfterRide=false;
  DeveloperObdScreen developerObd;
@@ -1826,11 +1826,14 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   }
   if(!"GPS".equals(part)&&!"MEDIA".equals(part))return;
   attempt(()->{
-   pendingBundleJson=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);
+   String snapshot=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);
+   int request="GPS".equals(part)?65:66;
    Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
    intent.setType("application/zip");intent.addCategory(Intent.CATEGORY_OPENABLE);
    intent.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-"+part+"-PART-"+today()+".zip");
-   startActivityForResult(intent,"GPS".equals(part)?65:66);
+   BackupPickerTransfer.begin(request,snapshot,null);
+   try{startActivityForResult(intent,request);}
+   catch(Exception failure){BackupPickerTransfer.cancel(request);throw failure;}
   });
  }
  void importSplitBundle(){
@@ -1886,10 +1889,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  void importEncryptedBundle(){
   if(restoreIsBlocked()){explainRestoreBlocked();return;}
   showBackupPassword(false,password->{
-   if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');
-   pendingSecurePassword=password;
    Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/octet-stream");i.addCategory(Intent.CATEGORY_OPENABLE);
-   i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/octet-stream","*/*"});startActivityForResult(i,48);
+   i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/octet-stream","*/*"});
+   BackupPickerTransfer.begin(48,"",password);
+   try{startActivityForResult(i,48);}catch(Exception failure){BackupPickerTransfer.cancel(48);error("암호화 백업 파일을 열지 못했습니다.");}
   });
  }
  interface PasswordChoice{void picked(char[] password);}
@@ -1914,15 +1917,15 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  void launchBackupDocument(char[] password){
   attempt(()->{
    if(!BackupExportGate.canExport(RideService.running,RideService.autoArmed,RestoreRideGate.isRestoring()))throw new IOException(BackupExportGate.MESSAGE);
-   if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');
-   pendingSecurePassword=password;
-   pendingBundleJson=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);
-   boolean secure=password!=null;
+   String snapshot=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);
+   boolean secure=password!=null;int request=secure?47:45;
    Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType(secure?"application/octet-stream":"application/zip");i.addCategory(Intent.CATEGORY_OPENABLE);
-   i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-FULL-"+today()+(secure?".mhub":".zip"));startActivityForResult(i,secure?47:45);
+   i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-FULL-"+today()+(secure?".mhub":".zip"));
+   BackupPickerTransfer.begin(request,snapshot,password);
+   try{startActivityForResult(i,request);}catch(Exception failure){BackupPickerTransfer.cancel(request);throw failure;}
   });
  }
- void exportData(){attempt(()->{pendingExport=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-"+today()+".json");startActivityForResult(i,41);});}
+ void exportData(){attempt(()->{String snapshot=readOnly?new String(disk.readFully(),StandardCharsets.UTF_8):db.toString(2);Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-"+today()+".json");BackupPickerTransfer.begin(41,snapshot,null);try{startActivityForResult(i,41);}catch(Exception failure){BackupPickerTransfer.cancel(41);throw failure;}});}
  /** JSON-only additive import; ZIP restore remains a full replacement with GPS/photo rollback. */
  void importJsonMerge(){
   if(readOnly){error("원본 보호 중에는 기록을 합칠 수 없어요. 먼저 복구 상태를 확인해 주세요.");return;}
@@ -2202,7 +2205,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     toast("입력칸에만 적용했어요. 확인 후 저장해 주세요.");
    }).show();
  }
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){if(request==47||request==48){if(pendingSecurePassword!=null)Arrays.fill(pendingSecurePassword,'\0');pendingSecurePassword=null;}if(request==45||request==47||request==65||request==66)pendingBundleJson="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==68){exportBatchToFolder(uri);return;}if(request==61){prepareJsonMerge(uri);return;}if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){BackupPickerTransfer.cancel(request);if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==68){exportBatchToFolder(uri);return;}if(request==61){prepareJsonMerge(uri);return;}if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
    GARAGE_PHOTO_SAVER.execute(()->{try{saveGaragePhoto(uri,bikeId);}catch(Exception error){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())this.error("바이크 사진 저장 실패: "+error.getMessage());});}});return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
   if(request==54){scanReceiptOcr(uri,null);return;}
   if(request==57){scanQuickOdometerPhoto(uri);return;}
@@ -2232,15 +2235,20 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   }
   if(request==46){prepareBundleRestore(uri);return;}
   if(request==67){prepareSplitRestore(uri);return;}
-  if(request==48){char[] password=pendingSecurePassword;pendingSecurePassword=null;
-   if(password==null){error("암호를 다시 입력해 주세요.");return;}
-   prepareBundleRestore(uri,password);return;
+  if(request==48){
+   BackupPickerTransfer.Entry handoff=BackupPickerTransfer.take(48);
+   if(handoff==null||handoff.password==null){error("암호 정보를 복구할 수 없습니다. 백업 파일을 다시 선택해 주세요.");return;}
+   prepareBundleRestore(uri,handoff.password);return;
   }
   if(request==45||request==47||request==65||request==66){
-   final char[] password=(request==47?pendingSecurePassword:null);pendingSecurePassword=null;
+   BackupPickerTransfer.Entry handoff=BackupPickerTransfer.take(request);
+   if(handoff==null||handoff.json.isEmpty()){
+    try{android.provider.DocumentsContract.deleteDocument(getContentResolver(),uri);}catch(Exception ignored){}
+    error("파일 선택 도중 백업 준비 정보가 만료됐습니다. 처음부터 다시 시도해 주세요.");return;
+   }
+   final char[] password=handoff.password;
    final String part=request==65?"GPS":request==66?"MEDIA":"FULL";
-   final String snapshot=pendingBundleJson;pendingBundleJson="";
-   if(snapshot.isEmpty()){error("백업 정보를 찾지 못했어요. 다시 시도하세요.");return;}
+   final String snapshot=handoff.json;
    new Thread(()->{
     boolean reserved=RestoreRideGate.beginExport(RideService.running,RideService.autoArmed);
     boolean exportVerified=false;
@@ -2317,7 +2325,12 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    },"moto-verified-gpx-export").start();
    return;
   }else if(request==41){
-   final String json=pendingExport;pendingExport="";
+   BackupPickerTransfer.Entry handoff=BackupPickerTransfer.take(41);
+   if(handoff==null||handoff.json.isEmpty()){
+    try{android.provider.DocumentsContract.deleteDocument(getContentResolver(),uri);}catch(Exception ignored){}
+    error("JSON 백업 정보가 만료됐습니다. 다시 내보내 주세요.");return;
+   }
+   final String json=handoff.json;
    new Thread(()->{
     try{
      if(json.isEmpty())throw new IOException("내보낼 JSON 데이터가 없습니다.");
