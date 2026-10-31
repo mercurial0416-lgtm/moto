@@ -111,7 +111,7 @@ public final class BackupBundle {
   if(!Arrays.asList("FULL","GPS","MEDIA").contains(part))throw new IOException("알 수 없는 백업 분할");
   boolean gps=!"MEDIA".equals(part),media=!"GPS".equals(part);
   if(internal==null||!regularDirectory(internal))throw new IOException("앱 백업 폴더를 확인하지 못했어요.");
-  requireDirectoryIfPresent(new File(internal,"rides"));
+  if(gps)requireDirectoryIfPresent(new File(internal,"rides"));
   byte[] data=json.getBytes(StandardCharsets.UTF_8);if(data.length>8_000_000)throw new IOException("JSON 데이터가 8MB를 넘었어요.");
   long total=data.length;int count=0;
   ZipOutputStream zip=new ZipOutputStream(new BufferedOutputStream(target),StandardCharsets.UTF_8);
@@ -134,14 +134,14 @@ public final class BackupBundle {
   if(readmeBytes.length>MAX_TOTAL-total)
    throw new IOException("백업 최대 크기(250MB)를 넘었어요.");
   total+=readmeBytes.length;
-  zip.putNextEntry(new ZipEntry("README-KO.txt"));zip.write(readmeBytes);zip.closeEntry();
-  File photos=internal;File[] files=listIfPresent(photos,(dir,name)->name.matches("garage-photo-[a-fA-F0-9-]{36}\\.jpg"));
+  zip.putNextEntry(new ZipEntry("README-KO.txt"));zip.write(readmeBytes);zip.closeEntry();count++;
+  File photos=internal;File[] files=media?listIfPresent(photos,(dir,name)->name.matches("garage-photo-[a-fA-F0-9-]{36}\\.jpg")):new File[0];
   if(media&&files!=null){
    if(files.length>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 백업 한도(1,000장)를 초과했습니다.");
    Arrays.sort(files,Comparator.comparing(File::getName));
    for(File f:files){total=writeFile(zip,f,"photos/"+f.getName(),total);count++;}
   }
-  File[] receipts=listIfPresent(internal,(dir,name)->name.matches(BackupFormat.RECEIPT));
+  File[] receipts=media?listIfPresent(internal,(dir,name)->name.matches(BackupFormat.RECEIPT)):new File[0];
   if(media&&receipts!=null){
    if(receipts.length>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증·작업 사진이 4,000장을 초과했습니다.");
    Arrays.sort(receipts,Comparator.comparing(File::getName));
@@ -149,8 +149,8 @@ public final class BackupBundle {
   }
   // Save user-selected online gallery images, not auto-recoverable downloaded thumbnails.
   File modelFolder=new File(internal,"moto-year-photos");
-  requireDirectoryIfPresent(modelFolder);
-  File[] selectedModels=listIfPresent(modelFolder,(dir,name)->name.matches(BackupFormat.MODEL_PHOTO));
+  if(media)requireDirectoryIfPresent(modelFolder);
+  File[] selectedModels=media?listIfPresent(modelFolder,(dir,name)->name.matches(BackupFormat.MODEL_PHOTO)):new File[0];
   if(media&&selectedModels!=null){
    Arrays.sort(selectedModels,Comparator.comparing(File::getName));
    int selectedCount=0;
@@ -165,7 +165,7 @@ public final class BackupBundle {
     total=writeFile(zip,metadata,"model-photos/"+metadata.getName(),total);count++;
    }
   }
-  File rides=new File(internal,"rides");File[] tracks=listIfPresent(rides,(dir,name)->name.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));
+  File rides=new File(internal,"rides");File[] tracks=gps?listIfPresent(rides,(dir,name)->name.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track")):new File[0];
   if(gps&&tracks!=null){if(tracks.length>BackupFormat.MAX_TRACKS)throw new IOException("주행 기록 10,000건 백업 한도를 초과했습니다.");
    Arrays.sort(tracks,Comparator.comparing(File::getName));
    for(File file:tracks){
@@ -191,7 +191,7 @@ public final class BackupBundle {
      if(estimatedGpx>0&&total<=MAX_TOTAL-estimatedGpx){
       zip.putNextEntry(new ZipEntry("gpx/"+file.getName().replace(".track",".gpx")));
       TrackFile.gpx(file,zip); // Any mid-write error aborts the full export.
-      zip.closeEntry();total+=estimatedGpx;
+      zip.closeEntry();total+=estimatedGpx;count++;
      }
     }
     
@@ -204,26 +204,26 @@ public final class BackupBundle {
      if(markerBytes.length>100||!destination.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track")||
        !new File(rides,destination+".done").isFile())
       throw new IOException("통합 라이딩 연결 정보가 손상됐습니다: "+file.getName());
-     total=writeFile(zip,merged,"rides/"+merged.getName(),total);
+     total=writeFile(zip,merged,"rides/"+merged.getName(),total);count++;
     }
     File rideBike=new File(file.getPath()+".bike");
     if(rideBike.isFile()||Files.isSymbolicLink(rideBike.toPath())){
      if(!new String(readSidecar(rideBike,64),StandardCharsets.US_ASCII)
        .matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))
       throw new IOException("라이딩 바이크 연결 정보가 손상됐습니다: "+file.getName());
-     total=writeFile(zip,rideBike,"rides/"+rideBike.getName(),total);
+     total=writeFile(zip,rideBike,"rides/"+rideBike.getName(),total);count++;
     }
     File category=new File(file.getPath()+".category");
     if(category.isFile()||Files.isSymbolicLink(category.toPath())){
      if(!java.util.Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(new String(readSidecar(category,64),StandardCharsets.UTF_8)))
       throw new IOException("라이딩 분류가 손상됐습니다: "+file.getName());
-     total=writeFile(zip,category,"rides/"+category.getName(),total);
+     total=writeFile(zip,category,"rides/"+category.getName(),total);count++;
     }
     for(String suffix:new String[]{".done",".imported",".recovered",".unmerged",".favorite"}){
      File marker=new File(file.getPath()+suffix);if(marker.isFile()||Files.isSymbolicLink(marker.toPath())){
       requireRegular(marker);
       if(marker.length()!=0)throw new IOException("라이딩 상태 표시가 손상됐습니다: "+marker.getName());
-      zip.putNextEntry(new ZipEntry("rides/"+marker.getName()));zip.closeEntry();
+      zip.putNextEntry(new ZipEntry("rides/"+marker.getName()));zip.closeEntry();count++;
      }
     }
    }
