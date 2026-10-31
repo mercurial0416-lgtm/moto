@@ -182,7 +182,6 @@ final class MotorcyclePhoto {
         showInternal(a,target,credit,brand,model,year,garageBikeId,true,false);
        }
       });
-     });
     };
     try{PHOTO_DISK.execute(manualDecode);}
     catch(java.util.concurrent.RejectedExecutionException queueFull){
