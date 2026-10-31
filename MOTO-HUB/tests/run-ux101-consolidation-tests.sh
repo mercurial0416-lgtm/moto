@@ -20,7 +20,9 @@ assert "if(folders==null)throw new IOException" in trash
 assert "static void verifySources(Part part,InputStream saved)" in bundle
 assert "MessageDigest.isEqual(archiveHash.digest(),localHash.digest())" in bundle
 assert "BatchArchiveExport.verifySources(part,proof)" in activity
-assert "restoreCheckpoint=LocalSafetyBackup.checkpoint(this,validated)" in activity
+assert "checkpoint=LocalSafetyBackup.checkpoint(this,validated)" in activity
+assert "atomic(disk,validated.toString(2)" in activity
+assert 'if(committed)jsonImportRevision++' in activity
 assert "VerifiedDocumentExport.save(getContentResolver(),uri,BackupFormat.MAX_GPX_BYTES" in activity
 assert "VerifiedDocumentExport.save(getContentResolver(),uri,BackupFormat.MAX_JSON_BYTES" in activity
 assert "new Thread(()->{" in activity
