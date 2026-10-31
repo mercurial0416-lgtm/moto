@@ -1727,7 +1727,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          // Non-critical follow-up must never turn a successfully committed restore
          // into an asset-only rollback. The previous JSON remains in before-import.json.
          boolean checkpointOk=true;
-         try{LocalSafetyBackup.checkpoint(this,db);}catch(Exception ignored){checkpointOk=false;}
+         try{checkpointOk=LocalSafetyBackup.checkpoint(this,db);}catch(Exception ignored){checkpointOk=false;}
          try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){ /* Restore is already committed. */ }
          final boolean checkpointReady=checkpointOk;
          runOnUiThread(()->{selected="";compare.clear();render();auditGarageSoon(false);
@@ -2240,6 +2240,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    if(snapshot.isEmpty()){error("백업 정보를 찾지 못했어요. 다시 시도하세요.");return;}
    new Thread(()->{
     boolean reserved=RestoreRideGate.beginExport(RideService.running,RideService.autoArmed);
+    boolean exportVerified=false;
     try{
     if(!reserved)throw new IOException(BackupExportGate.MESSAGE);
     int count;
@@ -2264,11 +2265,25 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       if(check==null)throw new IOException("백업 검증을 위해 파일을 다시 열 수 없어요.");
       checkedBackup=BackupIntegrity.verify(check);
      }
+     exportVerified=true;
     }finally{if(authenticated!=null)java.nio.file.Files.deleteIfExists(authenticated.toPath());}
     // Allow safe trash only for exact GPS bytes actually found in the verified user-owned ZIP.
     if(!"MEDIA".equals(part))BackupGpsProof.recordVerifiedZip(this,checkedBackup.trackSha256,checkedBackup.sidecarSha256,snapshot,"FULL".equals(part));
-    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast((password==null?("FULL".equals(part)?"전체 백업":part+" 분할 백업"):"암호화 백업")+" ZIP 검증 완료 · "+count+"개 항목");});
-   }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 백업 실패: "+e.getMessage());});}
+    final int actualCount=checkedBackup.entryNames.size();
+    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast((password==null?("FULL".equals(part)?"전체 백업":part+" 분할 백업"):"암호화 백업")+" ZIP 검증 완료 · "+actualCount+"개 항목");});
+   }catch(Exception e){
+    // The ACTION_CREATE_DOCUMENT result belongs to this export attempt.
+    // Never leave an incomplete ZIP looking like a valid user backup.
+    boolean orphan=false;
+    if(!exportVerified){
+     try{orphan=!android.provider.DocumentsContract.deleteDocument(getContentResolver(),uri);}
+     catch(Exception cleanup){orphan=true;}
+    }
+    final String detail=(exportVerified?"ZIP 자체는 검증됐지만 백업 증명 저장에 실패했습니다: ":"통합 백업 실패: ")
+     +(e.getMessage()==null?"파일/저장소를 확인해 주세요.":e.getMessage())
+     +(orphan?" · 불완전 ZIP 파일을 자동 삭제하지 못했으니 선택한 폴더에서 직접 삭제하세요.":"");
+    runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error(detail);});
+   }
     finally{if(password!=null)Arrays.fill(password,'\0');if(reserved)RestoreRideGate.endExport();}
    },"MOTO-full-backup").start();return;
   }
