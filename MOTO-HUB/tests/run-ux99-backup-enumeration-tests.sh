@@ -9,8 +9,8 @@ preflight=(src/"BackupReadiness.java").read_text()
 assert "File[] found=folder.listFiles(selector);" in bundle
 assert "if(found==null)throw new IOException" in bundle
 assert "if(folders==null)throw new IOException" in bundle
-assert "File[] tracks=listIfPresent(rides," in bundle
-assert "File[] selectedModels=listIfPresent(modelFolder," in bundle
+assert "File[] tracks=gps?listIfPresent(rides," in bundle
+assert "File[] selectedModels=media?listIfPresent(modelFolder," in bundle
 assert "total+=readmeBytes.length;" in bundle
 assert "File[] found=folder.listFiles(filter);" in preflight
 assert "if(found==null)throw new IOException" in preflight
