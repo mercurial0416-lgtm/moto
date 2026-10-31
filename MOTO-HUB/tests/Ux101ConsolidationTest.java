@@ -51,7 +51,7 @@ public final class Ux101ConsolidationTest {
      Files.write(model,jpg);
     }
    }
-   Path trash=Files.createDirectory(root.resolve("rides-trash"));
+   Path trash=Files.createDirectories(root.resolve("rides-trash"));
    Files.writeString(trash.resolve("strange.txt"),"not a ride");
    expectFailure(()->RideTrash.entries(root.toFile()),"unknown trash asset cannot disappear silently");
    Files.delete(trash.resolve("strange.txt"));
