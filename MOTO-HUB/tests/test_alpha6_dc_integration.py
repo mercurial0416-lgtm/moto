@@ -11,7 +11,8 @@ assert 'checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=P
 assert 'catch(Exception e){stopWith(' in service
 assert 'v.setTypeface(null,android.graphics.Typeface.BOLD);' in src('ObdDashboardActivity.java')
 assert 'static File[] recoveryPoints(Context context)' in back
-assert 'static void checkpoint(Context context,JSONObject data)' in back
+assert 'static boolean checkpoint(Context context,JSONObject data)' in back
+assert 'checkpointOk=LocalSafetyBackup.checkpoint(this,db)' in activity
 assert 'Store.parse(new String(bytes,StandardCharsets.UTF_8))' in back
 assert 'new AtomicFile(file)' in back
 assert 'if(points!=null&&points.length>12)' in back
