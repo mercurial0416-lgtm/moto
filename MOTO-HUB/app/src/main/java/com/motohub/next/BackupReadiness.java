@@ -36,6 +36,16 @@ final class BackupReadiness {
   return file!=null&&!Files.isSymbolicLink(file.toPath())
    &&Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS);
  }
+ /** Missing folders are empty; a present but unreadable folder must abort preflight. */
+ private static File[] listIfPresent(File folder,FilenameFilter filter)throws IOException{
+  if(!Files.exists(folder.toPath(),LinkOption.NOFOLLOW_LINKS))return new File[0];
+  if(Files.isSymbolicLink(folder.toPath())||
+     !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS))
+   throw new IOException("백업 폴더가 안전하지 않습니다: "+folder.getName());
+  File[] found=folder.listFiles(filter);
+  if(found==null)throw new IOException("백업 폴더 목록을 읽지 못했습니다: "+folder.getName());
+  return found;
+ }
  private static long addBytes(long current,long amount){
   if(amount<0||current>BackupFormat.MAX_TOTAL_BYTES||amount>BackupFormat.MAX_TOTAL_BYTES-current)
    return BackupFormat.MAX_TOTAL_BYTES+1;
@@ -48,9 +58,9 @@ final class BackupReadiness {
   if(Files.isSymbolicLink(ridesFolder.toPath())
    ||(ridesFolder.exists()&&!Files.isDirectory(ridesFolder.toPath(),LinkOption.NOFOLLOW_LINKS)))
    throw new IOException("GPS 저장 폴더가 안전하지 않습니다.");
-  File[] rides=ridesFolder.listFiles((d,name)->name.matches(BackupFormat.TRACK));
-  File[] photos=internal.listFiles((d,name)->name.matches(BackupFormat.PHOTO));
-  File[] receipts=internal.listFiles((d,name)->name.matches(BackupFormat.RECEIPT));
+  File[] rides=listIfPresent(ridesFolder,(d,name)->name.matches(BackupFormat.TRACK));
+  File[] photos=listIfPresent(internal,(d,name)->name.matches(BackupFormat.PHOTO));
+  File[] receipts=listIfPresent(internal,(d,name)->name.matches(BackupFormat.RECEIPT));
   int count=0,photoCount=0,receiptCount=0,empty=0,unfinished=0,oversized=0,completedEmpty=0;long bytes=0;
   if(rides!=null)for(File f:rides){
    count++;
@@ -59,21 +69,20 @@ final class BackupReadiness {
    if(length==0)empty++;
    if(length>BackupFormat.MAX_TRACK_BYTES)oversized++;
    boolean done=false;
-   for(String suffix:new String[]{".done",".imported",".recovered"}){
-    File flag=new File(f.getPath()+suffix);
-    if(Files.isSymbolicLink(flag.toPath())){oversized++;continue;}
-    if(safeRegular(flag))done=true;
+   // Mirror every sidecar emitted by BackupBundle; do not silently skip state flags.
+   for(String suffix:new String[]{".done",".imported",".recovered",".unmerged",
+            ".mergedinto",".bike",".category",".favorite"}){
+    File marker=new File(f.getPath()+suffix);
+    if(!Files.exists(marker.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
+    if(!safeRegular(marker)){oversized++;continue;}
+    long markerBytes=marker.length();
+    bytes=addBytes(bytes,markerBytes);
+    if(markerBytes>BackupFormat.entryLimit("rides/"+f.getName()+suffix))oversized++;
+    if(markerBytes==0&&(".done".equals(suffix)||".imported".equals(suffix)||
+                         ".recovered".equals(suffix)))done=true;
    }
    if(!done)unfinished++;
    else if(length==0)completedEmpty++;
-   for(String suffix:new String[]{".mergedinto",".bike",".category"}){
-    File metadata=new File(f.getPath()+suffix);
-    if(Files.isSymbolicLink(metadata.toPath()))oversized++;
-    else if(safeRegular(metadata)){
-     bytes=addBytes(bytes,metadata.length());
-     if(metadata.length()>BackupFormat.entryLimit("rides/"+f.getName()+suffix))oversized++;
-    }
-   }
   }
   if(photos!=null)for(File f:photos){
    photoCount++;

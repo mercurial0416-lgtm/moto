@@ -27,14 +27,23 @@ public final class BackupBundle {
     (Files.isSymbolicLink(dir.toPath())||!Files.isDirectory(dir.toPath(),LinkOption.NOFOLLOW_LINKS)))
    throw new IOException("백업 폴더가 안전하지 않습니다: "+dir.getName());
  }
+ /** An unreadable directory is NOT an empty directory: never certify an incomplete ZIP. */
+ private static File[] listIfPresent(File folder,FilenameFilter selector)throws IOException{
+  requireDirectoryIfPresent(folder);
+  if(!Files.exists(folder.toPath(),LinkOption.NOFOLLOW_LINKS))return new File[0];
+  File[] found=folder.listFiles(selector);
+  if(found==null)throw new IOException("백업 폴더 목록을 읽을 수 없습니다: "+folder.getName());
+  return found;
+ }
  private static final String[] TRASH_SIDECARS={".done",".imported",".recovered",".unmerged",".category",".bike",".favorite",".mergedinto"};
  /** Explicitly enumerate quarantined sessions without Android dependencies; incomplete folders block export. */
  private static List<File> trashTracks(File internal)throws IOException{
   File root=new File(internal,"rides-trash");
   requireDirectoryIfPresent(root);
   List<File> list=new ArrayList<>();
+  if(!Files.exists(root.toPath(),LinkOption.NOFOLLOW_LINKS))return list;
   File[] folders=root.listFiles();
-  if(folders==null)return list;
+  if(folders==null)throw new IOException("GPS 복구함 목록을 읽을 수 없습니다.");
   for(File folder:folders){
    if(!folder.getName().matches(BackupFormat.TRACK)||
       !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS)||
@@ -121,14 +130,18 @@ public final class BackupBundle {
    "현재 버전에서는 설정 > 백업·복원 > 전체 ZIP 백업 복원으로 사진과 GPS도 한 번에 불러올 수 있습니다.\n"+
    "FULL/암호화 ZIP에는 7일 이내의 저장되지 않은 주유 임시초안도 포함될 수 있습니다.\n"+
    "친구 로그인 토큰/인증키는 포함되지 않습니다. 위치가 포함될 수 있으니 공유하지 마세요.\n";
-  zip.putNextEntry(new ZipEntry("README-KO.txt"));zip.write(readme.getBytes(StandardCharsets.UTF_8));zip.closeEntry();
-  File photos=internal;File[] files=photos.listFiles((dir,name)->name.matches("garage-photo-[a-fA-F0-9-]{36}\\.jpg"));
+  byte[] readmeBytes=readme.getBytes(StandardCharsets.UTF_8);
+  if(readmeBytes.length>MAX_TOTAL-total)
+   throw new IOException("백업 최대 크기(250MB)를 넘었어요.");
+  total+=readmeBytes.length;
+  zip.putNextEntry(new ZipEntry("README-KO.txt"));zip.write(readmeBytes);zip.closeEntry();
+  File photos=internal;File[] files=listIfPresent(photos,(dir,name)->name.matches("garage-photo-[a-fA-F0-9-]{36}\\.jpg"));
   if(media&&files!=null){
    if(files.length>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 백업 한도(1,000장)를 초과했습니다.");
    Arrays.sort(files,Comparator.comparing(File::getName));
    for(File f:files){total=writeFile(zip,f,"photos/"+f.getName(),total);count++;}
   }
-  File[] receipts=internal.listFiles((dir,name)->name.matches(BackupFormat.RECEIPT));
+  File[] receipts=listIfPresent(internal,(dir,name)->name.matches(BackupFormat.RECEIPT));
   if(media&&receipts!=null){
    if(receipts.length>BackupFormat.MAX_RECEIPTS)throw new IOException("영수증·작업 사진이 4,000장을 초과했습니다.");
    Arrays.sort(receipts,Comparator.comparing(File::getName));
@@ -137,7 +150,7 @@ public final class BackupBundle {
   // Save user-selected online gallery images, not auto-recoverable downloaded thumbnails.
   File modelFolder=new File(internal,"moto-year-photos");
   requireDirectoryIfPresent(modelFolder);
-  File[] selectedModels=modelFolder.listFiles((dir,name)->name.matches(BackupFormat.MODEL_PHOTO));
+  File[] selectedModels=listIfPresent(modelFolder,(dir,name)->name.matches(BackupFormat.MODEL_PHOTO));
   if(media&&selectedModels!=null){
    Arrays.sort(selectedModels,Comparator.comparing(File::getName));
    int selectedCount=0;
@@ -152,7 +165,7 @@ public final class BackupBundle {
     total=writeFile(zip,metadata,"model-photos/"+metadata.getName(),total);count++;
    }
   }
-  File rides=new File(internal,"rides");File[] tracks=rides.listFiles((dir,name)->name.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));
+  File rides=new File(internal,"rides");File[] tracks=listIfPresent(rides,(dir,name)->name.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));
   if(gps&&tracks!=null){if(tracks.length>BackupFormat.MAX_TRACKS)throw new IOException("주행 기록 10,000건 백업 한도를 초과했습니다.");
    Arrays.sort(tracks,Comparator.comparing(File::getName));
    for(File file:tracks){
