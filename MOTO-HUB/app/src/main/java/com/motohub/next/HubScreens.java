@@ -609,6 +609,21 @@ final class HubScreens {
   a.label(p,BackupGpsProof.fullStatus(a)+"\n"+BackupGpsProof.fullCurrentStatus(a,a.db.toString())+
    "\n바이크 영구 삭제는 현재 데이터와 일치하는 검증된 전체 ZIP이 있어야 가능합니다.",13,a.muted,false);
   a.action(p,"전체 ZIP 백업",true,a::exportBundle);
+  a.action(p,"GPS 백업 내용 정밀 검사 (SHA-256)",false,()->{
+   if(RideService.running||RideService.autoArmed||RideService.saving()){
+    a.toast("라이딩 중에는 GPS 원본 검사 대신 기록을 먼저 완료해 주세요.");return;
+   }
+   final String snapshot=a.db.toString();
+   a.toast("GPS 원본을 읽어 전체 ZIP 해시와 비교하는 중…");
+   LOCAL_BACKUP_IO.execute(()->{
+    String report=BackupGpsProof.fullGpsDeepStatus(a,snapshot);
+    a.runOnUiThread(()->{
+     if(a.isFinishing()||a.isDestroyed())return;
+     new AlertDialog.Builder(a).setTitle("GPS 전체 백업 정밀 검사")
+      .setMessage(report).setPositiveButton("확인",null).show();
+    });
+   });
+  });
   a.action(p,"전체 ZIP 복원",false,a::importBundle);
   a.action(p,"추가 도구 · 대용량 백업 · GPS",false,this::backupMore);
   a.show();
