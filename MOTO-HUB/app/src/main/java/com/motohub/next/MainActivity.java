@@ -343,7 +343,7 @@ public class MainActivity extends Activity {
   return arr("vehicles").length()>0?arr("vehicles").optJSONObject(0):null;}
  String bikeName(String id){for(JSONObject b:items("vehicles"))if(b.optString("id").equals(id))return b.optString("name");return "차량 없음";}
  List<JSONObject> items(String key){List<JSONObject> list=new ArrayList<>();JSONArray a=arr(key);for(int i=a.length()-1;i>=0;i--)list.add(a.optJSONObject(i));if(key.equals("services")||key.equals("expenses"))list.sort((x,y)->y.optString("date").compareTo(x.optString("date")));return list;}
- void write(JSONObject next)throws Exception{if(readOnly)throw new Exception("원본 보호 중입니다. 백업 복원을 먼저 해 주세요.");if(RestoreRideGate.isRestoring())throw new IOException("복원 중에는 기록을 변경할 수 없습니다.");Store.parse(next.toString());
+ void write(JSONObject next)throws Exception{if(readOnly)throw new Exception("원본 보호 중입니다. 백업 복원을 먼저 해 주세요.");if(RestoreRideGate.isRestoring()||jsonImportRunning||observedJsonImportRevision!=jsonImportRevision)throw new IOException("JSON 복원 데이터 갱신 중에는 기존 화면에서 저장할 수 없습니다.");Store.parse(next.toString());
   // The first snapshot of the day must preserve the state before the edit, not the new state.
   LocalSafetyBackup.snapshot(this,db);
   atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));db=next;LocalSafetyBackup.checkpoint(this,next);MotoWidgetProvider.refresh(this);}
