@@ -278,7 +278,7 @@ final class GarageHomeUi {
    android.graphics.Bitmap loaded=MotorcyclePhoto.decodeLocalSampled(custom,1024);
    if(loaded!=null)HERO_CACHE.put(key,loaded);
    a.runOnUiThread(()->{
-    if(a.isFinishing()||a.isDestroyed()||!iv.isAttachedToWindow()||
+    if(a.isFinishing()||a.isDestroyed()||
        !key.equals(iv.getTag())||a.bike()==null||
        !bikeId.equals(a.bike().optString("id")))return;
     if(loaded!=null){iv.setImageBitmap(loaded);return;}

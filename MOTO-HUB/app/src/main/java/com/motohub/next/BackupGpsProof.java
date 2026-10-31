@@ -39,8 +39,18 @@ final class BackupGpsProof {
     .putString("last_gps_zip_kind",full?"전체 ZIP":"GPS 분할 ZIP");
   if(full){
    if(currentJson==null||currentJson.isEmpty())throw new IOException("전체 백업 원본을 확인하지 못했습니다.");
+   JSONObject fileDetails=new JSONObject();
+   File folder=new File(context.getFilesDir(),"rides");
+   for(String name:hashes.keySet()){
+    File file=new File(folder,name);
+    if(!file.isFile()||java.nio.file.Files.isSymbolicLink(file.toPath()))
+     throw new IOException("전체 백업 GPS 원본 파일이 사라졌습니다. 새로 내보내세요.");
+    try{fileDetails.put(name,new JSONObject().put("size",file.length()).put("modified",file.lastModified()));}
+    catch(org.json.JSONException malformed){throw new IOException("백업 GPS 파일 정보 저장 실패",malformed);}
+   }
    editor.putString("full_db_sha256",digest(currentJson))
     .putString("full_track_names",json.toString())
+    .putString("full_track_details",fileDetails.toString())
     .putLong("full_completed_at",System.currentTimeMillis());
   }
   if(!editor.commit())throw new IOException("검증한 백업 GPS 정보를 저장하지 못했습니다.");
@@ -95,22 +105,68 @@ final class BackupGpsProof {
     :"마지막 전체 ZIP 이후 데이터 변경됨 · 새 전체 백업 권장";
   }catch(IOException error){return "전체 백업 검증 상태 확인 실패 · 원본 유지";}
  }
- /** File-name inventory only: cheap enough for settings, never claims GPS contents match by hash. */
+ /** Fast metadata check for the settings screen. Byte-for-byte verification is a separate worker action. */
  private static String fullGpsStatus(Context context,SharedPreferences prefs){
-  String inventory=prefs.getString("full_track_names",null);
-  if(inventory==null)return "DB 백업 일치 · 이전 전체 ZIP의 GPS 목록 검증 정보 없음 · 새 전체 백업 권장";
+  String raw=prefs.getString("full_track_names",null),detailsRaw=prefs.getString("full_track_details",null);
+  if(raw==null)return "DB 백업 일치 · 이전 ZIP의 GPS 정보 없음 · 새 전체 백업 권장";
   try{
-   JSONObject exported=new JSONObject(inventory);
+   JSONObject exported=new JSONObject(raw);
+   if(detailsRaw==null)return "DB 백업 일치 · GPS 변경 검사 정보 없음 · 새 전체 백업 권장";
+   JSONObject details=new JSONObject(detailsRaw);
    File rides=new File(context.getFilesDir(),"rides");
-   if(rides.exists()&&!rides.isDirectory())return "GPS 저장 폴더 확인 불가 · 전체 백업 확인 필요";
-   if(rides.isDirectory()){
-    File[] local=rides.listFiles((dir,name)->name.matches(BackupFormat.TRACK));
-    if(local==null)return "GPS 목록 확인 실패 · 전체 백업 확인 필요";
-    for(File file:local)if(file.isFile()&&!java.nio.file.Files.isSymbolicLink(file.toPath())&&!exported.has(file.getName()))
-     return "마지막 전체 ZIP 이후 새 GPS 기록 있음 · 전체 백업 다시 권장";
+   if(rides.exists()&&!rides.isDirectory())return "GPS 저장 폴더 확인 불가 · 새 백업 필요";
+   File[] local=rides.isDirectory()?rides.listFiles((dir,name)->name.matches(BackupFormat.TRACK)):new File[0];
+   if(local==null)return "GPS 파일 목록 읽기 실패 · 새 백업 필요";
+   int checked=0;
+   for(File file:local){
+    if(java.nio.file.Files.isSymbolicLink(file.toPath())||!file.isFile())return "GPS 원본 파일 접근 오류 · 새 백업 필요";
+    if(!exported.has(file.getName()))return "마지막 전체 ZIP 이후 새 GPS 기록 있음 · 새 전체 백업 권장";
+    JSONObject expected=details.optJSONObject(file.getName());
+    if(expected==null||!expected.has("size")||!expected.has("modified"))
+     return "GPS 백업 정보 불완전 · 새 전체 백업 권장";
+    if(file.length()!=expected.optLong("size",-1)||file.lastModified()!=expected.optLong("modified",-1))
+     return "전체 ZIP 이후 GPS 원본이 변경됨 · 새 전체 백업 권장";
+    checked++;
    }
-   return "현재 DB·GPS 파일 목록이 전체 ZIP 검증 기록과 일치 · GPS 내용 변경과 외부 파일 보관은 별도 확인";
-  }catch(org.json.JSONException invalid){return "GPS 백업 목록 검증 정보 손상 · 전체 백업 다시 권장";}
+   if(checked!=exported.length())return "전체 ZIP 이후 GPS 원본이 삭제됨 · 백업 재확인 필요";
+   return "DB·GPS 목록 및 파일 정보 일치 · 정확한 내용은 GPS 해시 검사에서 확인";
+  }catch(org.json.JSONException invalid){return "GPS 백업 검사 정보 손상 · 새 전체 백업 권장";}
+ }
+ /** Full GPS SHA-256 check, call only from a background worker while no ride is recording. */
+ static String fullGpsDeepStatus(Context context,String currentJson){
+  SharedPreferences prefs=context.getSharedPreferences(PREFS,0);
+  String raw=prefs.getString("full_track_names",null);
+  String expectedDb=prefs.getString("full_db_sha256","");
+  if(raw==null||expectedDb==null||!expectedDb.matches("[a-f0-9]{64}"))
+   return "검증된 전체 ZIP의 GPS 해시 기록이 없습니다. 전체 ZIP을 다시 만들어 주세요.";
+  try{
+   if(currentJson==null||!expectedDb.equals(digest(currentJson)))
+    return "전체 ZIP 이후 DB 내용이 변경됐습니다. 새 전체 백업을 만들어 주세요.";
+   JSONObject exported=new JSONObject(raw);
+   File rides=new File(context.getFilesDir(),"rides");
+   if(rides.exists()&&!rides.isDirectory())return "GPS 폴더를 읽지 못했습니다.";
+   File[] local=rides.isDirectory()?rides.listFiles((dir,name)->name.matches(BackupFormat.TRACK)):new File[0];
+   if(local==null)return "GPS 파일 목록을 읽지 못했습니다.";
+   int verified=0;
+   for(File file:local){
+    if(java.nio.file.Files.isSymbolicLink(file.toPath())||!file.isFile())
+     return "안전하지 않거나 읽을 수 없는 GPS 원본이 있습니다.";
+    String expected=exported.optString(file.getName(),"");
+    if(!expected.matches("[a-f0-9]{64}"))return "전체 ZIP 이후 추가된 GPS 원본이 있습니다. 새 백업을 만들어 주세요.";
+    if(file.length()>TrackFile.MAX_BYTES)return "GPS 원본 크기 제한 초과 · 검사 중단";
+    java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256");
+    try(java.io.InputStream input=new java.io.BufferedInputStream(new java.io.FileInputStream(file))){
+     byte[] buffer=new byte[32768];int read;
+     while((read=input.read(buffer))!=-1)digest.update(buffer,0,read);
+    }
+    StringBuilder actual=new StringBuilder(64);
+    for(byte b:digest.digest())actual.append(String.format(java.util.Locale.ROOT,"%02x",b&0xff));
+    if(!expected.equals(actual.toString()))return "전체 ZIP 이후 GPS 원본의 내용이 변경됐습니다. 새 전체 백업이 필요합니다.";
+    verified++;
+   }
+   if(verified!=exported.length())return "전체 ZIP 이후 GPS 원본이 삭제됐습니다. 백업을 확인해 주세요.";
+   return "전체 ZIP과 현재 DB·GPS 원본 "+verified+"건의 SHA-256이 모두 일치합니다. ZIP 파일의 외부 보관 여부는 별도 확인하세요.";
+  }catch(Exception error){return "GPS 원본 해시 검사 실패 · 원본 기록은 변경하지 않았습니다.";}
  }
  static String fullStatus(Context context){
   long timestamp=context.getSharedPreferences(PREFS,0).getLong("full_completed_at",0);

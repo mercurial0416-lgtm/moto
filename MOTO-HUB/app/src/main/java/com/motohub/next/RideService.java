@@ -101,6 +101,15 @@ public final class RideService extends Service implements LocationListener {
    catch(IOException e){stopWith("GPS 저장 오류 · 경로를 복구 화면에서 확인하세요.",false);}
   }
  }};
+ /** Independent of location callbacks: runs every 60s even during GPS signal loss. */
+ final Runnable storageWatchdog=new Runnable(){@Override public void run(){
+  synchronized(RideService.this){
+   if(!running||output==null)return;
+   checkRuntimeStorage();
+   if(running&&output!=null&&gpsWriteHandler!=null)
+    gpsWriteHandler.postDelayed(this,60_000L);
+  }
+ }};
  volatile boolean finishPending=false,autoFinishPending=false;
  final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
     // Turning off developer experiments revokes OBD permission, not consent to a
@@ -217,6 +226,10 @@ public final class RideService extends Service implements LocationListener {
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);gpsSyncScheduled=false;
   startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;liveMovingMillis=0;liveStationaryMillis=0;lastWidgetRefreshElapsed=0;gpsOnlyAfterObd=false;
   active=track.getName();running=true;notificationRate.reset();status="GPS 신호 대기";
+  if(gpsWriteHandler!=null){
+   gpsWriteHandler.removeCallbacks(storageWatchdog);
+   gpsWriteHandler.postDelayed(storageWatchdog,60_000L);
+  }
   MotoWidgetProvider.refresh(this);
  }
  private void armAutomaticRide(String address){
@@ -436,7 +449,7 @@ public final class RideService extends Service implements LocationListener {
   return builder.build();
  }
  /** Runs on the GPS worker, not UI; the first check is immediate, then at most once a minute. */
- private boolean checkRuntimeStorage(){
+ private synchronized boolean checkRuntimeStorage(){
   long now=SystemClock.elapsedRealtime();
   if(now-lastStorageCheckElapsed<60_000L)return running;
   lastStorageCheckElapsed=now;
@@ -541,6 +554,8 @@ public final class RideService extends Service implements LocationListener {
   return verified;
  }
  synchronized void cleanup(boolean completed){
+  // Stop the independent space watchdog before closing any GPS writer.
+  if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(storageWatchdog);
   // Invalidate queued main-thread finalization callbacks after failures or process teardown.
   finishPending=false;autoFinishPending=false;
   Sharing.stop();autoArmed=false;obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";

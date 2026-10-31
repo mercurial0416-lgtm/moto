@@ -16,7 +16,8 @@ archive=g("BatchArchiveExport.java")
 assert hub.index('line("고급 설정 · 문제 해결"')>hub.index('void settings(){')
 assert 'void advancedSettings(){' in hub and 'void backupMore(){' in hub
 base=hub[hub.index('void basicBackup(){'):hub.index('void backupMore(){')]
-assert base.count('a.action(')==3 and '전체 ZIP 백업' in base and '전체 ZIP 복원' in base
+assert base.count('a.action(')==4 and '전체 ZIP 백업' in base and '전체 ZIP 복원' in base
+assert 'GPS 백업 내용 정밀 검사 (SHA-256)' in base and 'BackupGpsProof.fullGpsDeepStatus(a,snapshot)' in base
 assert '홈 버튼 편집 · 순서' not in home and 'new GarageHomeUi(a).editHomeShortcuts()' in hub
 assert 'recoverInterrupted(File files)' in ride and 'RideTrash.recoverInterrupted(getFilesDir())' in main
 assert 'RideCompletionInbox.record(a,restored)' not in store

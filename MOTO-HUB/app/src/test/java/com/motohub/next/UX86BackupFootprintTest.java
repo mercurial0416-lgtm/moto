@@ -145,9 +145,14 @@ public class UX86BackupFootprintTest {
    fail("GPS partition may not authorize vehicle cascade delete");
   }catch(java.io.IOException expected){assertTrue(expected.getMessage().contains("전체 ZIP"));}
   String current=Store.empty().toString();
-  BackupGpsProof.record(app,hashes,Map.of(),current,true);
-  assertTrue(BackupGpsProof.status(app,track).contains("전체 ZIP"));
-  BackupGpsProof.requireFullCurrent(app,current);
+  // A verified full ZIP has a real local GPS origin; the legacy test used only a synthetic hash.
+  File source=new File(TrackFile.directory(app.getFilesDir()),track.getName());
+  java.nio.file.Files.write(source.toPath(),TrackFile.point(37.0,127.0,5.0,1761888000000L).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  try{
+   BackupGpsProof.record(app,hashes,Map.of(),current,true);
+   assertTrue(BackupGpsProof.status(app,track).contains("전체 ZIP"));
+   BackupGpsProof.requireFullCurrent(app,current);
+  }finally{java.nio.file.Files.deleteIfExists(source.toPath());}
   try{
    BackupGpsProof.requireFullCurrent(app,current+"modified");
    fail("stale full-backup snapshot must be refused");

@@ -3,7 +3,7 @@
   "project": "MOTO HUB",
   "lastReviewed": "2026-10-31",
   "sourceBranch": "release/moto-hub-apk",
-  "sourceCandidateVersion": 558,
+  "sourceCandidateVersion": 559,
   "publicSignedVersionAtReview": 556,
   "definition": {
     "implemented": "Source and regression code created",
@@ -127,8 +127,33 @@
       "title": "Signed OTA publishing waits for exact commit Android CI and validates safety checks",
       "status": "implemented",
       "releaseCandidate": 558
+    },
+    {
+      "id": "UX96-BACKUP-GPS-DEEP-INTEGRITY",
+      "title": "Detect missing/changed GPS after full backup; one-tap streaming SHA-256 check",
+      "status": "implemented",
+      "releaseCandidate": 559
+    },
+    {
+      "id": "UX96-PHOTO-PREATTACH",
+      "title": "Preserve correct async model/garage photo result before view attachment",
+      "status": "implemented",
+      "releaseCandidate": 559
+    },
+    {
+      "id": "UX96-NOFIX-GPS-SPACE",
+      "title": "Run independent 60s storage watchdog during GPS signal loss with original track preserved",
+      "status": "implemented",
+      "releaseCandidate": 559
+    },
+    {
+      "id": "UX96-FIXED-KEY-OTA",
+      "title": "Publish in-app 559 OTA with original signing key",
+      "status": "blocked",
+      "releaseCandidate": 559,
+      "blocker": "GitHub Actions original signing secrets not configured; do not publish false update manifest"
     }
   ],
   "policy": "Never suggest implemented or merged items again as if they were newly discovered; instead test or finish their specific outstanding blocker. Never claim installed-device or signed release complete from source-only checks.",
-  "signingStatus": "Local original-key PKCS#12 certificate fingerprint verified 2026-10-31. User key never committed. Attempt offline apksigner-produced fixed-key v558 APK separately from OTA publication; GitHub signing secrets still unconfigured."
+  "signingStatus": "Original fixed PKCS12 remains private. v559 signed APK local build subject to CI. GitHub Actions OTA needs configured signing secrets; public manifest remains 556 until actual signed release is published."
 }
