@@ -7,6 +7,11 @@ final class HubScreens {
   Thread t=new Thread(r,"moto-local-backup-io");t.setDaemon(true);return t;
  });
  final MainActivity a;
+ /** Use exactly the verified ZIP JSON formatting; an invalid snapshot must fail closed. */
+ String backupJsonSnapshot(){
+  try{return a.db.toString(2);}
+  catch(org.json.JSONException malformed){return null;}
+ }
  final Map<JSONObject,String> visibleLedgerCollections=new IdentityHashMap<>();
  static final class GpsSearchRow {
   final String title,filename,bikeId,date,index;
@@ -452,7 +457,17 @@ final class HubScreens {
   a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
- void settings(){title("설정","기록·내비·정비·백업만 간편하게 관리");a.section("데이터 및 복구");line("백업 · 복원",BackupGpsProof.fullCurrentStatus(a,a.db.toString()),"열기",this::basicBackup);
+ void settings(){title("설정","기록·내비·정비·백업만 간편하게 관리");a.section("데이터 및 복구");line("백업 · 복원","GPS 백업 상태를 백그라운드에서 검사합니다","열기",this::basicBackup);
+ final TextView backupState=a.text("백업 상태 확인 중…",12,a.muted,false);
+ a.content.addView(backupState);
+ final String settingsSnapshot=backupJsonSnapshot();
+ LOCAL_BACKUP_IO.execute(()->{
+  String status=BackupGpsProof.fullCurrentStatus(a,settingsSnapshot);
+  a.runOnUiThread(()->{
+   if(!a.isFinishing()&&!a.isDestroyed()&&backupState.getParent()!=null)
+    backupState.setText(status);
+  });
+ });
  line("데이터 연결 검사","주유·정비 기록의 바이크 연결, 계기판, 중복 점검","검사",()->a.auditGarageSoon(true));
   line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":
     "현재 "+BuildConfig.VERSION_CODE+" · "+(UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256)?
@@ -606,15 +621,26 @@ final class HubScreens {
  void basicBackup(){
   LinearLayout p=a.page("백업 · 복원");
   a.label(p,"전체 ZIP에는 주행 기록·GPS 복구함·사진·기본 홈 설정과 유효한 주유 임시초안도 포함됩니다. 앱 삭제 전에 휴대폰 밖에 보관하세요.",14,a.muted,false);
-  a.label(p,BackupGpsProof.fullStatus(a)+"\n"+BackupGpsProof.fullCurrentStatus(a,a.db.toString())+
+  final TextView freshness=a.text(BackupGpsProof.fullStatus(a)+"\nGPS 원본 백업 상태 검사 중…"+
    "\n바이크 영구 삭제는 현재 데이터와 일치하는 검증된 전체 ZIP이 있어야 가능합니다.",13,a.muted,false);
+  p.addView(freshness);
+  final String backupSnapshot=backupJsonSnapshot(); // Same JSON serialization as the verified ZIP.
+  LOCAL_BACKUP_IO.execute(()->{
+   String status=BackupGpsProof.fullCurrentStatus(a,backupSnapshot);
+   a.runOnUiThread(()->{
+    if(!a.isFinishing()&&!a.isDestroyed()&&freshness.getParent()!=null)
+     freshness.setText(BackupGpsProof.fullStatus(a)+"\n"+status+
+      "\n바이크 영구 삭제는 현재 데이터와 일치하는 검증된 전체 ZIP이 있어야 가능합니다.");
+   });
+  });
   a.action(p,"전체 ZIP 백업",true,a::exportBundle);
   a.action(p,"GPS 백업 내용 정밀 검사 (SHA-256)",false,()->{
    if(RideService.running||RideService.autoArmed||RideService.saving()){
     a.toast("라이딩 중에는 GPS 원본 검사 대신 기록을 먼저 완료해 주세요.");return;
    }
-   final String snapshot=a.db.toString();
-   a.toast("GPS 원본을 읽어 전체 ZIP 해시와 비교하는 중…");
+   final String snapshot=backupJsonSnapshot();
+   if(snapshot==null){a.toast("백업 DB JSON 형식을 확인하지 못했습니다. 데이터 검사 후 새 백업을 만드세요.");return;}
+   a.toast("GPS 원본과 부속 파일을 전체 ZIP 해시와 비교하는 중…");
    LOCAL_BACKUP_IO.execute(()->{
     String report=BackupGpsProof.fullGpsDeepStatus(a,snapshot);
     a.runOnUiThread(()->{

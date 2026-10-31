@@ -39,7 +39,7 @@ public final class UX96IntegrityTest {
    Files.write(file.toPath(),initial);
    BackupGpsProof.record(c,hashes,new HashMap<>(),json,true);
    assertTrue(BackupGpsProof.fullCurrentStatus(c,json).contains("일치"));
-   assertTrue(BackupGpsProof.fullGpsDeepStatus(c,json).contains("모두 일치"));
+   assertTrue(BackupGpsProof.fullGpsDeepStatus(c,json).contains("SHA-256이 일치"));
    long time=file.lastModified();
    Files.write(file.toPath(),changed);
    assertEquals(initial.length,file.length());
