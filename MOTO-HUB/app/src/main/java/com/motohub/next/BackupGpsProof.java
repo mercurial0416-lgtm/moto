@@ -51,6 +51,8 @@ final class BackupGpsProof {
    editor.putString("full_db_sha256",digest(currentJson))
     .putString("full_track_names",json.toString())
     .putString("full_track_details",fileDetails.toString())
+    // Snapshot of the verified FULL ZIP, not the most recent split GPS ZIP.
+    .putString("full_sidecar_sha256",sidecars==null?"":metadata.toString())
     .putLong("full_completed_at",System.currentTimeMillis());
   }
   if(!editor.commit())throw new IOException("검증한 백업 GPS 정보를 저장하지 못했습니다.");
@@ -143,6 +145,10 @@ final class BackupGpsProof {
    if(currentJson==null||!expectedDb.equals(digest(currentJson)))
     return "전체 ZIP 이후 DB 내용이 변경됐습니다. 새 전체 백업을 만들어 주세요.";
    JSONObject exported=new JSONObject(raw);
+   String fullSidecarsRaw=prefs.getString("full_sidecar_sha256",null);
+   if(fullSidecarsRaw==null||fullSidecarsRaw.isEmpty())
+    return "이전 전체 ZIP의 GPS 부속 파일 검증 기록이 없습니다. 새 전체 백업이 필요합니다.";
+   JSONObject savedSidecars=new JSONObject(fullSidecarsRaw);
    File rides=new File(context.getFilesDir(),"rides");
    if(rides.exists()&&!rides.isDirectory())return "GPS 폴더를 읽지 못했습니다.";
    File[] local=rides.isDirectory()?rides.listFiles((dir,name)->name.matches(BackupFormat.TRACK)):new File[0];
@@ -162,10 +168,31 @@ final class BackupGpsProof {
     StringBuilder actual=new StringBuilder(64);
     for(byte b:digest.digest())actual.append(String.format(java.util.Locale.ROOT,"%02x",b&0xff));
     if(!expected.equals(actual.toString()))return "전체 ZIP 이후 GPS 원본의 내용이 변경됐습니다. 새 전체 백업이 필요합니다.";
+    JSONObject tracked=savedSidecars.optJSONObject(file.getName());
+    if(tracked==null)return "전체 ZIP의 GPS 부속 파일 목록이 불완전합니다. 다시 백업해 주세요.";
+    for(String suffix:RideTrash.SIDECARS){
+     File sidecar=new File(file.getPath()+suffix);
+     String expectedSidecar=tracked.optString(suffix,"");
+     if(!expectedSidecar.isEmpty()&&!expectedSidecar.matches("[a-f0-9]{64}"))
+      return "GPS 부속 파일 검증값이 잘못됐습니다: "+suffix;
+     boolean exists=java.nio.file.Files.exists(sidecar.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS);
+     if(!exists){
+      if(!expectedSidecar.isEmpty())return "전체 ZIP 이후 GPS 부속 파일이 삭제됐습니다: "+suffix;
+      continue;
+     }
+     if(java.nio.file.Files.isSymbolicLink(sidecar.toPath())||
+       !java.nio.file.Files.isRegularFile(sidecar.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS))
+      return "안전하지 않은 GPS 부속 파일이 있습니다: "+suffix;
+     if(expectedSidecar.isEmpty())return "전체 ZIP 이후 GPS 부속 파일이 추가됐습니다: "+suffix;
+     long max=suffix.equals(".mergedinto")?100:suffix.equals(".bike")||suffix.equals(".category")?64:0;
+     if(sidecar.length()>max)return "GPS 부속 파일 크기 초과: "+suffix;
+     if(!expectedSidecar.equals(digestBytes(java.nio.file.Files.readAllBytes(sidecar.toPath()))))
+      return "전체 ZIP 이후 GPS 부속 파일 내용이 변경됐습니다: "+suffix;
+    }
     verified++;
    }
    if(verified!=exported.length())return "전체 ZIP 이후 GPS 원본이 삭제됐습니다. 백업을 확인해 주세요.";
-   return "전체 ZIP과 현재 DB·GPS 원본 "+verified+"건의 SHA-256이 모두 일치합니다. ZIP 파일의 외부 보관 여부는 별도 확인하세요.";
+   return "전체 ZIP과 현재 DB·GPS 원본 및 부속 파일 "+verified+"건의 SHA-256이 일치합니다. ZIP 외부 보관은 별도 확인하세요.";
   }catch(Exception error){return "GPS 원본 해시 검사 실패 · 원본 기록은 변경하지 않았습니다.";}
  }
  static String fullStatus(Context context){
