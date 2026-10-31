@@ -15,8 +15,9 @@ public class BackupBundleTest {
    File attribution=new File(galleryDir,selected.getName()+".json");
    Files.writeString(attribution.toPath(),"{\"userSelected\":true,\"label\":\"Honda Super Cub\"}");
    ByteArrayOutputStream out=new ByteArrayOutputStream();int files=BackupBundle.export("{\"version\":3}",root,out);
-   ok(files==5,"selected gallery image + attribution included");
+   ok(files==8,"all ZIP entries counted including README, GPX, marker, gallery image and attribution");
    Set<String> entries=new HashSet<>();try(ZipInputStream zip=new ZipInputStream(new ByteArrayInputStream(out.toByteArray()))){ZipEntry e;while((e=zip.getNextEntry())!=null)entries.add(e.getName());}
+   ok(files==entries.size(),"exporter entry count matches the actual ZIP directory");
    for(String n:new String[]{"README-KO.txt","MOTO-HUB-data.json","rides/"+track.getName(),"photos/"+photo.getName(),"gpx/"+track.getName().replace(".track",".gpx"),"rides/"+track.getName()+".recovered",
     "model-photos/"+selected.getName(),"model-photos/"+attribution.getName()})ok(entries.contains(n),"missing "+n);
    BackupIntegrity.Result verified=BackupIntegrity.verify(new ByteArrayInputStream(out.toByteArray()));
