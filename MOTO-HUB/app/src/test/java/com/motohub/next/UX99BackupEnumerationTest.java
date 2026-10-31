@@ -62,4 +62,25 @@ public final class UX99BackupEnumerationTest {
    assertTrue(data);assertTrue(readme);
   }finally{Files.deleteIfExists(root);}
  }
+
+ @Test public void presentButUnreadableDirectoryCannotMasqueradeAsEmpty()throws Exception{
+  Path root=Files.createTempDirectory("ux99-unreadable-");
+  try{
+   File unreadable=new File(root.toString()){
+    @Override public File[] listFiles(java.io.FilenameFilter filter){return null;}
+   };
+   for(Class<?> klass:new Class<?>[]{BackupBundle.class,BackupReadiness.class}){
+    java.lang.reflect.Method method=klass.getDeclaredMethod(
+       "listIfPresent",File.class,java.io.FilenameFilter.class);
+    method.setAccessible(true);
+    try{
+     method.invoke(null,unreadable,
+       (java.io.FilenameFilter)(dir,name)->true);
+     fail(klass.getSimpleName()+" must not treat an unreadable folder as empty");
+    }catch(java.lang.reflect.InvocationTargetException failure){
+     assertTrue(failure.getCause() instanceof java.io.IOException);
+    }
+   }
+  }finally{Files.deleteIfExists(root);}
+ }
 }
