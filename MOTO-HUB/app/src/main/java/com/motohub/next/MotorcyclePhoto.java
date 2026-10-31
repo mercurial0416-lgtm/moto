@@ -123,6 +123,24 @@ final class MotorcyclePhoto {
    return BitmapFactory.decodeFile(photo.getAbsolutePath(),scaled);
   }catch(Exception invalid){return null;}
  }
+ /** Retry bounded photo-worker saturation without blocking the UI or repeating a stale view request. */
+ private static void retryManualPhotoQueue(MainActivity a,ImageView target,TextView credit,
+   long requestToken,Runnable decode,Runnable manualRetry,int remaining){
+  if(a.isFinishing()||a.isDestroyed()||!PhotoRequestGuard.isCurrent(target,requestToken))return;
+  if(remaining<=0){
+   credit.setText("사진 로딩이 밀렸어요 · 탭해서 다시 시도");
+   credit.setOnClickListener(v->manualRetry.run());
+   return;
+  }
+  credit.setText("내 사진 불러오기 대기 중…");
+  new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(()->{
+   if(a.isFinishing()||a.isDestroyed()||!PhotoRequestGuard.isCurrent(target,requestToken))return;
+   try{PHOTO_DISK.execute(decode);}
+   catch(java.util.concurrent.RejectedExecutionException full){
+    retryManualPhotoQueue(a,target,credit,requestToken,decode,manualRetry,remaining-1);
+   }
+  },remaining==2?350L:800L);
+ }
  /** Main thread only. Each lookup owns a generation token, so stale responses cannot overwrite newer selections. */
  static void show(MainActivity a,ImageView target,TextView credit,String brand,String model,int year,String garageBikeId){
   showInternal(a,target,credit,brand,model,year,garageBikeId,false,false);
@@ -147,8 +165,7 @@ final class MotorcyclePhoto {
     final long size=manual.length(),modified=manual.lastModified();
     credit.setText("내 사진 불러오는 중… · 탭해서 변경");
     credit.setOnClickListener(v->a.chooseGaragePhoto());
-    try{
-     PHOTO_DISK.execute(()->{
+    Runnable manualDecode=()->{
       Bitmap loaded=decodeLocalSampled(manual,1200);
       a.runOnUiThread(()->{
        if(a.isFinishing()||a.isDestroyed()||!PhotoRequestGuard.isCurrent(target,requestToken)){
@@ -166,8 +183,11 @@ final class MotorcyclePhoto {
        }
       });
      });
-    }catch(java.util.concurrent.RejectedExecutionException queueFull){
-     credit.setText("내 사진 불러오기 대기 중 · 사진 변경 후 다시 확인");
+    };
+    try{PHOTO_DISK.execute(manualDecode);}
+    catch(java.util.concurrent.RejectedExecutionException queueFull){
+     retryManualPhotoQueue(a,target,credit,requestToken,manualDecode,
+      ()->show(a,target,credit,brand,model,year,garageBikeId),2);
     }
     return;
    }
