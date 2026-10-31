@@ -34,6 +34,11 @@ public final class Ux102SafetyRegressionTest {
   expect(json!=null&&json.json.contains("records"),"JSON export retains snapshot");
   expect(json.password==null,"plaintext export does not attach a password");
 
+  char[] abandoned="abandoned-secret-123".toCharArray();
+  BackupPickerTransfer.begin(48,"",abandoned);
+  BackupPickerTransfer.cancelAll();
+  expect(BackupPickerTransfer.take(48)==null,"Activity finish scrubs abandoned password");
+
   Path root=Files.createTempDirectory("moto-ux102-");
   try{
    expect(TrackFile.tracks(root.toFile()).isEmpty(),"fresh directory returns empty safe list");
