@@ -141,10 +141,36 @@ final class MotorcyclePhoto {
   // A reused preview must not keep displaying the previous motorcycle during lookup/failure.
   target.setImageResource(BikeVisual.superCub(model)?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
   if(brand.isEmpty()||model.isEmpty()) {credit.setText(garageMode?"모델 정보 확인 필요 · 탭해서 사진 직접 등록":"모델 정보를 선택하면 사진을 검색해요");if(garageMode)credit.setOnClickListener(v->a.chooseGaragePhoto());return;}
-  if(garageMode&&!skipInvalidLocal){File manual=a.garagePhotoFile(garageBikeId);
-   if(manual!=null&&manual.isFile())try{Bitmap user=decodeLocalSampled(manual,1200);
-    if(user!=null){target.setImageBitmap(user);credit.setText("내가 선택한 사진 · 탭해서 변경");credit.setOnClickListener(v->a.chooseGaragePhoto());return;}}
-   catch(Exception ignored){}
+  if(garageMode&&!skipInvalidLocal){
+   File manual=a.garagePhotoFile(garageBikeId);
+   if(manual!=null&&manual.isFile()){
+    final long size=manual.length(),modified=manual.lastModified();
+    credit.setText("내 사진 불러오는 중… · 탭해서 변경");
+    credit.setOnClickListener(v->a.chooseGaragePhoto());
+    try{
+     PHOTO_DISK.execute(()->{
+      Bitmap loaded=decodeLocalSampled(manual,1200);
+      a.runOnUiThread(()->{
+       if(a.isFinishing()||a.isDestroyed()||!PhotoRequestGuard.isCurrent(target,requestToken)){
+        if(loaded!=null&&!loaded.isRecycled())loaded.recycle();
+        return;
+       }
+       if(loaded!=null&&manual.isFile()&&manual.length()==size&&manual.lastModified()==modified){
+        target.setImageBitmap(loaded);
+        credit.setText("내가 선택한 사진 · 탭해서 변경");
+        credit.setOnClickListener(v->a.chooseGaragePhoto());
+       }else{
+        if(loaded!=null&&!loaded.isRecycled())loaded.recycle();
+        // Preserve the unreadable/moved personal file and try the catalog image only.
+        showInternal(a,target,credit,brand,model,year,garageBikeId,true,false);
+       }
+      });
+     });
+    }catch(java.util.concurrent.RejectedExecutionException queueFull){
+     credit.setText("내 사진 불러오기 대기 중 · 사진 변경 후 다시 확인");
+    }
+    return;
+   }
   }
   File file=photoFile(a,brand,model,year);File attribution=new File(file.getAbsolutePath()+".json");
   // An earlier cached automatic image may explicitly describe another model/year.
