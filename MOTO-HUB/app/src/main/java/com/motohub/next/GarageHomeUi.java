@@ -19,6 +19,10 @@ final class GarageHomeUi {
  private static final java.util.concurrent.ExecutorService HOME_IO=java.util.concurrent.Executors.newSingleThreadExecutor(r->{
   Thread t=new Thread(r,"moto-home-status");t.setDaemon(true);return t;
  });
+ // Hero images must not wait behind a large interrupted-GPS scan.
+ private static final java.util.concurrent.ExecutorService HERO_PHOTO_IO=java.util.concurrent.Executors.newSingleThreadExecutor(r->{
+  Thread t=new Thread(r,"moto-home-photo");t.setDaemon(true);return t;
+ });
  private static final java.util.concurrent.atomic.AtomicLong HOME_SCAN=new java.util.concurrent.atomic.AtomicLong();
  // At most 8 MiB of decoded, sized-down photos; never decode full camera images on UI.
  private static final android.util.LruCache<String,android.graphics.Bitmap> HERO_CACHE=
@@ -274,7 +278,7 @@ final class GarageHomeUi {
   iv.setTag(key);
   android.graphics.Bitmap cached=HERO_CACHE.get(key);
   if(cached!=null&&!cached.isRecycled()){iv.setImageBitmap(cached);return true;}
-  HOME_IO.execute(()->{
+  HERO_PHOTO_IO.execute(()->{
    android.graphics.Bitmap loaded=MotorcyclePhoto.decodeLocalSampled(custom,1024);
    if(loaded!=null)HERO_CACHE.put(key,loaded);
    a.runOnUiThread(()->{

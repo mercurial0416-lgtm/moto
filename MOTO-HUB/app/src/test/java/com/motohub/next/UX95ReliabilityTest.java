@@ -29,6 +29,9 @@ public final class UX95ReliabilityTest {
    BackupGpsProof.record(c,old,Collections.emptyMap(),json,true);
    assertTrue(BackupGpsProof.fullCurrentStatus(c,json).contains("일치"));
    assertTrue(added.createNewFile());
+   // The full ZIP omits zero-byte unfinished tracks; such placeholders do not make it stale.
+   assertTrue(BackupGpsProof.fullCurrentStatus(c,json).contains("일치"));
+   java.nio.file.Files.write(added.toPath(),TrackFile.point(37.0,127.0,5.0,1761880000000L).getBytes(java.nio.charset.StandardCharsets.UTF_8));
    assertTrue(BackupGpsProof.fullCurrentStatus(c,json).contains("새 GPS"));
    assertTrue(BackupGpsProof.fullCurrentStatus(c,json+" ").contains("데이터 변경"));
   }finally{

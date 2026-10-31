@@ -13,6 +13,80 @@ final class BackupGpsProof {
  static void record(Context context,Map<String,String> hashes,String currentJson,boolean full)throws IOException{
   record(context,hashes,null,currentJson,full);
  }
+ private static boolean noCompletionMarker(File file){
+  for(String suffix:new String[]{".done",".imported",".recovered"})
+   if(new File(file.getPath()+suffix).exists())return false;
+  return true;
+ }
+ /** Re-reads the actual on-device GPS bytes after ZIP readback, before any proof is persisted.
+  * This is deliberately worker-only IO: a source changed while exporting must not be blessed.
+  */
+ static void recordVerifiedZip(Context context,Map<String,String> hashes,Map<String,String> sidecars,
+                   String currentJson,boolean full)throws IOException{
+  if(hashes==null||sidecars==null)throw new IOException("검증된 GPS 및 부속 파일 해시가 없습니다.");
+  File rides=new File(context.getFilesDir(),"rides");
+  if(java.nio.file.Files.isSymbolicLink(rides.toPath())||
+     rides.exists()&&!rides.isDirectory())throw new IOException("GPS 저장 폴더가 안전하지 않습니다.");
+  if(full){
+   File[] local=rides.isDirectory()?rides.listFiles((dir,name)->name.matches(BackupFormat.TRACK)):new File[0];
+   if(local==null)throw new IOException("GPS 목록을 읽지 못했습니다.");
+   int included=0;
+   for(File file:local){
+    if(file.length()==0&&noCompletionMarker(file))continue;
+    included++;
+    if(!hashes.containsKey(file.getName()))
+     throw new IOException("ZIP 이후 새 GPS 원본이 있습니다. 다시 백업하세요.");
+   }
+   if(included!=hashes.size())throw new IOException("ZIP 이후 GPS 원본 목록이 변경됐습니다. 다시 백업하세요.");
+  }
+  for(Map.Entry<String,String> row:hashes.entrySet()){
+   String name=row.getKey(),expected=row.getValue();
+   if(!name.matches(BackupFormat.TRACK)||expected==null||!expected.matches("[a-f0-9]{64}"))
+    throw new IOException("GPS 검증값이 유효하지 않습니다.");
+   File track=new File(rides,name);
+   if(!expected.equals(hashLocalFile(track,TrackFile.MAX_BYTES)))
+    throw new IOException("ZIP 내보내기 도중 GPS 원본이 변경됐습니다: "+name);
+   for(String suffix:RideTrash.SIDECARS){
+    File sidecar=new File(track.getPath()+suffix);
+    String path="rides/"+name+suffix,hash=sidecars.get(path);
+    if(!java.nio.file.Files.exists(sidecar.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS)){
+     if(hash!=null)throw new IOException("ZIP에 백업한 GPS 부속 파일이 사라졌습니다: "+suffix);
+     continue;
+    }
+    if(hash==null||!hash.matches("[a-f0-9]{64}"))
+     throw new IOException("ZIP 내보내기 후 GPS 부속 파일이 추가되거나 손상됐습니다: "+suffix);
+    long limit=suffix.equals(".mergedinto")?100:suffix.equals(".bike")||suffix.equals(".category")?64:0;
+    if(!hash.equals(hashLocalFile(sidecar,limit)))
+     throw new IOException("ZIP 내보내기 도중 GPS 부속 파일이 변경됐습니다: "+suffix);
+   }
+  }
+  record(context,hashes,sidecars,currentJson,full);
+ }
+ private static String hashLocalFile(File file,long limit)throws IOException{
+  if(file==null||java.nio.file.Files.isSymbolicLink(file.toPath())||
+     !java.nio.file.Files.isRegularFile(file.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS)||
+     file.length()>limit)throw new IOException("백업 원본이 없거나 안전하지 않습니다: "+(file==null?"GPS":file.getName()));
+  try{
+   java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256");
+   try(java.io.InputStream in=new java.io.BufferedInputStream(new java.io.FileInputStream(file))){
+    byte[] buffer=new byte[32768];long total=0;int n;
+    while((n=in.read(buffer))!=-1){
+     total+=n;if(total>limit)throw new IOException("GPS 백업 원본 크기 제한 초과");
+     digest.update(buffer,0,n);
+    }
+   }
+   StringBuilder out=new StringBuilder(64);
+   for(byte b:digest.digest())out.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
+   return out.toString();
+  }catch(java.security.NoSuchAlgorithmException e){throw new IOException("GPS SHA-256 검증 불가",e);}
+ }
+ /** Used by destructive actions only after the UI has captured an immutable DB snapshot. */
+ static void requireFullDeepCurrent(Context context,String currentJson)throws IOException{
+  requireFullCurrent(context,currentJson);
+  String verdict=fullGpsDeepStatus(context,currentJson);
+  if(!verdict.startsWith("전체 ZIP과 현재 DB·GPS 원본 및 부속 파일 "))
+   throw new IOException("GPS 전체 백업 정밀 검사 미통과 · "+verdict);
+ }
  /** Hashes must come from reopening and verifying the completed ZIP. */
  static void record(Context context,Map<String,String> hashes,Map<String,String> sidecars,
                    String currentJson,boolean full)throws IOException{
@@ -121,6 +195,7 @@ final class BackupGpsProof {
    if(local==null)return "GPS 파일 목록 읽기 실패 · 새 백업 필요";
    int checked=0;
    for(File file:local){
+    if(file.length()==0&&noCompletionMarker(file))continue;
     if(java.nio.file.Files.isSymbolicLink(file.toPath())||!file.isFile())return "GPS 원본 파일 접근 오류 · 새 백업 필요";
     if(!exported.has(file.getName()))return "마지막 전체 ZIP 이후 새 GPS 기록 있음 · 새 전체 백업 권장";
     JSONObject expected=details.optJSONObject(file.getName());
@@ -155,6 +230,7 @@ final class BackupGpsProof {
    if(local==null)return "GPS 파일 목록을 읽지 못했습니다.";
    int verified=0;
    for(File file:local){
+    if(file.length()==0&&noCompletionMarker(file))continue;
     if(java.nio.file.Files.isSymbolicLink(file.toPath())||!file.isFile())
      return "안전하지 않거나 읽을 수 없는 GPS 원본이 있습니다.";
     String expected=exported.optString(file.getName(),"");

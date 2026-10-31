@@ -3,7 +3,7 @@
   "project": "MOTO HUB",
   "lastReviewed": "2026-10-31",
   "sourceBranch": "release/moto-hub-apk",
-  "sourceCandidateVersion": 560,
+  "sourceCandidateVersion": 561,
   "publicSignedVersionAtReview": 556,
   "definition": {
     "implemented": "Source and regression code created",
@@ -176,8 +176,32 @@
       "title": "Move settings and backup screen GPS file enumeration to bounded background worker",
       "status": "implemented",
       "releaseCandidate": 560
+    },
+    {
+      "id": "UX98-DELETE-GPS-FULL-PROOF",
+      "title": "Perform off-UI exact SHA-256 full GPS/sidecar verification before bike cascade deletion",
+      "status": "implemented",
+      "releaseCandidate": 561
+    },
+    {
+      "id": "UX98-VERIFY-ZIP-SOURCES",
+      "title": "After ZIP readback verify all live GPS files and sidecars before persisting backup proof",
+      "status": "implemented",
+      "releaseCandidate": 561
+    },
+    {
+      "id": "UX98-PHOTO-QUEUE-RETRY",
+      "title": "Automatically retry saturated personal photo disk decode queue twice; offer tap-to-retry",
+      "status": "implemented",
+      "releaseCandidate": 561
+    },
+    {
+      "id": "UX98-HOME-WORKER-SEPARATION",
+      "title": "Isolate home hero photo decode from interrupted GPS track scan worker",
+      "status": "implemented",
+      "releaseCandidate": 561
     }
   ],
   "policy": "Never suggest implemented or merged items again as if they were newly discovered; instead test or finish their specific outstanding blocker. Never claim installed-device or signed release complete from source-only checks.",
-  "signingStatus": "Version 560 candidate (same fixed package/signature): CI validation and local fixed-key signing required. In-app OTA remains blocked by missing GitHub Actions signing secrets, main manifest still v556."
+  "signingStatus": "Candidate 561 must pass regression+Android unit tests and receive original fixed signer. GitHub Actions OTA remains unavailable without configured MOTO_SIGNING secrets; do not change manifest until signed release exists."
 }
