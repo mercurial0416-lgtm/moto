@@ -15,7 +15,11 @@ assert 'Store.parse(next.toString())' in method
 assert method.index('atomic(rollback,previous)') < method.index('atomic(disk,validated.toString(2)')
 assert method.index('atomic(disk,validated.toString(2)') < method.index('LocalSafetyBackup.checkpoint(this,validated)')
 assert 'try{write(next);}' not in method
-assert 'db=validated;readOnly=false;' in method
+assert 'db=result;readOnly=false;' in method
+assert 'if(committed)jsonImportRevision++' in method
+assert 'jsonImportRunning=false;' in method
+assert 'if(RestoreRideGate.isRestoring()||jsonImportRunning||observedJsonImportRevision!=jsonImportRevision)' in s
+assert '"moto-json-import-apply").start()' in method
 r=Path('app/src/main/java/com/motohub/next/RestoreArchive.java').read_text()
 chunk=r.split('static void recoverOne(',1)[1].split('private static void validate(',1)[0]
 assert chunk.index('for(String name:fresh)safePath(') < chunk.index('for(String name:fresh)if(!original.contains(name))')
