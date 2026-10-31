@@ -13,9 +13,11 @@ assert "부속 파일 내용이 변경" in proof
 assert "BackupGpsProof.fullCurrentStatus(a,settingsSnapshot)" in screen
 assert "BackupGpsProof.fullCurrentStatus(a,backupSnapshot)" in screen
 assert "BackupGpsProof.fullGpsDeepStatus(a,snapshot)" in screen
-assert 'final String settingsSnapshot=a.db.toString(2);' in screen
-assert 'final String backupSnapshot=a.db.toString(2);' in screen
-assert 'final String snapshot=a.db.toString(2);' in screen
+assert "try{return a.db.toString(2);}" in screen
+assert "catch(org.json.JSONException malformed){return null;}" in screen
+assert 'final String settingsSnapshot=backupJsonSnapshot();' in screen
+assert 'final String backupSnapshot=backupJsonSnapshot();' in screen
+assert 'final String snapshot=backupJsonSnapshot();' in screen
 assert 'LOCAL_BACKUP_IO.execute(()->{' in screen
 assert 'line("백업 · 복원",BackupGpsProof.fullCurrentStatus(' not in screen
 assert 'if(garageMode&&!skipInvalidLocal)' in photo
