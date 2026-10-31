@@ -40,4 +40,7 @@ final class BackupPickerTransfer {
    pending.clearPassword();pending=null;
   }
  }
+ static synchronized void cancelAll(){
+  if(pending!=null){pending.clearPassword();pending=null;}
+ }
 }
