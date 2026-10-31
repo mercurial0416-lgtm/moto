@@ -199,13 +199,14 @@ final class BatchArchiveExport {
   for(Asset item:part.assets)if(expected.put(item.name,item)!=null)
    throw new IOException("분할 백업 항목 중복: "+item.name);
   Set<String> checked=new HashSet<>();
+  Set<String> allowed=part.expectedEntries();
   byte[] buffer=new byte[32768];
   long total=0;
   try(ZipInputStream zip=new ZipInputStream(new BufferedInputStream(saved),StandardCharsets.UTF_8)){
    ZipEntry entry;
    while((entry=zip.getNextEntry())!=null){
     String name=entry.getName();
-    if(!part.expectedEntries().contains(name)||!checked.add(name))
+    if(!allowed.contains(name)||!checked.add(name))
      throw new IOException("분할 ZIP 항목이 예상과 다릅니다: "+name);
     Asset item=expected.get(name);
     MessageDigest archiveHash=item==null?null:digest();
@@ -236,7 +237,7 @@ final class BatchArchiveExport {
     }
    }
   }
-  if(!checked.equals(part.expectedEntries()))throw new IOException("분할 ZIP에 누락된 파일이 있습니다.");
+  if(!checked.equals(allowed))throw new IOException("분할 ZIP에 누락된 파일이 있습니다.");
  }
  private static MessageDigest digest()throws IOException{
   try{return MessageDigest.getInstance("SHA-256");}
