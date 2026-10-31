@@ -221,7 +221,7 @@ final class MotorcyclePhoto {
    }catch(Exception ignored){} // A cache write failure must not hide a downloaded photo.
    final JSONObject data=found;final Bitmap image=b;
    final Bitmap selectedImage=manualOverride;final JSONObject selectedMeta=manualAttribution;
-   a.runOnUiThread(()->{if(a.isFinishing()||a.isDestroyed()||target.getParent()==null||!PhotoRequestGuard.isCurrent(target,requestToken)){
+   a.runOnUiThread(()->{if(a.isFinishing()||a.isDestroyed()||!PhotoRequestGuard.isCurrent(target,requestToken)){
     if(image!=null&&!image.isRecycled())image.recycle();
     if(selectedImage!=null&&!selectedImage.isRecycled())selectedImage.recycle();
     return;
