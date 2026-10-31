@@ -7,6 +7,7 @@ on:
       - '.github/workflows/moto-publish-verified-564.yml'
 permissions:
   contents: write
+  actions: read
 concurrency:
   group: moto-fixed-signed-release
   cancel-in-progress: false
@@ -77,8 +78,9 @@ jobs:
             echo "::error::Existing v564 release requires manual inspection; refusing overwrite"
             exit 1
           fi
-          cp "$RUNNER_TEMP/MOTO-HUB.apk" "$RUNNER_TEMP/MOTO-HUB-publish.apk"
-          gh release create "$TAG" "$RUNNER_TEMP/MOTO-HUB-publish.apk#MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" --target aecf114e3516da409ff53c1fb9a01ea1a74bc2b0 --title 'MOTO HUB 564 (original signed)' --notes 'Offline original-key signature verified. In-app update preserves compatible installed application data.'
+          mkdir -p "$RUNNER_TEMP/release-v564"
+          cp "$RUNNER_TEMP/MOTO-HUB.apk" "$RUNNER_TEMP/release-v564/MOTO-HUB.apk"
+          gh release create "$TAG" "$RUNNER_TEMP/release-v564/MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" --target aecf114e3516da409ff53c1fb9a01ea1a74bc2b0 --title 'MOTO HUB 564 (original signed)' --notes 'Offline original-key signature verified. In-app update preserves compatible installed application data.'
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fx 'MOTO-HUB.apk'
           URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
           python3 MOTO-HUB/tools/make_update_manifest.py --apk "$RUNNER_TEMP/MOTO-HUB.apk" --apk-url "$URL" --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" --output "$RUNNER_TEMP/manifest-v564.json"
