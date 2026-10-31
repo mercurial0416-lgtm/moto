@@ -195,6 +195,7 @@ final class BackupGpsProof {
    if(local==null)return "GPS 파일 목록 읽기 실패 · 새 백업 필요";
    int checked=0;
    for(File file:local){
+    if(file.length()==0&&noCompletionMarker(file))continue;
     if(java.nio.file.Files.isSymbolicLink(file.toPath())||!file.isFile())return "GPS 원본 파일 접근 오류 · 새 백업 필요";
     if(!exported.has(file.getName()))return "마지막 전체 ZIP 이후 새 GPS 기록 있음 · 새 전체 백업 권장";
     JSONObject expected=details.optJSONObject(file.getName());
@@ -229,6 +230,7 @@ final class BackupGpsProof {
    if(local==null)return "GPS 파일 목록을 읽지 못했습니다.";
    int verified=0;
    for(File file:local){
+    if(file.length()==0&&noCompletionMarker(file))continue;
     if(java.nio.file.Files.isSymbolicLink(file.toPath())||!file.isFile())
      return "안전하지 않거나 읽을 수 없는 GPS 원본이 있습니다.";
     String expected=exported.optString(file.getName(),"");
