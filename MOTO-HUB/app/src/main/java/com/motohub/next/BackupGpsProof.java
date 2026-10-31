@@ -24,7 +24,7 @@ final class BackupGpsProof {
      rides.exists()&&!rides.isDirectory())throw new IOException("GPS 저장 폴더가 안전하지 않습니다.");
   if(full){
    File[] local=rides.isDirectory()?rides.listFiles((dir,name)->name.matches(BackupFormat.TRACK)):new File[0];
-   if(local==null||local.length!=hashes.size())throw new IOException("ZIP 이후 GPS 원본 목록이 변경됐습니다. 다시 백업하세요.");
+   if(local==null)throw new IOException("GPS 목록을 읽지 못했습니다.");
    for(File file:local)if(!hashes.containsKey(file.getName()))
     throw new IOException("ZIP 이후 새 GPS 원본이 있습니다. 다시 백업하세요.");
   }
