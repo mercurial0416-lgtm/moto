@@ -3,7 +3,7 @@
   "project": "MOTO HUB",
   "lastReviewed": "2026-10-31",
   "sourceBranch": "release/moto-hub-apk",
-  "sourceCandidateVersion": 559,
+  "sourceCandidateVersion": 560,
   "publicSignedVersionAtReview": 556,
   "definition": {
     "implemented": "Source and regression code created",
@@ -152,8 +152,32 @@
       "status": "blocked",
       "releaseCandidate": 559,
       "blocker": "GitHub Actions original signing secrets not configured; do not publish false update manifest"
+    },
+    {
+      "id": "UX97-PRETTY-JSON-BACKUP",
+      "title": "Check full-ZIP database with the exact pretty-printed snapshot used at export",
+      "status": "implemented",
+      "releaseCandidate": 560
+    },
+    {
+      "id": "UX97-FULL-ZIP-SIDECAR-PROOF",
+      "title": "Retain full-ZIP-only sidecar SHA evidence and verify exact sidecar bytes, additions and deletions",
+      "status": "implemented",
+      "releaseCandidate": 560
+    },
+    {
+      "id": "UX97-MANUAL-PHOTO-WORKER",
+      "title": "Move remaining manually chosen local photo disk decode to bounded worker with generation guard",
+      "status": "implemented",
+      "releaseCandidate": 560
+    },
+    {
+      "id": "UX97-ASYNC-BACKUP-STATUS",
+      "title": "Move settings and backup screen GPS file enumeration to bounded background worker",
+      "status": "implemented",
+      "releaseCandidate": 560
     }
   ],
   "policy": "Never suggest implemented or merged items again as if they were newly discovered; instead test or finish their specific outstanding blocker. Never claim installed-device or signed release complete from source-only checks.",
-  "signingStatus": "Original fixed PKCS12 remains private. v559 signed APK local build subject to CI. GitHub Actions OTA needs configured signing secrets; public manifest remains 556 until actual signed release is published."
+  "signingStatus": "Version 560 candidate (same fixed package/signature): CI validation and local fixed-key signing required. In-app OTA remains blocked by missing GitHub Actions signing secrets, main manifest still v556."
 }
