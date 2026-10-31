@@ -13,6 +13,11 @@ final class BackupGpsProof {
  static void record(Context context,Map<String,String> hashes,String currentJson,boolean full)throws IOException{
   record(context,hashes,null,currentJson,full);
  }
+ private static boolean noCompletionMarker(File file){
+  for(String suffix:new String[]{".done",".imported",".recovered"})
+   if(new File(file.getPath()+suffix).exists())return false;
+  return true;
+ }
  /** Re-reads the actual on-device GPS bytes after ZIP readback, before any proof is persisted.
   * This is deliberately worker-only IO: a source changed while exporting must not be blessed.
   */
@@ -25,8 +30,14 @@ final class BackupGpsProof {
   if(full){
    File[] local=rides.isDirectory()?rides.listFiles((dir,name)->name.matches(BackupFormat.TRACK)):new File[0];
    if(local==null)throw new IOException("GPS 목록을 읽지 못했습니다.");
-   for(File file:local)if(!hashes.containsKey(file.getName()))
-    throw new IOException("ZIP 이후 새 GPS 원본이 있습니다. 다시 백업하세요.");
+   int included=0;
+   for(File file:local){
+    if(file.length()==0&&noCompletionMarker(file))continue;
+    included++;
+    if(!hashes.containsKey(file.getName()))
+     throw new IOException("ZIP 이후 새 GPS 원본이 있습니다. 다시 백업하세요.");
+   }
+   if(included!=hashes.size())throw new IOException("ZIP 이후 GPS 원본 목록이 변경됐습니다. 다시 백업하세요.");
   }
   for(Map.Entry<String,String> row:hashes.entrySet()){
    String name=row.getKey(),expected=row.getValue();
