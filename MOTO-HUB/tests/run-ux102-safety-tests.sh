@@ -27,6 +27,8 @@ assert "pendingBundleJson" not in activity
 assert "pendingExport" not in activity
 assert "jsonImportRunning=true" in activity
 assert "RestoreRideGate.isRestoring()" in activity
+assert "observedJsonImportRevision!=jsonImportRevision" in activity
+assert "if(isFinishing())BackupPickerTransfer.cancelAll()" in activity
 assert '"moto-json-import-check").start()' in activity
 assert '"moto-json-import-apply").start()' in activity
 assert "refreshJsonImportAfterRecreation()" in activity
