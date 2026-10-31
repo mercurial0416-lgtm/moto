@@ -15,7 +15,17 @@ final class TrackFile {
   if(bike.exists()&&!bike.delete())throw new IOException("빈 GPS 파일의 바이크 연결 정보 정리 실패");
   return true;
  }
- static List<File> tracks(File files)throws IOException{File[] a=directory(files).listFiles((d,n)->n.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));List<File> list=new ArrayList<>();if(a!=null)for(File f:a)if(!Files.isSymbolicLink(f.toPath())&&Files.isRegularFile(f.toPath(),LinkOption.NOFOLLOW_LINKS))list.add(f);list.sort((x,y)->y.getName().compareTo(x.getName()));return list;}
+ static List<File> tracks(File files)throws IOException{
+  File[] found=directory(files).listFiles((d,n)->n.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"));
+  if(found==null)throw new IOException("GPS 기록 목록을 읽지 못했습니다. 기록은 삭제하지 않았습니다.");
+  List<File> list=new ArrayList<>();
+  for(File file:found){
+   if(Files.isSymbolicLink(file.toPath())||!Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS))
+    throw new IOException("GPS 기록 항목이 안전하지 않습니다: "+file.getName());
+   list.add(file);
+  }
+  list.sort((x,y)->y.getName().compareTo(x.getName()));return list;
+ }
  interface Consumer{void point(double lat,double lon,double accuracy,long time)throws Exception;}
  static int read(File f,Consumer consumer)throws Exception{
   if(f==null||Files.isSymbolicLink(f.toPath())||!Files.isRegularFile(f.toPath(),LinkOption.NOFOLLOW_LINKS))throw new IOException("안전하지 않은 GPS 원본 파일입니다.");
