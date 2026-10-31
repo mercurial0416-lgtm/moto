@@ -5,14 +5,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.util.*;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.zip.*;
 
 /** Plans disjoint archives before touching the selected SAF folder. The same route and its markers stay together. */
 final class BatchArchiveExport {
  static final long TARGET_BYTES=175_000_000L;
  static final class Asset {
-  final File file;final String name;
-  Asset(File f,String n){file=f;name=n;}
+  final File file;final String name;final long originalBytes;
+  Asset(File f,String n){file=f;name=n;originalBytes=f.length();}
  }
  static final class Part {
   final String kind;final List<Asset> assets=new ArrayList<>();
@@ -35,8 +37,17 @@ final class BatchArchiveExport {
    throw new IOException("백업 대상 파일이 안전하지 않습니다.");
  }
  private static void safeDir(File d)throws IOException{
-  if(Files.isSymbolicLink(d.toPath())||(d.exists()&&!Files.isDirectory(d.toPath(),LinkOption.NOFOLLOW_LINKS)))
-   throw new IOException("백업 원본 폴더가 안전하지 않습니다.");
+  if(Files.isSymbolicLink(d.toPath())||(Files.exists(d.toPath(),LinkOption.NOFOLLOW_LINKS)&&
+     !Files.isDirectory(d.toPath(),LinkOption.NOFOLLOW_LINKS)))
+   throw new IOException("백업 원본 폴더가 안전하지 않습니다: "+d.getName());
+ }
+ /** A missing optional directory is empty; an existing unreadable directory is NOT. */
+ static File[] listIfPresent(File dir,FilenameFilter selector)throws IOException{
+  safeDir(dir);
+  if(!Files.exists(dir.toPath(),LinkOption.NOFOLLOW_LINKS))return new File[0];
+  File[] found=dir.listFiles(selector);
+  if(found==null)throw new IOException("백업 원본 폴더 목록을 읽지 못했습니다: "+dir.getName());
+  return found;
  }
  private static void add(List<Asset> into,File f,String zipName)throws IOException{
   regular(f);
@@ -61,7 +72,7 @@ final class BatchArchiveExport {
  static Plan plan(File root)throws IOException{
   safeDir(root);
   File rides=new File(root,"rides");safeDir(rides);
-  File[] candidates=rides.listFiles((d,n)->n.matches(BackupFormat.TRACK));
+  File[] candidates=listIfPresent(rides,(d,n)->n.matches(BackupFormat.TRACK));
   List<File> tracks=new ArrayList<>();
   if(candidates!=null)tracks.addAll(Arrays.asList(candidates));
   tracks.sort(Comparator.comparing(File::getName));
@@ -83,22 +94,26 @@ final class BatchArchiveExport {
   List<File> trashed=RideTrash.entries(root);
   for(File f:trashed)gpsGroups.put("trash-"+f.getName(),ride(f,"rides-trash/"+f.getName()+"/"));
   List<List<Asset>> gps=new ArrayList<>(gpsGroups.values()),media=new ArrayList<>();
-  File[] photos=root.listFiles((d,n)->n.matches(BackupFormat.PHOTO));
+  File[] photos=listIfPresent(root,(d,n)->n.matches(BackupFormat.PHOTO));
   if(photos!=null)for(File f:photos){
    List<Asset> group=new ArrayList<>();add(group,f,"photos/"+f.getName());media.add(group);
   }
-  File[] receipts=root.listFiles((d,n)->n.matches(BackupFormat.RECEIPT));
+  File[] receipts=listIfPresent(root,(d,n)->n.matches(BackupFormat.RECEIPT));
   if(receipts!=null)for(File f:receipts){
    List<Asset> group=new ArrayList<>();add(group,f,"receipts/"+f.getName());media.add(group);
   }
   File models=new File(root,"moto-year-photos");safeDir(models);
-  File[] modelImages=models.listFiles((d,n)->n.matches(BackupFormat.MODEL_PHOTO));
+  File[] modelImages=listIfPresent(models,(d,n)->n.matches(BackupFormat.MODEL_PHOTO));
   if(modelImages!=null)for(File image:modelImages){
    File metadata=new File(models,image.getName()+".json");
    if(!Files.exists(metadata.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
    regular(metadata);
    if(metadata.length()>8192)throw new IOException("모델 사진 출처 파일 크기 초과");
-   if(!BackupFormat.selectedModelMetadata(new String(Files.readAllBytes(metadata.toPath()),StandardCharsets.UTF_8)))continue;
+   String origin=new String(Files.readAllBytes(metadata.toPath()),StandardCharsets.UTF_8);
+   if(!BackupFormat.selectedModelMetadata(origin)){
+    if(BackupFormat.automaticallyCachedModelMetadata(origin))continue;
+    throw new IOException("모델 사진 출처 정보가 손상되어 누락 없이 백업할 수 없습니다: "+image.getName());
+   }
    List<Asset> group=new ArrayList<>();
    add(group,image,"model-photos/"+image.getName());
    add(group,metadata,"model-photos/"+metadata.getName());
@@ -145,15 +160,21 @@ final class BatchArchiveExport {
    put(zip,"MOTO-HUB-batch.txt",batchRecord(id,part).getBytes(StandardCharsets.US_ASCII));
    byte[] buffer=new byte[32768];
    long total=body.length;
+   total+=(long)("MOTO-HUB-PART:"+part.kind+
+    "\n자동 분할 백업 "+part.index+"/"+part.total+
+    " · 다른 분할 파일도 모두 보관해야 전체 자료를 복구할 수 있습니다.\n").getBytes(StandardCharsets.UTF_8).length;
+   total+=batchRecord(id,part).getBytes(StandardCharsets.US_ASCII).length;
+   if(total>BackupFormat.MAX_TOTAL_BYTES)throw new IOException("분할 ZIP 메타정보 크기 초과");
    for(Asset item:part.assets){
     regular(item.file);
-    if(item.file.length()>BackupFormat.entryLimit(item.name))
-     throw new IOException("백업 항목이 변경되어 용량 검증 실패");
+    if(item.file.length()!=item.originalBytes||item.originalBytes>BackupFormat.entryLimit(item.name))
+     throw new IOException("백업 계획 후 원본 파일이 변경됐습니다: "+item.name);
     total+=item.file.length();
     if(total>BackupFormat.MAX_TOTAL_BYTES)throw new IOException("ZIP 최대 용량 초과");
     zip.putNextEntry(new ZipEntry(item.name));
+    long written=0;
     try(InputStream in=new BufferedInputStream(new FileInputStream(item.file))){
-     int n;long written=0;while((n=in.read(buffer))!=-1){
+     int n;while((n=in.read(buffer))!=-1){
       written+=n;
       if(written>BackupFormat.entryLimit(item.name)||total-item.file.length()+written>BackupFormat.MAX_TOTAL_BYTES)
        throw new IOException("파일이 백업 중 변경됐습니다.");
@@ -161,6 +182,7 @@ final class BatchArchiveExport {
      }
     }
     zip.closeEntry();
+    if(written!=item.originalBytes)throw new IOException("백업 중 원본 파일 크기가 변경됐습니다: "+item.name);
    }
    zip.finish();
   }
@@ -168,6 +190,58 @@ final class BatchArchiveExport {
  private static void put(ZipOutputStream z,String name,byte[] data)throws IOException{
   if(data.length>BackupFormat.entryLimit(name))throw new IOException("분할 ZIP 메타정보 크기 제한");
   z.putNextEntry(new ZipEntry(name));z.write(data);z.closeEntry();
+ }
+ /** Read back the saved ZIP and compare every asset to its still-existing original.
+  * Includes media, metadata and quarantined routes; never trusts ZIP CRC alone. */
+ static void verifySources(Part part,InputStream saved)throws IOException{
+  if(saved==null)throw new IOException("분할 ZIP을 다시 열 수 없습니다.");
+  Map<String,Asset> expected=new HashMap<>();
+  for(Asset item:part.assets)if(expected.put(item.name,item)!=null)
+   throw new IOException("분할 백업 항목 중복: "+item.name);
+  Set<String> checked=new HashSet<>();
+  Set<String> allowed=part.expectedEntries();
+  byte[] buffer=new byte[32768];
+  long total=0;
+  try(ZipInputStream zip=new ZipInputStream(new BufferedInputStream(saved),StandardCharsets.UTF_8)){
+   ZipEntry entry;
+   while((entry=zip.getNextEntry())!=null){
+    String name=entry.getName();
+    if(!allowed.contains(name)||!checked.add(name))
+     throw new IOException("분할 ZIP 항목이 예상과 다릅니다: "+name);
+    Asset item=expected.get(name);
+    MessageDigest archiveHash=item==null?null:digest();
+    long size=0;
+    int n;
+    while((n=zip.read(buffer))!=-1){
+     size+=n;total+=n;
+     if(size>BackupFormat.entryLimit(name)||total>BackupFormat.MAX_TOTAL_BYTES)
+      throw new IOException("분할 ZIP 크기 제한 초과");
+     if(archiveHash!=null)archiveHash.update(buffer,0,n);
+    }
+    zip.closeEntry();
+    if(item!=null){
+     regular(item.file);
+     if(size!=item.originalBytes||item.file.length()!=item.originalBytes)
+      throw new IOException("원본과 분할 백업의 파일 크기가 다릅니다: "+name);
+     MessageDigest localHash=digest();
+     long original=0;
+     try(InputStream in=new BufferedInputStream(new FileInputStream(item.file))){
+      while((n=in.read(buffer))!=-1){
+       original+=n;
+       if(original>item.originalBytes)throw new IOException("검증 중 원본 파일이 변경됐습니다: "+name);
+       localHash.update(buffer,0,n);
+      }
+     }
+     if(original!=item.originalBytes||!MessageDigest.isEqual(archiveHash.digest(),localHash.digest()))
+      throw new IOException("원본과 분할 ZIP의 SHA-256이 다릅니다: "+name);
+    }
+   }
+  }
+  if(!checked.equals(allowed))throw new IOException("분할 ZIP에 누락된 파일이 있습니다.");
+ }
+ private static MessageDigest digest()throws IOException{
+  try{return MessageDigest.getInstance("SHA-256");}
+  catch(NoSuchAlgorithmException e){throw new IOException("SHA-256 검증을 사용할 수 없습니다.",e);}
  }
  static String validateBatchRecord(String record)throws IOException{
   if(record==null||!record.matches("MOTO-HUB-BATCH:v1:[a-f0-9-]{36}:(GPS|MEDIA):[0-9]{1,5}/[0-9]{1,5}\\n"))

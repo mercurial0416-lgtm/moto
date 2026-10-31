@@ -1794,6 +1794,9 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      try(InputStream input=resolver.openInputStream(file)){verified=BackupIntegrity.verify(input);}
      if(!verified.entryNames.equals(part.expectedEntries()))
       throw new IOException("ZIP 항목 누락: "+filename);
+     try(InputStream proof=resolver.openInputStream(file)){
+      BatchArchiveExport.verifySources(part,proof);
+     }
      for(BatchArchiveExport.Asset asset:part.assets)if(!found.add(asset.name))
       throw new IOException("ZIP 중복 항목: "+asset.name);
     }
@@ -2298,7 +2301,36 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("GPX 가져오기 실패: "+e.getMessage());});}
    },"MOTO-GPX-import").start();return;
   }
-  if(request==43)attempt(()->{String name=pendingTrack;pendingTrack="";if(!name.matches("[0-9]+-[a-f0-9-]+\\.track"))throw new IOException("내보낼 경로를 다시 선택해 주세요.");File f=new File(TrackFile.directory(getFilesDir()),name);if(RideService.running&&name.equals(RideService.active))throw new IOException("기록 종료 후 내보내세요.");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("파일 열기 실패");int points=TrackFile.gpx(f,out);toast(points+"개 좌표 GPX 저장 완료");}});else if(request==41)attempt(()->{if(pendingExport.isEmpty())throw new Exception("내보내기가 중단됐어요. 다시 시작해 주세요.");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("파일을 열 수 없습니다.");out.write(pendingExport.getBytes(StandardCharsets.UTF_8));}pendingExport="";toast("백업 파일을 저장했어요.");});else if(request==42)attempt(()->{if(restoreIsBlocked())throw new IOException(RestoreRideGate.MESSAGE);try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("파일을 열 수 없습니다.");ByteArrayOutputStream buf=new ByteArrayOutputStream();byte[] chunk=new byte[8192];int n;while((n=in.read(chunk))!=-1){if(buf.size()+n>8_000_000)throw new IOException("백업 최대 크기는 8MB입니다.");buf.write(chunk,0,n);}confirmImport(Store.parse(buf.toString("UTF-8")));}});}
+  if(request==43){
+   final String name=pendingTrack;pendingTrack="";
+   new Thread(()->{
+    try{
+     if(!name.matches(BackupFormat.TRACK))throw new IOException("내보낼 GPS 파일을 다시 선택해 주세요.");
+     if(RideService.running&&name.equals(RideService.active))throw new IOException("라이딩 기록 종료 후 내보내 주세요.");
+     File track=new File(TrackFile.directory(getFilesDir()),name);
+     int points=VerifiedDocumentExport.save(getContentResolver(),uri,BackupFormat.MAX_GPX_BYTES,
+      out->TrackFile.gpx(track,out));
+     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast(points+"개 좌표 GPX 저장·재검증 완료");});
+    }catch(Exception failure){
+     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("GPX 내보내기 실패: "+failure.getMessage());});
+    }
+   },"moto-verified-gpx-export").start();
+   return;
+  }else if(request==41){
+   final String json=pendingExport;pendingExport="";
+   new Thread(()->{
+    try{
+     if(json.isEmpty())throw new IOException("내보낼 JSON 데이터가 없습니다.");
+     final byte[] bytes=json.getBytes(StandardCharsets.UTF_8);
+     VerifiedDocumentExport.save(getContentResolver(),uri,BackupFormat.MAX_JSON_BYTES,
+      out->{out.write(bytes);return 1;});
+     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast("JSON 백업 저장·재검증 완료");});
+    }catch(Exception failure){
+     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("JSON 백업 실패: "+failure.getMessage());});
+    }
+   },"moto-verified-json-export").start();
+   return;
+  }else if(request==42)attempt(()->{if(restoreIsBlocked())throw new IOException(RestoreRideGate.MESSAGE);try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("파일을 열 수 없습니다.");ByteArrayOutputStream buf=new ByteArrayOutputStream();byte[] chunk=new byte[8192];int n;while((n=in.read(chunk))!=-1){if(buf.size()+n>8_000_000)throw new IOException("백업 최대 크기는 8MB입니다.");buf.write(chunk,0,n);}confirmImport(Store.parse(buf.toString("UTF-8")));}});}
  void confirmImport(JSONObject next){
   if(restoreIsBlocked()){explainRestoreBlocked();return;}
   new AlertDialog.Builder(this).setTitle("이 백업으로 복원할까요?")
@@ -2317,9 +2349,11 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      // Commit JSON exactly once. Never run a fallible checkpoint inside the commit.
      atomic(disk,validated.toString(2).getBytes(StandardCharsets.UTF_8));
      db=validated;readOnly=false;
-     try{LocalSafetyBackup.checkpoint(this,validated);}catch(Exception ignored){}
+     boolean restoreCheckpoint=false;
+     try{restoreCheckpoint=LocalSafetyBackup.checkpoint(this,validated);}catch(Exception ignored){}
      try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){}
-     selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();compare.clear();render();toast("복원했어요.");
+     selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();compare.clear();render();
+     toast(restoreCheckpoint?"복원했어요.":"복원 완료 · 새 안전 복구 지점 저장 실패. 내보낸 전체 ZIP을 따로 보관하세요.");
     }finally{RestoreRideGate.end();}
    })).show();
  }
