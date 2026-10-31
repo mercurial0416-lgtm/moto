@@ -31,11 +31,12 @@ public final class Ux7TrackSafetyTest {
    try {
     File linked=new File(rides,"1792490000002-12345678-1234-1234-1234-123456789abc.track");
     Files.createSymbolicLink(linked.toPath(),external.toPath());
-    ok(TrackFile.tracks(root).size()==1,"linked external track never listed");
+    ok(throwsIo(()->TrackFile.tracks(root)),"linked external track makes history scan fail safely");
     ok(throwsIo(()->TrackFile.read(linked,(lat,lon,acc,time)->{})),"linked external track never parsed");
     ok(!TrackFile.discardEmptySession(linked),"linked external file not removed");
     ok(external.exists(),"external data preserved");
     Files.delete(linked.toPath());
+    ok(TrackFile.tracks(root).size()==1,"ordinary GPS still visible after unsafe link removed");
    }catch(UnsupportedOperationException|SecurityException e){ /* Skip unsupported filesystem links. */ }
    File linkedRoot=Files.createTempDirectory("moto-ride-linked-").toFile();
    try{
