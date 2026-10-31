@@ -1596,14 +1596,50 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     removeConfirmed(key,item);
    }).show();
  }
- void removeConfirmed(String key,JSONObject item){new AlertDialog.Builder(this).setTitle("정말 삭제할까요?")
- .setMessage("삭제 후 연결 기록·사진을 원래대로 돌리기 어려울 수 있습니다.")
- .setNegativeButton("유지",null).setPositiveButton("영구 삭제",(d,w)->attempt(()->{JSONObject next=new JSONObject(db.toString());String id=item.getString("id");List<String> childReceipts=new ArrayList<>();
+ void removeConfirmed(String key,JSONObject item){
+  new AlertDialog.Builder(this).setTitle("정말 삭제할까요?")
+   .setMessage("삭제 후 연결 기록·사진을 원래대로 돌리기 어려울 수 있습니다.")
+   .setNegativeButton("유지",null)
+   .setPositiveButton("영구 삭제",(d,w)->{
+    if(!"vehicles".equals(key)){removeConfirmedApply(key,item);return;}
+    final String snapshot;
+    try{snapshot=db.toString(2);}catch(Exception invalid){error("백업 데이터 형식을 확인하지 못해 영구 삭제를 취소했습니다.");return;}
+    if(readOnly||RestoreRideGate.blocked(RideService.running,RideService.autoArmed)){
+     error("라이딩 또는 보호 중에는 바이크를 영구 삭제할 수 없습니다.");return;
+    }
+    toast("GPS 원본·부속 파일의 전체 ZIP 백업 무결성을 검사하고 있어요.");
+    new Thread(()->{
+     try{
+      BackupGpsProof.requireFullDeepCurrent(this,snapshot);
+      runOnUiThread(()->{
+       if(isFinishing()||isDestroyed())return;
+       boolean same=false;
+       try{same=snapshot.equals(db.toString(2));}catch(Exception ignored){}
+       if(!same||readOnly||RestoreRideGate.blocked(RideService.running,RideService.autoArmed)){
+        error("검사 도중 기록 또는 라이딩 상태가 변경됐습니다. 다시 확인해 주세요.");return;
+       }
+       // Metadata recheck on UI is bounded; the full SHA verification above ran off-main.
+       if(!BackupGpsProof.fullCurrentStatus(this,snapshot).contains("일치")){
+        error("GPS 파일이 백업 검사 후 변경됐습니다. 새 전체 ZIP을 만든 뒤 다시 확인하세요.");return;
+       }
+       removeConfirmedApply(key,item);
+      });
+     }catch(Exception failure){
+      runOnUiThread(()->{
+       if(!isFinishing()&&!isDestroyed())
+        error("삭제하지 않았습니다. "+(failure.getMessage()==null?"GPS 백업 정밀 검증 실패":failure.getMessage()));
+      });
+     }
+    },"MOTO-bike-delete-proof").start();
+   }).show();
+ }
+ void removeConfirmedApply(String key,JSONObject item){attempt(()->{JSONObject next=new JSONObject(db.toString());String id=item.getString("id");List<String> childReceipts=new ArrayList<>();
   if(readOnly||RestoreRideGate.blocked(RideService.running,RideService.autoArmed))throw new java.io.IOException("라이딩 중 또는 데이터 보호 모드에서는 삭제할 수 없어요.");
   if(Store.find(db,key,id)==null)throw new java.io.IOException("이미 삭제된 기록이에요.");
    if(key.equals("vehicles"))BackupGpsProof.requireFullCurrent(this,db.toString(2));
   if(key.equals("vehicles"))for(String collection:new String[]{"services","expenses"})for(JSONObject oldEntry:items(collection))if(id.equals(oldEntry.optString("vehicleId")))childReceipts.add(oldEntry.optString("id"));
-  Store.remove(next,key,id);if(key.equals("vehicles")){for(String k:new String[]{"services","expenses"}){JSONArray a=next.getJSONArray(k);for(int i=a.length()-1;i>=0;i--)if(a.getJSONObject(i).optString("vehicleId").equals(id))a.remove(i);}if(next.getJSONObject("settings").optString("primary").equals(id))next.getJSONObject("settings").remove("primary");selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();}write(next);if(key.equals("vehicles"))for(String childId:childReceipts)clearReceiptFiles(childId);if(key.equals("services")||key.equals("expenses")){clearReceiptFiles(id);}render();})).show();}
+  Store.remove(next,key,id);if(key.equals("vehicles")){for(String k:new String[]{"services","expenses"}){JSONArray a=next.getJSONArray(k);for(int i=a.length()-1;i>=0;i--)if(a.getJSONObject(i).optString("vehicleId").equals(id))a.remove(i);}if(next.getJSONObject("settings").optString("primary").equals(id))next.getJSONObject("settings").remove("primary");selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();}write(next);if(key.equals("vehicles"))for(String childId:childReceipts)clearReceiptFiles(childId);if(key.equals("services")||key.equals("expenses")){clearReceiptFiles(id);}render();});}
+
  boolean restoreIsBlocked(){return RestoreRideGate.blocked(RideService.running,RideService.autoArmed);}
  void explainRestoreBlocked(){error(RestoreRideGate.MESSAGE);}
  void importBundle(){
@@ -2230,7 +2266,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
      }
     }finally{if(authenticated!=null)java.nio.file.Files.deleteIfExists(authenticated.toPath());}
     // Allow safe trash only for exact GPS bytes actually found in the verified user-owned ZIP.
-    if(!"MEDIA".equals(part))BackupGpsProof.record(this,checkedBackup.trackSha256,checkedBackup.sidecarSha256,snapshot,"FULL".equals(part));
+    if(!"MEDIA".equals(part))BackupGpsProof.recordVerifiedZip(this,checkedBackup.trackSha256,checkedBackup.sidecarSha256,snapshot,"FULL".equals(part));
     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast((password==null?("FULL".equals(part)?"전체 백업":part+" 분할 백업"):"암호화 백업")+" ZIP 검증 완료 · "+count+"개 항목");});
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 백업 실패: "+e.getMessage());});}
     finally{if(password!=null)Arrays.fill(password,'\0');if(reserved)RestoreRideGate.endExport();}
