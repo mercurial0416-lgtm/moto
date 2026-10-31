@@ -64,7 +64,7 @@ final class RideTrash {
   File rides=TrackFile.directory(files),trash=root(files);
   File[] folders=trash.listFiles();
   int repaired=0;
-  if(folders==null)return 0;
+  if(folders==null)throw new IOException("GPS 복구함 목록을 읽지 못했습니다.");
   for(File folder:folders){
    if(Files.isSymbolicLink(folder.toPath())||!Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS)||
       !folder.getName().matches(BackupFormat.TRACK))
@@ -121,13 +121,25 @@ final class RideTrash {
  }
  static synchronized List<File> entries(File files)throws IOException{
   File[] folders=root(files).listFiles();
+  if(folders==null)throw new IOException("GPS 복구함 목록을 읽지 못했습니다.");
   List<File> tracks=new ArrayList<>();
-  if(folders!=null)for(File folder:folders){
+  for(File folder:folders){
    if(!folder.getName().matches(BackupFormat.TRACK)||
        Files.isSymbolicLink(folder.toPath())||
-       !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
+       !Files.isDirectory(folder.toPath(),LinkOption.NOFOLLOW_LINKS))
+    throw new IOException("GPS 복구함에 알 수 없는 항목이 있습니다: "+folder.getName());
    File track=new File(folder,folder.getName());
-   if(regular(track))tracks.add(track);
+   if(!regular(track))throw new IOException("GPS 복구함 원본이 누락되거나 손상됐습니다: "+folder.getName());
+   File[] members=folder.listFiles();
+   if(members==null)throw new IOException("GPS 복구함 내부 파일을 읽지 못했습니다: "+folder.getName());
+   for(File member:members){
+    if(!member.getName().equals(track.getName())){
+     boolean known=false;
+     for(String suffix:SIDECARS)if(member.getName().equals(track.getName()+suffix))known=true;
+     if(!known||!regular(member))throw new IOException("GPS 복구함에 안전하지 않은 부속 파일이 있습니다: "+member.getName());
+    }
+   }
+   tracks.add(track);
   }
   tracks.sort((a,b)->b.getName().compareTo(a.getName()));
   return tracks;
