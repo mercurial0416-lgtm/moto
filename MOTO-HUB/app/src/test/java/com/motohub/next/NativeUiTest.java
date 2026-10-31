@@ -15,7 +15,29 @@ public class NativeUiTest {
  @Test public void formsPersistAcrossActivityRestart()throws Exception{bike();a.edit("services",null);field("cost","55000");field("nextKm","15000");save();a.edit("expenses",null);field("amount","23000");field("liters","11");a.fullTankBox.setChecked(true);save();a.edit("listings",null);field("model","TEST · Saved motorcycle");field("year","2024");field("price","5300000");save();assertEquals(1,a.arr("services").length());assertTrue(a.arr("expenses").getJSONObject(0).getBoolean("fullTank"));a.finish();a=Robolectric.buildActivity(MainActivity.class).setup().get();assertEquals(1,a.arr("listings").length());assertEquals(1,a.arr("services").length());assertEquals(1,a.arr("expenses").length());}
  @Test public void invalidPriceDoesNotSave(){a.edit("listings",null);field("model","TEST invalid");field("price","0");save();assertEquals(0,a.arr("listings").length());assertTrue(a.dialog.isShowing());}
  @Test public void draftSurvivesFormClose(){bike();a.edit("services",null);field("cost","77000");a.close();assertTrue(a.getSharedPreferences("draft",0).contains("active"));a.resumeDraft();assertEquals("77000",a.draftFields.get("cost").getText().toString());assertEquals(0,a.arr("services").length());}
- @Test public void backupRestoreAndRollback()throws Exception{bike();String original=a.db.toString();a.confirmImport(Store.empty());ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(0,a.arr("vehicles").length());String rollback=new String(new android.util.AtomicFile(new File(a.getFilesDir(),"before-import.json")).readFully(),StandardCharsets.UTF_8);assertEquals(Store.parse(original).toString(),Store.parse(rollback).toString());a.confirmImport(Store.parse(rollback));ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(1,a.arr("vehicles").length());}
+ void awaitVehicleCount(int count)throws Exception{
+  // JSON restore now commits on a worker. Pump the UI queue until the real
+  // AtomicFile write and the UI state refresh finish, never assume synchronous IO.
+  for(int attempt=0;attempt<150;attempt++){
+   Shadows.shadowOf(Looper.getMainLooper()).idle();
+   if(a.arr("vehicles").length()==count)return;
+   Thread.sleep(20);
+  }
+  fail("JSON 복원 완료 또는 UI 갱신이 제한 시간 안에 끝나지 않았습니다.");
+ }
+ @Test public void backupRestoreAndRollback()throws Exception{
+  bike();
+  String original=a.db.toString();
+  a.confirmImport(Store.empty());
+  ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+  awaitVehicleCount(0);
+  String rollback=new String(new android.util.AtomicFile(new File(a.getFilesDir(),"before-import.json")).readFully(),StandardCharsets.UTF_8);
+  assertEquals(Store.parse(original).toString(),Store.parse(rollback).toString());
+  a.confirmImport(Store.parse(rollback));
+  ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+  awaitVehicleCount(1);
+  assertEquals(1,a.arr("vehicles").length());
+ }
  @Test public void archivedListingTabRedirectsHomeWithoutDeletingRecords()throws Exception{JSONObject x=new JSONObject().put("id","listing-test").put("model","TEST comparison").put("price",5000000);a.saveItem("listings",x);a.navigate("매물");assertEquals("홈",a.tab);assertNull(find(a.root,"선택 비교"));assertEquals(1,a.arr("listings").length());}
  @Test public void calculatorAndBack(){a.tradeIn();assertTrue(a.dialog.isShowing());a.back();assertNull(a.dialog);}
  @Test public void nativeLayoutPreviews()throws Exception{
