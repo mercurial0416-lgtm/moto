@@ -172,8 +172,9 @@ final class BatchArchiveExport {
     total+=item.file.length();
     if(total>BackupFormat.MAX_TOTAL_BYTES)throw new IOException("ZIP 최대 용량 초과");
     zip.putNextEntry(new ZipEntry(item.name));
+    long written=0;
     try(InputStream in=new BufferedInputStream(new FileInputStream(item.file))){
-     int n;long written=0;while((n=in.read(buffer))!=-1){
+     int n;while((n=in.read(buffer))!=-1){
       written+=n;
       if(written>BackupFormat.entryLimit(item.name)||total-item.file.length()+written>BackupFormat.MAX_TOTAL_BYTES)
        throw new IOException("파일이 백업 중 변경됐습니다.");
