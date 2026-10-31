@@ -161,7 +161,7 @@ final class MotorcyclePhoto {
      android.graphics.Bitmap cached=decodeLocalSampled(file,1200);
      final android.graphics.Bitmap loaded=cached;
      a.runOnUiThread(()->{
-      if(a.isFinishing()||a.isDestroyed()||target.getParent()==null||
+      if(a.isFinishing()||a.isDestroyed()||
          !PhotoRequestGuard.isCurrent(target,requestToken)){
        if(loaded!=null&&!loaded.isRecycled())loaded.recycle();
        return;
