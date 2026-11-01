@@ -191,8 +191,8 @@ final class GarageHomeUi {
  }
 
  void addHero(JSONObject bike){
-  LinearLayout box=a.col();box.setBackground(a.shape(surface,stroke,18));box.setClipToOutline(true);
-  FrameLayout imageArea=new FrameLayout(a);imageArea.setBackgroundColor(a.dark?0xFF141619:0xFFEDECEA);int displayWidth=a.getResources().getDisplayMetrics().widthPixels;
+  LinearLayout box=a.col();box.setBackground(a.shape(surface,stroke,20));box.setClipToOutline(true);box.setElevation(a.dp(1));
+  FrameLayout imageArea=new FrameLayout(a);imageArea.setBackgroundColor(a.dark?0xFF192537:0xFFF1F5FC);int displayWidth=a.getResources().getDisplayMetrics().widthPixels;
   int photoHeight=displayWidth<a.dp(390)?190:211;
   imageArea.setLayoutParams(new LinearLayout.LayoutParams(-1,a.dp(photoHeight)));
   ImageView visual=new ImageView(a);visual.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -201,7 +201,7 @@ final class GarageHomeUi {
   boolean own=loadBikePhoto(visual,bike,example);
   imageArea.addView(visual,new FrameLayout.LayoutParams(-1,-1));
   View shade=new View(a);shade.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-   new int[]{0x00000000,0x00000000,0x58000000}));imageArea.addView(shade,new FrameLayout.LayoutParams(-1,-1));
+   new int[]{0x00000000,0x00000000,0x44000000}));imageArea.addView(shade,new FrameLayout.LayoutParams(-1,-1));
   int bikeCount=a.items("vehicles").size();
   boolean canSwitch=HomeBikeSwitch.visible(bikeCount);
   if(canSwitch){
@@ -365,7 +365,7 @@ final class GarageHomeUi {
   String[] names={"계기판 누적거리","다음 정비"};
   LinearLayout surfaceCard=a.col();
   surfaceCard.setPadding(a.dp(16),a.dp(15),a.dp(16),a.dp(13));
-  surfaceCard.setBackground(a.shape(surface,stroke,16));
+  surfaceCard.setBackground(a.shape(surface,stroke,19));
   LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
   boolean narrow=a.getResources().getConfiguration().fontScale>=1.35f||
     a.getResources().getConfiguration().screenWidthDp<360;
@@ -447,7 +447,7 @@ final class GarageHomeUi {
   });
   btn.setTextColor(recording?(a.dark?0xFFFFC5BE:0xFF8F352E):light);btn.setTextSize(14);btn.setMinHeight(a.dp(48));
   btn.setBackground(a.shape(recording?(a.dark?0xFF372422:0xFFFCE8E6):surface,
-   recording?(a.dark?0xFFAD615B:0xFFD99792):stroke,8));
+   recording?(a.dark?0xFFAD615B:0xFFD99792):stroke,16));
   a.content.addView(btn,new LinearLayout.LayoutParams(-1,-2));
   }
   if(!recording&&!armed){
@@ -612,7 +612,7 @@ final class GarageHomeUi {
    .setNegativeButton("닫기",null).setPositiveButton("정비 관리",(d,w)->a.navigate("차고")).show();
  }
  void sectionTitle(String title,String action,Runnable click){LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
-  TextView t=a.text(title,17,light,true);row.addView(t,new LinearLayout.LayoutParams(0,-2,1));if(action!=null){TextView more=a.text(action,12,soft,true);more.setPadding(a.dp(8),a.dp(9),a.dp(3),a.dp(9));more.setOnClickListener(v->click.run());row.addView(more);}a.content.addView(row);a.gap(a.content,10);
+  TextView t=a.text(title,18,light,true);row.addView(t,new LinearLayout.LayoutParams(0,-2,1));if(action!=null){TextView more=a.text(action,12,soft,true);more.setPadding(a.dp(8),a.dp(9),a.dp(3),a.dp(9));more.setOnClickListener(v->click.run());row.addView(more);}a.content.addView(row);a.gap(a.content,10);
  }
  void insights(JSONObject b){
   sectionTitle("유지비와 연비","기록 관리  ›",()->a.navigate("차고"));
