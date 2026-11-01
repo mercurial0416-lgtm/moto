@@ -39,9 +39,9 @@ final class RideUi {
  final MainActivity a;RideUi(MainActivity a){this.a=a;}
  void render(){
   final boolean saving=RideService.saving();
-  LinearLayout hero=a.col();hero.setPadding(a.dp(18),a.dp(20),a.dp(18),a.dp(18));hero.setBackground(a.shape(a.panel,a.line,13));
-  TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?0xff48d99a:a.accent,true);hero.addView(eyebrow);
-  TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?RideService.count+"개 위치 기록":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",24,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
+  LinearLayout hero=a.col();hero.setPadding(a.dp(20),a.dp(22),a.dp(20),a.dp(20));hero.setBackground(a.shape(a.panel,a.line,20));hero.setElevation(a.dp(1));
+  TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?a.accent:a.accent,true);hero.addView(eyebrow);
+  TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?RideService.count+"개 위치 기록":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",24,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(13);hero.addView(title,t);
   TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?"화면을 꺼도 기기에 GPS 경로를 기록해요":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
   RideReadiness.State readiness=readiness();
   if(!RideService.running){
@@ -62,7 +62,7 @@ final class RideUi {
    LinearLayout live=new LinearLayout(a);
    TextView[] values=new TextView[3];String[] names={"주행거리","경과시간","실시간 속도"};
    for(int i=0;i<3;i++){
-    LinearLayout box=a.col();box.setPadding(a.dp(9),a.dp(12),a.dp(9),a.dp(12));box.setBackground(a.shape(a.bg,0,13));
+    LinearLayout box=a.col();box.setPadding(a.dp(9),a.dp(12),a.dp(9),a.dp(12));box.setBackground(a.shape(a.highlight,0,15));
     values[i]=a.text("—",19,a.fg,true);values[i].setGravity(Gravity.CENTER);box.addView(values[i]);
     TextView name=a.text(names[i],11,a.muted,false);name.setGravity(Gravity.CENTER);
     LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.topMargin=a.dp(7);box.addView(name,np);
@@ -89,7 +89,7 @@ final class RideUi {
    if(RideService.running){new AlertDialog.Builder(a).setTitle("라이딩 기록 종료").setMessage("기록을 끝내고 주행 분석에서 이동거리와 경로를 확인할 수 있어요.").setNegativeButton("취소",null).setPositiveButton("종료",(d,w)->{
     a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
    }).show();}else requestStart();
-  });start.setTextColor(Color.WHITE);start.setBackground(a.shape(RideService.running?0xffda443c:0xffff6b1b,0,14));start.setMinHeight(a.dp(58));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);hero.addView(start);
+  });start.setTextColor(Color.WHITE);start.setBackground(a.shape(RideService.running?0xffda443c:a.accent,0,17));start.setMinHeight(a.dp(60));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);hero.addView(start);
   // Auto detection and GPS recording are independent. When both are active,
   // expose a direct way to finish the ride instead of hiding it behind a
   // developer-mode disarm button or relying exclusively on a notification.
@@ -107,7 +107,7 @@ final class RideUi {
    finishRide.setMinHeight(a.dp(48));finishRide.setEnabled(!saving);
    hero.addView(finishRide);
   }
-  a.content.addView(hero);a.gap(a.content,12);
+  a.content.addView(hero);a.gap(a.content,17);
   // External navigation remains separate: no Kakao app key or GPS upload is required.
   a.action(a.content,"카카오내비 열기",false,()->KakaoNaviLaunch.open(a));
   a.label(a.content,"카카오내비는 길 안내, MOTO HUB는 로컬 라이딩 기록을 담당합니다. 경로·위치 정보는 자동 전달되지 않아요.",12,a.muted,false);
