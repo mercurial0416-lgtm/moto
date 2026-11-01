@@ -21,7 +21,7 @@ import java.util.*;
 public class MainActivity extends Activity {
  JSONObject db;AtomicFile disk;LinearLayout root,content,formFooter;Dialog dialog;LinearLayout formBody;
  String tab="홈",selected="",query="",filter="전체",sort="최신순";
- String pendingTrack="";
+ String pendingTrack="",pendingOwnershipReportBike="";
  private static volatile boolean jsonImportRunning=false;
  private static volatile long jsonImportRevision=0;
  private static volatile long formWriteRevision=0;
@@ -83,7 +83,7 @@ public class MainActivity extends Activity {
   rideHistoryPeriod=RideHistoryPeriod.restore(getSharedPreferences("ride_history_ui",MODE_PRIVATE).getString("period",RideHistoryPeriod.ALL),state==null?null:state.getString("rideHistoryPeriod"));
   rideHistoryBike=RideHistoryBikeFilter.restore(getSharedPreferences("ride_history_ui",MODE_PRIVATE).getString("bike",RideHistoryBikeFilter.ALL),state==null?null:state.getString("rideHistoryBike"));
   if(state==null)selected=getSharedPreferences("garage_ui",MODE_PRIVATE).getString("selected_bike","");
-  if(state!=null){rideHistoryQuery=RideHistorySearch.limit(state.getString("rideHistoryQuery",""));pendingTrack=state.getString("pendingTrack","");tab=state.getString("tab","홈");selected=state.getString("selected","");garagePhotoTarget=state.getString("garagePhotoTarget","");receiptPhotoTarget=state.getString("receiptPhotoTarget","");receiptPhotoKey=state.getString("receiptPhotoKey","");receiptPhotoSlot=state.getInt("receiptPhotoSlot",1);cameraCaptureName=state.getString("cameraCaptureName","");if(state.getBoolean("rideStartConsent",false))rideStartConsent.approve();launchNavigationAfterRide=state.getBoolean("launchNavigationAfterRide",false);}
+  if(state!=null){rideHistoryQuery=RideHistorySearch.limit(state.getString("rideHistoryQuery",""));pendingTrack=state.getString("pendingTrack","");pendingOwnershipReportBike=state.getString("pendingOwnershipReportBike","");tab=state.getString("tab","홈");selected=state.getString("selected","");garagePhotoTarget=state.getString("garagePhotoTarget","");receiptPhotoTarget=state.getString("receiptPhotoTarget","");receiptPhotoKey=state.getString("receiptPhotoKey","");receiptPhotoSlot=state.getInt("receiptPhotoSlot",1);cameraCaptureName=state.getString("cameraCaptureName","");if(state.getBoolean("rideStartConsent",false))rideStartConsent.approve();launchNavigationAfterRide=state.getBoolean("launchNavigationAfterRide",false);}
   if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::back);
   applyWidgetTab(getIntent());
   render();
@@ -357,7 +357,7 @@ public class MainActivity extends Activity {
   intent.removeExtra(Intent.EXTRA_TEXT);
   toast("매물 관리 기능을 숨겼습니다. 기존 기록은 전체 백업에 보존돼요.");
  }
- @Override public void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("pendingTrack",pendingTrack);out.putString("tab",tab);out.putString("selected",selected);out.putString("garagePhotoTarget",garagePhotoTarget);out.putString("receiptPhotoTarget",receiptPhotoTarget);out.putString("receiptPhotoKey",receiptPhotoKey);out.putInt("receiptPhotoSlot",receiptPhotoSlot);out.putString("cameraCaptureName",cameraCaptureName);out.putString("rideHistoryFilter",rideHistoryFilter);out.putString("rideHistorySort",rideHistorySort);out.putString("rideHistoryPeriod",rideHistoryPeriod);out.putString("rideHistoryBike",rideHistoryBike);out.putString("rideHistoryQuery",rideHistoryQuery);out.putBoolean("rideStartConsent",rideStartConsent.pending());out.putBoolean("launchNavigationAfterRide",launchNavigationAfterRide);}
+ @Override public void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("pendingTrack",pendingTrack);out.putString("pendingOwnershipReportBike",pendingOwnershipReportBike);out.putString("tab",tab);out.putString("selected",selected);out.putString("garagePhotoTarget",garagePhotoTarget);out.putString("receiptPhotoTarget",receiptPhotoTarget);out.putString("receiptPhotoKey",receiptPhotoKey);out.putInt("receiptPhotoSlot",receiptPhotoSlot);out.putString("cameraCaptureName",cameraCaptureName);out.putString("rideHistoryFilter",rideHistoryFilter);out.putString("rideHistorySort",rideHistorySort);out.putString("rideHistoryPeriod",rideHistoryPeriod);out.putString("rideHistoryBike",rideHistoryBike);out.putString("rideHistoryQuery",rideHistoryQuery);out.putBoolean("rideStartConsent",rideStartConsent.pending());out.putBoolean("launchNavigationAfterRide",launchNavigationAfterRide);}
  void attempt(Work w){try{w.run();}catch(Exception e){error(e instanceof NumberFormatException?"숫자를 확인해 주세요.":e instanceof java.time.format.DateTimeParseException?"날짜는 YYYY-MM-DD 형식으로 입력해 주세요.":e.getMessage()==null?"작업을 완료하지 못했습니다.":e.getMessage());}}
  void error(String s){new AlertDialog.Builder(this).setTitle("확인해 주세요").setMessage(s).setPositiveButton("확인",null).show();}
  void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
@@ -817,6 +817,25 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   new RideUi(this).render();
  }
  // Saved manual routes are preserved under advanced tools; data is never deleted.
+ /** Owner-controlled SAF export. Generates an actual local PDF, not a text dump. */
+ void exportOwnershipPdf(String bikeId){
+  if(readOnly){error("기록 원본 보호 상태입니다. 복원 또는 점검 후 PDF를 만들어 주세요.");return;}
+  if(RideService.running||RideService.autoArmed||RestoreRideGate.isRestoring()
+      ||RestoreRideGate.isFormWriting()||RestoreRideGate.isExporting()){
+   toast("라이딩과 데이터 저장·백업이 끝난 뒤 PDF를 내보내 주세요.");return;
+  }
+  attempt(()->{
+   if(!RideBikeBinding.valid(bikeId)||Store.find(db,"vehicles",bikeId)==null)
+    throw new IOException("내보낼 바이크를 다시 선택해 주세요.");
+   pendingOwnershipReportBike=bikeId;
+   Intent picker=new Intent(Intent.ACTION_CREATE_DOCUMENT)
+    .addCategory(Intent.CATEGORY_OPENABLE)
+    .setType("application/pdf")
+    .putExtra(Intent.EXTRA_TITLE,"MOTO-HUB-바이크-정비이력-"+today()+".pdf");
+   try{startActivityForResult(picker,69);}
+   catch(Exception e){pendingOwnershipReportBike="";throw e;}
+  });
+ }
  void savedRoutes(){
   LinearLayout p=page("저장한 코스");
   action(p,"＋ 코스 저장",true,()->edit("routes",null));
@@ -2392,7 +2411,25 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     toast("입력칸에만 적용했어요. 확인 후 저장해 주세요.");
    }).show();
  }
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){BackupPickerTransfer.cancel(request);if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==68){exportBatchToFolder(uri);return;}if(request==61){prepareJsonMerge(uri);return;}if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){BackupPickerTransfer.cancel(request);if(request==69)pendingOwnershipReportBike="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==69){
+   final String bikeId=pendingOwnershipReportBike;pendingOwnershipReportBike="";
+   if(!RideBikeBinding.valid(bikeId)){error("PDF 내보내기 바이크 정보를 찾지 못했습니다.");return;}
+   final String snapshot=db.toString();
+   new Thread(()->{
+    boolean reserved=RestoreRideGate.beginExport(RideService.running,RideService.autoArmed);
+    try{
+     if(!reserved)throw new IOException("다른 기록 저장·복원 또는 라이딩 중에는 PDF를 만들 수 없습니다.");
+     MotoOwnershipReport.Report report=MotoOwnershipReport.prepare(Store.parse(snapshot),bikeId);
+     int pages=VerifiedDocumentExport.save(getContentResolver(),uri,MotoOwnershipReport.MAX_PDF_BYTES,
+       out->MotoOwnershipReport.write(report,out));
+     runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast("바이크 정비·주유 이력 PDF "+pages+"쪽 저장 및 재검증 완료");});
+    }catch(Exception e){runOnUiThread(()->{
+     if(!isFinishing()&&!isDestroyed())error("바이크 이력 PDF 내보내기 실패: "+e.getMessage());
+    });}finally{if(reserved)RestoreRideGate.endExport();}
+   },"moto-ownership-pdf-export").start();
+   return;
+  }
+  if(request==68){exportBatchToFolder(uri);return;}if(request==61){prepareJsonMerge(uri);return;}if(request==52){final String bikeId=garagePhotoTarget;garagePhotoTarget="";if(readOnly){error("원본 보호 중에는 사진을 변경할 수 없어요.");return;}
    GARAGE_PHOTO_SAVER.execute(()->{try{saveGaragePhoto(uri,bikeId);}catch(Exception error){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())this.error("바이크 사진 저장 실패: "+error.getMessage());});}});return;}if(request==53){new Thread(()->{try{saveReceiptPhoto(uri);}catch(Exception e){runOnUiThread(()->error("영수증 저장 실패: "+e.getMessage()));}},"moto-receipt-photo").start();return;}
   if(request==54){scanReceiptOcr(uri,null);return;}
   if(request==57){scanQuickOdometerPhoto(uri);return;}
