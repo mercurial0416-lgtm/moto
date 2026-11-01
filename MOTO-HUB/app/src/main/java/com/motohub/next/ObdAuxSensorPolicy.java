@@ -43,8 +43,8 @@ final class ObdAuxSensorPolicy {
  /** Local diagnostic only; no Bluetooth IDs or ECU values are persisted. */
  String summary(long nowNs) {
   StringBuilder b=new StringBuilder();
-  String[] pids={"010C","0105","0142"};
-  String[] names={"RPM","수온","전압"};
+  String[] pids={"010C","0105","0142","012F"};
+  String[] names={"RPM","수온","전압","연료"};
   for(int i=0;i<pids.length;i++){
    String pid=pids[i];
    if(i>0)b.append(" · ");
@@ -60,6 +60,6 @@ final class ObdAuxSensorPolicy {
   return b.toString();
  }
  private static boolean known(String pid) {
-  return "010C".equals(pid)||"0105".equals(pid)||"0142".equals(pid);
+  return "010C".equals(pid)||"0105".equals(pid)||"0142".equals(pid)||"012F".equals(pid);
  }
 }
