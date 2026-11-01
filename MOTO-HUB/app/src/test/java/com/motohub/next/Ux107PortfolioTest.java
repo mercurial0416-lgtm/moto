@@ -68,6 +68,17 @@ public final class Ux107PortfolioTest {
   assertFalse(all.contains("Other Bike"));
   assertEquals(0,report.records.stream().filter(x->x.contains("GPS 좌표")).count());
  }
+ @Test public void pdfWriterProducesRealPdfHeaderWithoutChangingGarage()throws Exception{
+  JSONObject original=data();
+  String before=original.toString();
+  MotoOwnershipReport.Report report=MotoOwnershipReport.prepare(original,A);
+  java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();
+  int pages=MotoOwnershipReport.write(report,out);
+  assertTrue("at least one PDF page",pages>=1);
+  assertTrue("real PDF file",out.size()>120);
+  assertEquals("%PDF",new String(out.toByteArray(),0,4,java.nio.charset.StandardCharsets.US_ASCII));
+  assertEquals("PDF export is read-only",before,original.toString());
+ }
  @Test public void userFacingTextCannotInsertNewPdfLines()throws Exception{
   assertEquals("memo added",MotoOwnershipReport.clean("memo\nadded",30));
   assertEquals("one two",MotoTimeline.safeText("one\ttwo",30));
