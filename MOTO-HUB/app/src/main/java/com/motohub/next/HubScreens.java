@@ -310,7 +310,7 @@ final class HubScreens {
   });
   a.section("내 바이크와 도구");
   line("기변 계산기","구매·정비·등록 비용과 판매 예상액","열기",a::tradeIn);
-  line("화면 테마","현재: "+a.settings().optString("theme","dark"),"변경",()->a.choose("화면 테마",new String[]{"system","light","dark"},v->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("theme",v);a.write(next);a.render();})));
+  line("화면 테마","현재: "+a.settings().optString("theme","light"),"변경",()->a.choose("화면 테마",new String[]{"system","light","dark"},v->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("theme",v);a.write(next);a.render();})));
   line("유지비 통계","바이크별 · 최근 6개월 주유/정비 비교","열기",this::costDashboard);
   line("보호장구","장비와 교체 메모","열기",()->{LinearLayout p=a.page("보호장구");a.action(p,"장구 추가",true,()->a.edit("gear",null));for(JSONObject x:a.items("gear"))a.action(p,x.optString("name"),false,()->a.edit("gear",x));a.show();});line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":"최신 버전 확인과 설치","열기",()->new AppUpdater(a).show());a.section("앱 정보");
   // Deliberately hidden until the user taps the version label seven times.
