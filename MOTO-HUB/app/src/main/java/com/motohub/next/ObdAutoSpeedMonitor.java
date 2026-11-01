@@ -15,6 +15,9 @@ final class ObdAutoSpeedMonitor {
   void disconnected(String reason);
   default void reconnecting(int attempt,int max){}
   default void telemetry(String pid,double value){}
+  default boolean allowOdometer(){return false;}
+  default void odometer(double km){}
+  default void odometerStatus(String reason){}
   default void connected(){}
   default void capabilities(ObdPidCapabilities capability){}
   default void auxiliaryDiagnostics(String summary){}
@@ -70,16 +73,22 @@ final class ObdAutoSpeedMonitor {
   }
   // PID support is a standard ECU read and may be unavailable on cheap adapters.
   // Missing responses mean unknown, never invented values.
-  String supported00="",supported20="",supported40="";
+  String supported00="",supported20="",supported40="",supportedA0="";
   try{supported00=query(in,out,ObdReadOnlyProtocol.query("0100"),2500);}catch(Exception ignored){}
   try{supported20=query(in,out,ObdReadOnlyProtocol.query("0120"),2500);}catch(Exception ignored){}
   try{supported40=query(in,out,ObdReadOnlyProtocol.query("0140"),2500);}catch(Exception ignored){}
-  ObdPidCapabilities capabilities=ObdPidCapabilities.fromAllResponses(supported00,supported20,supported40,null);
+  if(listener.allowOdometer())try{
+   supportedA0=query(in,out,ObdReadOnlyProtocol.query("01A0"),2500);
+  }catch(Exception ignored){}
+  ObdPidCapabilities capabilities=ObdPidCapabilities.fromAllResponses(supported00,supported20,supported40,supportedA0);
   listener.capabilities(capabilities);
   if(ObdSpeedResponsePolicy.unsupported(capabilities.forPid("010D")))throw new UnsupportedSpeed();
   connectedAtNanos=System.nanoTime();listener.connected();
   int unsupported=0,samples=0;
   ObdAuxSensorPolicy auxiliary=new ObdAuxSensorPolicy();
+  final boolean odoSupported=capabilities.forPid("01A6")==ObdPidCapabilities.Support.YES;
+  if(listener.allowOdometer()&&!odoSupported)
+   listener.odometerStatus("ECU ODO 01A6 미지원 또는 확인 불가 · 계기판 km 보존");
   ObdLatencyStats latency=new ObdLatencyStats();
   while(!stopped){
    long started=System.nanoTime();
@@ -101,6 +110,18 @@ final class ObdAutoSpeedMonitor {
      throw new IOException("차량 속도 응답 6회 연속 무효 · 안전하게 재연결합니다.");
    }
    else {unsupported=0;listener.speed(speed);}
+   // Optional and explicitly opted-in ODO: two independent read-only samples.
+   // Failure must never disrupt safety-critical speed-triggered GPS tracking.
+   if(!stopped&&samples>0&&samples%60==0&&odoSupported&&listener.allowOdometer()){
+    try{
+     double a=ObdOdometer.parseKm(query(in,out,ObdReadOnlyProtocol.query("01A6"),2500));
+     double b=ObdOdometer.parseKm(query(in,out,ObdReadOnlyProtocol.query("01A6"),2500));
+     double verified=OdoAutoSyncPolicy.consistent(a,b);
+     if(Double.isFinite(verified))listener.odometer(verified);
+     else listener.odometerStatus("ODO 2회 수신값이 일치하지 않아 반영 보류");
+    }catch(InterruptedException e){throw e;}
+    catch(Exception e){listener.odometerStatus("ODO 응답 실패 · 기존 계기판 km 유지");}
+   }
    // Rotate low-rate supported sensors without ever requesting a write-capable PID.
    if(!stopped&&++samples%4==0){
     String pid=new String[]{"010C","0105","0142","012F"}[(samples/4-1)%4];
