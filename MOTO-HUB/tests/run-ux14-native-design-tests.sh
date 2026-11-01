@@ -24,7 +24,7 @@ assert 'headerAction(a,"알림")' in design and '.showNotices()' in design
 assert 'orange=a.accent;light=a.fg;soft=a.muted;surface=a.panel' in home
 assert 'void quickAction(String key){' in home and 'HomeShortcutOrder.parse(' in home and 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
 assert '"⛽","⚒","▤","▣"' not in home, 'no emoji shortcut placeholders'
-assert 'void stats(JSONObject b)' in home and 'String[] names={"계기판 누적거리","다음 정비"};' in home and 'group.setOnClickListener(v->new ServiceStatusUi(a).updateOdo(b))' in home
+assert 'void stats(JSONObject b)' in home and 'String[] names={"계기판 누적거리","다음 정비"};' in home and 'new ServiceStatusUi(a).updateOdo(b)' in home and 'a.readOnly||RideService.running||RideService.autoArmed' in home
 assert 'void line(LinearLayout target' in lists and 'MotoDesign.ripple(a,block,settingCard?a.panel:a.bg,settingCard?a.line:0,settingCard?14:8)' in lists
 assert 'a.pair(actions,"간편 주유"' in lists and 'QuickEntryUi(a).maintenance()' in lists and '🔧 정비' not in lists
 assert '"라이딩 시작하기"' in ride and 'title.setTypeface(MotoDesign.display())' in ride
