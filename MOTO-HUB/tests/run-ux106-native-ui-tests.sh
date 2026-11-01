@@ -11,9 +11,9 @@ screen=(root/'HubScreens.java').read_text()
 main=(root/'MainActivity.java').read_text()
 
 # No URL or remote dependency in the new native presentation.
-assert 'TextView brand=a.text("MOTO HUB",10,a.accent,true)' in design
+assert 'TextView brand=a.text("MOTO HUB",12,a.accent,true)' in design
 assert 'FrameLayout pill=new FrameLayout(a)' in design
-assert 'pill.setBackground(a.shape(selected?a.highlight:a.panel,0,14))' in design
+assert 'pill.setBackground(a.shape(selected?a.highlight:a.panel,0,16))' in design
 assert 'cell.setMinimumHeight(a.dp(62))' in design
 assert 'if(!destination.equals(a.tab))a.navigate(destination)' in design
 assert 'setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"))' in design
@@ -28,7 +28,7 @@ assert 'if(!shortcut(key))continue;' in render
 assert 'i++;' in render and 'quickActionPair(key,ordered[i+1])' in render
 assert 'void quickActionPair(String left,String right)' in home
 assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
-assert 'surfaceCard.setBackground(a.shape(surface,stroke,16))' in home
+assert 'surfaceCard.setBackground(a.shape(surface,stroke,19))' in home
 assert 'MotoDesign.figure(a,values[i],24,light)' in home
 assert 'group.setOnClickListener(v->a.navigate("차고"))' in home
 assert 'new ServiceStatusUi(a).updateOdo(b)' in home
@@ -52,7 +52,7 @@ assert 'RideScreenRefreshPolicy.interval(' in ride
 assert 'settingCard=target==a.content&&"더보기".equals(a.tab)' in screen
 assert 'MotoDesign.ripple(a,block,settingCard?a.panel:a.bg' in screen
 assert 'block.setOnClickListener(v->click.run())' in screen
-assert 'MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,14)' in main
+assert 'MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,17)' in main
 
 # Explicitly preserve no unapproved ECU changes and all local persistence APIs.
 assert 'Sharing.start(' not in ride and 'Sharing.start(' not in home
