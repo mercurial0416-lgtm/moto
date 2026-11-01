@@ -23,7 +23,7 @@ test('setFontFeatureSettings("tnum")' in design,
      "numeric values must use tabular digit widths")
 test(design.count("static TextView figure(") == 1,
      "one reusable figure type style")
-test("MotoDesign.figure(a,values[i],22,light)" in garage,
+test("MotoDesign.figure(a,values[i],24,light)" in garage,
      "odometer must use numeric figure style")
 test("MotoDesign.figure(a,a.won(" in garage,
      "recent maintenance expenses must use numeric figure style")
@@ -41,9 +41,9 @@ test('void listings(){' not in records,
      "retired listing UI stays out of active screens")
 test('void listings(){' not in records,
      "retired listing UI stays out of active screens")
-test('value.setMaxLines(2);value.setMinHeight(a.dp(30))' in garage,
+test('value.setMaxLines(2)' in garage and 'value.setAutoSizeTextTypeUniformWithConfiguration(14,i==0?24:18,1,' in garage,
      "odometer/maintenance values should have room for large text")
-test('new LinearLayout.LayoutParams(-1,-2);vp.topMargin=a.dp(6)' in garage,
+test('vp.topMargin=a.dp(7);group.addView(value,vp)' in garage,
      "metrics cannot use a hardcoded one-line height")
 test('void listings(){' not in records,
      "retired listing UI stays out of active screens")
