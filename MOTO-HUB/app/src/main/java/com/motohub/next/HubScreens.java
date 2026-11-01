@@ -73,10 +73,10 @@ final class HubScreens {
   // separators. Data sources, click actions and navigation are unchanged.
   boolean settingCard=target==a.content&&"더보기".equals(a.tab);
   LinearLayout block=a.col();
-  block.setPadding(a.dp(settingCard?14:4),a.dp(14),
-                   a.dp(settingCard?14:4),a.dp(14));
-  block.setMinimumHeight(a.dp(settingCard?76:70));
-  if(settingCard)block.setBackground(a.shape(a.panel,a.line,14));
+  block.setPadding(a.dp(settingCard?17:7),a.dp(15),
+                   a.dp(settingCard?17:7),a.dp(15));
+  block.setMinimumHeight(a.dp(settingCard?78:70));
+  if(settingCard)block.setBackground(a.shape(a.panel,a.line,18));
   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);
   boolean largeText=a.getResources().getConfiguration().fontScale>=1.35f;
   if(largeText)head.setOrientation(LinearLayout.VERTICAL);
@@ -105,12 +105,12 @@ final class HubScreens {
   }
   if(click!=null){
    block.setFocusable(true);block.setClickable(true);
-   MotoDesign.ripple(a,block,settingCard?a.panel:a.bg,settingCard?a.line:0,settingCard?14:8);
+   MotoDesign.ripple(a,block,settingCard?a.panel:a.bg,settingCard?a.line:0,settingCard?18:10);
    block.setOnClickListener(v->click.run());
    block.setContentDescription(title+", "+detail+", "+value);
   }
   target.addView(block);
-  if(settingCard)a.gap(target,8);
+  if(settingCard)a.gap(target,10);
   else{
    View rule=new View(a);rule.setBackgroundColor(a.line);
    target.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
@@ -121,7 +121,7 @@ final class HubScreens {
  // Signature screen: one strong garage hero, then one-tap actions and clear records.
  void home(){new GarageHomeUi(a).render();}
  LinearLayout quickTile(String name,String detail,Runnable click){
-  LinearLayout tile=a.col();tile.setGravity(Gravity.CENTER_VERTICAL);tile.setPadding(a.dp(16),a.dp(14),a.dp(14),a.dp(14));tile.setMinimumHeight(a.dp(78));tile.setBackground(a.shape(a.panel,a.line,12));
+  LinearLayout tile=a.col();tile.setGravity(Gravity.CENTER_VERTICAL);tile.setPadding(a.dp(16),a.dp(14),a.dp(14),a.dp(14));tile.setMinimumHeight(a.dp(78));tile.setBackground(a.shape(a.panel,a.line,18));
   TextView t=a.text(name,15,a.fg,true);tile.addView(t);TextView d=a.text(detail,12,a.muted,false);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(9);tile.addView(d,dp);
   tile.setClickable(true);tile.setFocusable(true);tile.setContentDescription(name+" "+detail);tile.setOnClickListener(v->click.run());return tile;
  }
@@ -412,9 +412,9 @@ final class HubScreens {
    Button b=a.button(value,false,()->select.pick(value));
    b.setTextSize(13);b.setMinHeight(a.dp(44));
    b.setTextColor(selected?a.accent:a.fg);
-   MotoDesign.ripple(a,b,selected?a.highlight:a.panel,selected?a.accent:a.line,7);
+   MotoDesign.ripple(a,b,selected?a.highlight:a.panel,selected?a.accent:a.line,19);
    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,a.dp(44));
-   lp.rightMargin=a.dp(7);group.addView(b,lp);
+   lp.rightMargin=a.dp(8);group.addView(b,lp);
   }
   sc.addView(group);a.content.addView(sc);a.gap(a.content,12);
  }
