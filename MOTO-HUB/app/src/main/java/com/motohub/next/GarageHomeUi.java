@@ -365,7 +365,14 @@ final class GarageHomeUi {
    group.setClickable(true);group.setFocusable(true);
    if(index==0){
     group.setContentDescription("계기판 누적거리 "+values[i]+" · 직접 갱신");
-    group.setOnClickListener(v->new ServiceStatusUi(a).updateOdo(b));
+    group.setOnClickListener(v->{
+     if(a.readOnly||RideService.running||RideService.autoArmed||
+        GarageBikeStatus.sold(b.optString("soldDate"))){
+      a.toast("주행·자동 감지를 종료하고 운행 중인 바이크를 선택한 뒤 계기판을 갱신해 주세요.");
+      return;
+     }
+     new ServiceStatusUi(a).updateOdo(b);
+    });
    }else{
     group.setContentDescription("다음 정비 "+values[i]+" · 정비 관리");
     group.setOnClickListener(v->a.navigate("차고"));
