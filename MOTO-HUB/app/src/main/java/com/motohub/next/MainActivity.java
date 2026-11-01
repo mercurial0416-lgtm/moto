@@ -21,7 +21,7 @@ import java.util.*;
 public class MainActivity extends Activity {
  JSONObject db;AtomicFile disk;LinearLayout root,content,formFooter;Dialog dialog;LinearLayout formBody;
  String tab="홈",selected="",query="",filter="전체",sort="최신순",pendingExport="";
- String pendingTrack="";String pendingBundleJson="";char[] pendingSecurePassword;
+ String pendingTrack="";int pendingPrivacyMeters=0;String pendingBundleJson="";char[] pendingSecurePassword;
  final RideStartConsent rideStartConsent=new RideStartConsent();
  DeveloperObdScreen developerObd;
  String draftKey="",draftId="",draftVehicle="";Map<String,EditText> draftFields;Map<String,Spinner> draftSelectors;CheckBox fullTankBox;boolean formDirty=false;
@@ -50,7 +50,7 @@ public class MainActivity extends Activity {
   rideHistoryPeriod=RideHistoryPeriod.restore(getSharedPreferences("ride_history_ui",MODE_PRIVATE).getString("period",RideHistoryPeriod.ALL),state==null?null:state.getString("rideHistoryPeriod"));
   rideHistoryBike=RideHistoryBikeFilter.restore(getSharedPreferences("ride_history_ui",MODE_PRIVATE).getString("bike",RideHistoryBikeFilter.ALL),state==null?null:state.getString("rideHistoryBike"));
   if(state==null)selected=getSharedPreferences("garage_ui",MODE_PRIVATE).getString("selected_bike","");
-  if(state!=null){rideHistoryQuery=RideHistorySearch.limit(state.getString("rideHistoryQuery",""));pendingTrack=state.getString("pendingTrack","");tab=state.getString("tab","홈");selected=state.getString("selected","");garagePhotoTarget=state.getString("garagePhotoTarget","");receiptPhotoTarget=state.getString("receiptPhotoTarget","");receiptPhotoKey=state.getString("receiptPhotoKey","");receiptPhotoSlot=state.getInt("receiptPhotoSlot",1);cameraCaptureName=state.getString("cameraCaptureName","");if(state.getBoolean("rideStartConsent",false))rideStartConsent.approve();}
+  if(state!=null){rideHistoryQuery=RideHistorySearch.limit(state.getString("rideHistoryQuery",""));pendingTrack=state.getString("pendingTrack","");pendingPrivacyMeters=state.getInt("pendingPrivacyMeters",0);tab=state.getString("tab","홈");selected=state.getString("selected","");garagePhotoTarget=state.getString("garagePhotoTarget","");receiptPhotoTarget=state.getString("receiptPhotoTarget","");receiptPhotoKey=state.getString("receiptPhotoKey","");receiptPhotoSlot=state.getInt("receiptPhotoSlot",1);cameraCaptureName=state.getString("cameraCaptureName","");if(state.getBoolean("rideStartConsent",false))rideStartConsent.approve();}
   if(Build.VERSION.SDK_INT>=33)getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,this::back);
   applyWidgetTab(getIntent());
   render();
@@ -120,7 +120,7 @@ public class MainActivity extends Activity {
   }
   toast("공유한 매물 링크를 가져왔어요.");
  }
- @Override public void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("pendingTrack",pendingTrack);out.putString("tab",tab);out.putString("selected",selected);out.putString("garagePhotoTarget",garagePhotoTarget);out.putString("receiptPhotoTarget",receiptPhotoTarget);out.putString("receiptPhotoKey",receiptPhotoKey);out.putInt("receiptPhotoSlot",receiptPhotoSlot);out.putString("cameraCaptureName",cameraCaptureName);out.putString("rideHistoryFilter",rideHistoryFilter);out.putString("rideHistorySort",rideHistorySort);out.putString("rideHistoryPeriod",rideHistoryPeriod);out.putString("rideHistoryBike",rideHistoryBike);out.putString("rideHistoryQuery",rideHistoryQuery);out.putBoolean("rideStartConsent",rideStartConsent.pending());}
+ @Override public void onSaveInstanceState(Bundle out){super.onSaveInstanceState(out);out.putString("pendingTrack",pendingTrack);out.putInt("pendingPrivacyMeters",pendingPrivacyMeters);out.putString("tab",tab);out.putString("selected",selected);out.putString("garagePhotoTarget",garagePhotoTarget);out.putString("receiptPhotoTarget",receiptPhotoTarget);out.putString("receiptPhotoKey",receiptPhotoKey);out.putInt("receiptPhotoSlot",receiptPhotoSlot);out.putString("cameraCaptureName",cameraCaptureName);out.putString("rideHistoryFilter",rideHistoryFilter);out.putString("rideHistorySort",rideHistorySort);out.putString("rideHistoryPeriod",rideHistoryPeriod);out.putString("rideHistoryBike",rideHistoryBike);out.putString("rideHistoryQuery",rideHistoryQuery);out.putBoolean("rideStartConsent",rideStartConsent.pending());}
  void attempt(Work w){try{w.run();}catch(Exception e){error(e instanceof NumberFormatException?"숫자를 확인해 주세요.":e instanceof java.time.format.DateTimeParseException?"날짜는 YYYY-MM-DD 형식으로 입력해 주세요.":e.getMessage()==null?"작업을 완료하지 못했습니다.":e.getMessage());}}
  void error(String s){new AlertDialog.Builder(this).setTitle("확인해 주세요").setMessage(s).setPositiveButton("확인",null).show();}
  void toast(String s){Toast.makeText(this,s,Toast.LENGTH_SHORT).show();}
@@ -446,6 +446,17 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
   i.setType("*/*");i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/gpx+xml","application/xml","text/xml","application/octet-stream"});
   startActivityForResult(i,44);
  }
+ void startRideGpxExport(File track,int radiusMeters){
+  attempt(()->{
+   if(!TrackPrivacy.supported(radiusMeters))throw new IOException("잘못된 GPX 위치 보호 설정입니다.");
+   if(TrackFile.read(track,(x,y,z,t)->{})==0)throw new IOException("저장된 좌표가 없습니다.");
+   pendingTrack=track.getName();pendingPrivacyMeters=radiusMeters;
+   String fileName=track.getName().replace(".track",radiusMeters>0?"-private.gpx":".gpx");
+   Intent picker=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+     .setType("application/gpx+xml").putExtra(Intent.EXTRA_TITLE,fileName);
+   startActivityForResult(picker,43);
+  });
+ }
  void openRideInsights(File track){
   if(RideService.running&&track.getName().equals(RideService.active)){toast("기록 종료 후 확인해 주세요.");return;}
   toast("주행 기록을 분석하고 있어요.");
@@ -507,11 +518,12 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
       },"moto-unmerge").start()).show());
      gap(p,16);
      action(p,"지도에서 경로 보기",true,()->{Intent i=new Intent(this,RideMapActivity.class);i.putExtra("track",track.getName());startActivity(i);});
-     action(p,"GPX 파일로 내보내기",false,()->attempt(()->{
-      if(TrackFile.read(track,(x,y,z,t)->{})==0)throw new IOException("저장된 좌표가 없습니다.");
-      pendingTrack=track.getName();Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/gpx+xml").putExtra(Intent.EXTRA_TITLE,track.getName().replace(".track",".gpx"));
-      startActivityForResult(i,43);
-     }));
+      action(p,"GPX 내보내기 · 원본 전체 경로",false,()->startRideGpxExport(track,0));
+      action(p,"위치 보호 GPX · 출발/도착 위치 숨기기",false,()->new AlertDialog.Builder(this)
+       .setTitle("공유할 GPX 위치 보호")
+       .setMessage("출발점·도착점 주변 좌표를 제거하고 잘린 구간은 연결하지 않습니다. 나머지 위치와 시각은 남으며 완전한 익명화는 아닙니다.")
+       .setItems(new String[]{"반경 300m 제외","반경 500m 제외","반경 1km 제외"},(d,which)->startRideGpxExport(track,TrackPrivacy.CHOICES_METERS[which]))
+       .setNegativeButton("취소",null).show());
      JSONObject b=bike();JSONObject ledger=settings().optJSONObject("appliedRides");
      boolean applied=ledger!=null&&ledger.has(track.getName());
      if(b!=null){
@@ -1529,7 +1541,7 @@ getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGH
    }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("GPX 가져오기 실패: "+e.getMessage());});}
    },"MOTO-GPX-import").start();return;
   }
-  if(request==43)attempt(()->{String name=pendingTrack;pendingTrack="";if(!name.matches("[0-9]+-[a-f0-9-]+\\.track"))throw new IOException("내보낼 경로를 다시 선택해 주세요.");File f=new File(TrackFile.directory(getFilesDir()),name);if(RideService.running&&name.equals(RideService.active))throw new IOException("기록 종료 후 내보내세요.");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("파일 열기 실패");int points=TrackFile.gpx(f,out);toast(points+"개 좌표 GPX 저장 완료");}});else if(request==41)attempt(()->{if(pendingExport.isEmpty())throw new Exception("내보내기가 중단됐어요. 다시 시작해 주세요.");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("파일을 열 수 없습니다.");out.write(pendingExport.getBytes(StandardCharsets.UTF_8));}pendingExport="";toast("백업 파일을 저장했어요.");});else if(request==42)attempt(()->{if(restoreIsBlocked())throw new IOException(RestoreRideGate.MESSAGE);try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("파일을 열 수 없습니다.");ByteArrayOutputStream buf=new ByteArrayOutputStream();byte[] chunk=new byte[8192];int n;while((n=in.read(chunk))!=-1){if(buf.size()+n>8_000_000)throw new IOException("백업 최대 크기는 8MB입니다.");buf.write(chunk,0,n);}confirmImport(Store.parse(buf.toString("UTF-8")));}});}
+  if(request==43)attempt(()->{String name=pendingTrack;int radius=pendingPrivacyMeters;pendingTrack="";pendingPrivacyMeters=0;if(!name.matches("[0-9]+-[a-f0-9-]+\\.track"))throw new IOException("내보낼 경로를 다시 선택해 주세요.");File f=new File(TrackFile.directory(getFilesDir()),name);if(RideService.running&&name.equals(RideService.active))throw new IOException("기록 종료 후 내보내세요.");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("파일 열기 실패");int points=TrackPrivacy.gpx(f,out,radius);toast(points+"개 좌표 "+(radius>0?"위치 보호 GPX":"GPX")+" 저장 완료");}});else if(request==41)attempt(()->{if(pendingExport.isEmpty())throw new Exception("내보내기가 중단됐어요. 다시 시작해 주세요.");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("파일을 열 수 없습니다.");out.write(pendingExport.getBytes(StandardCharsets.UTF_8));}pendingExport="";toast("백업 파일을 저장했어요.");});else if(request==42)attempt(()->{if(restoreIsBlocked())throw new IOException(RestoreRideGate.MESSAGE);try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("파일을 열 수 없습니다.");ByteArrayOutputStream buf=new ByteArrayOutputStream();byte[] chunk=new byte[8192];int n;while((n=in.read(chunk))!=-1){if(buf.size()+n>8_000_000)throw new IOException("백업 최대 크기는 8MB입니다.");buf.write(chunk,0,n);}confirmImport(Store.parse(buf.toString("UTF-8")));}});}
  void confirmImport(JSONObject next){
   if(restoreIsBlocked()){explainRestoreBlocked();return;}
   new AlertDialog.Builder(this).setTitle("이 백업으로 복원할까요?")

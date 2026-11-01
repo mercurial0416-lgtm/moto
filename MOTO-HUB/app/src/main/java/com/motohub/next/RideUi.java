@@ -134,6 +134,8 @@ final class RideUi {
   a.label(a.content,"GPX 가져오기: 다른 앱에서 저장한 코스 파일을 지도와 주행 기록으로 불러옵니다. 가져오기만으로 GPS 기록이나 길 안내가 시작되지는 않아요.",12,a.muted,false);
   a.gap(a.content,12);
   a.action(a.content,"최근 30일 주행 통계 · 바이크별",false,this::chooseRideReport);
+  int goal=RideGoals.normalize(a.getSharedPreferences("ride_goal",0).getInt("rolling_30d_km",0));
+  a.action(a.content,"최근 30일 거리 목표 · "+(goal==0?"설정":goal+" km"),false,this::chooseRideGoal);
   a.action(a.content,"라이딩 2건 통합 · 원본 보존",false,this::chooseMerge);
   a.gap(a.content,8);a.label(a.content,"기록된 라이딩",20,a.fg,true);
   // Render controls immediately and read track/sidecar metadata on one background worker.
@@ -468,6 +470,17 @@ final class RideUi {
   boolean notifyEnabled=nm!=null&&nm.areNotificationsEnabled();
   return RideReadiness.check(RideService.running,fine,gps,notifyPermission,notifyEnabled);
  }
+ void chooseRideGoal(){
+  final int[] options=RideGoals.OPTIONS;
+  final String[] labels={"목표 사용 안 함","100 km","300 km","500 km","1,000 km"};
+  final int chosen=RideGoals.normalize(a.getSharedPreferences("ride_goal",0).getInt("rolling_30d_km",0));
+  int selected=0;for(int i=0;i<options.length;i++)if(options[i]==chosen)selected=i;
+  new AlertDialog.Builder(a).setTitle("최근 30일 라이딩 목표")
+   .setSingleChoiceItems(labels,selected,(dialog,which)->{
+    a.getSharedPreferences("ride_goal",0).edit().putInt("rolling_30d_km",options[which]).apply();
+    dialog.dismiss();a.render();
+   }).setNegativeButton("취소",null).show();
+ }
  void chooseRideReport(){
   String selectedBike=a.bike()==null?"":a.bike().optString("id","");
   boolean hasBike=RideBikeBinding.valid(selectedBike);
@@ -505,10 +518,12 @@ final class RideUi {
    final int omitted=limited;
    a.runOnUiThread(()->{
     if(a.isFinishing()||a.isDestroyed())return;
+    int goal=RideGoals.normalize(a.getSharedPreferences("ride_goal",0).getInt("rolling_30d_km",0));
     String text="대상: "+scopeLabel+"\n최근 30일: "+report.current.count+"회 · "+String.format(Locale.KOREA,"%.1f km",report.current.km)
      +" · "+(report.current.minutes/60)+"시간 "+(report.current.minutes%60)+"분"
      +"\n이전 30일: "+report.previous.count+"회 · "+String.format(Locale.KOREA,"%.1f km",report.previous.km)
      +"\n"+RideTrend.compare(report.current.km,report.previous.km)
+     +(goal>0?"\n"+RideGoals.label(report.current.km,goal):"")
      +"\n최근   "+RideReportBars.render(report.current.km,Math.max(report.current.km,report.previous.km))
      +"\n이전   "+RideReportBars.render(report.previous.km,Math.max(report.current.km,report.previous.km))
      +"\n손상·크기 초과 등 제외 "+report.skipped+"건"
