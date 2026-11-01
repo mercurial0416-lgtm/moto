@@ -15,7 +15,7 @@ checks={
  'notification throttle does not alter GPS points': 'notificationRate.shouldNotify(SystemClock.elapsedRealtime())' in service and 'output.getFD().sync()' in service,
  'read-only PID queries': 'ObdReadOnlyProtocol.query("010D")' in monitor and 'ObdReadOnlyProtocol.query(pid)' in monitor,
  'partial OBD response rejected': 'OBD2 응답 완료 신호 없음' in monitor,
- 'user can still disarm manually': 'if(AUTO_DISARM.equals(action))' in service and '자동 출발 감지만 끕니다' in ui,
+ 'user can still disarm manually': 'if(AUTO_DISARM.equals(action))' in service and 'OBD만 중지 · GPS 기록은 계속' in ui and 'RideService.AUTO_DISARM' in ui and 'finishWithSummary();' in ui,
  'reconnect session bounded': 'MAX_RETRIES=8' in policy and 'while(!stopped&&System.nanoTime()<until)' in monitor,
  'navigation remains separate': 'NavigationApps.choose(a)' in ui and 'NavigationApps.installedLaunchIntent(this,choice)' in service and 'Sharing.offer(' not in (src/'NavigationApps.java').read_text(),
  'developer only OBD': 'developer_experiments' in service,
