@@ -38,6 +38,6 @@ final class ObdPidCapabilities {
  }
  private static String state(Support x){return x==Support.YES?"지원":x==Support.NO?"미지원":"확인 불가";}
  String summary(){return String.format(Locale.KOREA,"속도 %s · RPM %s · 수온 %s · 전압 %s · 누적거리(ODO) 미검증",
-   state(forPid("010D")),state(forPid("010C")),state(forPid("0105")),state(forPid("0142")))+" · 연료 잔량 "+state(forPid("012F"));}
+   state(forPid("010D")),state(forPid("010C")),state(forPid("0105")),state(forPid("0142")))+" · 연료 잔량 "+state(forPid("012F"))+" · 누적거리 PID 01A6 "+state(forPid("01A6"))+" (실차값 미검증)";}
  private ObdPidCapabilities() {mode00=null;mode20=null;mode40=null;modeA0=null;}
 }
