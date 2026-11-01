@@ -103,6 +103,25 @@ final class GarageHomeUi {
    }
    a.gap(a.content,8);
   }
+  // Integrated ownership timeline and saved route access are daily tools,
+  // not developer-mode features. Existing records remain the single source of truth.
+  LinearLayout library=new LinearLayout(a);
+  library.setGravity(Gravity.CENTER_VERTICAL);
+  boolean narrowTools=a.getResources().getConfiguration().fontScale>=1.35f||
+    a.getResources().getConfiguration().screenWidthDp<360;
+  if(narrowTools)library.setOrientation(LinearLayout.VERTICAL);
+  Button timeline=a.button("활동 타임라인",false,()->new MotoTimelineUi(a).open());
+  timeline.setMinHeight(a.dp(50));
+  timeline.setContentDescription("현재 바이크의 라이딩 주유 정비 비용 통합 타임라인");
+  library.addView(timeline,narrowTools?new LinearLayout.LayoutParams(-1,-2):
+    new LinearLayout.LayoutParams(0,-2,1));
+  Button routes=a.button("저장한 코스",false,a::savedRoutes);
+  routes.setMinHeight(a.dp(50));
+  routes.setContentDescription("내가 저장한 출발지와 목적지 코스 관리");
+  LinearLayout.LayoutParams routesLp=narrowTools?new LinearLayout.LayoutParams(-1,-2):
+    new LinearLayout.LayoutParams(0,-2,1);
+  if(narrowTools)routesLp.topMargin=a.dp(8);else routesLp.leftMargin=a.dp(8);
+  library.addView(routes,routesLp);a.content.addView(library);a.gap(a.content,12);
   // Home shortcut editing lives under Advanced Settings to keep the riding screen focused.
   String condition=condition(b);
   if("점검 필요".equals(condition)||"곧 점검".equals(condition)){
@@ -111,8 +130,7 @@ final class GarageHomeUi {
    alert.setClickable(true);alert.setFocusable(true);alert.setContentDescription(condition+" 정비 알림 열기");
    alert.setOnClickListener(v->showNotices());a.content.addView(alert);a.gap(a.content,10);
   }
-  if(RideService.autoArmed&&!RideService.running){TextView arm=a.text("OBD2 자동 감지 대기 · 출발하면 기록 시작",13,orange,true);arm.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));arm.setBackground(a.shape(surface,stroke,13));a.content.addView(arm);a.gap(a.content,10);}
-  if(RideService.running){TextView live=a.text("GPS 기록 중 · "+RideService.status,13,orange,true);live.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));live.setBackground(a.shape(surface,stroke,13));a.content.addView(live);a.gap(a.content,10);}
+  // Global activity banner already shows GPS/OBD status; avoid duplicates on Home.
   interruptedRideShortcut();a.gap(a.content,8);
   if(UndoLastSave.available(a)){
    Button undo=a.button("↶ 마지막 저장 실행 취소 · 2분",false,()->UndoLastSave.undo(a));
