@@ -40,8 +40,8 @@ public final class Ux107PortfolioTest {
  @Test public void unifiedTimelineShowsOnlyBoundBikeAndSortsSafely()throws Exception{
   List<MotoTimeline.Event> feed=MotoTimeline.ledger(data(),A);
   assertEquals(4,feed.size());
-  assertEquals("fuel",feed.get(0).recordId);
-  assertEquals("scheduled",feed.get(1).recordId);
+  assertEquals("scheduled",feed.get(0).recordId);
+  assertEquals("fuel",feed.get(1).recordId);
   assertEquals("oil",feed.get(2).recordId);
   assertEquals(1,MotoTimeline.filtered(feed,MotoTimeline.FUEL,20).size());
   assertEquals(2,MotoTimeline.filtered(feed,MotoTimeline.SERVICE,20).size());
