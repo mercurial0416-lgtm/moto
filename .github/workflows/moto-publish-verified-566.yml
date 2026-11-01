@@ -1,0 +1,93 @@
+name: Publish verified offline-signed MOTO HUB v566 OTA (no private key in GitHub)
+on:
+  push:
+    branches: ['release/moto-hub-apk']
+    paths:
+      - '.github/verified-release/566.patch.zst.b64'
+      - '.github/workflows/moto-publish-verified-566.yml'
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: moto-fixed-signed-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/moto-hub-apk
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: release-meta
+          persist-credentials: true
+      - name: Pin tested v566 source and public manifest
+        run: |
+          set -euo pipefail
+          test "$(tr -d '[:space:]' < MOTO-HUB/release-code.txt)" = 566
+          # The checked unsigned APK was built from the exact v566 source tree
+          # (PR merge preview 1fd3e048; release squash c7d1c3c).
+          git diff --quiet 5d9635c1843e575e655dca289d32c79b696818ab HEAD -- MOTO-HUB/app MOTO-HUB/release-code.txt
+          test "$(git rev-parse 5d9635c1843e575e655dca289d32c79b696818ab^{tree})" = 85f318046274c315076869dbe1bbd6ddbf282de2
+          CURRENT=$(python3 -c 'import json;print(int(json.load(open("release-meta/updates/manifest.json"))["versionCode"]))')
+          test "$CURRENT" -lt 566 || { echo "::error::Published version already 566 or newer"; exit 1; }
+      - name: Retrieve exact CI-generated unsigned v566 archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/13073850535/zip" > "$RUNNER_TEMP/unsigned-archive.zip"
+          unzip -tq "$RUNNER_TEMP/unsigned-archive.zip"
+          unzip -p "$RUNNER_TEMP/unsigned-archive.zip" 'apk/release/app-release-unsigned.apk' > "$RUNNER_TEMP/unsigned-v566.apk"
+          echo '13e78d3475c96bf708d679e68600d5c71809c245df54bf5e0a805c398fd18687  '"$RUNNER_TEMP/unsigned-v566.apk" | sha256sum -c -
+      - name: Recover exactly locally signed, certificate-bound APK
+        run: |
+          set -euo pipefail
+          base64 --decode < .github/verified-release/566.patch.zst.b64 > "$RUNNER_TEMP/v566.patch.zst"
+          echo '43c15eae6298619a9d647b15ac35b86fa9d28db3000c1d0924188f37efd40086  '"$RUNNER_TEMP/v566.patch.zst" | sha256sum -c -
+          zstd -q -d --patch-from="$RUNNER_TEMP/unsigned-v566.apk" "$RUNNER_TEMP/v566.patch.zst" -o "$RUNNER_TEMP/MOTO-HUB.apk"
+          echo 'e8aa5b5961139a3676207d7cbc99743014f85214258a4b2496448e2dcada7f74  '"$RUNNER_TEMP/MOTO-HUB.apk" | sha256sum -c -
+          unzip -tq "$RUNNER_TEMP/MOTO-HUB.apk"
+      - name: Verify Android v566, package and original signer (no key exposed)
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0'
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$SIGNER" verify --min-sdk-version 26 --verbose --print-certs "$RUNNER_TEMP/MOTO-HUB.apk" > "$RUNNER_TEMP/signature.txt"
+          grep -Fqx 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/signature.txt"
+          grep -Fqx 'Verified using v3 scheme (APK Signature Scheme v3): true' "$RUNNER_TEMP/signature.txt"
+          CERT=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/signature.txt" | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          test "$CERT" = 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b || { echo "::error::Original signer mismatch"; exit 1; }
+          "$AAPT" dump badging "$RUNNER_TEMP/MOTO-HUB.apk" | grep -F "package: name='com.motohub.next' versionCode='566'"
+          test "$(sha256sum "$RUNNER_TEMP/MOTO-HUB.apk" | cut -d' ' -f1)" = e8aa5b5961139a3676207d7cbc99743014f85214258a4b2496448e2dcada7f74
+      - name: Publish v566 asset, then advance the existing OTA manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content | tr -d '\n' | base64 --decode | python3 -c 'import json,sys;print(json.load(sys.stdin)["versionCode"])')
+          test "$CURRENT" -lt 566 || { echo "::error::Manifest has already advanced"; exit 1; }
+          TAG=moto-hub-v566
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Existing v566 release requires manual inspection; refusing overwrite"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/release-v566"
+          cp "$RUNNER_TEMP/MOTO-HUB.apk" "$RUNNER_TEMP/release-v566/MOTO-HUB.apk"
+          gh release create "$TAG" "$RUNNER_TEMP/release-v566/MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY" --target 5d9635c1843e575e655dca289d32c79b696818ab --title 'MOTO HUB 566 (original signed)' --notes 'Offline original-key signature verified. In-app update preserves compatible installed application data.'
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fx 'MOTO-HUB.apk'
+          URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/MOTO-HUB.apk"
+          python3 MOTO-HUB/tools/make_update_manifest.py --apk "$RUNNER_TEMP/MOTO-HUB.apk" --apk-url "$URL" --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" --output "$RUNNER_TEMP/manifest-v566.json"
+          python3 -c 'import json,sys;d=json.load(open(sys.argv[1])); assert d["versionCode"]==566; assert d["packageName"]=="com.motohub.next"; assert d["certificateSha256"]=="212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b"' "$RUNNER_TEMP/manifest-v566.json"
+          SHA=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .sha)
+          LATEST=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content | tr -d '\n' | base64 --decode | python3 -c 'import json,sys;print(json.load(sys.stdin)["versionCode"])')
+          test "$LATEST" -lt 566 || { echo "::error::Concurrent newer manifest; refusing overwrite"; exit 1; }
+          PAYLOAD=$(base64 --wrap=0 "$RUNNER_TEMP/manifest-v566.json")
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json" -f branch=main -f sha="$SHA" -f content="$PAYLOAD" -f message="Publish verified original-signed MOTO HUB v566 OTA"
+          echo 'v566 original-signed OTA published in main/updates/manifest.json'
