@@ -69,7 +69,14 @@ final class HubScreens {
   line(target,title,detail,value,click,null,false);
  }
  void line(LinearLayout target,String title,String detail,String value,Runnable click,Runnable favorite,boolean starred){
-  LinearLayout block=a.col();block.setPadding(a.dp(4),a.dp(14),a.dp(4),a.dp(14));block.setMinimumHeight(a.dp(70));
+  // Settings uses concise cards, while dense searchable ledger rows retain
+  // separators. Data sources, click actions and navigation are unchanged.
+  boolean settingCard=target==a.content&&"더보기".equals(a.tab);
+  LinearLayout block=a.col();
+  block.setPadding(a.dp(settingCard?14:4),a.dp(14),
+                   a.dp(settingCard?14:4),a.dp(14));
+  block.setMinimumHeight(a.dp(settingCard?76:70));
+  if(settingCard)block.setBackground(a.shape(a.panel,a.line,14));
   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);
   boolean largeText=a.getResources().getConfiguration().fontScale>=1.35f;
   if(largeText)head.setOrientation(LinearLayout.VERTICAL);
@@ -98,13 +105,16 @@ final class HubScreens {
   }
   if(click!=null){
    block.setFocusable(true);block.setClickable(true);
-   MotoDesign.ripple(a,block,a.bg,0,8);
+   MotoDesign.ripple(a,block,settingCard?a.panel:a.bg,settingCard?a.line:0,settingCard?14:8);
    block.setOnClickListener(v->click.run());
    block.setContentDescription(title+", "+detail+", "+value);
   }
   target.addView(block);
-  View rule=new View(a);rule.setBackgroundColor(a.line);
-  target.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
+  if(settingCard)a.gap(target,8);
+  else{
+   View rule=new View(a);rule.setBackgroundColor(a.line);
+   target.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
+  }
  }
  void bikePicker(){JSONObject b=a.bike();if(b==null)return;Button picker=a.button(b.optString("name")+"  ▾",false,this::chooseBike);picker.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);a.content.addView(picker,new LinearLayout.LayoutParams(-1,-2));a.gap(a.content,12);}
  void chooseBike(){List<JSONObject> list=a.items("vehicles");list.sort((x,y)->Integer.compare(GarageBikeStatus.rank(x.optString("soldDate")),GarageBikeStatus.rank(y.optString("soldDate"))));String[] options=new String[list.size()+1];for(int i=0;i<list.size();i++)options[i]=GarageBikeStatus.label(list.get(i).optString("name"),list.get(i).optString("soldDate"));options[list.size()]="＋ 바이크 추가";new AlertDialog.Builder(a).setTitle("내 바이크").setItems(options,(d,n)->{if(n==list.size()){a.edit("vehicles",null);return;}a.selected=list.get(n).optString("id");a.getSharedPreferences("garage_ui",0).edit().putString("selected_bike",a.selected).apply();a.render();}).show();}
