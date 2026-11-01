@@ -20,9 +20,9 @@ final class QuickEntryUi {
   field.setTextColor(a.fg);field.setHintTextColor(a.muted);field.setTextSize(19);
   field.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
   field.setImeOptions(EditorInfo.IME_ACTION_NEXT);
-  field.setBackground(a.shape(a.panel,a.line,11));
-  field.setPadding(a.dp(15),a.dp(12),a.dp(15),a.dp(12));
-  field.setMinHeight(a.dp(54));field.setHint(hint);field.setContentDescription(label);
+  field.setBackground(a.shape(a.panel,a.line,17));
+  field.setPadding(a.dp(16),a.dp(13),a.dp(16),a.dp(13));
+  field.setMinHeight(a.dp(56));field.setHint(hint);field.setContentDescription(label);
   if(initial!=null&&!initial.isEmpty())field.setText(initial);
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=a.dp(18);body.addView(field,lp);
   return field;
@@ -41,9 +41,8 @@ final class QuickEntryUi {
    @Override public View getView(int position,View view,android.view.ViewGroup parent){
     TextView item=(TextView)super.getView(position,view,parent);item.setTextColor(a.fg);item.setTextSize(16);return item;
    }
-  };spinner.setAdapter(adapter);spinner.setBackground(a.shape(a.panel,a.line,11));
-  spinner.setPadding(a.dp(10),0,a.dp(8),0);
-  spinner.setMinimumHeight(a.dp(56));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=a.dp(14);body.addView(spinner,lp);
+  };spinner.setAdapter(adapter);spinner.setContentDescription(title);
+  MotoDesign.spinnerField(a,body,spinner,14);
   return spinner;
  }
  void fuel(){
@@ -142,7 +141,7 @@ final class QuickEntryUi {
   a.quickOdoField=odo;
   a.action(extra,"갤러리에서 계기판 사진 선택",false,()->a.chooseQuickOdometerPhoto(odo));
   EditText date=new EditText(a);date.setText(a.today());date.setTextSize(16);date.setTextColor(a.fg);
-  date.setFocusable(false);date.setClickable(true);date.setMinHeight(a.dp(50));date.setBackground(a.shape(a.panel,a.line,11));
+  date.setFocusable(false);date.setClickable(true);date.setMinHeight(a.dp(50));date.setBackground(a.shape(a.panel,a.line,17));
   date.setPadding(a.dp(13),0,a.dp(13),0);date.setOnClickListener(v->a.pickDate(date));
   a.label(extra,"주유 날짜",14,a.fg,true);extra.addView(date,new LinearLayout.LayoutParams(-1,a.dp(52)));
   a.gap(extra,12);
@@ -339,7 +338,7 @@ final class QuickEntryUi {
   }
   EditText customType=new EditText(a);customType.setSingleLine(true);customType.setHint("정비 항목 이름");
   customType.setTextColor(a.fg);customType.setHintTextColor(a.muted);
-  customType.setPadding(a.dp(14),a.dp(12),a.dp(14),a.dp(12));customType.setBackground(a.shape(a.panel,a.line,11));
+  customType.setPadding(a.dp(14),a.dp(12),a.dp(14),a.dp(12));customType.setBackground(a.shape(a.panel,a.line,17));
   customType.setVisibility(View.GONE);body.addView(customType);
   service.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
    public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
@@ -370,7 +369,7 @@ final class QuickEntryUi {
   a.label(advanced,"직접 지정하는 다음 정비일",14,a.fg,true);
   EditText nextDate=new EditText(a);nextDate.setText(LocalDate.parse(a.today()).plusMonths(1).toString());nextDate.setTextColor(a.fg);nextDate.setSingleLine(true);
   nextDate.setFocusable(false);nextDate.setClickable(true);nextDate.setMinHeight(a.dp(54));
-  nextDate.setBackground(a.shape(a.panel,a.line,11));nextDate.setPadding(a.dp(13),0,a.dp(13),0);
+  nextDate.setBackground(a.shape(a.panel,a.line,17));nextDate.setPadding(a.dp(13),0,a.dp(13),0);
   nextDate.setOnClickListener(v->a.pickDate(nextDate));advanced.addView(nextDate);
   Button advancedToggle=a.button("계기판·직접 지정 수정",false,
    ()->advanced.setVisibility(advanced.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
