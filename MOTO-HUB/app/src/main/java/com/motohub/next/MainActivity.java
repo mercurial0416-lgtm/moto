@@ -27,6 +27,13 @@ public class MainActivity extends Activity {
  private static volatile long formWriteRevision=0;
  private long observedJsonImportRevision=0;
  private long observedFormWriteRevision=0;
+ private final android.os.Handler odoSyncHandler=new android.os.Handler(android.os.Looper.getMainLooper());
+ private final java.util.concurrent.atomic.AtomicBoolean odoApplying=new java.util.concurrent.atomic.AtomicBoolean();
+ private final Runnable odoSyncTick=new Runnable(){@Override public void run(){
+  if(isFinishing()||isDestroyed())return;
+  syncVerifiedOdoInbox();
+  odoSyncHandler.postDelayed(this,12_000L);
+ }};
  private final java.util.concurrent.atomic.AtomicBoolean restoreReadRunning=new java.util.concurrent.atomic.AtomicBoolean();
  final RideStartConsent rideStartConsent=new RideStartConsent();
   boolean launchNavigationAfterRide=false;
@@ -243,6 +250,8 @@ public class MainActivity extends Activity {
  }
  @Override protected void onResume(){super.onResume();
   refreshJsonImportAfterRecreation();
+  odoSyncHandler.removeCallbacks(odoSyncTick);
+  odoSyncHandler.postDelayed(odoSyncTick,1200L);
   if(root!=null)root.postDelayed(this::showPendingRideSummary,350);
   // Device location/notification settings may have changed while the settings app was open.
   if(root!=null&&"라이딩".equals(tab)&&dialog==null&&rideStateSignature()!=lastRenderedRideState)renderPreservingPosition();
@@ -371,6 +380,63 @@ public class MainActivity extends Activity {
   if(!checkpointOk)error("기록은 저장됐지만 자동 복구 지점을 만들지 못했습니다. 전체 ZIP 백업을 따로 보관하세요.");
   MotoWidgetProvider.refresh(this);}
  /** Form validation completes on the UI; expensive parse/backup/fsync run on one worker. */
+ /** Apply an already twice-verified OBD reading only after live GPS writing stops.
+  * A pending reading stays safely queued across process death and activity restarts. */
+ void syncVerifiedOdoInbox(){
+  if(readOnly||RideService.running||jsonImportRunning||odoApplying.get()||
+     observedJsonImportRevision!=jsonImportRevision||observedFormWriteRevision!=formWriteRevision)return;
+  final String bikeId=OdometerAutoSyncInbox.configuredBikeId(this);
+  if(!OdometerAutoSyncInbox.enabled(this,bikeId))return;
+  final double offered=OdometerAutoSyncInbox.pending(this,bikeId);
+  if(!OdoAutoSyncPolicy.sane(offered))return;
+  JSONObject bike=Store.find(db,"vehicles",bikeId);
+  if(bike==null)return;
+  // The app never decreases a manually entered/verified odometer.
+  if(offered<=bike.optDouble("odo",0)+0.05){
+   OdometerAutoSyncInbox.acknowledged(this,bikeId,offered);return;
+  }
+  if(!RestoreRideGate.beginFormWrite())return;
+  if(!odoApplying.compareAndSet(false,true)){RestoreRideGate.endFormWrite();return;}
+  new Thread(()->{
+   boolean wrote=false,checkpoint=false,skip=false;String failure=null;JSONObject updated=null;
+   try{
+    if(RideService.running||!OdometerAutoSyncInbox.enabled(this,bikeId))
+     throw new java.io.IOException("자동 라이딩 또는 동기화 설정 변경 중");
+    JSONObject original=Store.parse(new String(disk.readFully(),StandardCharsets.UTF_8));
+    JSONObject vehicle=Store.find(original,"vehicles",bikeId);
+    if(vehicle==null)throw new java.io.IOException("선택한 바이크가 삭제되었습니다.");
+    double current=vehicle.optDouble("odo",Double.NaN);
+    if(!Double.isFinite(current))throw new java.io.IOException("현재 계기판 값이 올바르지 않습니다.");
+    if(offered<=current+0.05){skip=true;}
+    else{
+     OdometerSyncPolicy.checkedManual(String.valueOf(offered),current);
+     vehicle.put("odo",offered);
+     Store.parse(original.toString());
+     LocalSafetyBackup.snapshot(this,Store.parse(new String(disk.readFully(),StandardCharsets.UTF_8)));
+     atomic(disk,original.toString(2).getBytes(StandardCharsets.UTF_8));
+     wrote=true;updated=original;
+     try{checkpoint=LocalSafetyBackup.checkpoint(this,original);}catch(Exception ignored){}
+    }
+    OdometerAutoSyncInbox.acknowledged(this,bikeId,offered);
+   }catch(Exception e){failure=e.getMessage();}
+   finally{
+    if(wrote)formWriteRevision++;
+    RestoreRideGate.endFormWrite();
+    odoApplying.set(false);
+   }
+   final JSONObject done=updated;final String why=failure;
+   final boolean saved=wrote,hadCheckpoint=checkpoint,ignored=skip;
+   runOnUiThread(()->{
+    if(isFinishing()||isDestroyed())return;
+    if(saved&&done!=null){
+     db=done;observedFormWriteRevision=formWriteRevision;readOnly=false;
+     render();DailyMaintenanceJob.checkSoon(this);MotoWidgetProvider.refresh(this);
+     toast("OBD 검증 누적거리 "+num(offered)+" km 자동 반영");
+     if(!hadCheckpoint)error("ODO 변경은 저장됐지만 자동 복구 지점 생성에 실패했습니다. ZIP 백업을 보관하세요.");
+    }else if(!ignored&&why!=null){toast("OBD ODO 반영 보류 · "+why);}
+   });
+  },"moto-verified-obd-odo-commit").start();
+ }
  void commitFormRecordAsync(JSONObject next,String beforeSave,String key,String title,JSONObject item,boolean attach){
   if(readOnly||jsonImportRunning||observedJsonImportRevision!=jsonImportRevision||
      observedFormWriteRevision!=formWriteRevision||!RestoreRideGate.beginFormWrite()){
@@ -2527,8 +2593,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  }
  void back(){if(dialog!=null&&dialog.isShowing()){close();return;}if(tab.equals("더보기")){tab=previousTab;render();}else if(!tab.equals("홈")){tab="홈";render();}else finish();}
 
- @Override protected void onDestroy(){if(isFinishing())BackupPickerTransfer.cancelAll();if(developerObd!=null){developerObd.stop();developerObd=null;}super.onDestroy();}
- @Override protected void onPause(){flushQuickFuelDraft();persistDraft();super.onPause();}
+ @Override protected void onDestroy(){odoSyncHandler.removeCallbacks(odoSyncTick);if(isFinishing())BackupPickerTransfer.cancelAll();if(developerObd!=null){developerObd.stop();developerObd=null;}super.onDestroy();}
+ @Override protected void onPause(){odoSyncHandler.removeCallbacks(odoSyncTick);flushQuickFuelDraft();persistDraft();super.onPause();}
  void clearDraft(){formDirty=false;getSharedPreferences("draft",MODE_PRIVATE).edit().remove("active").apply();}
  void confirmDiscardDraft(){
   if(!getSharedPreferences("draft",MODE_PRIVATE).contains("active")){render();return;}
