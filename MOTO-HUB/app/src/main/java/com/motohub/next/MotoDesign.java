@@ -9,6 +9,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.FrameLayout;
 
 /**
  * A small, consistent native design language. No image fonts, generated assets,
@@ -129,5 +130,4 @@ final class MotoDesign {
   }
   root.addView(bar);
  }
-}
 }
