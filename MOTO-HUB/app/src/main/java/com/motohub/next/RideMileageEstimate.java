@@ -23,6 +23,28 @@ final class RideMileageEstimate {
    return p.edit().putString("ledger",ledger.toString()).commit();
   }catch(Exception ignored){return false;}
  }
+ /** Reconstruct totals from restored/completed source tracks, never from an unverified GPS path.
+  * Runs only on a worker thread; old tracks with no bike binding stay unassigned. */
+ static int rebuild(Context c)throws java.io.IOException {
+  int added=0;
+  for(File track:TrackFile.tracks(c.getFilesDir())){
+   if(!RideMileageIntegrity.validCompleted(track))continue;
+   String bike;
+   try{bike=RideBikeBinding.readStrict(track);}catch(java.io.IOException invalid){continue;}
+   if(!RideBikeBinding.valid(bike))continue;
+   boolean already;
+   synchronized(RideMileageEstimate.class){
+    try{already=new JSONObject(c.getSharedPreferences(PREF,Context.MODE_PRIVATE).getString("ledger","{}")).has(track.getName());}
+    catch(Exception e){throw new java.io.IOException("GPS 누적 통계 파일을 읽을 수 없습니다.",e);}
+   }
+   if(already)continue;
+   try{
+    RideInsights.Result measured=RideInsights.analyze(track);
+    if(measured.points>0&&record(c,track,bike,measured.distanceKm))added++;
+   }catch(Exception ignored){/* Invalid tracks remain intact and are never counted. */}
+  }
+  return added;
+ }
  static synchronized double total(Context c,String bikeId){
   if(!RideBikeBinding.valid(bikeId))return 0;
   try{
