@@ -8,6 +8,8 @@ import android.content.res.ColorStateList;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.FrameLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 /**
@@ -85,6 +87,20 @@ final class MotoDesign {
   ripple(a,view,a.highlight,0,16);
   view.setClickable(true);view.setFocusable(true);
   return view;
+ }
+ static void spinnerField(MainActivity a,LinearLayout parent,Spinner spinner,int bottomMarginDp){
+  FrameLayout shell=new FrameLayout(a);
+  shell.setBackground(a.shape(a.panel,a.line,17));
+  spinner.setBackgroundColor(Color.TRANSPARENT);
+  spinner.setPadding(a.dp(14),a.dp(8),a.dp(35),a.dp(8));
+  shell.addView(spinner,new FrameLayout.LayoutParams(-1,-1));
+  TextView chevron=a.text("⌄",21,a.muted,true);
+  chevron.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+  chevron.setGravity(Gravity.CENTER);
+  FrameLayout.LayoutParams icon=new FrameLayout.LayoutParams(a.dp(25),a.dp(35),Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+  icon.rightMargin=a.dp(10);shell.addView(chevron,icon);
+  LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,a.dp(56));
+  p.bottomMargin=a.dp(bottomMarginDp);parent.addView(shell,p);
  }
  static void addNavigation(MainActivity a,LinearLayout root){
   View rule=new View(a);rule.setBackgroundColor(a.line);
