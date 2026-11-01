@@ -136,6 +136,32 @@ final class DeveloperObdScreen {
   activity.action(p,"최근 라이딩 기록 확인",false,()->{stop();activity.close();activity.navigate("라이딩");});
   activity.action(p,"실험 · ECU 표준 ODO(01A6) 1회 조회",false,this::loadPairedOdo);
   activity.action(p,"계기판 누적 주행거리 수동 확인·반영",false,this::manualOdo);
+  JSONObject configured=activity.bike();
+  String configuredId=configured==null?"":configured.optString("id");
+  boolean odoEnabled=OdometerAutoSyncInbox.enabled(activity,configuredId);
+  activity.action(p,odoEnabled?"OBD 누적거리 자동 동기화 끄기":"OBD 누적거리 자동 동기화 켜기 · 최초 계기판 확인",false,()->{
+   if(RideService.running||RideService.autoArmed){setStatus("OBD 자동 감지를 중지한 뒤 누적거리 동기화 설정을 바꿔 주세요.");return;}
+   JSONObject chosen=activity.bike();
+   if(chosen==null||!RideBikeBinding.valid(chosen.optString("id"))){setStatus("먼저 차고에서 바이크를 등록하고 선택해 주세요.");return;}
+   String id=chosen.optString("id");
+   if(OdometerAutoSyncInbox.enabled(activity,id)){
+    new AlertDialog.Builder(activity).setTitle("ODO 자동 동기화 끄기")
+     .setMessage("기존 주행 기록과 차고 km는 그대로 유지합니다.")
+     .setNegativeButton("취소",null).setPositiveButton("끄기",(d,w)->{
+       OdometerAutoSyncInbox.disable(activity);setStatus("ODO 자동 동기화 꺼짐 · 기록 유지");
+     }).show();return;
+   }
+   double baseline=chosen.optDouble("odo",Double.NaN);
+   if(!OdoAutoSyncPolicy.sane(baseline)){setStatus("차고에 실제 계기판의 누적 km를 먼저 입력해 주세요.");return;}
+   new AlertDialog.Builder(activity).setTitle("실제 계기판과 일치할 때만 자동 동기화")
+    .setMessage(chosen.optString("name")+" · 차고 "+activity.num(baseline)+" km\\n\\n지금 실제 바이크 계기판에 표시된 누적거리와 일치하는지 확인했나요?\\n\\nECU 표준 01A6을 지원할 때 2회 검증 후 자동 반영합니다. ECU 미지원·불일치·이상 급증 시 실제 km를 변경하지 않고, GPS 누적 추정치는 별도로 남깁니다. 자동 감지를 매번 사용자가 켜야 하며 앱 재부팅 후 자동 접속은 하지 않습니다.")
+    .setNegativeButton("취소",null).setPositiveButton("계기판과 일치 · 켜기",(d,w)->{
+      if(!OdometerAutoSyncInbox.enable(activity,id,baseline))
+       setStatus("동기화 설정 저장 실패 · 기록 변경 없음");
+      else setStatus("ODO 동기화 활성화 · 다음 OBD 자동 감지부터 ECU 지원 확인");
+    }).show();
+  });
+  activity.label(p,OdometerAutoSyncInbox.display(activity,configuredId),12,activity.muted,false);
   activity.label(p,"표준 01A6 ODO는 지원 차량에서만 조회됩니다. 듀크 390 지원은 미검증입니다. 조회 결과가 실제 계기판과 일치하는지 두 번 확인해야만 앱 주행거리를 변경합니다. GPS·정비 이력은 그대로 보존합니다.",13,activity.muted,false);
   activity.action(p,"연결 끊기",false,this::stop);
   activity.show();owner=activity.dialog;
