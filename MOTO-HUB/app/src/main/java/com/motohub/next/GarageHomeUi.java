@@ -249,37 +249,45 @@ final class GarageHomeUi {
   if(RideService.autoArmed){a.navigate("라이딩");a.toast("자동 감지는 라이딩 탭에서 중지할 수 있어요.");}
   else if(RideService.running){new AlertDialog.Builder(a).setTitle("주행 기록을 종료할까요?").setMessage("기록을 종료하면 현재 GPS 위치 수집을 중단합니다.").setNegativeButton("취소",null).setPositiveButton("종료",(d,w)->{a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));a.toast("정상 종료를 요청했어요.");a.root.postDelayed(()->{if(!a.isFinishing())a.render();},750);}).show();}
   else {a.navigate("라이딩");new RideUi(a).requestStart();}
- });btn.setTextColor(RideService.running?Color.WHITE:(a.dark?0xFF18191B:Color.WHITE));btn.setTextSize(16);btn.setMinHeight(a.dp(58));btn.setBackground(a.shape(RideService.running?0xFFC34A43:orange,0,17));a.content.addView(btn,new LinearLayout.LayoutParams(-1,a.dp(58)));}
+ });btn.setTextColor(RideService.running?Color.WHITE:(a.dark?0xFF152B4C:Color.WHITE));btn.setTextSize(16);btn.setMinHeight(a.dp(58));btn.setBackground(a.shape(RideService.running?0xFFC34A43:orange,0,17));a.content.addView(btn,new LinearLayout.LayoutParams(-1,a.dp(58)));}
  void quickActions(){
   sectionTitle("바로가기",null,null);
   String[] labels={"간편 주유","정비주기 알림","라이딩 기록","내 바이크"};
-  String[] details={"금액·주유량만 입력","거리·날짜 주기 설정","경로와 주행 통계","차량 정보 수정"};
+  String[] details={"주유량·금액 입력","소모품 관리","경로·주행 통계","정보·사진 관리"};
   Runnable[] actions={()->new QuickEntryUi(a).fuel(),()->new QuickEntryUi(a).maintenance(),
    ()->a.navigate("라이딩"),()->new HubScreens(a).manageBike()};
-  LinearLayout block=a.col();block.setPadding(a.dp(13),a.dp(5),a.dp(13),a.dp(5));block.setBackground(a.shape(surface,stroke,18));
-  for(int i=0;i<labels.length;i++){
-   Runnable action=actions[i];
-   LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
-   row.setPadding(a.dp(4),a.dp(13),a.dp(5),a.dp(13));
-   row.setMinimumHeight(a.dp(70));
-   MotoQuickIcon icon=new MotoQuickIcon(a,i,orange);
-   LinearLayout.LayoutParams iconParams=new LinearLayout.LayoutParams(a.dp(25),a.dp(25));
-   iconParams.rightMargin=a.dp(17);row.addView(icon,iconParams);
-   LinearLayout caption=a.col();caption.addView(a.text(labels[i],15,light,true));
-   TextView secondary=a.text(details[i],12,soft,false);
-   LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);cp.topMargin=a.dp(6);caption.addView(secondary,cp);
-   row.addView(caption,new LinearLayout.LayoutParams(0,-2,1));
-   row.addView(a.text("›",22,soft,false));
-   row.setClickable(true);row.setFocusable(true);
-   row.setContentDescription(labels[i]+" 열기");
-   MotoDesign.ripple(a,row,surface,0,12);
-   row.setOnClickListener(v->action.run());block.addView(row);
-   if(i<labels.length-1){
-    View divider=new View(a);divider.setBackgroundColor(stroke);
-    LinearLayout.LayoutParams rule=new LinearLayout.LayoutParams(-1,a.dp(1));rule.leftMargin=a.dp(46);block.addView(divider,rule);
+  LinearLayout grid=a.col();
+  for(int r=0;r<2;r++){
+   LinearLayout pair=new LinearLayout(a);
+   for(int c=0;c<2;c++){
+    final int index=r*2+c;
+    LinearLayout tile=a.col();
+    tile.setPadding(a.dp(16),a.dp(16),a.dp(12),a.dp(16));
+    tile.setMinimumHeight(a.dp(126));
+    tile.setGravity(Gravity.CENTER_VERTICAL);
+    MotoDesign.ripple(a,tile,surface,stroke,18);
+    LinearLayout iconRow=new LinearLayout(a);iconRow.setGravity(Gravity.CENTER_VERTICAL);
+    LinearLayout iconBg=a.col();iconBg.setGravity(Gravity.CENTER);
+    iconBg.setBackground(a.shape(a.highlight,0,14));
+    iconBg.addView(new MotoQuickIcon(a,index,orange),new LinearLayout.LayoutParams(a.dp(25),a.dp(25)));
+    iconRow.addView(iconBg,new LinearLayout.LayoutParams(a.dp(43),a.dp(43)));
+    tile.addView(iconRow);
+    TextView title=a.text(labels[index],15,light,true);
+    LinearLayout.LayoutParams titleP=new LinearLayout.LayoutParams(-1,-2);titleP.topMargin=a.dp(12);tile.addView(title,titleP);
+    TextView sub=a.text(details[index],11,soft,false);sub.setMaxLines(2);
+    LinearLayout.LayoutParams subP=new LinearLayout.LayoutParams(-1,-2);subP.topMargin=a.dp(5);tile.addView(sub,subP);
+    tile.setFocusable(true);tile.setClickable(true);
+    tile.setContentDescription(labels[index]+" · "+details[index]+" 열기");
+    tile.setOnClickListener(v->actions[index].run());
+    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);
+    if(c==1)lp.leftMargin=a.dp(10);
+    pair.addView(tile,lp);
    }
+   LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);
+   if(r>0)rp.topMargin=a.dp(10);
+   grid.addView(pair,rp);
   }
-  a.content.addView(block);
+  a.content.addView(grid);
  }
  void sectionTitle(String title,String action,Runnable click){LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
   TextView t=a.text(title,18,light,true);row.addView(t,new LinearLayout.LayoutParams(0,-2,1));if(action!=null){TextView more=a.text(action,12,soft,true);more.setPadding(a.dp(8),a.dp(9),a.dp(3),a.dp(9));more.setOnClickListener(v->click.run());row.addView(more);}a.content.addView(row);a.gap(a.content,10);
@@ -295,7 +303,7 @@ final class GarageHomeUi {
   double efficiency=0;int segments=0;
   try{JSONObject fuel=Store.fuelStats(a.db,b.optString("id"));efficiency=fuel.optDouble("kmPerLiter");segments=fuel.optInt("segments");}
   catch(Exception ignored){}
-  LinearLayout frame=a.col();frame.setPadding(a.dp(15),a.dp(15),a.dp(15),a.dp(12));frame.setBackground(a.shape(surface,stroke,15));
+  LinearLayout frame=a.col();frame.setPadding(a.dp(15),a.dp(15),a.dp(15),a.dp(12));frame.setBackground(a.shape(surface,stroke,18));
   LinearLayout cells=new LinearLayout(a);
   String[] title={"이번 달 유지비","실측 연비"};
   String[] values={a.won(spent),segments>0?String.format(Locale.KOREA,"%.1f km/L",efficiency):"기록 부족"};
@@ -334,7 +342,7 @@ final class GarageHomeUi {
  void recent(JSONObject b){sectionTitle("최근 기록","전체 보기  ›",()->a.navigate("차고"));List<JSONObject> r=new HubScreens(a).records("전체",b);
   if(r.isEmpty()){a.label(a.content,"주유·정비 기록을 남기면 여기에 표시돼.",13,soft,false);return;}
   int count=0;for(JSONObject x:r){if(count++>=2)break;
-   LinearLayout row=new LinearLayout(a);row.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(12));row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(a.shape(surface,0,12));LinearLayout details=a.col();details.addView(a.text(x.optString("type","기록"),13,light,true));TextView date=a.text(x.optString("date"),11,soft,false);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(3);details.addView(date,dp);row.addView(details,new LinearLayout.LayoutParams(0,-2,1));row.addView(a.text(a.won(x.optDouble(x.has("amount")?"amount":"cost")),13,orange,true));row.setOnClickListener(v->a.edit(x.has("amount")?"expenses":"services",x));row.setClickable(true);a.content.addView(row);a.gap(a.content,7);
+   LinearLayout row=new LinearLayout(a);row.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(12));row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(a.shape(surface,stroke,16));LinearLayout details=a.col();details.addView(a.text(x.optString("type","기록"),13,light,true));TextView date=a.text(x.optString("date"),11,soft,false);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(3);details.addView(date,dp);row.addView(details,new LinearLayout.LayoutParams(0,-2,1));row.addView(a.text(a.won(x.optDouble(x.has("amount")?"amount":"cost")),13,orange,true));row.setOnClickListener(v->a.edit(x.has("amount")?"expenses":"services",x));row.setClickable(true);row.setFocusable(true);row.setContentDescription("기록 상세 열기");a.content.addView(row);a.gap(a.content,7);
   }
  }
 }
