@@ -16,13 +16,14 @@ final class HubScreens {
   line(target,title,detail,value,click,null,false);
  }
  void line(LinearLayout target,String title,String detail,String value,Runnable click,Runnable favorite,boolean starred){
-  LinearLayout block=a.col();block.setPadding(a.dp(2),a.dp(17),a.dp(2),a.dp(17));block.setMinimumHeight(a.dp(68));
+  LinearLayout block=a.col();block.setPadding(a.dp(16),a.dp(14),a.dp(16),a.dp(14));block.setMinimumHeight(a.dp(70));
   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);
   TextView label=a.text(title,15,a.fg,true);label.setMaxLines(2);
   head.addView(label,new LinearLayout.LayoutParams(0,-2,1));
   if(value!=null&&!value.isEmpty()){
-   TextView hint=a.text(value,13,a.muted,true);hint.setGravity(Gravity.END);
-   hint.setPadding(a.dp(10),0,0,0);hint.setMaxLines(2);head.addView(hint);
+   TextView hint=a.text(value,12,a.accent,true);hint.setGravity(Gravity.END);
+   hint.setPadding(a.dp(9),0,0,0);hint.setMaxLines(1);hint.setEllipsize(android.text.TextUtils.TruncateAt.END);
+   head.addView(hint,new LinearLayout.LayoutParams(-2,-2));
   }
   if(favorite!=null){
    Button star=a.button(starred?"★":"☆",false,favorite);
@@ -39,20 +40,20 @@ final class HubScreens {
   }
   if(click!=null){
    block.setFocusable(true);block.setClickable(true);
-   MotoDesign.ripple(a,block,a.bg,0,8);
+   MotoDesign.ripple(a,block,a.panel,a.line,17);
    block.setOnClickListener(v->click.run());
    block.setContentDescription(title+", "+detail+", "+value);
   }
-  target.addView(block);
-  View rule=new View(a);rule.setBackgroundColor(a.line);
-  target.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
+  if(click==null)block.setBackground(a.shape(a.panel,a.line,17));
+  LinearLayout.LayoutParams card=new LinearLayout.LayoutParams(-1,-2);card.bottomMargin=a.dp(9);
+  target.addView(block,card);
  }
  void bikePicker(){JSONObject b=a.bike();if(b==null)return;Button picker=a.button(b.optString("name")+"  ▾",false,this::chooseBike);picker.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);a.content.addView(picker,new LinearLayout.LayoutParams(-1,-2));a.gap(a.content,12);}
  void chooseBike(){List<JSONObject> list=a.items("vehicles");list.sort((x,y)->Integer.compare(GarageBikeStatus.rank(x.optString("soldDate")),GarageBikeStatus.rank(y.optString("soldDate"))));String[] options=new String[list.size()+1];for(int i=0;i<list.size();i++)options[i]=GarageBikeStatus.label(list.get(i).optString("name"),list.get(i).optString("soldDate"));options[list.size()]="＋ 바이크 추가";new AlertDialog.Builder(a).setTitle("내 바이크").setItems(options,(d,n)->{if(n==list.size()){a.edit("vehicles",null);return;}a.selected=list.get(n).optString("id");a.getSharedPreferences("garage_ui",0).edit().putString("selected_bike",a.selected).apply();a.render();}).show();}
  // Signature screen: one strong garage hero, then one-tap actions and clear records.
  void home(){new GarageHomeUi(a).render();}
  LinearLayout quickTile(String name,String detail,Runnable click){
-  LinearLayout tile=a.col();tile.setGravity(Gravity.CENTER_VERTICAL);tile.setPadding(a.dp(16),a.dp(14),a.dp(14),a.dp(14));tile.setMinimumHeight(a.dp(78));tile.setBackground(a.shape(a.panel,a.line,12));
+  LinearLayout tile=a.col();tile.setGravity(Gravity.CENTER_VERTICAL);tile.setPadding(a.dp(16),a.dp(14),a.dp(14),a.dp(14));tile.setMinimumHeight(a.dp(78));tile.setBackground(a.shape(a.panel,a.line,17));
   TextView t=a.text(name,15,a.fg,true);tile.addView(t);TextView d=a.text(detail,12,a.muted,false);LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(-1,-2);dp.topMargin=a.dp(9);tile.addView(d,dp);
   tile.setClickable(true);tile.setFocusable(true);tile.setContentDescription(name+" "+detail);tile.setOnClickListener(v->click.run());return tile;
  }
@@ -72,7 +73,7 @@ final class HubScreens {
   a.gap(a.content,4);a.label(a.content,"주유·정비 내역을 한곳에서 관리하세요.",12,a.muted,false);
   if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}
   bikePicker();
-  LinearLayout actions=a.col();actions.setPadding(a.dp(14),a.dp(15),a.dp(14),a.dp(8));actions.setBackground(a.shape(a.panel,0,18));
+  LinearLayout actions=a.col();actions.setPadding(a.dp(14),a.dp(15),a.dp(14),a.dp(8));actions.setBackground(a.shape(a.panel,a.line,20));
   a.label(actions,"빠른 기록",16,a.fg,true);
   a.pair(actions,"간편 주유",()->new QuickEntryUi(a).fuel(),"정비주기 설정",()->new QuickEntryUi(a).maintenance());
   LinearLayout details=a.col();details.setVisibility(View.GONE);
@@ -95,7 +96,7 @@ final class HubScreens {
    if(lastFuel==null||RecentRecordReuse.isNewer(record.optString("date"),record.optDouble("mileage"),lastFuel.optString("date"),lastFuel.optDouble("mileage")))lastFuel=record;
   }
   if(lastFuel!=null){
-   LinearLayout summary=a.col();summary.setPadding(a.dp(15),a.dp(15),a.dp(15),a.dp(13));summary.setBackground(a.shape(a.panel,a.line,15));
+   LinearLayout summary=a.col();summary.setPadding(a.dp(15),a.dp(15),a.dp(15),a.dp(13));summary.setBackground(a.shape(a.panel,a.line,18));
    a.label(summary,"최근 주유  ·  "+lastFuel.optString("date"),13,a.muted,false);
    a.label(summary,a.won(lastFuel.optDouble("amount"))+"  /  "+a.num(lastFuel.optDouble("liters"))+"L",19,a.fg,true);
    double price=lastFuel.optDouble("amount")/lastFuel.optDouble("liters");
@@ -104,7 +105,7 @@ final class HubScreens {
   }
   FuelStats fuelStats=FuelStats.forBike(a.items("expenses"),bikeId);
   if(fuelStats.fills>0){
-   LinearLayout insight=a.col();insight.setPadding(a.dp(15),a.dp(12),a.dp(15),a.dp(12));insight.setBackground(a.shape(a.panel,a.line,15));
+   LinearLayout insight=a.col();insight.setPadding(a.dp(15),a.dp(12),a.dp(15),a.dp(12));insight.setBackground(a.shape(a.panel,a.line,18));
    a.label(insight,"주유 기록 "+fuelStats.fills+"회 · 평균 리터당 "+a.won(Math.round(fuelStats.averageWonPerLiter)),14,a.fg,true);
    if(fuelStats.fullIntervals>0&&Double.isFinite(fuelStats.kmPerLiter))
     a.label(insight,"만땅 간격 추정 연비 약 "+String.format(java.util.Locale.KOREA,"%.1f",fuelStats.kmPerLiter)+" km/L · "+fuelStats.fullIntervals+"구간",13,a.muted,false);
@@ -127,7 +128,23 @@ final class HubScreens {
   if(ListPageLimit.canPrevious(list.size(),a.recordPageOffset))a.action(a.content,"◀ 최근 기록",false,()->{a.recordPageOffset=ListPageLimit.previous(list.size(),a.recordPageOffset);a.render();});
   if(ListPageLimit.canNext(list.size(),a.recordPageOffset))a.action(a.content,"이전 기록 ▶ · "+ListPageLimit.end(list.size(),a.recordPageOffset)+"/"+list.size(),false,()->{a.recordPageOffset=ListPageLimit.next(list.size(),a.recordPageOffset);a.render();});
  }
- void tabs(String[] values,String current,MainActivity.Choice select){HorizontalScrollView sc=new HorizontalScrollView(a);sc.setHorizontalScrollBarEnabled(false);LinearLayout group=new LinearLayout(a);for(String value:values){Button b=a.button(value,current.equals(value),()->select.pick(value));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.rightMargin=a.dp(8);group.addView(b,lp);}sc.addView(group);a.content.addView(sc);a.gap(a.content,12);}
+ void tabs(String[] values,String current,MainActivity.Choice select){
+  HorizontalScrollView scroll=new HorizontalScrollView(a);
+  scroll.setHorizontalScrollBarEnabled(false);
+  LinearLayout group=new LinearLayout(a);group.setGravity(Gravity.CENTER_VERTICAL);
+  for(String value:values){
+   boolean checked=current.equals(value);
+   TextView chip=a.text(value,13,checked?a.accent:a.muted,checked);
+   chip.setGravity(Gravity.CENTER);chip.setMinHeight(a.dp(39));
+   chip.setPadding(a.dp(17),a.dp(9),a.dp(17),a.dp(9));
+   MotoDesign.ripple(a,chip,checked?a.highlight:a.panel,checked?a.accent:a.line,19);
+   chip.setContentDescription(value+(checked?", 선택됨":""));chip.setSelected(checked);
+   chip.setClickable(true);chip.setFocusable(true);chip.setOnClickListener(v->select.pick(value));
+   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.rightMargin=a.dp(8);
+   group.addView(chip,lp);
+  }
+  scroll.addView(group);a.content.addView(scroll);a.gap(a.content,15);
+ }
  void manageBike(){JSONObject b=a.bike();if(b==null){a.edit("vehicles",null);return;}LinearLayout p=a.page("내 바이크 관리");a.label(p,b.optString("name"),25,a.fg,true);a.label(p,b.optInt("year")+"년식 · "+a.num(b.optDouble("odo"))+" km",17,a.muted,false);a.label(p,"구매가 "+a.won(b.optDouble("purchase")),17,a.fg,false);
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
