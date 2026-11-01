@@ -1,0 +1,31 @@
+name: Prepare MOTO HUB 570 draft release for signed APK upload
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/moto-v570-create-draft.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create empty draft release without publishing an unverified APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=moto-hub-v570
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. No overwrite."
+            exit 0
+          fi
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --target ce050ce80f2c23aacdd0f803126769d5f0af4602 \
+            --title "MOTO HUB v570 · 새로운 UI · 기존 데이터 유지" \
+            --notes "Original-key signed APK required. Verify SHA256 d869049f63807f413f3fc6e90f77c93caeb54d968caa9323dd7dc988107100d8. Upload as MOTO-HUB.apk and publish release; a dedicated workflow then validates the signature and advances OTA manifest from 569 to 570."
+          echo 'Draft release prepared. Keep it draft until the signed v570 APK is attached.'
