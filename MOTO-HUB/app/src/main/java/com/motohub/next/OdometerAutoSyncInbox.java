@@ -6,6 +6,7 @@ final class OdometerAutoSyncInbox {
  private static final String PREF="odo_auto_sync";
  private OdometerAutoSyncInbox(){}
  private static SharedPreferences p(Context context){return context.getSharedPreferences(PREF,Context.MODE_PRIVATE);}
+ static synchronized String configuredBikeId(Context c){return p(c).getString("bikeId","");}
  static synchronized boolean enabled(Context c,String bikeId){
   return RideBikeBinding.valid(bikeId)&&p(c).getBoolean("enabled",false)&&bikeId.equals(p(c).getString("bikeId",""));
  }
