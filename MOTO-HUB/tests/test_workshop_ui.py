@@ -65,7 +65,7 @@ check("changeHeroPhoto(bike,own)" in home and "switchBike(direction)" in home,
       "hero photo management or bike switching lost")
 check('String[] labels={"홈","라이딩","정비","설정"}' in design,
       "navigation labels inconsistent")
-check('setContentDescription(labels[i]+(selected?", 선택됨":""))' in design,
+check('setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"))' in design,
       "navigation accessibility label missing")
 check('getWindow().setStatusBarColor(dark?bg:panel)' in main,
       "system chrome doesn't track theme")
