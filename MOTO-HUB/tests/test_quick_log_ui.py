@@ -11,7 +11,7 @@ checks={
  'manual interval recalculation': 'RecentRecordReuse.nextServiceKm(' in s,
  'duplicate confirmation': 'QuickLogDuplicate.exists(items(key),item,key)' in s and '그래도 저장' in s,
  'fresh vehicle ID preserved': 'item.put("vehicleId",old.optString("vehicleId",b.optString("id")))' in s,
- 'same saved backup mechanism': 'write(next);if(key.equals("vehicles")||key.equals("services")||key.equals("expenses"))DailyMaintenanceJob.checkSoon(this);clearDraft();close();render();UndoLastSave.offer(this,beforeSave,db.toString(),title,' in s and 'JSONObject next=new JSONObject(beforeSave);Store.upsert(next,key,item)' in s,
+ 'same saved backup mechanism': 'commitFormRecordAsync(next,beforeSave,key,title,item,attachAfterSave.isChecked())' in s and 'JSONObject next=new JSONObject(beforeSave);Store.upsert(next,key,item)' in s and 'LocalSafetyBackup.snapshot(this,Store.parse(beforeSave))' in s and 'atomic(disk,bytes);' in s and 'LocalSafetyBackup.checkpoint(this,verified)' in s,
  'duplicate dialog rejects stale DB': 'if(!db.toString().equals(beforeSave))throw new java.io.IOException' in s,
  'draft recovery unaffected': 'void resumeDraft(){' in s,
  'fuel full tank opt-in': 'full.setChecked(old.optBoolean("fullTank"))' in s,

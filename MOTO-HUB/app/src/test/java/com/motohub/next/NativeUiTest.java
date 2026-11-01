@@ -8,7 +8,16 @@ public class NativeUiTest {
  @Before public void start(){a=Robolectric.buildActivity(MainActivity.class).setup().get();}
  @After public void finish(){if(a!=null){a.close();a.finish();}}
  View find(View v,String text){if(v instanceof Button&&((Button)v).getText().toString().equals(text))return v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View r=find(g.getChildAt(i),text);if(r!=null)return r;}}return null;}
- void save(){View b=find(a.dialog.getWindow().getDecorView(),"저장");assertNotNull(b);b.performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();}
+ void save(){
+  View b=find(a.dialog.getWindow().getDecorView(),"저장");assertNotNull(b);b.performClick();
+  // Form writes now commit on a worker; wait for a real atomic save and UI post.
+  for(int i=0;i<250;i++){
+   Shadows.shadowOf(Looper.getMainLooper()).idle();
+   if(!RestoreRideGate.isFormWriting()){Shadows.shadowOf(Looper.getMainLooper()).idle();return;}
+   try{Thread.sleep(20);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();fail("Interrupted while saving");}
+  }
+  fail("Form atomic write did not finish");
+ }
  void field(String name,String value){a.draftFields.get(name).setText(value);}
  void bike(){a.edit("vehicles",null);assertEquals("",a.draftFields.get("name").getText().toString());assertEquals("",a.draftFields.get("year").getText().toString());field("name","TEST · My Bike");field("year","2024");field("odo","12450");save();assertEquals(1,a.arr("vehicles").length());}
  @Test public void emptyLaunchAndNavigation(){assertEquals(0,a.arr("vehicles").length());for(String tab:a.tabs){a.navigate(tab);assertTrue(a.content.getChildCount()>0);}a.navigate("더보기");a.back();assertEquals("차고",a.tab);a.back();assertEquals("홈",a.tab);}

@@ -162,7 +162,7 @@ final class DeveloperObdScreen {
     "\n"+RideService.engineEstimate()+"\n지원 항목: "+RideService.obdPidSupport+
     "\n보조 센서 진단: "+RideService.obdAuxDiagnostics+
     "\n"+ObdRestStatus.label(RideService.autoArmed,RideService.running,RideService.obdStationaryRemainingMs)+
-    "\n최근 오류: "+RideService.obdLastError+"\nODO/연료 소모량 미검증 · 통신 데이터 외부 전송 없음");
+    "\n연료 잔량: "+(RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdFuelAt,android.os.SystemClock.elapsedRealtime())&&Double.isFinite(RideService.obdFuelPercent)?String.format(java.util.Locale.KOREA,"%.1f%%",RideService.obdFuelPercent):"미지원/응답 없음")+"\n최근 오류: "+RideService.obdLastError+"\nODO/연료 소모량 미검증 · 통신 데이터 외부 전송 없음");
    telemetry.postDelayed(this,2500);
   }};telemetry.post(update);
  }
@@ -352,7 +352,7 @@ final class DeveloperObdScreen {
  private void confirmConnect(BluetoothDevice device){
   if(RideService.autoArmed){setStatus("자동 라이딩 감지 중에는 개별 OBD2 연결을 사용할 수 없습니다. 먼저 자동 감지를 종료하세요.");return;}
   new AlertDialog.Builder(activity).setTitle("읽기 전용 연결")
-   .setMessage("선택한 Bluetooth 장치와 연결하고 표준 OBD-II 센서(PID 01 0C/0D/05/42)만 읽습니다. ECU·계기판에 설정을 기록하지 않습니다. KTM 국내 사양과 어댑터 호환성은 검증되지 않았습니다.")
+   .setMessage("선택한 Bluetooth 장치와 연결하고 표준 OBD-II 센서(PID 01 0C/0D/05/42, 확인된 2F 연료 비율)만 읽습니다. ECU·계기판에 설정을 기록하지 않습니다. KTM 국내 사양과 어댑터 호환성은 검증되지 않았습니다.")
    .setNegativeButton("취소",null).setPositiveButton("동의하고 연결",(d,w)->connect(device)).show();
  }
  private synchronized void connect(BluetoothDevice device){
@@ -373,10 +373,11 @@ final class DeveloperObdScreen {
    for(String setup:new String[]{"ATZ\r","ATE0\r","ATL0\r","ATS0\r","ATSP0\r"}){
     request(in,out,setup,4000);if(stopped)return;
    }
-   String supported00="",supported40="";
+   String supported00="",supported20="",supported40="";
    try{supported00=request(in,out,ObdReadOnlyProtocol.query("0100"),2500);}catch(Exception ignored){}
+   try{supported20=request(in,out,ObdReadOnlyProtocol.query("0120"),2500);}catch(Exception ignored){}
    try{supported40=request(in,out,ObdReadOnlyProtocol.query("0140"),2500);}catch(Exception ignored){}
-   ObdPidCapabilities capabilities=ObdPidCapabilities.fromResponses(supported00,supported40);
+   ObdPidCapabilities capabilities=ObdPidCapabilities.fromAllResponses(supported00,supported20,supported40,null);
    ObdLocalDiagnosticLog.record(activity,"BT_OK");
    ObdLocalDiagnosticLog.capability(activity,capabilities);
    setStatus("Bluetooth 연결됨 · 차량 센서 응답 확인 중…");
@@ -387,6 +388,7 @@ final class DeveloperObdScreen {
     for(int i=0;i<ObdReadOnlyProtocol.SENSOR_PIDS.length&&!stopped;i++){
      String pid=ObdReadOnlyProtocol.SENSOR_PIDS[i];
      if(capabilities.forPid(pid)==ObdPidCapabilities.Support.NO){updateField(i,"미지원 (PID 목록)");continue;}
+     if("012F".equals(pid)&&capabilities.forPid(pid)!=ObdPidCapabilities.Support.YES){updateField(i,"지원 미확인 · 연료 조회 생략");continue;}
      try{
       String result=ObdReadOnlyProtocol.decode(pid,request(in,out,ObdReadOnlyProtocol.query(pid),2500));
       if(!"지원 안 함".equals(result)){

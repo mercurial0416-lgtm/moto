@@ -8,10 +8,10 @@ public final class RideService extends Service implements LocationListener {
  static volatile long obdAverageLatencyMs=-1;
  static volatile int obdQueryFailures=0,obdConnectionAttempts=0,obdConnectionSuccesses=0;
  static volatile long obdSpeedSamples=0; // only current, explicitly enabled connection session
- static volatile double obdRpm=Double.NaN,obdCoolantC=Double.NaN,obdVoltage=Double.NaN;
+ static volatile double obdRpm=Double.NaN,obdCoolantC=Double.NaN,obdVoltage=Double.NaN,obdFuelPercent=Double.NaN;
  static volatile String obdLink="연결 안 됨";
  static volatile long obdLastSampleElapsed=0;
- static volatile long obdRpmAt=0,obdCoolantAt=0,obdVoltageAt=0;
+ static volatile long obdRpmAt=0,obdCoolantAt=0,obdVoltageAt=0,obdFuelAt=0;
  static volatile String obdLastError="없음";
  static volatile String obdPidSupport="지원 PID 확인 전 · ODO는 미검증";
  static volatile String obdAuxDiagnostics="센서 수신 기록 없음";
@@ -247,11 +247,11 @@ public final class RideService extends Service implements LocationListener {
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
-   obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
+   obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;obdFuelPercent=Double.NaN;obdFuelAt=0;
    obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=1;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
    obdPidSupport="표준 지원 PID 확인 중 · ODO 미검증";
    obdAuxDiagnostics="센서 수신 기록 없음";obdStationaryRemainingMs=-1;
-   obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdLastError="없음";
+   obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;obdLastError="없음";
    final ObdAutoSpeedMonitor[] ref=new ObdAutoSpeedMonitor[1];
    ObdAutoSpeedMonitor reader=new ObdAutoSpeedMonitor(paired,new ObdAutoSpeedMonitor.Listener(){
     @Override public void linkQuality(long averageMs,int samples,int failures){
@@ -274,6 +274,7 @@ public final class RideService extends Service implements LocationListener {
      if("010C".equals(pid)){obdRpm=value;obdRpmAt=now;}
      else if("0105".equals(pid)){obdCoolantC=value;obdCoolantAt=now;}
      else if("0142".equals(pid)){obdVoltage=value;obdVoltageAt=now;}
+     else if("012F".equals(pid)){obdFuelPercent=value;obdFuelAt=now;}
     }});}
     @Override public void capabilities(ObdPidCapabilities capability){handler.post(()->{
      if(autoArmed&&obdMonitor==ref[0]){
@@ -294,7 +295,7 @@ public final class RideService extends Service implements LocationListener {
     @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
      obdLink="연결 재시도 "+attempt+"/"+max;obdConnectionAttempts++;MotoWidgetProvider.refresh(RideService.this);
      obdReconnects=attempt;speedSanity.reset();ObdLocalDiagnosticLog.record(RideService.this,"RECONNECT");obdSpeedKmh=-1;obdLastSampleElapsed=0;
-     obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
+     obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;
      obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
      autoGate.connectionLost();obdStationaryRemainingMs=-1;liveSpeedKmh=0;
      status="OBD2 신호 손실 · "+obdLink+(running?" · GPS 기록 유지":"");
@@ -411,7 +412,7 @@ public final class RideService extends Service implements LocationListener {
   obdLastError="OBD2 · "+reason;
   obdLink="연결 종료 · "+ObdFailureGuide.classify(reason);MotoWidgetProvider.refresh(this);speedSanity.reset();ObdLocalDiagnosticLog.record(this,"AUTO_OFF");obdSpeedKmh=-1;obdLastSampleElapsed=0;
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
-  obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
+  obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;
   autoArmed=false;autoGate.reset();obdStationaryRemainingMs=-1;obdMonitor=null;
   Sharing.stop();
   if(autoFinishPending){
@@ -561,7 +562,7 @@ public final class RideService extends Service implements LocationListener {
   Sharing.stop();autoArmed=false;obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
-  obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;
+  obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;
   if(obdMonitor!=null){obdMonitor.stop();obdMonitor=null;}
   autoGate.reset();running=false;handler.removeCallbacksAndMessages(null);
   if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}

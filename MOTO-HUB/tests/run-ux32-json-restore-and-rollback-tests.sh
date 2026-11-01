@@ -18,7 +18,7 @@ assert 'try{write(next);}' not in method
 assert 'db=result;readOnly=false;' in method
 assert 'if(committed)jsonImportRevision++' in method
 assert 'jsonImportRunning=false;' in method
-assert 'if(RestoreRideGate.isRestoring()||jsonImportRunning||observedJsonImportRevision!=jsonImportRevision)' in s
+assert 'RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()||jsonImportRunning||observedJsonImportRevision!=jsonImportRevision' in s
 assert '"moto-json-import-apply").start()' in method
 r=Path('app/src/main/java/com/motohub/next/RestoreArchive.java').read_text()
 chunk=r.split('static void recoverOne(',1)[1].split('private static void validate(',1)[0]
