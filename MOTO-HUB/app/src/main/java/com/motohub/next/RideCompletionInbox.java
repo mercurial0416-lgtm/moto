@@ -75,6 +75,8 @@ final class RideCompletionInbox {
     if(id.equals(current.optJSONObject(i)==null?"":current.optJSONObject(i).optString("id")))return;
    JSONObject row=new JSONObject();
    String boundBike=RideBikeBinding.readStrict(track);
+   // GPS is a separate, explicitly approximate ledger; never rewrite dashboard ODO.
+   RideMileageEstimate.record(context,track,boundBike,result.distanceKm);
    row.put("id",id).put("summary",recap).put("seen",false)
     .put("bikeId",boundBike)
     .put("time",System.currentTimeMillis());
