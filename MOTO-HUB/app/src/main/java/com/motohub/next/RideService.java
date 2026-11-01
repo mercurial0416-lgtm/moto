@@ -254,6 +254,14 @@ public final class RideService extends Service implements LocationListener {
    obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;obdLastError="없음";
    final ObdAutoSpeedMonitor[] ref=new ObdAutoSpeedMonitor[1];
    ObdAutoSpeedMonitor reader=new ObdAutoSpeedMonitor(paired,new ObdAutoSpeedMonitor.Listener(){
+    @Override public boolean allowOdometer(){return OdometerAutoSyncInbox.enabled(RideService.this,pendingBikeId);}
+    @Override public void odometer(double km){
+     if(autoArmed&&OdometerAutoSyncInbox.enabled(RideService.this,pendingBikeId))
+      OdometerAutoSyncInbox.offer(RideService.this,pendingBikeId,km,km,System.currentTimeMillis());
+    }
+    @Override public void odometerStatus(String reason){
+     handler.post(()->{if(autoArmed)obdLastError=reason;});
+    }
     @Override public void linkQuality(long averageMs,int samples,int failures){
      handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
       obdAverageLatencyMs=averageMs;obdQueryFailures=failures;

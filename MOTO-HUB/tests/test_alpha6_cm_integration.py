@@ -17,7 +17,7 @@ checks={
  'ODO support query': 'query("01A0")' in screen and 'Support.YES' in screen,
  'ODO manual verification twice': '1차 확인' in screen and '최종 확인' in screen and '계기판과 일치' in screen,
  'ODO update locked while riding': 'if(RideService.running||RideService.autoArmed)throw new IllegalStateException' in screen,
- 'ODO isolated from normal auto telemetry': '01A6' not in load('app/src/main/java/com/motohub/next/ObdAutoSpeedMonitor.java'),
+ 'ODO auto restricted to explicit per-bike opt-in and read-only': ('listener.allowOdometer()' in load('app/src/main/java/com/motohub/next/ObdAutoSpeedMonitor.java') and 'capabilities.forPid("01A6")==ObdPidCapabilities.Support.YES' in load('app/src/main/java/com/motohub/next/ObdAutoSpeedMonitor.java') and 'OdoAutoSyncPolicy.consistent(a,b)' in load('app/src/main/java/com/motohub/next/ObdAutoSpeedMonitor.java') and 'OdometerAutoSyncInbox.enable(activity,id,baseline)' in screen),
  'ignition is RPM estimate only': 'ObdEngineState.label' in service and '시동 상태 확인 불가' in load('app/src/main/java/com/motohub/next/ObdEngineState.java'),
  'privacy of ongoing notification': 'setVisibility(Notification.VISIBILITY_PRIVATE)' in service,
  'no group sharing upon auto arm': 'Sharing.stop(); // Automatic local rides' in service,

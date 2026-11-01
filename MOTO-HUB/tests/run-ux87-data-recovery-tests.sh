@@ -19,7 +19,7 @@ checks={
  "service duplicates rechecked":'if(!reviewedDuplicate&&QuickLogDuplicate.exists(a.items("services"),record,"services"))' in quick,
  "service keeps undo on successful commit":'UndoLastSave.offer(a,beforeSave,a.db.toString(),"정비주기"' in quick,
  "fuel drafts fast while editing":'FuelDraft.save(a,bikeId' in quick and '.apply();' in fuel,
- "fuel drafts fsync on activity pause":'@Override protected void onPause(){flushQuickFuelDraft();persistDraft();super.onPause();}' in main,
+ "fuel drafts fsync on activity pause":'@Override protected void onPause(){odoSyncHandler.removeCallbacks(odoSyncTick);flushQuickFuelDraft();persistDraft();super.onPause();}' in main,
  "fuel drafts fsync on dismissed page":'dialog.setOnDismissListener(d->{flushQuickFuelDraft();quickFuelDraftFlush=null;' in main,
  "fuel drafts fsync on normal close":'if(dialog!=null){flushQuickFuelDraft();quickFuelDraftFlush=null;' in main,
  "fuel drafts durable small snapshot":'.putString(key(bike),raw).commit()' in fuel and 'static boolean saveDurable(' in fuel,
