@@ -735,6 +735,30 @@ public class MainActivity extends Activity {
    });break;
   }
  }
+ /** Cross-tab reminder is observational only; it never starts or stops GPS. */
+ void addRideStatusBanner(){
+  if("라이딩".equals(tab)||!RideService.running&&!RideService.autoArmed)return;
+  final TextView status=text("",13,fg,true);
+  status.setMinHeight(dp(48));status.setGravity(Gravity.CENTER_VERTICAL);
+  status.setPadding(dp(18),dp(10),dp(18),dp(10));
+  status.setBackground(shape(highlight,line,13));
+  status.setContentDescription("라이딩 상태 보기 · 누르면 라이딩 탭");
+  status.setClickable(true);status.setFocusable(true);
+  status.setOnClickListener(v->navigate("라이딩"));
+  final Runnable tick=new Runnable(){@Override public void run(){
+   if(isFinishing()||isDestroyed()||!status.isAttachedToWindow())return;
+   if(!RideService.running&&!RideService.autoArmed){status.setVisibility(View.GONE);return;}
+   if(RideService.running){
+    long seconds=Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.startedElapsed)/1000L);
+    status.setText(String.format(Locale.KOREA,"● GPS 기록 중  ·  %02d:%02d  ·  %.1f km  ·  라이딩 보기",
+     seconds/3600,seconds/60%60,Math.max(0,RideService.liveDistanceKm)));
+   }else status.setText("● OBD 자동 출발 감지 대기  ·  라이딩 보기");
+   status.postDelayed(this,5000L);
+  }};
+  LinearLayout bar=col();bar.setPadding(dp(18),dp(4),dp(18),dp(4));
+  bar.addView(status,new LinearLayout.LayoutParams(-1,-2));root.addView(bar);
+  status.post(tick);
+ }
  void render(){
   if(WidgetBikeSnapshot.update(this)){
    MotoWidgetProvider.refresh(this);
@@ -746,6 +770,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
   root=col();root.setBackgroundColor(bg);setContentView(root);root.setOnApplyWindowInsetsListener((v,i)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets x=i.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());v.setPadding(x.left,x.top,x.right,x.bottom);}else v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});root.requestApplyInsets();
   MotoDesign.addHeader(this,root);
+  addRideStatusBanner();
   if(Sharing.enabled){
    LinearLayout sharingBar=new LinearLayout(this);sharingBar.setGravity(Gravity.CENTER_VERTICAL);sharingBar.setPadding(dp(20),dp(5),dp(20),dp(7));
    TextView live=text("●  내 위치 공유 중",14,accent,true);sharingBar.addView(live,new LinearLayout.LayoutParams(0,-2,1));
@@ -1306,7 +1331,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  }
  void field(LinearLayout p,Map<String,EditText> f,JSONObject old,String key,String label,String def){label(p,label,14,muted,true);EditText e=new EditText(this);e.setContentDescription(label);e.setTextSize(16);e.setTextColor(fg);e.setHintTextColor(muted);e.setPadding(dp(12),dp(10),dp(12),dp(10));e.setMinHeight(dp(52));e.setInputType(numbers.contains(key)?android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL:android.text.InputType.TYPE_CLASS_TEXT|(key.equals("url")?android.text.InputType.TYPE_TEXT_VARIATION_URI:android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE));e.setText(old.has(key)?old.optString(key):def);e.setBackground(shape(panel,line,13));e.setHint(key.equals("date")?"날짜를 선택하세요":key.equals("model")?"모델명 직접 입력":key.equals("name")&&activeForm.equals("vehicles")?"바이크 이름 직접 입력":key.equals("year")?"연식 4자리 입력 또는 모델 선택":key.equals("type")?"항목 직접 입력":"직접 입력");f.put(key,e);e.setSelectAllOnFocus(numbers.contains(key));helpers(p,activeForm,key,e,activeOld,bike());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(20);p.addView(e,lp);}
  void selector(LinearLayout p,Map<String,Spinner> f,String key,String title,String[] values,String value){label(p,title,14,muted,true);Spinner s=new Spinner(this);ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,values){@Override public View getView(int position,View convert,ViewGroup parent){TextView t=(TextView)super.getView(position,convert,parent);t.setTextColor(fg);t.setTextSize(16);return t;}};s.setAdapter(adapter);for(int i=0;i<values.length;i++)if(values[i].equals(value))s.setSelection(i);p.addView(s,new LinearLayout.LayoutParams(-1,dp(56)));gap(p,12);f.put(key,s);if(key.equals("type")&&activeForm.equals("expenses")){
-   String[] options={"주유","보험","부품","기타"};
+   String[] options={"주유","보험","부품","튜닝","기타"};
    HorizontalScrollView scroll=new HorizontalScrollView(this);scroll.setHorizontalScrollBarEnabled(false);LinearLayout bar=new LinearLayout(this);
    for(int i=0;i<options.length;i++){final int index=i;Button b=button(options[i],false,()->s.setSelection(index));b.setTextSize(14);b.setMinHeight(dp(40));LinearLayout.LayoutParams l=new LinearLayout.LayoutParams(-2,-2);l.rightMargin=dp(4);bar.addView(b,l);}
    scroll.addView(bar);p.addView(scroll,new LinearLayout.LayoutParams(-1,-2));gap(p,8);
@@ -1630,7 +1655,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     dateMileageFields.setVisibility(open?View.VISIBLE:View.GONE);
    });metaToggle=expand;p.addView(expand);dateMileageFields.setVisibility(View.GONE);p.addView(dateMileageFields);
   }
-  if(key.equals("expenses"))selector(p,sel,"type","비용 종류",new String[]{"주유","보험","부품","기타"},old.optString("type","주유"));
+  if(key.equals("expenses"))selector(p,sel,"type","비용 종류",new String[]{"주유","보험","부품","튜닝","기타"},old.optString("type","주유"));
   LinearLayout optional=col();optional.setVisibility(View.GONE);formOptionalSection=optional;formOptionalToggle=null;formOptionalKeys.clear();
   Set<String> essentials=new HashSet<>(Arrays.asList("name","model","odo","year","price","url","type","date","mileage","amount","cost","liters","start","end"));
   LinearLayout litersContainer=null;
