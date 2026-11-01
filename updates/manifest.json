@@ -1,11 +1,11 @@
 {
   "packageName": "com.motohub.next",
-  "versionCode": 569,
-  "versionName": "4.0.0-alpha6-di.569",
+  "versionCode": 570,
+  "versionName": "4.0.0-alpha6-di.570",
   "minSdk": 26,
-  "sizeBytes": 47387214,
-  "sha256": "e4b19ad4f1f6970f8c81553f1be61100d99a5fa586d06d5b8b454dab124629bb",
+  "sizeBytes": 47452949,
+  "sha256": "d869049f63807f413f3fc6e90f77c93caeb54d968caa9323dd7dc988107100d8",
   "certificateSha256": "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b",
-  "apkUrl": "https://github.com/mercurial0416-lgtm/moto/releases/download/moto-hub-v569/MOTO-HUB.apk",
+  "apkUrl": "https://github.com/mercurial0416-lgtm/moto/releases/download/moto-hub-v570/MOTO-HUB.apk",
   "notes": "고정 서명 MOTO HUB 업데이트. 기존 데이터가 유지되며 Android 설치 승인이 필요합니다."
 }
