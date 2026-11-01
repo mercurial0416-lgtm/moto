@@ -105,6 +105,7 @@ public class MainActivity extends Activity {
    },"moto-post-update-data-audit").start();
   }
   if(state==null&&!readOnly)auditGarageSoon(false);
+  if(state==null&&!readOnly)rebuildGpsEstimateAsync();
   if(state==null && !RideService.running && !RideService.autoArmed && !widgetActionTaken&&!notificationActionTaken)showInterruptedRidePrompt();
  }
  void auditGarageSoon(boolean showAll){
@@ -382,6 +383,21 @@ public class MainActivity extends Activity {
  /** Form validation completes on the UI; expensive parse/backup/fsync run on one worker. */
  /** Apply an already twice-verified OBD reading only after live GPS writing stops.
   * A pending reading stays safely queued across process death and activity restarts. */
+ void rebuildGpsEstimateAsync(){
+  new Thread(()->{
+   try{
+    int added=RideMileageEstimate.rebuild(this);
+    if(added>0)runOnUiThread(()->{
+     if(!isFinishing()&&!isDestroyed()&&"홈".equals(tab)&&dialog==null)render();
+    });
+   }catch(java.io.IOException invalid){
+    runOnUiThread(()->{
+     if(!isFinishing()&&!isDestroyed())
+      toast("GPS 누적거리 목록 확인 실패 · 원본 경로는 보존했습니다.");
+    });
+   }
+  },"moto-gps-mileage-rebuild").start();
+ }
  void syncVerifiedOdoInbox(){
   if(readOnly||RideService.running||jsonImportRunning||odoApplying.get()||
      observedJsonImportRevision!=jsonImportRevision||observedFormWriteRevision!=formWriteRevision)return;
