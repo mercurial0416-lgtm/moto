@@ -162,7 +162,7 @@ final class DeveloperObdScreen {
     "\n"+RideService.engineEstimate()+"\n지원 항목: "+RideService.obdPidSupport+
     "\n보조 센서 진단: "+RideService.obdAuxDiagnostics+
     "\n"+ObdRestStatus.label(RideService.autoArmed,RideService.running,RideService.obdStationaryRemainingMs)+
-    "\n최근 오류: "+RideService.obdLastError+"\nODO/연료 소모량 미검증 · 통신 데이터 외부 전송 없음");
+    "\n연료 잔량: "+(RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdFuelAt,android.os.SystemClock.elapsedRealtime())&&Double.isFinite(RideService.obdFuelPercent)?String.format(java.util.Locale.KOREA,"%.1f%%",RideService.obdFuelPercent):"미지원/응답 없음")+"\n최근 오류: "+RideService.obdLastError+"\nODO/연료 소모량 미검증 · 통신 데이터 외부 전송 없음");
    telemetry.postDelayed(this,2500);
   }};telemetry.post(update);
  }
