@@ -405,7 +405,9 @@ public class MainActivity extends Activity {
   if(!OdometerAutoSyncInbox.enabled(this,bikeId))return;
   final double offered=OdometerAutoSyncInbox.pending(this,bikeId);
   if(!OdoAutoSyncPolicy.sane(offered))return;
-  JSONObject bike=Store.find(db,"vehicles",bikeId);
+  JSONObject bike;
+  try{bike=Store.find(db,"vehicles",bikeId);}
+  catch(Exception invalid){return;} // Corrupt garage data is never overwritten by OBD.
   if(bike==null)return;
   // The app never decreases a manually entered/verified odometer.
   if(offered<=bike.optDouble("odo",0)+0.05){
