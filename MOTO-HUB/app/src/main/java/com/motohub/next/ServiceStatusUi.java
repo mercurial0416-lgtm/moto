@@ -33,14 +33,14 @@ final class ServiceStatusUi {
   }
   if(entries.isEmpty()){
    TextView blank=a.text("등록된 정비주기가 없어요. 엔진오일·체인 등 필요한 항목부터 등록하세요.",13,a.muted,false);
-   blank.setPadding(a.dp(13),a.dp(13),a.dp(13),a.dp(13));target.addView(blank);
+   blank.setPadding(a.dp(17),a.dp(15),a.dp(17),a.dp(15));blank.setBackground(a.shape(a.panel,a.line,17));target.addView(blank);
    a.action(target,"정비주기 등록",false,()->new QuickEntryUi(a).maintenance());return;
   }
   int shown=0;
   for(JSONObject item:entries){
    if(shown++>=8)break;
    MaintenancePlanner.Status status=status(item,bike);
-   LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);if(narrow)row.setOrientation(LinearLayout.VERTICAL);row.setPadding(a.dp(11),a.dp(10),a.dp(6),a.dp(10));
+   LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);if(narrow)row.setOrientation(LinearLayout.VERTICAL);row.setPadding(a.dp(15),a.dp(13),a.dp(11),a.dp(13));row.setBackground(a.shape(a.panel,a.line,17));
    LinearLayout info=a.col();
    String state=status==MaintenancePlanner.Status.OVERDUE?"점검 필요":status==MaintenancePlanner.Status.SOON?"곧 정비":"정비 예정";
    int tone=status==MaintenancePlanner.Status.OVERDUE?0xFFE28370:status==MaintenancePlanner.Status.SOON?a.accent:a.fg;
@@ -51,8 +51,7 @@ final class ServiceStatusUi {
    row.addView(info,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
    Button complete=a.button("완료",false,()->complete(item));complete.setMinHeight(a.dp(44));
    row.addView(complete,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(-2,-2));
-   target.addView(row);View divider=new View(a);divider.setBackgroundColor(a.line);
-   target.addView(divider,new LinearLayout.LayoutParams(-1,a.dp(1)));
+   LinearLayout.LayoutParams cardLp=new LinearLayout.LayoutParams(-1,-2);cardLp.bottomMargin=a.dp(8);target.addView(row,cardLp);
   }
   a.gap(target,9);
   a.label(target,"정비 알림은 저장된 계기판과 예정일을 기준으로 계산합니다. GPS 거리만으로 계기판을 자동 변경하지 않습니다.",12,a.muted,false);
