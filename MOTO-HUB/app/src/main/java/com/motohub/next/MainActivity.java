@@ -498,11 +498,18 @@ public class MainActivity extends Activity {
  void label(LinearLayout p,String s,int size,int color,boolean bold){TextView t=text(s,size,color,bold);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(t,lp);}
  void gap(LinearLayout p,int n){p.addView(new Space(this),new LinearLayout.LayoutParams(1,dp(n)));}
  void divider(LinearLayout p){View v=new View(this);v.setBackgroundColor(line);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(1));lp.topMargin=dp(12);lp.bottomMargin=dp(12);p.addView(v,lp);}
- Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(14);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(48));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?(dark?0xFF18191B:Color.WHITE):fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,8);b.setPadding(dp(14),dp(8),dp(14),dp(8));b.setOnClickListener(v->r.run());return b;}
+ Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(14);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(48));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?(dark?0xFF18191B:Color.WHITE):fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,14);b.setPadding(dp(14),dp(8),dp(14),dp(8));b.setOnClickListener(v->r.run());return b;}
  void action(LinearLayout p,String s,boolean primary,Runnable r){if(p==formBody&&s.equals("저장")&&formFooter!=null)p=formFooter;LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(button(s,primary,r),lp);}
  void pair(LinearLayout p,String a,Runnable ra,String b,Runnable rb){LinearLayout row=new LinearLayout(this);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(0,0,dp(4),dp(8));row.addView(button(a,true,ra),lp);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);rp.setMargins(dp(4),0,0,dp(8));row.addView(button(b,false,rb),rp);p.addView(row);}
  void heading(String t,String sub){gap(content,8);if(!t.equals(MotoDesign.heading(tab))){TextView title=text(t,22,fg,true);title.setTypeface(MotoDesign.display());content.addView(title);gap(content,6);}if(sub!=null&&!sub.isEmpty())label(content,sub,13,muted,false);gap(content,13);}
- void section(String s){gap(content,18);label(content,s,17,fg,true);}
+ void section(String s){
+  gap(content,22);
+  TextView heading=text(s,15,fg,true);
+  heading.setLetterSpacing(.012f);
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+  lp.bottomMargin=dp(11);
+  content.addView(heading,lp);
+ }
  void note(String s){TextView t=text(s,13,muted,false);t.setLineSpacing(dp(3),1f);t.setPadding(dp(15),dp(15),dp(15),dp(15));t.setBackground(shape(panel,0,12));content.addView(t);gap(content,8);}
  void row(String title,String sub,String tail,Runnable r){new HubScreens(this).line(title,sub,tail,r);}
  File garagePhotoFile(String id){

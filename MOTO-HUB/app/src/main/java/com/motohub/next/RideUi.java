@@ -50,7 +50,7 @@ final class RideUi {
  void render(){
   final boolean saving=RideService.saving();
   final boolean focus=RideService.running&&a.getSharedPreferences("ride_display",0).getBoolean("focus",false);
-  LinearLayout hero=a.col();hero.setPadding(a.dp(18),a.dp(20),a.dp(18),a.dp(18));hero.setBackground(a.shape(a.panel,a.line,13));
+  LinearLayout hero=a.col();hero.setPadding(a.dp(18),a.dp(20),a.dp(18),a.dp(18));hero.setBackground(a.shape(a.panel,a.line,16));
   TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?0xff48d99a:a.accent,true);hero.addView(eyebrow);
   TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?RideService.count+"개 위치 기록":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",24,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
   TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?"화면을 꺼도 기기에 GPS 경로를 기록해요":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
@@ -63,13 +63,20 @@ final class RideUi {
    });
    focusToggle.setMinHeight(a.dp(48));hero.addView(focusToggle);a.gap(hero,10);
    LinearLayout live=new LinearLayout(a);
+   boolean narrowMetrics=a.getResources().getConfiguration().fontScale>=1.3f||
+     a.getResources().getConfiguration().screenWidthDp<360;
+   if(narrowMetrics)live.setOrientation(LinearLayout.VERTICAL);
    TextView[] values=new TextView[3];String[] names={"주행거리","경과시간","실시간 속도"};
    for(int i=0;i<3;i++){
     LinearLayout box=a.col();box.setPadding(a.dp(9),a.dp(12),a.dp(9),a.dp(12));box.setBackground(a.shape(a.bg,0,13));
-    values[i]=a.text("—",focus?32:24,a.fg,true);values[i].setGravity(Gravity.CENTER);box.addView(values[i]);
+    values[i]=a.text("—",focus?32:24,a.fg,true);values[i].setGravity(Gravity.CENTER);
+    values[i].setAutoSizeTextTypeUniformWithConfiguration(14,focus?32:24,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+    box.addView(values[i]);
     TextView name=a.text(names[i],12,a.muted,false);name.setGravity(Gravity.CENTER);
     LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(-1,-2);np.topMargin=a.dp(7);box.addView(name,np);
-    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);if(i>0)lp.leftMargin=a.dp(7);live.addView(box,lp);
+    LinearLayout.LayoutParams lp=narrowMetrics?new LinearLayout.LayoutParams(-1,-2):
+      new LinearLayout.LayoutParams(0,-2,1);
+    if(i>0){if(narrowMetrics)lp.topMargin=a.dp(7);else lp.leftMargin=a.dp(7);}live.addView(box,lp);
    }hero.addView(live);live.setVisibility(focus?android.view.View.GONE:android.view.View.VISIBLE); // Phone navigation is primary; never duplicate a dashboard in focus mode.
    TextView average=a.text("평균속도 계산 중",13,a.muted,false);average.setPadding(a.dp(6),a.dp(10),0,a.dp(8));if(!focus)hero.addView(average);
    TextView peak=a.text("최고속도 계산 중",13,a.muted,false);peak.setPadding(a.dp(6),0,0,a.dp(9));if(!focus)hero.addView(peak);
@@ -117,43 +124,82 @@ final class RideUi {
    }};hero.post(refresh);
   }
 
-  Button start=a.button(RideService.autoArmed?"자동 감지 종료":RideService.running?"라이딩 종료":"GPS 기록 시작",true,()->{
-   if(RideService.autoArmed){new AlertDialog.Builder(a).setTitle("OBD2 자동 기록을 종료할까요?").setMessage("OBD2 자동 출발 감지만 끕니다. 진행 중인 GPS 기록은 계속되며, 종료하려면 라이딩 종료를 눌러 주세요.").setNegativeButton("취소",null).setPositiveButton("중지",(d,w)->{a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);}).show();return;}
-   if(RideService.running){new AlertDialog.Builder(a).setTitle("라이딩 기록 종료").setMessage("기록을 끝내고 주행 분석에서 이동거리와 경로를 확인할 수 있어요.").setNegativeButton("취소",null).setPositiveButton("종료",(d,w)->{
-    finishWithSummary();a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
-   }).show();}else requestStart();
-  });start.setTextColor(Color.WHITE);start.setBackground(a.shape(RideService.running?0xffda443c:0xffff6b1b,0,14));start.setMinHeight(a.dp(58));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);hero.addView(start);
-  // Auto detection and GPS recording are independent. When both are active,
-  // expose a direct way to finish the ride instead of hiding it behind a
-  // developer-mode disarm button or relying exclusively on a notification.
-  if(RideService.autoArmed&&RideService.running){
-   a.gap(hero,8);
-   Button finishRide=a.button("라이딩 저장 후 종료",false,()->{
-    new AlertDialog.Builder(a).setTitle("자동 라이딩 기록 종료")
-     .setMessage("진행 중인 GPS 기록을 저장하고 OBD2 자동 감지도 종료합니다. 그룹 위치 공유는 시작하지 않습니다.")
+  // Primary action always finishes GPS if GPS is live. Never accidentally
+  // label OBD-only disarm as the main "ride finish" control.
+  Button start=a.button(RideService.running?"라이딩 저장 후 종료":
+   RideService.autoArmed?"OBD 자동 감지 중지":"GPS 기록 시작",true,()->{
+   if(RideService.running){
+    new AlertDialog.Builder(a)
+     .setTitle(RideService.autoArmed?"자동 라이딩 기록 종료":"라이딩 기록 종료")
+     .setMessage(RideService.autoArmed?
+      "현재 GPS 기록을 저장하고 OBD2 자동 출발 감지도 함께 종료합니다. 기록은 검증 후 완료됩니다.":
+      "GPS 경로를 저장·검증한 뒤 기록을 종료합니다.")
      .setNegativeButton("취소",null)
-     .setPositiveButton("기록 종료",(d,w)->{
+     .setPositiveButton("저장하고 종료",(d,w)->{
       finishWithSummary();
       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
      }).show();
+    return;
+   }
+   if(RideService.autoArmed){
+    new AlertDialog.Builder(a).setTitle("OBD2 자동 출발 감지를 중지할까요?")
+     .setMessage("아직 시작하지 않은 GPS 기록은 없습니다. 감지를 중지하고 기존 주행 기록은 보존합니다.")
+     .setNegativeButton("취소",null)
+     .setPositiveButton("감지 중지",(d,w)->{
+      a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));
+      a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
+     }).show();
+    return;
+   }
+   requestStart();
+  });
+  start.setTextColor(Color.WHITE);
+  start.setBackground(a.shape(RideService.running?0xffc94b44:0xffff6b1b,0,14));
+  start.setMinHeight(a.dp(58));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);
+  start.setContentDescription(RideService.running?"현재 GPS 기록을 저장 후 종료":
+    RideService.autoArmed?"OBD 자동 출발 감지만 중지":"GPS 기록 시작, 사용자 동의 필요");
+  hero.addView(start);
+  if(RideService.autoArmed&&RideService.running){
+   a.gap(hero,8);
+   Button disarm=a.button("OBD만 중지 · GPS 기록은 계속",false,()->{
+    new AlertDialog.Builder(a).setTitle("OBD 자동 감지만 중지할까요?")
+     .setMessage("OBD 연결만 끄고 현재 GPS 경로 기록은 계속됩니다. GPS를 끝내려면 '라이딩 저장 후 종료'를 눌러 주세요.")
+     .setNegativeButton("취소",null)
+     .setPositiveButton("OBD만 중지",(d,w)->{
+      a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));
+      a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
+     }).show();
    });
-   finishRide.setMinHeight(a.dp(48));finishRide.setEnabled(!saving);
-   hero.addView(finishRide);
+   disarm.setMinHeight(a.dp(50));disarm.setEnabled(!saving);
+   hero.addView(disarm);
   }
   a.content.addView(hero);a.gap(a.content,12);
   // Riding view prioritizes the phone's selected navigation; OBD diagnostics
   // are tucked into opt-in advanced settings instead of duplicating the TFT.
   // Safe launcher: changing the default does not unexpectedly open an external app.
   NavigationChoice chosen=NavigationApps.preferred(a);
-  LinearLayout navigation=a.col();navigation.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(12));
-  navigation.setBackground(a.shape(a.panel,a.line,12));
-  navigation.addView(a.text("외부 내비게이션 · 선택: "+chosen.label,15,a.fg,true));a.gap(navigation,8);
-  Button openNav=a.button(chosen.label+" 바로 실행",true,()->NavigationApps.openPreferred(a));
+  LinearLayout navigation=a.col();navigation.setPadding(a.dp(16),a.dp(14),a.dp(16),a.dp(14));
+  navigation.setBackground(a.shape(a.panel,a.line,16));
+  navigation.addView(a.text("내비게이션",16,a.fg,true));a.gap(navigation,9);
+  LinearLayout launchRow=new LinearLayout(a);launchRow.setGravity(Gravity.CENTER_VERTICAL);
+  boolean narrowNav=a.getResources().getConfiguration().fontScale>=1.35f||
+    a.getResources().getConfiguration().screenWidthDp<360;
+  if(narrowNav)launchRow.setOrientation(LinearLayout.VERTICAL);
+  Button openNav=a.button(chosen.label+" 실행",true,()->NavigationApps.openPreferred(a));
   openNav.setMinHeight(a.dp(54));openNav.setContentDescription(chosen.label+" 앱 실행");
-  navigation.addView(openNav);
-  Button changeNav=a.button("기본 내비 설정 · 카카오 / 네이버 / 티맵",false,()->NavigationApps.choose(a));
-  changeNav.setMinHeight(a.dp(48));navigation.addView(changeNav);
-  if(!focus)navigation.addView(a.text("내비를 실행해도 GPS 기록은 계속됩니다. 경로·위치·OBD 값은 전송하지 않으며 이륜차 통행 제한은 직접 확인하세요.",12,a.muted,false));
+  launchRow.addView(openNav,narrowNav?new LinearLayout.LayoutParams(-1,-2):
+    new LinearLayout.LayoutParams(0,-2,1));
+  Button changeNav=a.button("변경",false,()->NavigationApps.choose(a));
+  changeNav.setMinHeight(a.dp(54));changeNav.setContentDescription("기본 내비 설정 · 카카오 / 네이버 / 티맵");
+  LinearLayout.LayoutParams navLp=narrowNav?new LinearLayout.LayoutParams(-1,-2):
+    new LinearLayout.LayoutParams(a.dp(94),-2);
+  if(narrowNav)navLp.topMargin=a.dp(8);else navLp.leftMargin=a.dp(9);
+  launchRow.addView(changeNav,navLp);navigation.addView(launchRow);
+  if(!focus){
+   TextView hint=a.text("내비를 실행해도 GPS 기록은 계속됩니다. 이륜차 통행 제한은 직접 확인하세요.",12,a.muted,false);
+   LinearLayout.LayoutParams hintLp=new LinearLayout.LayoutParams(-1,-2);hintLp.topMargin=a.dp(11);
+   navigation.addView(hint,hintLp);
+  }
   a.content.addView(navigation);a.gap(a.content,12);
   if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
   // Live OBD sensor dashboard intentionally hidden here: the KTM's TFT already
