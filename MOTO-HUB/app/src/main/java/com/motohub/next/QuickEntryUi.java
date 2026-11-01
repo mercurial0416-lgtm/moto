@@ -20,9 +20,9 @@ final class QuickEntryUi {
   field.setTextColor(a.fg);field.setHintTextColor(a.muted);field.setTextSize(19);
   field.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
   field.setImeOptions(EditorInfo.IME_ACTION_NEXT);
-  field.setBackground(a.shape(a.panel,a.line,11));
-  field.setPadding(a.dp(15),a.dp(12),a.dp(15),a.dp(12));
-  field.setMinHeight(a.dp(54));field.setHint(hint);field.setContentDescription(label);
+  field.setBackground(a.shape(a.panel,a.line,17));
+  field.setPadding(a.dp(16),a.dp(13),a.dp(16),a.dp(13));
+  field.setMinHeight(a.dp(56));field.setHint(hint);field.setContentDescription(label);
   if(initial!=null&&!initial.isEmpty())field.setText(initial);
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=a.dp(18);body.addView(field,lp);
   return field;
@@ -41,8 +41,8 @@ final class QuickEntryUi {
    @Override public View getView(int position,View view,android.view.ViewGroup parent){
     TextView item=(TextView)super.getView(position,view,parent);item.setTextColor(a.fg);item.setTextSize(16);return item;
    }
-  };spinner.setAdapter(adapter);spinner.setBackground(a.shape(a.panel,a.line,11));
-  spinner.setPadding(a.dp(10),0,a.dp(8),0);
+  };spinner.setAdapter(adapter);spinner.setBackground(a.shape(a.panel,a.line,17));
+  spinner.setPadding(a.dp(15),0,a.dp(12),0);
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,a.dp(56));lp.bottomMargin=a.dp(18);body.addView(spinner,lp);
   return spinner;
  }
