@@ -201,6 +201,30 @@ final class RideUi {
    navigation.addView(hint,hintLp);
   }
   a.content.addView(navigation);a.gap(a.content,12);
+  // Route planning uses explicit user-entered waypoints. No claim of
+  // turn-by-turn motorcycle routing without an external navigation provider.
+  LinearLayout tripTools=a.col();
+  tripTools.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(12));
+  tripTools.setBackground(a.shape(a.panel,a.line,16));
+  tripTools.addView(a.text("내 코스 · 라이딩 분석",16,a.fg,true));
+  a.gap(tripTools,8);
+  int saved=a.items("routes").size();
+  boolean narrowTrip=a.getResources().getConfiguration().fontScale>=1.35f||
+    a.getResources().getConfiguration().screenWidthDp<360;
+  LinearLayout tripRow=new LinearLayout(a);
+  if(narrowTrip)tripRow.setOrientation(LinearLayout.VERTICAL);
+  Button savedRoutes=a.button("저장한 코스 "+saved+"개",false,a::savedRoutes);
+  savedRoutes.setContentDescription("저장한 수동 코스 "+saved+"개 관리");
+  tripRow.addView(savedRoutes,narrowTrip?new LinearLayout.LayoutParams(-1,-2):
+    new LinearLayout.LayoutParams(0,-2,1));
+  Button importRoute=a.button("GPX 가져오기",false,a::pickGpx);
+  LinearLayout.LayoutParams importLp=narrowTrip?new LinearLayout.LayoutParams(-1,-2):
+    new LinearLayout.LayoutParams(0,-2,1);
+  if(narrowTrip)importLp.topMargin=a.dp(8);else importLp.leftMargin=a.dp(9);
+  tripRow.addView(importRoute,importLp);tripTools.addView(tripRow);
+  a.gap(tripTools,9);
+  a.action(tripTools,"최근 30일 주행 통계 · 바이크별",false,this::chooseRideReport);
+  a.content.addView(tripTools);a.gap(a.content,12);
   if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
   // Live OBD sensor dashboard intentionally hidden here: the KTM's TFT already
   // displays RPM, speed and coolant. The Bluetooth adapter and recorded data
@@ -208,21 +232,15 @@ final class RideUi {
   // Advanced GPX import, manual merging and statistics are intentionally
   // collapsed; the normal ride view focuses on record, navigation and history.
   final boolean extras=a.getSharedPreferences("ride_ui",0).getBoolean("extras",false);
-  Button extrasToggle=a.button(extras?"추가 기능 접기":"GPX · 통계 등 추가 기능",false,()->{
+  Button extrasToggle=a.button(extras?"고급 기록 도구 접기":"고급 기록 도구 · 라이딩 통합",false,()->{
    a.getSharedPreferences("ride_ui",0).edit().putBoolean("extras",!extras).apply();
    a.renderPreservingPosition();
   });
   extrasToggle.setMinHeight(a.dp(42));a.content.addView(extrasToggle);
   if(extras){
-  a.gap(a.content,4);
-  LinearLayout tools=new LinearLayout(a);
-  Button importButton=a.button("GPX 가져오기",false,a::pickGpx);Button refresh=a.button("새로고침",false,a::render);
-  tools.addView(importButton,new LinearLayout.LayoutParams(0,a.dp(50),1));LinearLayout.LayoutParams second=new LinearLayout.LayoutParams(0,a.dp(50),1);second.leftMargin=a.dp(8);tools.addView(refresh,second);a.content.addView(tools);
-  a.gap(a.content,8);
-  a.label(a.content,"GPX 가져오기: 다른 앱에서 저장한 코스 파일을 지도와 주행 기록으로 불러옵니다. 가져오기만으로 GPS 기록이나 길 안내가 시작되지는 않아요.",12,a.muted,false);
-  a.gap(a.content,12);
-  a.action(a.content,"최근 30일 주행 통계 · 바이크별",false,this::chooseRideReport);
-  a.action(a.content,"라이딩 2건 통합 · 원본 보존",false,this::chooseMerge);
+   a.gap(a.content,8);
+   a.label(a.content,"선택한 두 라이딩의 GPS 원본을 보존한 채 하나의 경로로 합칠 수 있어요.",12,a.muted,false);
+   a.action(a.content,"라이딩 2건 통합 · 원본 보존",false,this::chooseMerge);
   }
   a.gap(a.content,8);a.label(a.content,"기록된 라이딩",20,a.fg,true);
   // Render controls immediately and read track/sidecar metadata on one background worker.

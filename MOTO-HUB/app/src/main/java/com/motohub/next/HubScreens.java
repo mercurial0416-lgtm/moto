@@ -422,6 +422,15 @@ final class HubScreens {
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
   a.action(p,"바이크 정보 수정",true,()->a.edit("vehicles",b));
+  a.label(p,"차량 라이프로그",15,a.fg,true);
+  a.action(p,"라이딩 · 주유 · 정비 통합 타임라인",false,()->new MotoTimelineUi(a).open());
+  a.action(p,"판매·정비 이력 PDF · 직접 저장",false,()->a.exportOwnershipPdf(b.optString("id")));
+  a.action(p,"튜닝·부품 비용 등록",false,()->{
+   a.toast("비용 종류에서 '튜닝' 또는 '부품'을 선택해 주세요.");
+   a.edit("expenses",null);
+  });
+  a.action(p,"보호장비 보관함 · 모든 바이크 공통",false,this::legacyGearManager);
+
   a.action(p,sold?"판매 처리 취소 (기록 유지)":"판매 처리 (기록 보존)",false,()->new AlertDialog.Builder(a)
    .setTitle(sold?"판매 처리를 취소할까요?":"판매한 바이크로 보관할까요?")
    .setMessage("바이크와 연결된 주유·정비 기록을 삭제하지 않습니다. 언제든 정보를 다시 수정할 수 있어요.")
@@ -544,6 +553,12 @@ final class HubScreens {
   a.action(p,"업데이트 데이터 검사",false,this::updateRecoveryReport);
   a.action(p,"라이딩 통합 자가진단",false,this::selfCheck);
   a.action(p,"유지비 통계",false,this::costDashboard);
+  a.action(p,"바이크별 통합 활동",false,()->new MotoTimelineUi(a).open());
+  a.action(p,"바이크 판매용 정비 이력 PDF",false,()->{
+   JSONObject selected=a.bike();
+   if(selected==null){a.toast("바이크를 먼저 선택해 주세요.");return;}
+   a.exportOwnershipPdf(selected.optString("id"));
+  });
   String signer=SigningIdentity.current(a);
   a.action(p,"설치 인증서 SHA-256 복사",false,()->{
    if(signer.isEmpty()){a.toast("서명 정보를 확인하지 못했습니다.");return;}
