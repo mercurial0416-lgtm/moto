@@ -161,6 +161,50 @@ final class DeveloperObdScreen {
       else setStatus("ODO 동기화 활성화 · 다음 OBD 자동 감지부터 ECU 지원 확인");
     }).show();
   });
+  if(odoEnabled)activity.action(p,"누적 km 동기화 기준값 재확인 · 계기판 직접 입력",false,()->{
+   if(activity.readOnly||RideService.running||RideService.autoArmed||RestoreRideGate.isRestoring()
+      ||RestoreRideGate.isFormWriting()){
+    setStatus("라이딩과 데이터 저장·복원이 모두 끝난 뒤 기준값을 재확인해 주세요.");return;
+   }
+   JSONObject selectedBike=activity.bike();
+   if(selectedBike==null||!configuredId.equals(selectedBike.optString("id"))
+      ||!OdometerAutoSyncInbox.enabled(activity,configuredId)){
+    setStatus("자동 동기화 설정과 선택한 바이크를 다시 확인해 주세요.");return;
+   }
+   final double oldKm=selectedBike.optDouble("odo",Double.NaN);
+   if(!OdoAutoSyncPolicy.sane(oldKm)){setStatus("먼저 실제 계기판 km를 차고에 확인해 주세요.");return;}
+   EditText entryKm=new EditText(activity);
+   entryKm.setSingleLine(true);
+   entryKm.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
+   entryKm.setHint("현재 실제 계기판 km");
+   LinearLayout form=new LinearLayout(activity);form.setOrientation(LinearLayout.VERTICAL);
+   form.setPadding(activity.dp(22),0,activity.dp(22),0);form.addView(entryKm);
+   AlertDialog dialog=new AlertDialog.Builder(activity).setTitle("OBD 자동 동기화 기준값 재확인")
+    .setMessage("정차 상태에서 실제 바이크 계기판의 현재 누적 km를 입력해 주세요.\n"+
+     "차고 기록: "+activity.num(oldKm)+" km\n\n"+
+     "값이 일치하는지 확인한 뒤 OBD 두 번 수신값과 재대조합니다. "+
+     "지금 차고 km나 정비·GPS 기록을 즉시 수정하지 않습니다.")
+    .setView(form).setNegativeButton("취소",null).setPositiveButton("계기판 확인 후 설정",null).create();
+   dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(button->{
+    final double confirmed;
+    try{confirmed=OdometerSyncPolicy.checkedManual(entryKm.getText().toString(),oldKm);}
+    catch(IllegalArgumentException wrong){entryKm.setError(wrong.getMessage());return;}
+    if(confirmed-oldKm>=2000){entryKm.setError("2,000km 이상 차이나면 차고에서 직접 계기판 값을 확인·수정한 뒤 다시 설정하세요.");return;}
+    if(RideService.running||RideService.autoArmed||RestoreRideGate.isRestoring()||
+       RestoreRideGate.isFormWriting()){entryKm.setError("라이딩·저장이 끝난 뒤 다시 설정하세요.");return;}
+    JSONObject latest=activity.bike();
+    if(latest==null||!configuredId.equals(latest.optString("id"))||
+       Double.compare(latest.optDouble("odo",Double.NaN),oldKm)!=0){
+     entryKm.setError("다른 화면에서 차고 km가 변경됐습니다. 다시 확인하세요.");return;
+    }
+    if(!OdometerAutoSyncInbox.rebaseline(activity,configuredId,confirmed,oldKm)){
+     entryKm.setError("기준값을 저장할 수 없습니다. 차고 km와 현재 설정을 확인하세요.");return;
+    }
+    dialog.dismiss();
+    setStatus("실제 계기판 "+activity.num(confirmed)+" km 확인 · 다음 OBD 자동 감지부터 새 기준값 적용");
+   }));
+   dialog.show();
+  });
   activity.label(p,OdometerAutoSyncInbox.display(activity,configuredId),12,activity.muted,false);
   activity.label(p,"표준 01A6 ODO는 지원 차량에서만 조회됩니다. 듀크 390 지원은 미검증입니다. 조회 결과가 실제 계기판과 일치하는지 두 번 확인해야만 앱 주행거리를 변경합니다. GPS·정비 이력은 그대로 보존합니다.",13,activity.muted,false);
   activity.action(p,"연결 끊기",false,this::stop);

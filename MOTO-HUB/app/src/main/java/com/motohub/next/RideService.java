@@ -322,9 +322,22 @@ public final class RideService extends Service implements LocationListener {
   ObdRideAutoGate.Event event=autoGate.accept(speedKmh,now);
   obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
   if(event==ObdRideAutoGate.Event.START){
-   try{openRideTrack();requestGpsUpdatesChecked();
-    status="OBD2 출발 감지 · GPS 기록 중";ObdLocalDiagnosticLog.record(this,"GPS_STARTED");}
-   catch(Exception e){stopWith("GPS 자동 기록 시작 실패: "+e.getMessage(),false);return;}
+   // The externally requested GPS start is interlocked; auto-start must use
+   // the same reservation or a concurrent form save/restore could begin.
+   if(!RestoreRideGate.beginRideStart()){
+    autoGate.reset(); // No GPS file was opened. Retry after fresh speed samples.
+    obdStationaryRemainingMs=-1;
+    status="기록 저장·백업 중 · OBD 출발 감지 대기";
+    notifySafely(status);
+    return;
+   }
+   try{
+    // Re-check after obtaining the process-wide write/start reservation.
+    if(!autoArmed||running||autoFinishPending)return;
+    openRideTrack();requestGpsUpdatesChecked();
+    status="OBD2 출발 감지 · GPS 기록 중";ObdLocalDiagnosticLog.record(this,"GPS_STARTED");
+   }catch(Exception e){stopWith("GPS 자동 기록 시작 실패: "+e.getMessage(),false);return;}
+   finally{RestoreRideGate.endRideStart();}
   }else if(event==ObdRideAutoGate.Event.FINISH){finishAutoTrack();}
   // Speed samples arrive faster than the user needs notification updates. Avoid
   // rebuilding the notification every second while an independent navigation app is in foreground.
