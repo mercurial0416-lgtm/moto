@@ -55,17 +55,23 @@ final class MotoDesign {
    default:return "설정과 도구";
   }
  }
+ /** Brand is subordinate to the current task, not another large title. */
  static void addHeader(MainActivity a,LinearLayout root){
-  // Tight native toolbar: information first, no decorative slogan above the title.
   LinearLayout header=new LinearLayout(a);
   header.setGravity(Gravity.CENTER_VERTICAL);
-  header.setPadding(a.dp(20),a.dp(10),a.dp(20),a.dp(10));
-  View rail=new View(a);rail.setBackgroundColor(a.accent);
-  LinearLayout.LayoutParams railParams=new LinearLayout.LayoutParams(a.dp(3),a.dp(23));
-  railParams.rightMargin=a.dp(12);header.addView(rail,railParams);
+  header.setPadding(a.dp(20),a.dp(8),a.dp(18),a.dp(9));
+  LinearLayout identity=new LinearLayout(a);
+  identity.setOrientation(LinearLayout.VERTICAL);
+  TextView brand=a.text("MOTO HUB",10,a.accent,true);
+  brand.setLetterSpacing(.16f);
+  brand.setContentDescription("MOTO HUB");
+  identity.addView(brand);
   TextView title=a.text(heading(a.tab),23,a.fg,true);
   title.setTypeface(display());
-  header.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+  LinearLayout.LayoutParams titleLp=new LinearLayout.LayoutParams(-1,-2);
+  titleLp.topMargin=a.dp(3);
+  identity.addView(title,titleLp);
+  header.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
   if("홈".equals(a.tab)){
    TextView notice=headerAction(a,"알림");
    notice.setContentDescription("정비 알림 열기");
@@ -83,17 +89,18 @@ final class MotoDesign {
   TextView view=a.text(label,13,a.fg,true);
   view.setGravity(Gravity.CENTER);
   view.setMinWidth(a.dp(48));
-  view.setMinHeight(a.dp(40));
+  view.setMinHeight(a.dp(44));
   view.setPadding(a.dp(10),0,a.dp(10),0);
-  ripple(a,view,a.panel,a.line,8);
+  ripple(a,view,a.panel,a.line,12);
   view.setClickable(true);view.setFocusable(true);
   return view;
  }
+ /** Compact bottom navigation with a real 48dp+ touch target and clear active pill. */
  static void addNavigation(MainActivity a,LinearLayout root){
   View rule=new View(a);rule.setBackgroundColor(a.line);
   root.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
   LinearLayout bar=new LinearLayout(a);
-  bar.setPadding(a.dp(8),a.dp(4),a.dp(8),a.dp(3));
+  bar.setPadding(a.dp(9),a.dp(5),a.dp(9),a.dp(5));
   bar.setBackgroundColor(a.panel);
   String[] labels={"홈","라이딩","정비","설정"};
   final int[] icons={0,3,2,4};
@@ -101,24 +108,26 @@ final class MotoDesign {
    final String destination=a.tabs[i];
    final boolean selected=destination.equals(a.tab);
    LinearLayout cell=a.col();cell.setGravity(Gravity.CENTER);
-   cell.setMinimumHeight(a.dp(55));
-   cell.setPadding(a.dp(2),0,a.dp(2),a.dp(3));
-   View indicator=new View(a);
-   indicator.setBackgroundColor(selected?a.accent:Color.TRANSPARENT);
-   LinearLayout.LayoutParams marker=new LinearLayout.LayoutParams(a.dp(26),a.dp(2));
-   marker.bottomMargin=a.dp(8);cell.addView(indicator,marker);
-   LinearLayout.LayoutParams iconParams=new LinearLayout.LayoutParams(a.dp(22),a.dp(22));
-   cell.addView(new NavIcon(a,icons[i],selected?a.accent:a.muted),iconParams);
-   TextView name=a.text(labels[i],11,selected?a.fg:a.muted,selected);
+   cell.setMinimumHeight(a.dp(62));
+   cell.setPadding(a.dp(2),a.dp(5),a.dp(2),a.dp(4));
+   // Selected tab is legible without relying on color alone.
+   FrameLayout pill=new FrameLayout(a);
+   pill.setBackground(a.shape(selected?a.highlight:a.panel,0,14));
+   NavIcon graphic=new NavIcon(a,icons[i],selected?a.accent:a.muted);
+   FrameLayout.LayoutParams iconParams=new FrameLayout.LayoutParams(a.dp(22),a.dp(22),Gravity.CENTER);
+   pill.addView(graphic,iconParams);
+   cell.addView(pill,new LinearLayout.LayoutParams(a.dp(52),a.dp(30)));
+   TextView name=a.text(labels[i],12,selected?a.accent:a.muted,selected);
    name.setGravity(Gravity.CENTER);
    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
-   lp.topMargin=a.dp(4);cell.addView(name,lp);
-   cell.setContentDescription(labels[i]+(selected?", 선택됨":""));
+   lp.topMargin=a.dp(5);cell.addView(name,lp);
+   cell.setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"));
    cell.setClickable(true);cell.setFocusable(true);cell.setSelected(selected);
-   ripple(a,cell,a.panel,0,6);
-   cell.setOnClickListener(v->a.navigate(destination));
+   ripple(a,cell,a.panel,0,14);
+   cell.setOnClickListener(v->{if(!destination.equals(a.tab))a.navigate(destination);});
    bar.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
   }
   root.addView(bar);
  }
+}
 }
