@@ -1,0 +1,117 @@
+name: Publish original-signed MOTO HUB v570 OTA (no private signing key)
+on:
+  push:
+    branches: ['release/moto-hub-apk']
+    paths:
+      - '.github/verified-release/570.patch.zst.b64'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: moto-fixed-signed-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/release/moto-hub-apk'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/moto-hub-apk
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin exact verified v570 source
+        run: |
+          set -euo pipefail
+          test "$(tr -d '[:space:]' < MOTO-HUB/release-code.txt)" = 570
+          git diff --quiet ce050ce80f2c23aacdd0f803126769d5f0af4602 HEAD -- MOTO-HUB/app MOTO-HUB/release-code.txt
+          test -s .github/verified-release/570.patch.zst.b64
+      - name: Obtain exact CI-tested unsigned v570 source artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RUN=41358989815
+          ACTUAL_SHA=$(gh run view "$RUN" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)
+          CONCLUSION=$(gh run view "$RUN" --repo "$GITHUB_REPOSITORY" --json conclusion --jq .conclusion)
+          test "$ACTUAL_SHA" = ce050ce80f2c23aacdd0f803126769d5f0af4602
+          test "$CONCLUSION" = success
+          mkdir -p "$RUNNER_TEMP/unsigned"
+          gh run download "$RUN" --repo "$GITHUB_REPOSITORY" \
+            --name 'moto-hub-unsigned-ce050ce80f2c23aacdd0f803126769d5f0af4602' --dir "$RUNNER_TEMP/unsigned"
+          APK=$(find "$RUNNER_TEMP/unsigned" -name 'app-release-unsigned.apk' -type f | head -1)
+          test -n "$APK" && test -s "$APK"
+          cp "$APK" "$RUNNER_TEMP/unsigned-v570.apk"
+          echo '674af2f00edf3f1c5555c043f355954204bebab9b953d31199e6ed0e3a973fca  '"$RUNNER_TEMP/unsigned-v570.apk" | sha256sum -c -
+      - name: Rebuild exactly offline-signed APK from public binary delta
+        run: |
+          set -euo pipefail
+          base64 --decode < .github/verified-release/570.patch.zst.b64 > "$RUNNER_TEMP/v570.patch.zst"
+          echo 'a1b8ea3b3b2c8c44272667fbf65c1df8e090626baaf3941ac8135288a4bf3b19  '"$RUNNER_TEMP/v570.patch.zst" | sha256sum -c -
+          zstd -q -d --patch-from="$RUNNER_TEMP/unsigned-v570.apk" \
+            "$RUNNER_TEMP/v570.patch.zst" -o "$RUNNER_TEMP/MOTO-HUB.apk"
+          echo 'd869049f63807f413f3fc6e90f77c93caeb54d968caa9323dd7dc988107100d8  '"$RUNNER_TEMP/MOTO-HUB.apk" | sha256sum -c -
+          test "$(stat -c%s "$RUNNER_TEMP/MOTO-HUB.apk")" -eq 47452949
+          unzip -tq "$RUNNER_TEMP/MOTO-HUB.apk"
+      - name: Verify package, Android signature and original installed-app certificate
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0'
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$SIGNER" verify --min-sdk-version 26 --verbose --print-certs "$RUNNER_TEMP/MOTO-HUB.apk" > "$RUNNER_TEMP/signature.txt"
+          grep -Fqx 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/signature.txt"
+          grep -Fqx 'Verified using v3 scheme (APK Signature Scheme v3): true' "$RUNNER_TEMP/signature.txt"
+          CERT=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/signature.txt" | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          test "$CERT" = 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b
+          "$AAPT" dump badging "$RUNNER_TEMP/MOTO-HUB.apk" | grep -F "package: name='com.motohub.next' versionCode='570'"
+          python3 MOTO-HUB/tools/make_update_manifest.py \
+            --apk "$RUNNER_TEMP/MOTO-HUB.apk" \
+            --apk-url "https://github.com/$GITHUB_REPOSITORY/releases/download/moto-hub-v570/MOTO-HUB.apk" \
+            --aapt "$AAPT" --apksigner "$SIGNER" \
+            --output "$RUNNER_TEMP/manifest-570.json"
+      - name: Publish verified original-signed v570 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content | tr -d '\n' | base64 --decode | python3 -c 'import json,sys;print(json.load(sys.stdin)["versionCode"])')
+          test "$CURRENT" -eq 569 || { echo "::error::Public manifest already advanced to $CURRENT; refusing stale release"; exit 1; }
+          TAG=moto-hub-v570
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft \
+              --target ce050ce80f2c23aacdd0f803126769d5f0af4602 --title 'MOTO HUB v570 · 새 UI' \
+              --notes 'Verified fixed signed APK. Existing local data preserved on in-place update.'
+          fi
+          test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fx 'MOTO-HUB.apk'; then
+            echo "::error::Release already contains an APK; refusing to overwrite existing binary"
+            exit 1
+          fi
+          gh release upload "$TAG" "$RUNNER_TEMP/MOTO-HUB.apk#MOTO-HUB.apk" --repo "$GITHUB_REPOSITORY"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fx 'MOTO-HUB.apk'
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = false
+      - name: Update public manifest to v570 only after APK publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=moto-hub-v570
+          test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = false
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fx 'MOTO-HUB.apk'
+          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content | tr -d '\n' | base64 --decode | python3 -c 'import json,sys;print(json.load(sys.stdin)["versionCode"])')
+          if (( CURRENT == 570 )); then
+            echo 'Manifest v570 already active'; exit 0
+          fi
+          test "$CURRENT" -eq 569 || { echo "::error::Newer manifest detected"; exit 1; }
+          SHA=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .sha)
+          B64=$(base64 --wrap=0 "$RUNNER_TEMP/manifest-570.json")
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json" \
+            -f branch=main -f sha="$SHA" -f content="$B64" \
+            -f message='Publish verified original-signed MOTO HUB v570 OTA [skip ci]'
+          NEW=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content | tr -d '\n' | base64 --decode | python3 -c 'import json,sys;print(json.load(sys.stdin)["versionCode"])')
+          test "$NEW" -eq 570
+          echo 'Verified v570 published to in-app updater.'
