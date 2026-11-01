@@ -21,7 +21,7 @@ import java.util.Locale;
 /** Experimental, local-only telemetry view. No interactive riding controls. */
 public final class ObdDashboardActivity extends Activity {
  private final Handler handler=new Handler(Looper.getMainLooper());
- private TextView speed,rpm,temperature,voltage,ride,status,advisory,linkStatus;
+ private TextView speed,rpm,temperature,voltage,fuel,ride,status,advisory,linkStatus;
  private boolean compactMode;
  private ProgressBar rpmMeter;
  private boolean visible;
@@ -44,6 +44,8 @@ public final class ObdDashboardActivity extends Activity {
   boolean tempFresh=RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdCoolantAt,now);
   boolean voltFresh=RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdVoltageAt,now);
   voltage.setText(voltFresh?format(RideService.obdVoltage,"%.1f V"):"—");
+  boolean fuelFresh=RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdFuelAt,now);
+  fuel.setText(fuelFresh?format(RideService.obdFuelPercent,"%.1f %%"):"— (지원 미확인)");
   advisory.setText(ObdGaugeWarnings.advisory(
    rpmFresh?RideService.obdRpm:Double.NaN,
    tempFresh?RideService.obdCoolantC:Double.NaN,
@@ -94,6 +96,7 @@ public final class ObdDashboardActivity extends Activity {
   base.addView(rpmMeter,new LinearLayout.LayoutParams(-1,24));
   temperature=value("냉각수 온도",23);
   voltage=value("ECU 전압",23);
+  fuel=value("연료 잔량 · 표준 012F 지원 ECU에서만",20);
   advisory=new TextView(this);
   advisory.setTextSize(14);advisory.setTextColor(0xffffc78d);
   advisory.setPadding(12,8,12,20);
@@ -118,7 +121,7 @@ public final class ObdDashboardActivity extends Activity {
    toggleDetails.setText(show?"진단 상세 접기":"진단 상세 보기");
   });
   base.addView(toggleDetails);
-  TextView warning=new TextView(this);warning.setText("실험용 읽기 전용 · ODO 및 연료소모량 미검증\nRPM 막대 최대값은 앱 표시 범위이며 레드라인이 아닙니다.\n순정 계기판 경고를 우선하고 주행 중 화면을 조작하지 마세요.");warning.setGravity(Gravity.CENTER);warning.setTextColor(0xffa3a9b0);warning.setTextSize(12);warning.setPadding(0,14,0,14);base.addView(warning);
+  TextView warning=new TextView(this);warning.setText("실험용 읽기 전용 · ODO 및 연료소모량 미검증 · 연료 잔량은 지원 ECU에서만\nRPM 막대 최대값은 앱 표시 범위이며 레드라인이 아닙니다.\n순정 계기판 경고를 우선하고 주행 중 화면을 조작하지 마세요.");warning.setGravity(Gravity.CENTER);warning.setTextColor(0xffa3a9b0);warning.setTextSize(12);warning.setPadding(0,14,0,14);base.addView(warning);
   SharedPreferences prefs=getSharedPreferences(PREFS,0);
   Button landscape=new Button(this);
   landscape.setText(prefs.getBoolean("landscape",false)?"세로 화면으로 전환":"가로 화면으로 전환");
