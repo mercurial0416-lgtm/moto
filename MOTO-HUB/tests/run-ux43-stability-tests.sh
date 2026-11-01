@@ -31,7 +31,7 @@ checks={
  "installation signing":'validateArchive(f,m)' in update,
  "input alerts collapsed":'LinearLayout alertOptions=a.col();alertOptions.setVisibility(View.GONE);' in quick,
  "empty schedule blocked":'if(kmInterval==0&&monthsInterval==0)' in quick,
- "spinner fits text":'spinner.setMinimumHeight(a.dp(56))' in quick,
+ "spinner fits text":'MotoDesign.spinnerField(a,body,spinner,14)' in quick and 'a.dp(56)' in read('MotoDesign.java'),
  "small-screen home":'screenWidthDp<360' in garage,
  "small-screen maintenance":'screenWidthDp<360' in service,
  "retired listings renderer":'void listings(){' not in listing,
