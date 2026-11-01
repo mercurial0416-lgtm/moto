@@ -28,7 +28,8 @@ assert 'moto-async-state-reload' in main
 assert 'restoreReadRunning.compareAndSet(false,true)' in main
 assert 'Store.parse(new String(disk.readFully(),StandardCharsets.UTF_8))' in main
 assert 'obdFuelPercent' in service and 'obdFuelAt' in service
-assert 'fromAllResponses(supported00,supported20,supported40,null)' in monitor
+assert 'fromAllResponses(supported00,supported20,supported40,supportedA0)' in monitor
+assert 'listener.allowOdometer()' in monitor
 assert 'capabilities.forPid(pid)==ObdPidCapabilities.Support.YES' in monitor
 assert 'fuel.setText(fuelFresh?' in dash
 print("PASS UX103 activity/OBD background, data checkpoint warning and unsupported fuel safety wiring")
