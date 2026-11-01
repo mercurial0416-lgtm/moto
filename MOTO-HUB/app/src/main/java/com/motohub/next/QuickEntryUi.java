@@ -41,9 +41,8 @@ final class QuickEntryUi {
    @Override public View getView(int position,View view,android.view.ViewGroup parent){
     TextView item=(TextView)super.getView(position,view,parent);item.setTextColor(a.fg);item.setTextSize(16);return item;
    }
-  };spinner.setAdapter(adapter);spinner.setBackground(a.shape(a.panel,a.line,17));
-  spinner.setPadding(a.dp(15),0,a.dp(12),0);
-  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,a.dp(56));lp.bottomMargin=a.dp(18);body.addView(spinner,lp);
+  };spinner.setAdapter(adapter);spinner.setContentDescription(title);
+  MotoDesign.spinnerField(a,body,spinner,18);
   return spinner;
  }
  void fuel(){
