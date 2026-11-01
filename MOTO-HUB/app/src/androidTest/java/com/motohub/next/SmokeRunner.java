@@ -16,6 +16,27 @@ public class SmokeRunner extends Instrumentation {
    for(String tab:a.tabs){ui(()->{a.tab=tab;a.render();});Thread.sleep(1000);Bitmap shot=getUiAutomation().takeScreenshot();if(shot==null)throw new IOException("screenshot unavailable");try(FileOutputStream f=getTargetContext().openFileOutput("screen-"+tab+".png",0)){shot.compress(Bitmap.CompressFormat.PNG,100,f);}shot.recycle();}
    result.putString("stream","Screenshots captured from emulator\n");finish(Activity.RESULT_OK,result);return;
   }
+  if(mode.equals("pdf")){
+   // Real Android PdfDocument requires a device graphics backend. Unlike
+   // Robolectric unit tests, this verifies actual on-device PDF bytes.
+   JSONObject sample=Store.empty();
+   String id="22222222-3333-4444-8555-666666666666";
+   sample.getJSONArray("vehicles").put(new JSONObject().put("id",id)
+    .put("name","TEST DUKE").put("year",2024).put("odo",1200));
+   sample.getJSONArray("services").put(new JSONObject().put("id","test-service")
+    .put("vehicleId",id).put("type","엔진오일").put("date","2026-10-30")
+    .put("cost",50000).put("mileage",1200));
+   MotoOwnershipReport.Report doc=MotoOwnershipReport.prepare(Store.parse(sample.toString()),id);
+   ByteArrayOutputStream buffer=new ByteArrayOutputStream();
+   int pages=MotoOwnershipReport.write(doc,buffer);
+   check(pages>=1,"PDF has at least one page");
+   check(buffer.size()>120,"PDF is not empty");
+   check("%PDF".equals(new String(buffer.toByteArray(),0,4,java.nio.charset.StandardCharsets.US_ASCII)),
+    "PDF header is valid on Android");
+   check(doc.completedServiceCount==1&&doc.totalCount==1,"PDF is vehicle-scoped");
+   result.putString("stream",log+"PDF DEVICE SMOKE TOTAL "+passed+" passed\\n");
+   finish(Activity.RESULT_OK,result);return;
+  }
   ui(()->{check(a.arr("vehicles").length()==0,"empty emulator required");a.edit("vehicles",null);set("name","TEST Bike");set("odo","12000");save();check(a.arr("vehicles").length()==1,"bike form save");});
   ui(()->{a.edit("services",null);set("cost","50000");set("nextKm","15000");save();check(a.arr("services").length()==1,"maintenance form save");});
   ui(()->{a.edit("expenses",null);set("amount","25000");set("liters","12");a.fullTankBox.setChecked(true);save();check(a.arr("expenses").getJSONObject(0).getBoolean("fullTank"),"fuel full tank save");});
