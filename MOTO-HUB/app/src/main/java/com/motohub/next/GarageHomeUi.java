@@ -140,7 +140,7 @@ final class GarageHomeUi {
   LinearLayout info=a.col();TextView name=a.text(bike.optString("name"),23,light,true);name.setMaxLines(2);info.addView(name);
   TextView sub=a.text((bike.optInt("year")>0?bike.optInt("year")+"년식 · ":"")+"내 바이크",12,soft,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(6);info.addView(sub,sp);meta.addView(info,new LinearLayout.LayoutParams(0,-2,1));
   if(GarageBikeStatus.sold(bike.optString("soldDate"))){
-   TextView archived=a.text("판매 완료 · 기록 보관 중",13,0xFFFFD58A,true);archived.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));archived.setBackground(a.shape(0xFF503E20,0,10));box.addView(archived);
+   TextView archived=a.text("판매 완료 · 기록 보관 중",13,a.dark?0xFFFFD58A:0xFF98641B,true);archived.setPadding(a.dp(14),a.dp(11),a.dp(14),a.dp(11));archived.setBackground(a.shape(a.dark?0xFF503E20:0xFFFFF5DE,0,14));box.addView(archived);
   }
   String condition=condition(bike);
    int badgeText=condition.equals("점검 필요")?0xFFC14535:condition.equals("곧 점검")?0xFF8F6813:condition.equals("정비 정상")?a.accent:soft;
