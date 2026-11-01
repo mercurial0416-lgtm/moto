@@ -50,8 +50,8 @@ final class RideUi {
  void render(){
   final boolean saving=RideService.saving();
   final boolean focus=RideService.running&&a.getSharedPreferences("ride_display",0).getBoolean("focus",false);
-  LinearLayout hero=a.col();hero.setPadding(a.dp(18),a.dp(20),a.dp(18),a.dp(18));hero.setBackground(a.shape(a.panel,a.line,16));
-  TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?0xff48d99a:a.accent,true);hero.addView(eyebrow);
+  LinearLayout hero=a.col();hero.setPadding(a.dp(20),a.dp(22),a.dp(20),a.dp(20));hero.setBackground(a.shape(a.panel,a.line,20));
+  TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?(a.dark?0xFFFFA79C:0xFFAA3833):a.accent,true);hero.addView(eyebrow);
   TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?RideService.count+"개 위치 기록":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",24,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
   TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?"화면을 꺼도 기기에 GPS 경로를 기록해요":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
   // No redundant pre-ride checklist. Explicit permission/consent handling stays
@@ -68,7 +68,7 @@ final class RideUi {
    if(narrowMetrics)live.setOrientation(LinearLayout.VERTICAL);
    TextView[] values=new TextView[3];String[] names={"주행거리","경과시간","실시간 속도"};
    for(int i=0;i<3;i++){
-    LinearLayout box=a.col();box.setPadding(a.dp(9),a.dp(12),a.dp(9),a.dp(12));box.setBackground(a.shape(a.bg,0,13));
+    LinearLayout box=a.col();box.setPadding(a.dp(9),a.dp(12),a.dp(9),a.dp(12));box.setBackground(a.shape(a.highlight,0,16));
     values[i]=a.text("—",focus?32:24,a.fg,true);values[i].setGravity(Gravity.CENTER);
     values[i].setAutoSizeTextTypeUniformWithConfiguration(14,focus?32:24,1,android.util.TypedValue.COMPLEX_UNIT_SP);
     box.addView(values[i]);
@@ -153,9 +153,9 @@ final class RideUi {
    }
    requestStart();
   });
-  start.setTextColor(Color.WHITE);
-  start.setBackground(a.shape(RideService.running?0xffc94b44:0xffff6b1b,0,14));
-  start.setMinHeight(a.dp(58));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);
+  start.setTextColor(RideService.running?Color.WHITE:(a.dark?0xFF10203D:Color.WHITE));
+  start.setBackground(a.shape(RideService.running?0xffc94b44:a.accent,0,18));
+  start.setMinHeight(a.dp(60));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);
   start.setContentDescription(RideService.running?"현재 GPS 기록을 저장 후 종료":
     RideService.autoArmed?"OBD 자동 출발 감지만 중지":"GPS 기록 시작, 사용자 동의 필요");
   hero.addView(start);
@@ -179,7 +179,7 @@ final class RideUi {
   // Safe launcher: changing the default does not unexpectedly open an external app.
   NavigationChoice chosen=NavigationApps.preferred(a);
   LinearLayout navigation=a.col();navigation.setPadding(a.dp(16),a.dp(14),a.dp(16),a.dp(14));
-  navigation.setBackground(a.shape(a.panel,a.line,16));
+  navigation.setBackground(a.shape(a.panel,a.line,19));
   navigation.addView(a.text("내비게이션",16,a.fg,true));a.gap(navigation,9);
   LinearLayout launchRow=new LinearLayout(a);launchRow.setGravity(Gravity.CENTER_VERTICAL);
   boolean narrowNav=a.getResources().getConfiguration().fontScale>=1.35f||
@@ -205,7 +205,7 @@ final class RideUi {
   // turn-by-turn motorcycle routing without an external navigation provider.
   LinearLayout tripTools=a.col();
   tripTools.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(12));
-  tripTools.setBackground(a.shape(a.panel,a.line,16));
+  tripTools.setBackground(a.shape(a.panel,a.line,19));
   tripTools.addView(a.text("내 코스 · 라이딩 분석",16,a.fg,true));
   a.gap(tripTools,8);
   int saved=a.items("routes").size();
@@ -340,7 +340,7 @@ final class RideUi {
  void populateHistory(LinearLayout historyPanel,HistoryData data){
   if(data.latestUnapplied!=null&&data.unappliedCount>0){
    LinearLayout review=a.col();review.setPadding(a.dp(14),a.dp(12),a.dp(14),a.dp(12));
-   review.setBackground(a.shape(a.panel,a.line,12));
+   review.setBackground(a.shape(a.panel,a.line,17));
    review.addView(a.text("주행거리 확인 대기 · "+data.unappliedCount+"건",15,a.fg,true));
    review.addView(a.text("완료된 GPS 기록을 검토한 뒤 원하는 경우에만 계기판 누적거리에 반영해요. 중복 반영은 막습니다.",12,a.muted,false));
    a.gap(review,7);
@@ -388,7 +388,7 @@ final class RideUi {
    search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
    search.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(RideHistorySearch.MAX_LENGTH)});
    search.setPadding(a.dp(14),a.dp(10),a.dp(14),a.dp(10));
-   search.setBackground(a.shape(a.panel,a.line,13));
+   search.setBackground(a.shape(a.panel,a.line,17));
    searchBar.addView(search,new LinearLayout.LayoutParams(0,a.dp(50),1));
    Button clear=a.button("지우기",false,()->search.setText(""));
    clear.setTextSize(12);clear.setMinHeight(a.dp(44));
@@ -556,7 +556,7 @@ final class RideUi {
     entries.isEmpty()?"선택한 바이크·상태·기간에 라이딩이 없어요. 필터를 바꿔 주세요.":
     "검색 결과가 없어요. 날짜·시간·상태를 바꾸거나 검색어를 지워 주세요.";
    TextView empty=a.text(message,14,a.muted,false);
-   empty.setPadding(a.dp(15),a.dp(16),a.dp(15),a.dp(16));empty.setBackground(a.shape(a.panel,0,14));
+   empty.setPadding(a.dp(15),a.dp(16),a.dp(15),a.dp(16));empty.setBackground(a.shape(a.panel,a.line,17));
    results.addView(empty);
    if(total>0){
     a.gap(results,8);
