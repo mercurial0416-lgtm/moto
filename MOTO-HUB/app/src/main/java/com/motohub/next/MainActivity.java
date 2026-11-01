@@ -400,6 +400,7 @@ public class MainActivity extends Activity {
  }
  void syncVerifiedOdoInbox(){
   if(readOnly||RideService.running||jsonImportRunning||odoApplying.get()||
+     RestoreRideGate.isRestoring()||RestoreRideGate.isExporting()||
      observedJsonImportRevision!=jsonImportRevision||observedFormWriteRevision!=formWriteRevision)return;
   final String bikeId=OdometerAutoSyncInbox.configuredBikeId(this);
   if(!OdometerAutoSyncInbox.enabled(this,bikeId))return;
@@ -1880,6 +1881,11 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));
           db=next;readOnly=false; // no fallible work after the JSON commit
          });
+         // Full restore replaces garage and GPS assets. Old ECU baselines and
+         // queued ODO readings must never overwrite the restored garage.
+         final boolean odoResetOk=OdometerAutoSyncInbox.suspendAfterRestore(this);
+         final boolean mileageResetOk=RideMileageEstimate.resetAfterFullRestore(this);
+         jsonImportRevision++;
          // Settings are imported only after database/assets commit. Legacy ZIPs retain current settings.
          boolean preferencesOk=true,rollbackNeedsAttention=false;
          try{DevicePreferencesBackup.restore(this,ready.preferences,db);}
@@ -1895,9 +1901,15 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          try{checkpointOk=LocalSafetyBackup.checkpoint(this,db);}catch(Exception ignored){checkpointOk=false;}
          try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){ /* Restore is already committed. */ }
          final boolean checkpointReady=checkpointOk;
-         runOnUiThread(()->{selected="";compare.clear();render();auditGarageSoon(false);
+         runOnUiThread(()->{
+          if(isFinishing()||isDestroyed())return;
+          observedJsonImportRevision=jsonImportRevision;
+          selected="";compare.clear();render();auditGarageSoon(false);
+          if(mileageResetOk)rebuildGpsEstimateAsync();
           toast("복원 완료 · GPS "+ready.rides+"개 · 사진 "+ready.photos+"개"+
            (checkpointReady?"":" · 자동 안전 백업 갱신 실패")+
+           (odoResetOk?"":" · 기존 ODO 자동 동기화 해제 저장 실패 · 확인 필요")+
+           (mileageResetOk?"":" · GPS 누적거리 재계산 준비 실패")+
            (settingsReady?"":settingsNeedReview?" · 설정 일부 복구 실패 · 확인 필요":" · 홈/내비 설정 복원 실패 · 이전 설정 유지/복구 시도"));
           if(!settingsReady)new AlertDialog.Builder(this).setTitle("백업의 기기 설정 확인")
            .setMessage(settingsNeedReview?"일부 설정의 자동 복구도 실패했습니다. 기존 기록은 복원됐지만 홈 버튼·기본 내비·알림을 직접 확인하세요.":
@@ -2545,7 +2557,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     toast("JSON 복원 적용 중…");
     new Thread(()->{
      JSONObject validated=null;
-     boolean committed=false,checkpoint=false;
+     boolean committed=false,checkpoint=false,odoReset=true;
      String failureReason=null;
      try{
       // Parse, rollback and atomic write off the UI thread.
@@ -2557,6 +2569,9 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       try{LocalSafetyBackup.snapshot(this,db);}catch(Exception ignored){}
       atomic(disk,validated.toString(2).getBytes(StandardCharsets.UTF_8));
       committed=true;
+      // The imported garage may be older than a queued ECU value: disable
+      // any prior ODO sync before allowing a new foreground Activity to apply it.
+      odoReset=OdometerAutoSyncInbox.suspendAfterRestore(this);
       try{checkpoint=LocalSafetyBackup.checkpoint(this,validated);}catch(Exception ignored){}
       try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){}
      }catch(Exception failure){
@@ -2566,7 +2581,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       jsonImportRunning=false;
       RestoreRideGate.end();
      }
-     final boolean applied=committed,checkpointReady=checkpoint;
+     final boolean applied=committed,checkpointReady=checkpoint,odoResetReady=odoReset;
      final String reason=failureReason;
      final JSONObject result=validated;
      runOnUiThread(()->{
@@ -2575,7 +2590,9 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       db=result;readOnly=false;observedJsonImportRevision=jsonImportRevision;
       selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();
       compare.clear();render();
-      toast(checkpointReady?"JSON 복원 완료":"JSON 복원 완료 · 새 안전 복구 지점 생성 실패. 전체 ZIP도 보관하세요.");
+      toast("JSON 복원 완료"+
+       (checkpointReady?"":" · 새 안전 복구 지점 생성 실패. 전체 ZIP도 보관하세요.")+
+       (odoResetReady?"":" · 기존 OBD 동기화 해제 저장 실패 · 설정을 직접 확인해 주세요."));
      });
     },"moto-json-import-apply").start();
    }).show();
