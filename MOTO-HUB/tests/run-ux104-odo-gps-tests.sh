@@ -28,7 +28,7 @@ assert 'OdometerAutoSyncInbox.acknowledged(this,bikeId,offered)' in main
 assert 'atomic(disk,original.toString(2)' in main
 assert 'LocalSafetyBackup.checkpoint(this,original)' in main
 assert 'RideMileageEstimate.record(context,track,boundBike,result.distanceKm)' in inbox
-assert 'GPS 기록 누적 추정' in garage
+assert 'GPS 누적 추정' in garage and 'RideMileageEstimate.total(a,b.optString("id"))' in garage
 assert '계기판 km와 별도' in garage
 assert 'obd' not in (p/"RideMileageEstimate.java").read_text().lower()
 print("PASS v567 source wiring: explicit ODO consent, safe background write and independent GPS ledger")
