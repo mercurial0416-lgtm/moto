@@ -70,10 +70,11 @@ final class ObdAutoSpeedMonitor {
   }
   // PID support is a standard ECU read and may be unavailable on cheap adapters.
   // Missing responses mean unknown, never invented values.
-  String supported00="",supported40="";
+  String supported00="",supported20="",supported40="";
   try{supported00=query(in,out,ObdReadOnlyProtocol.query("0100"),2500);}catch(Exception ignored){}
+  try{supported20=query(in,out,ObdReadOnlyProtocol.query("0120"),2500);}catch(Exception ignored){}
   try{supported40=query(in,out,ObdReadOnlyProtocol.query("0140"),2500);}catch(Exception ignored){}
-  ObdPidCapabilities capabilities=ObdPidCapabilities.fromResponses(supported00,supported40);
+  ObdPidCapabilities capabilities=ObdPidCapabilities.fromAllResponses(supported00,supported20,supported40,null);
   listener.capabilities(capabilities);
   if(ObdSpeedResponsePolicy.unsupported(capabilities.forPid("010D")))throw new UnsupportedSpeed();
   connectedAtNanos=System.nanoTime();listener.connected();
@@ -102,8 +103,9 @@ final class ObdAutoSpeedMonitor {
    else {unsupported=0;listener.speed(speed);}
    // Rotate low-rate supported sensors without ever requesting a write-capable PID.
    if(!stopped&&++samples%4==0){
-    String pid=new String[]{"010C","0105","0142"}[(samples/4-1)%3];
-    if(capabilities.forPid(pid)!=ObdPidCapabilities.Support.NO&&auxiliary.mayPoll(pid,System.nanoTime())){
+    String pid=new String[]{"010C","0105","0142","012F"}[(samples/4-1)%4];
+    if((!"012F".equals(pid)||capabilities.forPid(pid)==ObdPidCapabilities.Support.YES)&&
+      capabilities.forPid(pid)!=ObdPidCapabilities.Support.NO&&auxiliary.mayPoll(pid,System.nanoTime())){
      long startedAt=System.nanoTime();
      try{
       double value=ObdSensorReading.number(pid,query(in,out,ObdReadOnlyProtocol.query(pid),2500));
