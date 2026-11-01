@@ -6,6 +6,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.GraphicsMode;
 import static org.junit.Assert.*;
 
 /** Protect cross-bike privacy and separate scheduled work from completed jobs. */
@@ -68,7 +69,8 @@ public final class Ux107PortfolioTest {
   assertFalse(all.contains("Other Bike"));
   assertEquals(0,report.records.stream().filter(x->x.contains("GPS 좌표")).count());
  }
- @Test public void pdfWriterProducesRealPdfHeaderWithoutChangingGarage()throws Exception{
+ @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+ public void pdfWriterProducesRealPdfHeaderWithoutChangingGarage()throws Exception{
   JSONObject original=data();
   String before=original.toString();
   MotoOwnershipReport.Report report=MotoOwnershipReport.prepare(original,A);
