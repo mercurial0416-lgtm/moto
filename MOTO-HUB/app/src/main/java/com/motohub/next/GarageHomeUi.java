@@ -353,6 +353,14 @@ final class GarageHomeUi {
    }
   }
   a.content.addView(row);
+  double gps=RideMileageEstimate.total(a,b.optString("id"));
+  String estimate=Double.isFinite(gps)?String.format(java.util.Locale.KOREA,"%,.1f km",gps):"확인 불가";
+  TextView gpsNote=a.text("GPS 기록 누적 추정 "+estimate+" · v567 이후 완료된 주행만 · 계기판 km와 별도",12,soft,false);
+  gpsNote.setMaxLines(3);gpsNote.setPadding(a.dp(3),0,a.dp(3),a.dp(10));a.content.addView(gpsNote);
+  if(OdometerAutoSyncInbox.enabled(a,b.optString("id"))){
+   TextView odoNote=a.text(OdometerAutoSyncInbox.display(a,b.optString("id")),12,soft,false);
+   odoNote.setPadding(a.dp(3),0,a.dp(3),a.dp(7));a.content.addView(odoNote);
+  }
  }
  void rideAction(){
   // Keep consent and stop confirmation; idle GPS action is deliberately secondary.
