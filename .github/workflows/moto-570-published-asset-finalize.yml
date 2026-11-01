@@ -1,0 +1,78 @@
+name: Publish verified MOTO HUB 570 in-app manifest
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: moto-fixed-signed-release
+  cancel-in-progress: false
+jobs:
+  finalize:
+    if: (github.event_name == 'release' && github.event.release.tag_name == 'moto-hub-v570') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout trusted release source
+        uses: actions/checkout@v4
+        with:
+          ref: ce050ce80f2c23aacdd0f803126769d5f0af4602
+          path: source
+          persist-credentials: false
+      - name: Install Android verifier
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0'
+      - name: Retrieve published APK (never use unsigned candidate)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=moto-hub-v570
+          test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = false
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fx 'MOTO-HUB.apk'
+          mkdir -p "$RUNNER_TEMP/moto570"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'MOTO-HUB.apk' --dir "$RUNNER_TEMP/moto570"
+          test -s "$RUNNER_TEMP/moto570/MOTO-HUB.apk"
+          echo 'd869049f63807f413f3fc6e90f77c93caeb54d968caa9323dd7dc988107100d8  '"$RUNNER_TEMP/moto570/MOTO-HUB.apk" | sha256sum -c -
+          test "$(stat -c%s "$RUNNER_TEMP/moto570/MOTO-HUB.apk")" -eq 47452949
+      - name: Verify original signing key and Android v570
+        run: |
+          set -euo pipefail
+          APK="$RUNNER_TEMP/moto570/MOTO-HUB.apk"
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$SIGNER" verify --min-sdk-version 26 --verbose --print-certs "$APK" > "$RUNNER_TEMP/signature.txt"
+          grep -Fqx 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/signature.txt"
+          grep -Fqx 'Verified using v3 scheme (APK Signature Scheme v3): true' "$RUNNER_TEMP/signature.txt"
+          CERT=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/signature.txt" | head -1 | tr -d ': ' | tr '[:upper:]' '[:lower:]')
+          test "$CERT" = 212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b
+          "$AAPT" dump badging "$APK" | grep -F "package: name='com.motohub.next' versionCode='570'"
+          python3 source/MOTO-HUB/tools/make_update_manifest.py \
+            --apk "$APK" \
+            --apk-url "https://github.com/$GITHUB_REPOSITORY/releases/download/moto-hub-v570/MOTO-HUB.apk" \
+            --aapt "$AAPT" --apksigner "$SIGNER" \
+            --output "$RUNNER_TEMP/moto570/manifest.json"
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["versionCode"] == 570 and d["sha256"] == "d869049f63807f413f3fc6e90f77c93caeb54d968caa9323dd7dc988107100d8"' "$RUNNER_TEMP/moto570/manifest.json"
+      - name: Advance public in-app manifest only after asset verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CURRENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content | tr -d '\n' | base64 --decode | python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
+          if (( CURRENT == 570 )); then
+            PRESENT=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content | tr -d '\n' | base64 --decode | python3 -c 'import json,sys;print(json.load(sys.stdin)["sha256"])')
+            test "$PRESENT" = d869049f63807f413f3fc6e90f77c93caeb54d968caa9323dd7dc988107100d8
+            echo 'Public manifest already points to verified v570.'
+            exit 0
+          fi
+          test "$CURRENT" -eq 569 || { echo "::error::Unexpected public manifest version $CURRENT"; exit 1; }
+          SHA=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .sha)
+          B64=$(base64 --wrap=0 "$RUNNER_TEMP/moto570/manifest.json")
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json" \
+            -f branch=main -f sha="$SHA" -f content="$B64" \
+            -f message='Publish original-signed v570 OTA [skip ci]'
+          CHECK=$(gh api "repos/$GITHUB_REPOSITORY/contents/updates/manifest.json?ref=main" --jq .content | tr -d '\n' | base64 --decode | python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
+          test "$CHECK" -eq 570
+          echo "MOTO HUB 570 is now available to in-app updater."
