@@ -7,12 +7,12 @@ import java.util.regex.Pattern;
 /** Experimental ELM327 OBD-II mode 01 sensor decoding. No ECU writes or DTC clearing. */
 final class ObdReadOnlyProtocol {
  private ObdReadOnlyProtocol() {}
- static final String[] SENSOR_PIDS={"010C","010D","0105","0142"};
+ static final String[] SENSOR_PIDS={"010C","010D","0105","0142","012F"};
  // Standard mode-01 supported PID bitmaps; never request proprietary odometer data.
- static final String[] CAPABILITY_PIDS={"0100","0140","01A0"};
+ static final String[] CAPABILITY_PIDS={"0100","0120","0140","01A0"};
  // 01A6 is used only after explicit developer-mode consent; never polled by auto riding.
  static final String ODOMETER_PID="01A6";
- static final String[] SENSOR_NAMES={"엔진 RPM","차량 속도","냉각수 온도","ECU 전압"};
+ static final String[] SENSOR_NAMES={"엔진 RPM","차량 속도","냉각수 온도","ECU 전압","연료 잔량 (%)"};
  static String query(String pid){
   for(String safe:SENSOR_PIDS)if(safe.equals(pid))return pid+"\r";
   for(String safe:CAPABILITY_PIDS)if(safe.equals(pid))return pid+"\r";
@@ -54,6 +54,7 @@ final class ObdReadOnlyProtocol {
   if("0142".equals(pid))return String.format(Locale.KOREA,"%.3f V",(a*256+b)/1000.0);
   if("010D".equals(pid))return a<=200?a+" km/h":"지원 안 함";
   if("0105".equals(pid))return (a-40)+" °C";
+  if("012F".equals(pid))return String.format(Locale.KOREA,"%.1f %%",a*100.0/255.0);
   return "지원 안 함";
  }
 }
