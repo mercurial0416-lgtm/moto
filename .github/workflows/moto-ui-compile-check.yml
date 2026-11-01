@@ -23,6 +23,9 @@ jobs:
       - name: Install Android SDK 36
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Native UI color contrast and action wiring checks
+        working-directory: MOTO-HUB
+        run: python3 tests/test_moto_ui_polish.py
       - name: Compile and test native Android UI (debug only, no release/signing)
         working-directory: MOTO-HUB
         run: |
