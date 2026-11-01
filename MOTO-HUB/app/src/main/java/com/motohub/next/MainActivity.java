@@ -24,7 +24,10 @@ public class MainActivity extends Activity {
  String pendingTrack="";
  private static volatile boolean jsonImportRunning=false;
  private static volatile long jsonImportRevision=0;
+ private static volatile long formWriteRevision=0;
  private long observedJsonImportRevision=0;
+ private long observedFormWriteRevision=0;
+ private final java.util.concurrent.atomic.AtomicBoolean restoreReadRunning=new java.util.concurrent.atomic.AtomicBoolean();
  final RideStartConsent rideStartConsent=new RideStartConsent();
   boolean launchNavigationAfterRide=false;
  DeveloperObdScreen developerObd;
@@ -64,7 +67,7 @@ public class MainActivity extends Activity {
    // Recover any interrupted GPS trash move before a new ride or backup sees partial files.
    if(RideTrash.recoverInterrupted(getFilesDir())>0)crashedRestoreRecovered=true;
   }catch(Exception e){readOnly=true;crashedRestoreNeedsHelp=true;}
-  observedJsonImportRevision=jsonImportRevision;
+  observedJsonImportRevision=jsonImportRevision;observedFormWriteRevision=formWriteRevision;
   try{db=disk.getBaseFile().exists()||new File(disk.getBaseFile()+".bak").exists()?Store.parse(new String(disk.readFully(),StandardCharsets.UTF_8)):Store.empty();}
   catch(Exception e){try{db=Store.empty();}catch(Exception ignored){}readOnly=true;}
   // Restore local list preference across process death; rotation state wins when available.
@@ -251,20 +254,35 @@ public class MainActivity extends Activity {
  /** Reload data when a JSON restore finishes after the Activity was recreated. */
  void refreshJsonImportAfterRecreation(){
   if(isFinishing()||isDestroyed())return;
-  if(jsonImportRunning){
+  if(jsonImportRunning||RestoreRideGate.isFormWriting()){
    if(root!=null)root.postDelayed(this::refreshJsonImportAfterRecreation,250);
    return;
   }
-  if(observedJsonImportRevision==jsonImportRevision)return;
-  try{
-   JSONObject refreshed=Store.parse(new String(disk.readFully(),StandardCharsets.UTF_8));
-   db=refreshed;readOnly=false;observedJsonImportRevision=jsonImportRevision;
-   selected="";compare.clear();render();
-   toast("JSON 복원 완료 · 화면과 기록을 다시 불러왔어요.");
-  }catch(Exception failure){
-   readOnly=true;
-   error("복원 후 저장 기록을 다시 열지 못했습니다. 앱을 삭제하지 말고 백업을 확인해 주세요.");
-  }
+  if(observedJsonImportRevision==jsonImportRevision&&observedFormWriteRevision==formWriteRevision)return;
+  if(!restoreReadRunning.compareAndSet(false,true))return;
+  final long wantedJson=jsonImportRevision,wantedForm=formWriteRevision;
+  new Thread(()->{
+   JSONObject loaded=null;String failure=null;
+   try{loaded=Store.parse(new String(disk.readFully(),StandardCharsets.UTF_8));}
+   catch(Exception error){failure=error.getMessage();}
+   final JSONObject result=loaded;final String reason=failure;
+   runOnUiThread(()->{
+    restoreReadRunning.set(false);
+    if(isFinishing()||isDestroyed())return;
+    if(jsonImportRunning||RestoreRideGate.isFormWriting()||
+       jsonImportRevision!=wantedJson||formWriteRevision!=wantedForm){
+     refreshJsonImportAfterRecreation();return;
+    }
+    if(result==null){
+     readOnly=true;
+     error("기록 다시 읽기 실패 · 원본을 보존하고 저장을 차단했습니다: "+reason);
+     return;
+    }
+    db=result;readOnly=false;
+    observedJsonImportRevision=wantedJson;observedFormWriteRevision=wantedForm;
+    selected="";compare.clear();render();toast("저장된 기록을 다시 불러왔어요.");
+   });
+  },"moto-async-state-reload").start();
  }
  @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);applyWidgetQuickActions(intent);confirmStopFromNotification(intent);receiveSharedListing(intent);}
  boolean applyWidgetTab(Intent intent){
@@ -343,10 +361,15 @@ public class MainActivity extends Activity {
   return arr("vehicles").length()>0?arr("vehicles").optJSONObject(0):null;}
  String bikeName(String id){for(JSONObject b:items("vehicles"))if(b.optString("id").equals(id))return b.optString("name");return "차량 없음";}
  List<JSONObject> items(String key){List<JSONObject> list=new ArrayList<>();JSONArray a=arr(key);for(int i=a.length()-1;i>=0;i--)list.add(a.optJSONObject(i));if(key.equals("services")||key.equals("expenses"))list.sort((x,y)->y.optString("date").compareTo(x.optString("date")));return list;}
- void write(JSONObject next)throws Exception{if(readOnly)throw new Exception("원본 보호 중입니다. 백업 복원을 먼저 해 주세요.");if(RestoreRideGate.isRestoring()||jsonImportRunning||observedJsonImportRevision!=jsonImportRevision)throw new IOException("JSON 복원 데이터 갱신 중에는 기존 화면에서 저장할 수 없습니다.");Store.parse(next.toString());
+ void write(JSONObject next)throws Exception{if(readOnly)throw new Exception("원본 보호 중입니다. 백업 복원을 먼저 해 주세요.");if(RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()||jsonImportRunning||observedJsonImportRevision!=jsonImportRevision||observedFormWriteRevision!=formWriteRevision)throw new IOException("기록 갱신 중에는 다른 저장을 시작할 수 없습니다.");Store.parse(next.toString());
   // The first snapshot of the day must preserve the state before the edit, not the new state.
   LocalSafetyBackup.snapshot(this,db);
-  atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));db=next;LocalSafetyBackup.checkpoint(this,next);MotoWidgetProvider.refresh(this);}
+  atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));db=next;
+  // Never report a failed optional recovery point as an unsuccessful primary save.
+  boolean checkpointOk=false;
+  try{checkpointOk=LocalSafetyBackup.checkpoint(this,next);}catch(Exception ignored){}
+  if(!checkpointOk)error("기록은 저장됐지만 자동 복구 지점을 만들지 못했습니다. 전체 ZIP 백업을 따로 보관하세요.");
+  MotoWidgetProvider.refresh(this);}
  void atomic(AtomicFile file,byte[] bytes)throws Exception{FileOutputStream out=null;try{out=file.startWrite();out.write(bytes);file.finishWrite(out);}catch(Exception e){if(out!=null)file.failWrite(out);throw e;}}
  void saveItem(String key,JSONObject item)throws Exception{JSONObject next=new JSONObject(db.toString());Store.upsert(next,key,item);write(next);}
  GradientDrawable shape(int color,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));if(stroke!=0)d.setStroke(dp(1),stroke);return d;}
