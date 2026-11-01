@@ -1883,8 +1883,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          });
          // Full restore replaces garage and GPS assets. Old ECU baselines and
          // queued ODO readings must never overwrite the restored garage.
-         final boolean odoResetOk=OdometerAutoSyncInbox.suspendAfterRestore(this);
-         final boolean mileageResetOk=RideMileageEstimate.resetAfterFullRestore(this);
+         boolean odometerCleared=false,gpsLedgerCleared=false;
+         try{odometerCleared=OdometerAutoSyncInbox.suspendAfterRestore(this);}catch(Exception ignored){}
+         try{gpsLedgerCleared=RideMileageEstimate.resetAfterFullRestore(this);}catch(Exception ignored){}
+         final boolean odoResetOk=odometerCleared,mileageResetOk=gpsLedgerCleared;
          jsonImportRevision++;
          // Settings are imported only after database/assets commit. Legacy ZIPs retain current settings.
          boolean preferencesOk=true,rollbackNeedsAttention=false;
@@ -2046,6 +2048,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          entered=true;
          int added=ready.installPart(getFilesDir());
          runOnUiThread(()->{
+          if(added>0)rebuildGpsEstimateAsync();
           if(isFinishing()||isDestroyed())return;
           new AlertDialog.Builder(this).setTitle("분할 복원 완료")
            .setMessage("새 GPS·사진 등 "+added+"개 파일을 추가했습니다. 기존 JSON 기록은 유지했습니다. 분할 백업에 들어 있던 JSON을 사용하려면 기존 기록을 백업한 다음 JSON 가져오기를 따로 실행하세요.")
@@ -2571,7 +2574,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       committed=true;
       // The imported garage may be older than a queued ECU value: disable
       // any prior ODO sync before allowing a new foreground Activity to apply it.
-      odoReset=OdometerAutoSyncInbox.suspendAfterRestore(this);
+      try{odoReset=OdometerAutoSyncInbox.suspendAfterRestore(this);}
+      catch(Exception ignored){odoReset=false;}
       try{checkpoint=LocalSafetyBackup.checkpoint(this,validated);}catch(Exception ignored){}
       try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){}
      }catch(Exception failure){
