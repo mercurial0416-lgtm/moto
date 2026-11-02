@@ -22,7 +22,7 @@ assert 'String baseline=UpdateDataFootprint.capture' not in footprint
 assert 'static Result merge(JSONObject current,JSONObject imported,Map<String,String> confirmed)' in merger
 assert 'JsonDataMerger.conflicts(' in activity
 assert 'selectJsonMergeBikes(' in activity and 'commitJsonMerge(source,new java.util.HashMap<>(selections))' in activity
-assert 'HomeShortcutOrder.parse(' in home and 'quickAction("fuel")' in home and 'quickAction("service")' in home
+assert 'HomeShortcutOrder.parse(' in home and 'homeShortcutTile(key)' in home and 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
 assert 'setMultiChoiceItems(labels,visible' in home
 assert 'ObdLinkQuality.score(' in obd and 'qualityScore<55' in obd
 assert 'CODE="$(tr -d \'[:space:]\' < release-code.txt)"' in ci
