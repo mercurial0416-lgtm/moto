@@ -73,10 +73,10 @@ final class HubScreens {
   // separators. Data sources, click actions and navigation are unchanged.
   boolean settingCard=target==a.content&&"더보기".equals(a.tab);
   LinearLayout block=a.col();
-  block.setPadding(a.dp(settingCard?17:7),a.dp(15),
-                   a.dp(settingCard?17:7),a.dp(15));
-  block.setMinimumHeight(a.dp(settingCard?78:70));
-  if(settingCard)block.setBackground(a.shape(a.panel,a.line,18));
+  block.setPadding(a.dp(settingCard?16:7),a.dp(settingCard?12:15),
+                   a.dp(settingCard?16:7),a.dp(settingCard?12:15));
+  block.setMinimumHeight(a.dp(settingCard?66:70));
+  if(settingCard)block.setBackground(a.shape(a.panel,a.line,16));
   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);
   boolean largeText=a.getResources().getConfiguration().fontScale>=1.35f;
   if(largeText)head.setOrientation(LinearLayout.VERTICAL);
@@ -110,7 +110,7 @@ final class HubScreens {
    block.setContentDescription(title+", "+detail+", "+value);
   }
   target.addView(block);
-  if(settingCard)a.gap(target,10);
+  if(settingCard)a.gap(target,7);
   else{
    View rule=new View(a);rule.setBackgroundColor(a.line);
    target.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
@@ -476,7 +476,7 @@ final class HubScreens {
   a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
- void settings(){title("설정","기록·내비·정비·백업만 간편하게 관리");a.section("데이터 및 복구");line("백업 · 복원","GPS 백업 상태를 백그라운드에서 검사합니다","열기",this::basicBackup);
+ void settings(){title("설정과 도구","내비 · 기록 보호 · 기기 환경을 관리해");a.section("데이터 관리");line("백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해","열기",this::basicBackup);
  final TextView backupState=a.text("백업 상태 확인 중…",12,a.muted,false);
  a.content.addView(backupState);
  final String settingsSnapshot=backupJsonSnapshot();
@@ -492,7 +492,7 @@ final class HubScreens {
     "현재 "+BuildConfig.VERSION_CODE+" · "+(UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256)?
     "서명 확인 · 업데이트 확인 가능":"서명 불일치 · 기존 앱 삭제 금지"),"열기",()->new AppUpdater(a).show());
 
-  a.section("내비 · 알림");
+  a.section("라이딩 환경");
 
 
   line("기본 내비 선택","현재: "+NavigationApps.preferred(a).label+" · 카카오내비 / 네이버지도 / 티맵","변경",()->NavigationApps.choose(a));
@@ -515,21 +515,19 @@ final class HubScreens {
      }
     }).show();
   });
-  a.section("안전");
-
   // Keep an accessible emergency stop ONLY if group location sharing is actually live.
-  if(Sharing.enabled)line("위치 공유 중지","현재 다른 사람에게 위치를 공유 중입니다.","즉시 중지",()->{
+  if(Sharing.enabled){a.section("안전 · 위치 공유");line("위치 공유 중지","현재 다른 사람에게 위치를 공유 중입니다.","즉시 중지",()->{
    if(Sharing.enabled)new AlertDialog.Builder(a).setTitle("위치 공유를 중지할까요?")
     .setNegativeButton("취소",null).setPositiveButton("즉시 중지",(d,w)->{Sharing.stop();a.render();}).show();
    else a.toast("위치 공유는 라이딩 화면에서 동의한 경우에만 시작됩니다.");
-  });
-  a.section("화면");
-  line("화면 테마","현재: "+a.settings().optString("theme","dark"),"변경",()->a.choose("화면 테마",new String[]{"system","light","dark"},v->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("theme",v);a.write(next);a.render();})));
+  });}
+  a.section("화면 · 개인화");
+  line("화면 테마","밝게 · 어둡게 · 기기 설정에 맞추기","변경",()->a.choose("화면 테마",new String[]{"system","light","dark"},v->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("theme",v);a.write(next);a.render();})));
 
   // The data structures for gear/trade-in and diagnostic reports stay untouched.
   // Hidden extras can be opened in version-tap developer settings without cluttering normal UI.
-  line("고급 설정 · 문제 해결","위젯·기록 검사·기기 정보","열기",this::advancedSettings);
-  a.section("앱 정보");
+  line("고급 도구","위젯 · 데이터 검사 · 유지비 통계","열기",this::advancedSettings);
+  a.section("MOTO HUB");
   // Deliberately hidden until the user taps the version label seven times.
   TextView version=a.text("MOTO HUB " + BuildConfig.VERSION_NAME + " · 기기별 독립 저장 · 계정 불필요",16,a.muted,false);
   LinearLayout.LayoutParams vl=new LinearLayout.LayoutParams(-1,-2);vl.bottomMargin=a.dp(8);a.content.addView(version,vl);
