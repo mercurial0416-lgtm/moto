@@ -72,7 +72,7 @@ final class RideStatsUi {
   @Override protected void onDraw(Canvas c){
    super.onDraw(c);
    int w=getWidth(),h=getHeight();if(w<=0||h<=0)return;
-   c.drawColor(dark?0xff1b2637:Color.WHITE);
+   c.drawColor(dark?MotoDesign.DARK_SURFACE:MotoDesign.LIGHT_SURFACE);
    if(data==null)return;
    float scale=getResources().getDisplayMetrics().scaledDensity;
    float left=22*scale,right=w-15*scale,top=30*scale,bottom=h-43*scale;
@@ -84,15 +84,15 @@ final class RideStatsUi {
     float cx=left+col*(i+.5f);
     float ratio=(float)Math.max(0,Math.min(1,data.km[i]/max));
     float bh=(bottom-top)*ratio;
-    paint.setColor(dark?0xff8ab4ff:0xff2870e2);
+    paint.setColor(dark?MotoDesign.DARK_ACCENT:MotoDesign.LIGHT_ACCENT);
     float half=col*.31f;
     c.drawRoundRect(cx-half,bottom-bh,cx+half,bottom,7*scale,7*scale,paint);
-    paint.setColor(dark?Color.WHITE:0xff20344e);paint.setTextSize(11*scale);
+    paint.setColor(dark?MotoDesign.DARK_TEXT:MotoDesign.LIGHT_TEXT);paint.setTextSize(11*scale);
     c.drawText(String.format(Locale.KOREA,"%.0f",data.km[i]),cx,Math.max(top+8*scale,bottom-bh-7*scale),paint);
-    paint.setColor(dark?0xffb5c3db:0xff52647d);paint.setTextSize(12*scale);
+    paint.setColor(dark?MotoDesign.DARK_MUTED:MotoDesign.LIGHT_MUTED);paint.setTextSize(12*scale);
     c.drawText(data.labels[i],cx,bottom+24*scale,paint);
    }
-   paint.setColor(dark?0xffaab9cf:0xff66788e);paint.setTextSize(10*scale);paint.setTextAlign(Paint.Align.LEFT);
+   paint.setColor(dark?MotoDesign.DARK_MUTED:MotoDesign.LIGHT_MUTED);paint.setTextSize(10*scale);paint.setTextAlign(Paint.Align.LEFT);
    c.drawText("km",12*scale,17*scale,paint);
    setContentDescription("월별 GPS 주행거리 "+Arrays.toString(data.labels)+" "+Arrays.toString(data.km)+" km");
   }
