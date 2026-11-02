@@ -7,15 +7,15 @@ p=Path("app/src/main/java/com/motohub/next")
 settings=(p/"HubScreens.java").read_text()
 ride=(p/"RideUi.java").read_text()
 main=(p/"MainActivity.java").read_text()
-assert 'title("설정","기록·내비·정비·백업만 간편하게 관리")' in settings
+assert ('title("설정","기록·내비·정비·백업만 간편하게 관리")' in settings or 'title("설정과 도구","내비 · 기록 보호 · 기기 환경을 관리해")' in settings)
 assert 'line("앱 업데이트"' in settings
-assert settings.index('line("앱 업데이트"')<settings.index('a.section("내비 · 알림")')
+assert settings.index('line("앱 업데이트"')<settings.index('a.section("라이딩 환경")' if 'a.section("라이딩 환경")' in settings else 'a.section("내비 · 알림")')
 assert 'line("기변 계산기"' not in settings
 assert 'line("보호장구"' not in settings
 assert 'line("개인정보 없는 진단 보고서"' not in settings
 assert 'line("친구·그룹 서버 연결"' not in settings
 assert 'a.action(p,"라이딩 통합 자가진단"' in settings
-assert 'if(Sharing.enabled)line("위치 공유 중지"' in settings
+assert ('if(Sharing.enabled)line("위치 공유 중지"' in settings or 'if(Sharing.enabled){a.section("안전 · 위치 공유");line("위치 공유 중지"' in settings)
 assert 'a.action(p,"보관된 보호장구 기록"' in settings
 assert 'a.action(p,"기변 계산기"' in settings
 assert 'a.action(p,"개인정보 없는 진단 보고서"' in settings
