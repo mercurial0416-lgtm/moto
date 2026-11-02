@@ -216,7 +216,7 @@ final class GarageHomeUi {
   final String label=nav?"내비게이션":fuel?"주유 기록":"정비 관리";
   final int glyph=nav?3:fuel?5:2;
   LinearLayout tile=a.col();tile.setGravity(Gravity.CENTER);
-  tile.setPadding(a.dp(6),a.dp(11),a.dp(6),a.dp(10));tile.setMinHeight(a.dp(91));
+  tile.setPadding(a.dp(6),a.dp(11),a.dp(6),a.dp(10));tile.setMinimumHeight(a.dp(91));
   MotoDesign.ripple(a,tile,surface,stroke,14);
   NavIcon icon=new NavIcon(a,glyph,a.accent);
   LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(a.dp(25),a.dp(25));
