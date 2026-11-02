@@ -52,9 +52,9 @@ final class MotoDesign {
  static String heading(String tab){
   switch(tab){
    case "홈":return "내 차고";
-   case "차고":return "정비와 주유";
+   case "차고":return "정비 · 주유";
    case "라이딩":return "라이딩";
-   default:return "설정과 도구";
+   default:return "설정";
   }
  }
  /** Brand is subordinate to the current task, not another large title. */
@@ -72,7 +72,7 @@ final class MotoDesign {
   TextView brand=a.text("MOTO HUB   /   RIDER LIFE",11,a.accent,true);
   brand.setLetterSpacing(.065f);eyebrow.addView(brand);
   identity.addView(eyebrow);
-  TextView title=a.text(heading(a.tab),25,a.fg,true);
+  TextView title=a.text(heading(a.tab),26,a.fg,true);
   title.setTypeface(display());title.setLetterSpacing(-.02f);
   LinearLayout.LayoutParams titleLp=new LinearLayout.LayoutParams(-1,-2);
   titleLp.topMargin=a.dp(5);identity.addView(title,titleLp);
@@ -83,7 +83,7 @@ final class MotoDesign {
    notice.setOnClickListener(v->new GarageHomeUi(a).showNotices());
    header.addView(notice);
   }else if(!"더보기".equals(a.tab)){
-   TextView settings=headerAction(a,"설정");
+   TextView settings=headerAction(a,"도구");
    settings.setContentDescription("설정과 도구로 이동");
    settings.setOnClickListener(v->a.navigate("더보기"));
    header.addView(settings);
