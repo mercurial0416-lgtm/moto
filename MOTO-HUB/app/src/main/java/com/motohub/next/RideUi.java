@@ -224,6 +224,7 @@ final class RideUi {
   tripRow.addView(importRoute,importLp);tripTools.addView(tripRow);
   a.gap(tripTools,9);
   a.action(tripTools,"최근 30일 주행 통계 · 바이크별",false,this::chooseRideReport);
+   a.action(tripTools,"최근 6개월 라이딩 그래프 · 현재 바이크",false,()->RideStatsUi.open(a));
   a.content.addView(tripTools);a.gap(a.content,12);
   if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
   // Live OBD sensor dashboard intentionally hidden here: the KTM's TFT already
