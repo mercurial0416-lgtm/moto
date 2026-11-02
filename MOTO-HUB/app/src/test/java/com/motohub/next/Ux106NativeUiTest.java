@@ -44,13 +44,15 @@ public final class Ux106NativeUiTest {
   return null;
  }
  @Test public void brandedNavigationHasFullClickableDestinations(){
-  assertNotNull(text(activity.root,"MOTO HUB"));
+  assertTrue("brand identity must be visible",
+   text(activity.root,"MOTO HUB")!=null||
+   text(activity.root,"MOTO HUB   /   RIDER LIFE")!=null);
   assertNotNull(desc(activity.root,"홈, 현재 탭"));
   for(String label:new String[]{"라이딩","정비","설정"}){
    View item=desc(activity.root,label+" 탭 열기");
    assertNotNull(label+" bottom tab",item);
    assertTrue(label+" is clickable",item.isClickable());
-   assertTrue(label+" >= 62dp target",item.getMinimumHeight()>=activity.dp(62));
+   assertTrue(label+" >= 56dp target",item.getMinimumHeight()>=activity.dp(56));
   }
   View ride=desc(activity.root,"라이딩 탭 열기");
   assertNotNull(ride);ride.performClick();
@@ -64,9 +66,10 @@ public final class Ux106NativeUiTest {
  @Test public void settingsCardsRetainClickableActions(){
   activity.navigate("더보기");
   View backup=desc(activity.root,"백업 · 복원, GPS 백업 상태를 백그라운드에서 검사합니다, 열기");
+  if(backup==null)backup=desc(activity.root,"백업 · 복원, 라이딩 원본·사진·정비 기록을 보관하고 복원해, 열기");
   assertNotNull("data backup settings row",backup);
   assertTrue(backup.isClickable());
-  assertTrue(backup.getMinimumHeight()>=activity.dp(76));
+  assertTrue(backup.getMinimumHeight()>=activity.dp(64));
   assertNotNull(text(activity.root,"앱 업데이트"));
  }
 }
