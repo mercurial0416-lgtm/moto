@@ -80,9 +80,24 @@ final class GarageHomeUi {
  void render(){
   JSONObject b=a.bike();if(b==null){emptyGarage();return;}
   addHero(b);a.gap(a.content,12);stats(b);a.gap(a.content,18);
-  TextView shortcutHeading=a.text("빠른 실행",16,light,true);
-  LinearLayout.LayoutParams headingLp=new LinearLayout.LayoutParams(-1,-2);
-  headingLp.bottomMargin=a.dp(10);a.content.addView(shortcutHeading,headingLp);
+  LinearLayout taskHeading=new LinearLayout(a);taskHeading.setGravity(Gravity.CENTER_VERTICAL);
+  LinearLayout titleBox=a.col();
+  TextView eyebrow=a.text("QUICK CONTROL",11,orange,true);
+  eyebrow.setLetterSpacing(.075f);titleBox.addView(eyebrow);
+  TextView shortcutHeading=a.text("바로 실행",19,light,true);
+  LinearLayout.LayoutParams headingTitleLp=new LinearLayout.LayoutParams(-1,-2);
+  headingTitleLp.topMargin=a.dp(4);titleBox.addView(shortcutHeading,headingTitleLp);
+  taskHeading.addView(titleBox,new LinearLayout.LayoutParams(0,-2,1));
+  TextView tune=a.text("편집  ↗",13,orange,true);
+  tune.setGravity(Gravity.CENTER);tune.setMinHeight(a.dp(44));
+  tune.setPadding(a.dp(12),0,a.dp(9),0);
+  tune.setBackground(a.shape(a.highlight,0,12));
+  tune.setClickable(true);tune.setFocusable(true);
+  tune.setContentDescription("홈 빠른 실행 버튼 표시 및 순서 편집");
+  tune.setOnClickListener(v->editHomeShortcuts());
+  taskHeading.addView(tune);
+  LinearLayout.LayoutParams taskLp=new LinearLayout.LayoutParams(-1,-2);
+  taskLp.bottomMargin=a.dp(12);a.content.addView(taskHeading,taskLp);
   // Keep user-selected order and visibility; combine only adjacent fuel/service
   // shortcuts when text size and screen width permit a safe two-column layout.
   String[] ordered=HomeShortcutOrder.parse(a.getSharedPreferences("home_shortcuts",0).getString("order",""));
@@ -110,12 +125,12 @@ final class GarageHomeUi {
   boolean narrowTools=a.getResources().getConfiguration().fontScale>=1.35f||
     a.getResources().getConfiguration().screenWidthDp<360;
   if(narrowTools)library.setOrientation(LinearLayout.VERTICAL);
-  Button timeline=a.button("활동 타임라인",false,()->new MotoTimelineUi(a).open());
+  Button timeline=a.button("활동 일지  ↗",false,()->new MotoTimelineUi(a).open());
   timeline.setMinHeight(a.dp(50));
   timeline.setContentDescription("현재 바이크의 라이딩 주유 정비 비용 통합 타임라인");
   library.addView(timeline,narrowTools?new LinearLayout.LayoutParams(-1,-2):
     new LinearLayout.LayoutParams(0,-2,1));
-  Button routes=a.button("저장한 코스",false,a::savedRoutes);
+  Button routes=a.button("내 라이딩 코스  ↗",false,a::savedRoutes);
   routes.setMinHeight(a.dp(50));
   routes.setContentDescription("내가 저장한 출발지와 목적지 코스 관리");
   LinearLayout.LayoutParams routesLp=narrowTools?new LinearLayout.LayoutParams(-1,-2):
@@ -246,7 +261,7 @@ final class GarageHomeUi {
   box.addView(imageArea);
   LinearLayout meta=a.col();meta.setPadding(a.dp(15),a.dp(13),a.dp(13),a.dp(14));
   LinearLayout info=a.col();TextView name=a.text(bike.optString("name"),21,light,true);name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);info.addView(name);
-  TextView sub=a.text(bike.optInt("year")>0?bike.optInt("year")+"년식":"모델 정보",12,soft,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(6);info.addView(sub,sp);meta.addView(info,new LinearLayout.LayoutParams(-1,-2));
+  TextView sub=a.text((bike.optInt("year")>0?bike.optInt("year")+"년식":"모델 정보")+"  ·  MY MOTORCYCLE",12,soft,false);LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(-1,-2);sp.topMargin=a.dp(6);info.addView(sub,sp);meta.addView(info,new LinearLayout.LayoutParams(-1,-2));
   if(GarageBikeStatus.sold(bike.optString("soldDate"))){
    TextView archived=a.text("판매 완료 · 기록 보관 중",13,0xFFFFD58A,true);archived.setPadding(a.dp(12),a.dp(10),a.dp(12),a.dp(10));archived.setBackground(a.shape(0xFF503E20,0,10));box.addView(archived);
   }
@@ -451,14 +466,28 @@ final class GarageHomeUi {
   a.content.addView(btn,new LinearLayout.LayoutParams(-1,-2));
   }
   if(!recording&&!armed){
-   Button go=a.button("GPS 기록 + 기본 내비 시작",true,()->{
+   LinearLayout panel=a.col();
+   panel.setPadding(a.dp(16),a.dp(15),a.dp(16),a.dp(16));
+   panel.setBackground(a.shape(a.highlight,a.line,18));
+   LinearLayout caption=new LinearLayout(a);caption.setGravity(Gravity.CENTER_VERTICAL);
+   TextView kicker=a.text("READY TO RIDE",11,orange,true);
+   kicker.setLetterSpacing(.08f);caption.addView(kicker,new LinearLayout.LayoutParams(0,-2,1));
+   TextView gps=a.text("GPS  ·  내비 연동",12,soft,true);caption.addView(gps);
+   panel.addView(caption);
+   TextView heading=a.text("오늘의 라이딩을 기록해",18,light,true);
+   LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,-2);
+   hlp.topMargin=a.dp(7);panel.addView(heading,hlp);
+   TextView hint=a.text("주행 기록을 켠 뒤 선택한 내비를 실행해.",12,soft,false);
+   LinearLayout.LayoutParams hintLp=new LinearLayout.LayoutParams(-1,-2);
+   hintLp.topMargin=a.dp(3);hintLp.bottomMargin=a.dp(12);panel.addView(hint,hintLp);
+   Button go=a.button("GPS 기록 + 내비 시작  ↗",true,()->{
     a.navigate("라이딩");
     new RideUi(a).requestStart(true);
    });
-   go.setMinHeight(a.dp(54));
-   go.setContentDescription("GPS 기록에 동의한 뒤 시작하고, 기록이 시작되면 기본 내비 실행");
-   LinearLayout.LayoutParams gp=new LinearLayout.LayoutParams(-1,-2);gp.topMargin=a.dp(8);
-   a.content.addView(go,gp);
+   go.setMinHeight(a.dp(56));
+   go.setContentDescription("위치 기록 동의 확인 후 GPS 시작 및 기본 내비 실행");
+   panel.addView(go,new LinearLayout.LayoutParams(-1,-2));
+   a.content.addView(panel);
   }
  }
  void quickNavigation(){
