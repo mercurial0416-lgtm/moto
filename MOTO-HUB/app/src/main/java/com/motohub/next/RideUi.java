@@ -214,14 +214,20 @@ final class RideUi {
   LinearLayout.LayoutParams labelLp=new LinearLayout.LayoutParams(-1,-2);
   labelLp.topMargin=a.dp(5);toolsTitle.addView(toolsLabel,labelLp);
   toolsHead.addView(toolsTitle,new LinearLayout.LayoutParams(0,-2,1));
-  boolean toolsOpen=a.getSharedPreferences("ride_ui",0).getBoolean("route_tools_open",false);
-  Button toolsToggle=a.button(toolsOpen?"접기  −":"펼치기  +",false,()->{
-   a.getSharedPreferences("ride_ui",0).edit().putBoolean("route_tools_open",!toolsOpen).apply();
-   a.renderPreservingPosition();
+  final boolean[] toolsOpen={a.getSharedPreferences("ride_ui",0).getBoolean("route_tools_open",false)};
+  LinearLayout toolsBody=a.col();toolsBody.setVisibility(toolsOpen[0]?View.VISIBLE:View.GONE);
+  Button toolsToggle=a.button(toolsOpen[0]?"접기  −":"펼치기  +",false,()->{});
+  toolsToggle.setOnClickListener(v->{
+   boolean next=!toolsOpen[0];
+   if(!a.getSharedPreferences("ride_ui",0).edit().putBoolean("route_tools_open",next).commit()){
+    a.toast("코스 도구 표시 설정을 저장하지 못했어.");return;
+   }
+   toolsOpen[0]=next;
+   toolsBody.setVisibility(next?View.VISIBLE:View.GONE);
+   toolsToggle.setText(next?"접기  −":"펼치기  +");
   });
   toolsToggle.setMinHeight(a.dp(44));toolsToggle.setTextSize(12);
   toolsHead.addView(toolsToggle);tripTools.addView(toolsHead);
-  LinearLayout toolsBody=a.col();toolsBody.setVisibility(toolsOpen?View.VISIBLE:View.GONE);
   a.gap(toolsBody,13);
   int saved=a.items("routes").size();
   boolean narrowTrip=a.getResources().getConfiguration().fontScale>=1.35f||
