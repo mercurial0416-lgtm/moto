@@ -31,7 +31,7 @@ final class ObdReadOnlyProtocol {
   */
  static int[] responseBytes(String pid,String raw){
   query(pid);
-  if(raw==null||raw.length()>4096)return null;
+  if(!ObdReplyStatus.valid(raw))return null;
   String responsePid=pid.substring(2);
   boolean twoBytes="010C".equals(pid)||"0142".equals(pid);
   java.util.regex.Pattern frame=Pattern.compile("(?i)(?:^|[^0-9a-f])41\\s*"+responsePid+
