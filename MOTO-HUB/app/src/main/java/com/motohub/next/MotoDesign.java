@@ -30,7 +30,7 @@ final class MotoDesign {
  static final int LIGHT_STROKE=0xFFE4E1DB;
  static final int LIGHT_TEXT=0xFF1B222B;
  static final int LIGHT_MUTED=0xFF626C76;
- static final int LIGHT_ACCENT=0xFFC65C20;
+ static final int LIGHT_ACCENT=0xFFB64D17;
  static final int LIGHT_TINT=0xFFFFF0E5;
  static int[] colors(boolean dark){
   return dark?new int[]{DARK_BACKGROUND,DARK_TEXT,DARK_MUTED,DARK_STROKE,DARK_ACCENT,DARK_SURFACE,DARK_TINT}:
