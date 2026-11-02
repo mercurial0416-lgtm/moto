@@ -39,7 +39,7 @@ for text,bg in (
 needs(main,'final String[] tabs={"홈","라이딩","차고","더보기"}')
 needs(design,'String[] labels={"홈","라이딩","정비","설정"}','a.navigate(destination)')
 needs(home,'QUICK CONTROL','READY TO RIDE','GPS 기록 + 내비 시작','requestStart(true)','editHomeShortcuts()')
-needs(ride,'route_tools_open','toolsOpen?View.VISIBLE:View.GONE','나의 라이딩 기록',
+needs(ride,'route_tools_open','toolsOpen[0]?View.VISIBLE:View.GONE','나의 라이딩 기록',
       'RideStatsUi.open(a)','this::chooseRideReport','a::pickGpx',
       'if(focus&&RideService.running)return')
 needs(screens,'title("설정과 도구"','if(Sharing.enabled){a.section("안전 · 위치 공유")',
