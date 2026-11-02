@@ -37,7 +37,7 @@ public final class Ux109RideJournalChartObdTest {
  }
  @Test public void elmErrorsCannotArmRideEvenWhenStaleSensorFrameFollows(){
   for(String status:new String[]{"NO DATA","UNABLE TO CONNECT","STOPPED","CAN ERROR","BUS ERROR","BUFFER FULL","?","DATA ERROR"}){
-   assertFalse("rejected "+status,ObdReplyStatus.valid(status));
+   assertFalse("rejected "+status,ObdReadOnlyProtocol.replyError(status).isEmpty());
    assertEquals(-1,ObdReadOnlyProtocol.speedKmh("41 0D 35\r"+status+"\r>"));
    assertEquals(ObdPidCapabilities.Support.UNKNOWN,
      ObdPidCapabilities.fromResponses("41 00 FF FF FF FF\r"+status,null).forPid("010D"));
