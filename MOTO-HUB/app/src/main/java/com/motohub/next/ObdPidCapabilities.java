@@ -15,7 +15,7 @@ final class ObdPidCapabilities {
  static ObdPidCapabilities fromAllResponses(String first,String twenty,String second,String a0){
   return new ObdPidCapabilities(bitmap("00",first),bitmap("20",twenty),bitmap("40",second),bitmap("A0",a0));}
  private static Long bitmap(String header,String response){
-  if(response==null||response.length()>4096)return null;
+  if(!ObdReplyStatus.valid(response))return null;
   Matcher match=REPLY.matcher(response);
   Long agreed=null;
   while(match.find())if(header.equalsIgnoreCase(match.group(1))){
