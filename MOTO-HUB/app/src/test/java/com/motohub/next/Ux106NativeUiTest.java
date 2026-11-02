@@ -43,10 +43,9 @@ public final class Ux106NativeUiTest {
   }
   return null;
  }
- @Test public void brandedNavigationHasFullClickableDestinations(){
-  assertTrue("brand identity must be visible",
-   text(activity.root,"MOTO HUB")!=null||
-   text(activity.root,"MOTO HUB   /   RIDER LIFE")!=null);
+ @Test public void nativeNavigationHasFullClickableDestinations(){
+  assertNotNull("active task title must be visible without decorative brand overline",
+   text(activity.root,"내 차고"));
   assertNotNull(desc(activity.root,"홈, 현재 탭"));
   for(String label:new String[]{"라이딩","정비","설정"}){
    View item=desc(activity.root,label+" 탭 열기");
