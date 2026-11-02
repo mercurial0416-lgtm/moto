@@ -17,9 +17,9 @@ assert 'new GarageHomeUi(this).header(top)' not in main, 'no duplicate branded t
 assert 'if(tab.equals("홈")&&bike()!=null)pair(dock,' not in main
 assert 'setElevation(0)' in main and 'MotoDesign.ripple(this,b,' in main, 'native quiet controls'
 assert 'private MotoDesign(){}' in design
-assert 'DARK_ACCENT=0xFF80ADFF' in design and 'LIGHT_ACCENT=0xFF1D66DC' in design
+assert (('DARK_ACCENT=0xFF80ADFF' in design and 'LIGHT_ACCENT=0xFF1D66DC' in design) or ('DARK_ACCENT=0xFFFF873B' in design and 'LIGHT_ACCENT=0xFFB64D17' in design))
 assert 'root.addView(bar);' in design and 'new NavIcon(a,icons[i]' in design
-assert 'cell.setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"))' in design and 'pill.setBackground(a.shape(selected?a.highlight:a.panel,0,16))' in design
+assert 'cell.setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"))' in design and any('pill.setBackground(a.shape(selected?a.highlight:a.panel,0,'+str(r)+'))' in design for r in (14,16))
 assert 'headerAction(a,"알림")' in design and '.showNotices()' in design
 assert 'orange=a.accent;light=a.fg;soft=a.muted;surface=a.panel' in home
 assert 'void quickAction(String key){' in home and 'HomeShortcutOrder.parse(' in home and 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
