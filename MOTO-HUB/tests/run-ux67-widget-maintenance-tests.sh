@@ -37,7 +37,7 @@ assert 'void finishWithSummary()' in ride and 'a.showPendingRideSummary()' in ri
 inbox=(root/"RideCompletionInbox.java").read_text()
 assert 'RideInsights.analyze(track)' in inbox and 'RideMileageIntegrity.validCompleted(track)' in inbox
 assert 'RideCompletionInbox.record(getApplicationContext(),savedTrack)' in (root/"RideService.java").read_text()
-assert 'new RideUi(a).finishWithSummary()' in home
+assert 'new RideUi(a).requestStart(true)' in home and 'setPositiveButton("저장하고 종료"' in ride and 'RideService.STOP' in ride
 assert 'extra_cards' in home and 'if(extra)' in home
 assert '이전 정비주기 불러오기' in quick and 'QuickRecordDraft.nextOdometer(' in quick
 assert 'ambiguousBikeIds.add(incoming.getString("id"))' in merge and 'byId.get(incoming.getString("id"))' in merge
