@@ -13,7 +13,7 @@ rest=g("RestoreArchive.java")
 export=g("BackupBundle.java")
 main=g("MainActivity.java")
 archive=g("BatchArchiveExport.java")
-assert hub.index('line("고급 설정 · 문제 해결"')>hub.index('void settings(){')
+assert any(hub.find(label)>hub.index('void settings(){') for label in ('line("고급 설정 · 문제 해결"','line("고급 도구"'))
 assert 'void advancedSettings(){' in hub and 'void backupMore(){' in hub
 base=hub[hub.index('void basicBackup(){'):hub.index('void backupMore(){')]
 assert base.count('a.action(')==4 and '전체 ZIP 백업' in base and '전체 ZIP 복원' in base
