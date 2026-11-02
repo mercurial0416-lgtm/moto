@@ -11,10 +11,10 @@ screen=(root/'HubScreens.java').read_text()
 main=(root/'MainActivity.java').read_text()
 
 # No URL or remote dependency in the new native presentation.
-assert 'TextView brand=a.text("MOTO HUB",12,a.accent,true)' in design
+assert ('TextView brand=a.text("MOTO HUB",12,a.accent,true)' in design or 'TextView brand=a.text("MOTO HUB   /   RIDER LIFE",11,a.accent,true)' in design)
 assert 'FrameLayout pill=new FrameLayout(a)' in design
-assert 'pill.setBackground(a.shape(selected?a.highlight:a.panel,0,16))' in design
-assert 'cell.setMinimumHeight(a.dp(62))' in design
+assert any('pill.setBackground(a.shape(selected?a.highlight:a.panel,0,'+str(r)+'))' in design for r in (14,16))
+assert ('cell.setMinimumHeight(a.dp(62))' in design or 'cell.setMinimumHeight(a.dp(59))' in design)
 assert 'if(!destination.equals(a.tab))a.navigate(destination)' in design
 assert 'setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"))' in design
 

@@ -206,8 +206,29 @@ final class RideUi {
   LinearLayout tripTools=a.col();
   tripTools.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(12));
   tripTools.setBackground(a.shape(a.panel,a.line,19));
-  tripTools.addView(a.text("내 코스 · 라이딩 분석",16,a.fg,true));
-  a.gap(tripTools,8);
+  LinearLayout toolsHead=new LinearLayout(a);toolsHead.setGravity(Gravity.CENTER_VERTICAL);
+  LinearLayout toolsTitle=a.col();
+  TextView toolsOverline=a.text("ROUTE & INSIGHTS",11,a.accent,true);
+  toolsOverline.setLetterSpacing(.06f);toolsTitle.addView(toolsOverline);
+  TextView toolsLabel=a.text("코스와 주행 분석",17,a.fg,true);
+  LinearLayout.LayoutParams labelLp=new LinearLayout.LayoutParams(-1,-2);
+  labelLp.topMargin=a.dp(5);toolsTitle.addView(toolsLabel,labelLp);
+  toolsHead.addView(toolsTitle,new LinearLayout.LayoutParams(0,-2,1));
+  final boolean[] toolsOpen={a.getSharedPreferences("ride_ui",0).getBoolean("route_tools_open",false)};
+  LinearLayout toolsBody=a.col();toolsBody.setVisibility(toolsOpen[0]?View.VISIBLE:View.GONE);
+  Button toolsToggle=a.button(toolsOpen[0]?"접기  −":"펼치기  +",false,()->{});
+  toolsToggle.setOnClickListener(v->{
+   boolean next=!toolsOpen[0];
+   if(!a.getSharedPreferences("ride_ui",0).edit().putBoolean("route_tools_open",next).commit()){
+    a.toast("코스 도구 표시 설정을 저장하지 못했어.");return;
+   }
+   toolsOpen[0]=next;
+   toolsBody.setVisibility(next?View.VISIBLE:View.GONE);
+   toolsToggle.setText(next?"접기  −":"펼치기  +");
+  });
+  toolsToggle.setMinHeight(a.dp(44));toolsToggle.setTextSize(12);
+  toolsHead.addView(toolsToggle);tripTools.addView(toolsHead);
+  a.gap(toolsBody,13);
   int saved=a.items("routes").size();
   boolean narrowTrip=a.getResources().getConfiguration().fontScale>=1.35f||
     a.getResources().getConfiguration().screenWidthDp<360;
@@ -221,10 +242,11 @@ final class RideUi {
   LinearLayout.LayoutParams importLp=narrowTrip?new LinearLayout.LayoutParams(-1,-2):
     new LinearLayout.LayoutParams(0,-2,1);
   if(narrowTrip)importLp.topMargin=a.dp(8);else importLp.leftMargin=a.dp(9);
-  tripRow.addView(importRoute,importLp);tripTools.addView(tripRow);
-  a.gap(tripTools,9);
-  a.action(tripTools,"최근 30일 주행 통계 · 바이크별",false,this::chooseRideReport);
-   a.action(tripTools,"최근 6개월 라이딩 그래프 · 현재 바이크",false,()->RideStatsUi.open(a));
+  tripRow.addView(importRoute,importLp);toolsBody.addView(tripRow);
+  a.gap(toolsBody,9);
+  a.action(toolsBody,"최근 30일 주행 통계 · 바이크별",false,this::chooseRideReport);
+  a.action(toolsBody,"최근 6개월 라이딩 그래프 · 현재 바이크",false,()->RideStatsUi.open(a));
+  tripTools.addView(toolsBody);
   a.content.addView(tripTools);a.gap(a.content,12);
   if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
   // Live OBD sensor dashboard intentionally hidden here: the KTM's TFT already
@@ -243,7 +265,10 @@ final class RideUi {
    a.label(a.content,"선택한 두 라이딩의 GPS 원본을 보존한 채 하나의 경로로 합칠 수 있어요.",12,a.muted,false);
    a.action(a.content,"라이딩 2건 통합 · 원본 보존",false,this::chooseMerge);
   }
-  a.gap(a.content,8);a.label(a.content,"기록된 라이딩",20,a.fg,true);
+  a.gap(a.content,8);
+  TextView historyOverline=a.text("RIDE ARCHIVE",11,a.accent,true);
+  historyOverline.setLetterSpacing(.07f);a.content.addView(historyOverline);
+  a.gap(a.content,5);a.label(a.content,"나의 라이딩 기록",20,a.fg,true);
   // Render controls immediately and read track/sidecar metadata on one background worker.
   // A new render invalidates the previous snapshot; no GPS file is modified here.
   LinearLayout historyPanel=a.col();

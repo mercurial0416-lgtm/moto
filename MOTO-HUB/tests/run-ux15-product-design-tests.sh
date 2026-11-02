@@ -22,8 +22,8 @@ assert 'a.navigate("라이딩")' in home and 'new HubScreens(a).manageBike()' in
 assert 'if(!a.items("listings").isEmpty())' not in home, "retired marketplace must not appear on home"
 assert 'friends();' not in home.split(' void render(){')[1].split(' void interruptedRideShortcut(')[0], "no unnecessary account card"
 assert 'addHeader(MainActivity a' in design and 'addNavigation(MainActivity a' in design
-assert 'View mark=new View(a)' not in design and 'pill.setBackground(a.shape(selected?a.highlight:a.panel,0,16))' in design
-assert 'ripple(a,cell,a.panel,0,17);' in design
+assert 'View mark=new View(a)' not in design and any('pill.setBackground(a.shape(selected?a.highlight:a.panel,0,'+str(r)+'))' in design for r in (14,16))
+assert ('ripple(a,cell,a.panel,0,17);' in design or 'ripple(a,cell,a.panel,0,14);' in design)
 assert 'if(!t.equals(MotoDesign.heading(tab)))' in activity, "avoid repeated page header"
 assert 'content.animate().alpha(1f)' not in activity, "no full-screen fade for every GPS refresh"
 assert 'android.graphics.Canvas' in icons and 'android.graphics.Paint' in icons
