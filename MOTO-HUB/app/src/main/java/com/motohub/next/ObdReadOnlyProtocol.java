@@ -6,6 +6,15 @@ import java.util.regex.Pattern;
 
 /** Experimental ELM327 OBD-II mode 01 sensor decoding. No ECU writes or DTC clearing. */
 final class ObdReadOnlyProtocol {
+ static String replyError(String raw){
+  if(raw==null||raw.isEmpty())return "NO RESPONSE";
+  if(raw.length()>4096)return "OVERSIZED";
+  String text=raw.toUpperCase(Locale.ROOT);
+  for(String error:new String[]{"NO DATA","UNABLE TO CONNECT","CAN ERROR","BUS ERROR",
+     "BUS INIT: ERROR","STOPPED","BUFFER FULL","DATA ERROR","ACT ALERT","UNSUPPORTED"})
+   if(text.contains(error))return error;
+  return text.indexOf('?')>=0?"ELM REJECTED":"";
+ }
  private ObdReadOnlyProtocol() {}
  static final String[] SENSOR_PIDS={"010C","010D","0105","0142","012F"};
  // Standard mode-01 supported PID bitmaps; never request proprietary odometer data.
@@ -31,7 +40,7 @@ final class ObdReadOnlyProtocol {
   */
  static int[] responseBytes(String pid,String raw){
   query(pid);
-  if(raw==null||raw.length()>4096)return null;
+  if(!replyError(raw).isEmpty())return null;
   String responsePid=pid.substring(2);
   boolean twoBytes="010C".equals(pid)||"0142".equals(pid);
   java.util.regex.Pattern frame=Pattern.compile("(?i)(?:^|[^0-9a-f])41\\s*"+responsePid+

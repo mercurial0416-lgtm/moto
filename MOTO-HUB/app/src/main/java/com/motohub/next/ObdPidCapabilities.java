@@ -8,6 +8,13 @@ final class ObdPidCapabilities {
  private static final Pattern REPLY=Pattern.compile("(?i)41\\s*(00|20|40|A0)\\s*([0-9a-f]{2})\\s*([0-9a-f]{2})\\s*([0-9a-f]{2})\\s*([0-9a-f]{2})(?![0-9a-f])");
  enum Support { YES, NO, UNKNOWN }
  private final Long mode00,mode20,mode40,modeA0;
+ private static boolean invalidResponse(String raw){
+  String text=raw.toUpperCase(Locale.ROOT);
+  for(String error:new String[]{"NO DATA","UNABLE TO CONNECT","CAN ERROR","BUS ERROR",
+     "BUS INIT: ERROR","STOPPED","BUFFER FULL","DATA ERROR","ACT ALERT","UNSUPPORTED"})
+   if(text.contains(error))return true;
+  return text.indexOf('?')>=0;
+ }
  private ObdPidCapabilities(Long first,Long twenty,Long second,Long third){mode00=first;mode20=twenty;mode40=second;modeA0=third;}
  static ObdPidCapabilities unknown(){return new ObdPidCapabilities(null,null,null,null);}
  static ObdPidCapabilities fromResponses(String first,String second){return fromResponses(first,second,null);}
@@ -15,7 +22,7 @@ final class ObdPidCapabilities {
  static ObdPidCapabilities fromAllResponses(String first,String twenty,String second,String a0){
   return new ObdPidCapabilities(bitmap("00",first),bitmap("20",twenty),bitmap("40",second),bitmap("A0",a0));}
  private static Long bitmap(String header,String response){
-  if(response==null||response.length()>4096)return null;
+  if(response==null||response.length()>4096||invalidResponse(response))return null;
   Matcher match=REPLY.matcher(response);
   Long agreed=null;
   while(match.find())if(header.equalsIgnoreCase(match.group(1))){

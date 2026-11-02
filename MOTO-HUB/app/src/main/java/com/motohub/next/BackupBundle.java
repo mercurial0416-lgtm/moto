@@ -125,7 +125,7 @@ public final class BackupBundle {
   String readme=("FULL".equals(part)?"MOTO HUB 전체 백업 - 개인 위치정보 포함 가능\n":"MOTO-HUB-PART:"+part+"\n분할 복구 파일: 전체 복원으로 다른 자료를 덮어쓰지 마세요. 분할 ZIP 추가 복원 메뉴를 사용하세요.\n")+
    "MOTO-HUB-data.json은 앱 설정 > JSON 백업 가져오기로 복원합니다.\n"+
    "rides 폴더는 원본 기록, gpx 폴더는 가져오기로 복원 가능한 GPX 경로입니다.\n"+
-   "photos에는 바이크 사진, receipts에는 정비·주유 영수증 사진이 있습니다.\n"+
+   "photos에는 바이크 사진과 라이딩 일지 사진, receipts에는 정비·주유 영수증 사진이 있습니다.\n"+
    "model-photos에는 온라인 갤러리에서 직접 고른 모델 사진과 출처 정보가 포함됩니다.\n"+
    "현재 버전에서는 설정 > 백업·복원 > 전체 ZIP 백업 복원으로 사진과 GPS도 한 번에 불러올 수 있습니다.\n"+
    "FULL/암호화 ZIP에는 7일 이내의 저장되지 않은 주유 임시초안도 포함될 수 있습니다.\n"+
@@ -135,7 +135,7 @@ public final class BackupBundle {
    throw new IOException("백업 최대 크기(250MB)를 넘었어요.");
   total+=readmeBytes.length;
   zip.putNextEntry(new ZipEntry("README-KO.txt"));zip.write(readmeBytes);zip.closeEntry();count++;
-  File photos=internal;File[] files=media?listIfPresent(photos,(dir,name)->name.matches("garage-photo-[a-fA-F0-9-]{36}\\.jpg")):new File[0];
+  File photos=internal;File[] files=media?listIfPresent(photos,(dir,name)->name.matches(BackupFormat.PHOTO)):new File[0];
   if(media&&files!=null){
    if(files.length>BackupFormat.MAX_PHOTOS)throw new IOException("사진이 백업 한도(1,000장)를 초과했습니다.");
    Arrays.sort(files,Comparator.comparing(File::getName));

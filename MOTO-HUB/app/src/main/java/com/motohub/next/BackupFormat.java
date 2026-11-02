@@ -12,7 +12,7 @@ final class BackupFormat {
  static final int MAX_RECEIPTS=4_000;
  static final int MAX_ENTRIES=100_000;
  static final String RECEIPT=ReceiptSlots.PATTERN;
- static final String PHOTO="garage-photo-[a-fA-F0-9-]{36}\\.jpg";
+ static final String PHOTO="(?:garage-photo-[a-fA-F0-9-]{36}|ride-photo-[0-9]{10,15}-[a-f0-9-]{36})\\.jpg";
  static final String TRACK="[0-9]{10,15}-[a-f0-9-]{36}\\.track";
  static final String MODEL_PHOTO="[a-f0-9]{24}\\.jpg";
  static final String MODEL_META="[a-f0-9]{24}\\.jpg\\.json";
