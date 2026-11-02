@@ -52,8 +52,8 @@ final class RideUi {
   final boolean focus=RideService.running&&a.getSharedPreferences("ride_display",0).getBoolean("focus",false);
   LinearLayout hero=a.col();hero.setPadding(a.dp(20),a.dp(22),a.dp(20),a.dp(20));hero.setBackground(a.shape(a.panel,a.line,20));
   TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?(a.dark?0xFFFFA79C:0xFFAA3833):a.accent,true);hero.addView(eyebrow);
-  TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?RideService.count+"개 위치 기록":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",24,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
-  TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?"화면을 꺼도 기기에 GPS 경로를 기록해요":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
+  TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?"라이딩 진행 중":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",26,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
+  TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?RideService.count+"개 위치 기록 · 화면을 꺼도 GPS 기록 유지":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
   // No redundant pre-ride checklist. Explicit permission/consent handling stays
   // inside requestStart/start; foreground GPS never starts silently.
   if(RideService.running){
