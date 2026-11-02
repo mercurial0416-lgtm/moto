@@ -18,7 +18,7 @@ assert '서비스' not in '' # Do not assume remote services or delete backups.
 assert '정비 "+serviceTotal+"건' in main
 assert '백업·복원' in main and 'void removeConfirmed(' in main
 assert 'a.toast(label+" 저장 완료' in undo and '.setTitle(label+" 저장 완료")' not in undo
-assert 'UndoLastSave.available(a)' in home and '마지막 저장 실행 취소' in home
+assert 'UndoLastSave.available(a)' in home and '마지막 저장 취소 · 2분' in home
 assert 'moneyWatcher.onTextChanged(' in main and 'value/10000' in main
 assert 'rideBikeCaption(item)' in main and 'rideBikeCaption(pending)' in main
 assert '정비 예정' in home and '정비 완료' in home and 'scheduleOnly' in home

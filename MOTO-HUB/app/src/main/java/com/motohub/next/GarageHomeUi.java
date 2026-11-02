@@ -77,98 +77,168 @@ final class GarageHomeUi {
    .setNegativeButton("취소",null).show();
  }
 
+ /** A vehicle dashboard, not a stack of promotional tiles. */
  void render(){
-  JSONObject b=a.bike();if(b==null){emptyGarage();return;}
-  addHero(b);a.gap(a.content,12);stats(b);a.gap(a.content,18);
-  LinearLayout taskHeading=new LinearLayout(a);taskHeading.setGravity(Gravity.CENTER_VERTICAL);
-  LinearLayout titleBox=a.col();
-  TextView eyebrow=a.text("QUICK CONTROL",11,orange,true);
-  eyebrow.setLetterSpacing(.075f);titleBox.addView(eyebrow);
-  TextView shortcutHeading=a.text("바로 실행",19,light,true);
-  LinearLayout.LayoutParams headingTitleLp=new LinearLayout.LayoutParams(-1,-2);
-  headingTitleLp.topMargin=a.dp(4);titleBox.addView(shortcutHeading,headingTitleLp);
-  taskHeading.addView(titleBox,new LinearLayout.LayoutParams(0,-2,1));
-  TextView tune=a.text("편집  ↗",13,orange,true);
-  tune.setGravity(Gravity.CENTER);tune.setMinHeight(a.dp(44));
-  tune.setPadding(a.dp(12),0,a.dp(9),0);
-  tune.setBackground(a.shape(a.highlight,0,12));
-  tune.setClickable(true);tune.setFocusable(true);
-  tune.setContentDescription("홈 빠른 실행 버튼 표시 및 순서 편집");
-  tune.setOnClickListener(v->editHomeShortcuts());
-  taskHeading.addView(tune);
-  LinearLayout.LayoutParams taskLp=new LinearLayout.LayoutParams(-1,-2);
-  taskLp.bottomMargin=a.dp(12);a.content.addView(taskHeading,taskLp);
-  // Keep user-selected order and visibility; combine only adjacent fuel/service
-  // shortcuts when text size and screen width permit a safe two-column layout.
+  JSONObject bike=a.bike();
+  if(bike==null){emptyGarage();return;}
+  compactVehicleHeader(bike);
+  a.gap(a.content,14);
+  stats(bike);
+  a.gap(a.content,14);
+  if(shortcut("ride"))rideAction();
+  a.gap(a.content,14);
+
+  // Three restrained, tappable shortcuts. Existing visibility and ordering preferences survive.
   String[] ordered=HomeShortcutOrder.parse(a.getSharedPreferences("home_shortcuts",0).getString("order",""));
-  boolean narrow=a.getResources().getConfiguration().fontScale>=1.35f||
-    a.getResources().getConfiguration().screenWidthDp<360;
-  for(int i=0;i<ordered.length;i++){
-   String key=ordered[i];
-   if(!shortcut(key))continue;
-   if(!narrow&&i+1<ordered.length&&shortcut(ordered[i+1])&&
-      (("fuel".equals(key)&&"service".equals(ordered[i+1]))||
-       ("service".equals(key)&&"fuel".equals(ordered[i+1])))){
-    quickActionPair(key,ordered[i+1]);i++;
-   }else switch(key){
-    case "ride":rideAction();break;
-    case "nav":quickNavigation();break;
-    case "fuel":quickAction("fuel");break;
-    case "service":quickAction("service");break;
+  java.util.List<String> visible=new java.util.ArrayList<>();
+  for(String key:ordered)if(!"ride".equals(key)&&shortcut(key))visible.add(key);
+  if(!visible.isEmpty()){
+   LinearLayout header=new LinearLayout(a);
+   header.setGravity(Gravity.CENTER_VERTICAL);
+   TextView label=a.text("바로가기",16,light,true);
+   header.addView(label,new LinearLayout.LayoutParams(0,-2,1));
+   TextView edit=a.text("편집",13,soft,true);
+   edit.setPadding(a.dp(12),a.dp(12),a.dp(4),a.dp(12));
+   edit.setMinHeight(a.dp(44));
+   edit.setOnClickListener(v->editHomeShortcuts());
+   edit.setContentDescription("홈 바로가기 표시 및 순서 편집");
+   header.addView(edit);
+   a.content.addView(header);a.gap(a.content,5);
+   LinearLayout shortcuts=new LinearLayout(a);
+   boolean stacked=a.getResources().getConfiguration().fontScale>=1.45f||
+     a.getResources().getConfiguration().screenWidthDp<320;
+   if(stacked)shortcuts.setOrientation(LinearLayout.VERTICAL);
+   for(int i=0;i<visible.size();i++){
+    String key=visible.get(i);
+    LinearLayout tile=homeShortcutTile(key);
+    LinearLayout.LayoutParams lp=stacked?new LinearLayout.LayoutParams(-1,-2):
+      new LinearLayout.LayoutParams(0,-2,1);
+    if(i>0){if(stacked)lp.topMargin=a.dp(8);else lp.leftMargin=a.dp(8);}
+    shortcuts.addView(tile,lp);
    }
-   a.gap(a.content,8);
+   a.content.addView(shortcuts);
+   a.gap(a.content,18);
+  }else{
+   TextView edit=a.text("바로가기 설정  ›",13,a.accent,true);
+   edit.setMinHeight(a.dp(44));edit.setGravity(Gravity.CENTER_VERTICAL);
+   edit.setOnClickListener(v->editHomeShortcuts());
+   a.content.addView(edit);a.gap(a.content,12);
   }
-  // Integrated ownership timeline and saved route access are daily tools,
-  // not developer-mode features. Existing records remain the single source of truth.
-  LinearLayout library=new LinearLayout(a);
-  library.setGravity(Gravity.CENTER_VERTICAL);
-  boolean narrowTools=a.getResources().getConfiguration().fontScale>=1.35f||
-    a.getResources().getConfiguration().screenWidthDp<360;
-  if(narrowTools)library.setOrientation(LinearLayout.VERTICAL);
-  Button timeline=a.button("활동 일지  ↗",false,()->new MotoTimelineUi(a).open());
-  timeline.setMinHeight(a.dp(50));
-  timeline.setContentDescription("현재 바이크의 라이딩 주유 정비 비용 통합 타임라인");
-  library.addView(timeline,narrowTools?new LinearLayout.LayoutParams(-1,-2):
-    new LinearLayout.LayoutParams(0,-2,1));
-  Button routes=a.button("내 라이딩 코스  ↗",false,a::savedRoutes);
-  routes.setMinHeight(a.dp(50));
-  routes.setContentDescription("내가 저장한 출발지와 목적지 코스 관리");
-  LinearLayout.LayoutParams routesLp=narrowTools?new LinearLayout.LayoutParams(-1,-2):
-    new LinearLayout.LayoutParams(0,-2,1);
-  if(narrowTools)routesLp.topMargin=a.dp(8);else routesLp.leftMargin=a.dp(8);
-  library.addView(routes,routesLp);a.content.addView(library);a.gap(a.content,12);
-  // Home shortcut editing lives under Advanced Settings to keep the riding screen focused.
-  String condition=condition(b);
+
+  // Real existing activity, not placeholder dashboard metrics.
+  recent(bike);a.gap(a.content,16);
+  LinearLayout links=new LinearLayout(a);
+  links.setOrientation(LinearLayout.VERTICAL);
+  homeLink(links,"라이딩 · 주유 · 정비 통합 일지",()->new MotoTimelineUi(a).open());
+  homeLink(links,"저장한 라이딩 코스",a::savedRoutes);
+  homeLink(links,"주차 · 소모품 · 기타 관리",()->showQuickTools(bike));
+  a.content.addView(links);
+
+  String condition=condition(bike);
   if("점검 필요".equals(condition)||"곧 점검".equals(condition)){
-   TextView alert=a.text(condition+" · 정비 일정 확인",13,a.fg,true);
-   alert.setPadding(a.dp(15),a.dp(14),a.dp(15),a.dp(14));alert.setBackground(a.shape(a.highlight,a.line,12));
-   alert.setClickable(true);alert.setFocusable(true);alert.setContentDescription(condition+" 정비 알림 열기");
-   alert.setOnClickListener(v->showNotices());a.content.addView(alert);a.gap(a.content,10);
+   a.gap(a.content,10);
+   TextView alert=a.text(condition+" · 정비 일정 확인  ›",13,a.fg,true);
+   alert.setPadding(a.dp(14),a.dp(13),a.dp(14),a.dp(13));
+   alert.setBackground(a.shape(a.highlight,a.line,12));
+   alert.setMinHeight(a.dp(48));
+   alert.setClickable(true);alert.setFocusable(true);
+   alert.setOnClickListener(v->showNotices());a.content.addView(alert);
   }
-  // Global activity banner already shows GPS/OBD status; avoid duplicates on Home.
-  interruptedRideShortcut();a.gap(a.content,8);
+  interruptedRideShortcut();
   if(UndoLastSave.available(a)){
-   Button undo=a.button("↶ 마지막 저장 실행 취소 · 2분",false,()->UndoLastSave.undo(a));
-   undo.setContentDescription("방금 저장한 기록 실행 취소");
-   a.content.addView(undo);a.gap(a.content,5);
+   a.gap(a.content,8);
+   TextView undo=a.text("마지막 저장 취소 · 2분",13,a.muted,true);
+   undo.setMinHeight(a.dp(48));undo.setGravity(Gravity.CENTER_VERTICAL);
+   undo.setOnClickListener(v->UndoLastSave.undo(a));
+   a.content.addView(undo);
   }
-  a.action(a.content,UndoLastSave.available(a)?"빠른 도구 · 저장 취소 가능":"빠른 도구 · 주차·기록·소모품",false,()->showQuickTools(b));
-  a.gap(a.content,6);
-  // Recent activity is optional rather than always visible on the first screen.
-  // Keep daily home focused on navigation and maintenance; secondary cards opt-in.
+  if(!RideCompletionInbox.entries(a).isEmpty()){
+   a.gap(a.content,6);
+   homeLink(a.content,"최근 라이딩 저장 요약",a::showRideCompletionHistory);
+  }
   boolean extra=a.getSharedPreferences("garage_home",0).getBoolean("extra_cards",false);
-  Button more=a.button(extra?"활동·유지비 접기":"활동·유지비 더 보기",false,()->{
+  a.gap(a.content,8);
+  TextView more=a.text(extra?"유지비 요약 접기  ⌃":"유지비 요약 보기  ›",13,a.muted,true);
+  more.setGravity(Gravity.CENTER_VERTICAL);more.setMinHeight(a.dp(48));
+  more.setOnClickListener(v->{
    a.getSharedPreferences("garage_home",0).edit().putBoolean("extra_cards",!extra).apply();
    a.renderPreservingPosition();
   });
-  more.setMinHeight(a.dp(44));a.content.addView(more);
-  // Manual access survives suppressed popups and repeated rides.
-  if(!RideCompletionInbox.entries(a).isEmpty()){
-   a.action(a.content,"최근 라이딩 저장 요약",false,a::showRideCompletionHistory);
+  a.content.addView(more);
+  if(extra){a.gap(a.content,12);insights(bike);}
+ }
+ /** Fuelio-like compact vehicle picker. The original photo and bike-switch actions are retained. */
+ void compactVehicleHeader(JSONObject bike){
+  LinearLayout row=new LinearLayout(a);
+  row.setGravity(Gravity.CENTER_VERTICAL);
+  row.setPadding(a.dp(12),a.dp(11),a.dp(12),a.dp(11));
+  MotoDesign.ripple(a,row,surface,stroke,17);
+  FrameLayout thumb=new FrameLayout(a);
+  thumb.setBackground(a.shape(a.highlight,0,12));thumb.setClipToOutline(true);
+  ImageView photo=new ImageView(a);photo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+  thumb.addView(photo,new FrameLayout.LayoutParams(-1,-1));
+  TextView credit=a.text("",10,soft,false);
+  boolean owned=loadBikePhoto(photo,bike,credit);
+  if(!owned){
+   JSONObject known=MotorcycleCatalog.search(a,bike.optString("name"));
+   String brand=bike.optString("catalogBrand",known==null?"":known.optString("brand"));
+   String model=bike.optString("catalogModel",known==null?"":known.optString("model"));
+   if(!brand.isEmpty()&&!model.isEmpty())
+    MotorcyclePhoto.show(a,photo,credit,brand,model,bike.optInt("year"),bike.optString("id"));
   }
-  if(extra){a.gap(a.content,16);recent(b);a.gap(a.content,16);insights(b);
-
-  }
+  thumb.setClickable(true);thumb.setFocusable(true);
+  thumb.setContentDescription("바이크 사진 변경");
+  thumb.setOnClickListener(v->changeHeroPhoto(bike,owned));
+  row.addView(thumb,new LinearLayout.LayoutParams(a.dp(78),a.dp(70)));
+  LinearLayout identity=a.col();
+  identity.setPadding(a.dp(12),0,0,0);
+  TextView name=a.text(bike.optString("name","내 바이크"),19,light,true);
+  name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+  identity.addView(name);
+  TextView sub=a.text((bike.optInt("year")>0?bike.optInt("year")+"년식":"모델 정보")+" · "+
+    condition(bike),12,soft,false);
+  LinearLayout.LayoutParams subLp=new LinearLayout.LayoutParams(-1,-2);
+  subLp.topMargin=a.dp(5);identity.addView(sub,subLp);
+  row.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
+  TextView switcher=a.text("⌄",22,soft,false);
+  switcher.setGravity(Gravity.CENTER);
+  row.addView(switcher,new LinearLayout.LayoutParams(a.dp(28),a.dp(48)));
+  identity.setClickable(true);identity.setFocusable(true);
+  identity.setContentDescription("바이크 선택 또는 추가");
+  identity.setOnClickListener(v->new HubScreens(a).chooseBike());
+  switcher.setClickable(true);switcher.setFocusable(true);
+  switcher.setOnClickListener(v->new HubScreens(a).chooseBike());
+  a.content.addView(row);
+ }
+ /** One icon-and-label destination per common action; never a wall of full-width buttons. */
+ LinearLayout homeShortcutTile(String key){
+  final boolean nav="nav".equals(key),fuel="fuel".equals(key);
+  final String label=nav?"내비게이션":fuel?"주유 기록":"정비 관리";
+  final int glyph=nav?3:fuel?5:2;
+  LinearLayout tile=a.col();tile.setGravity(Gravity.CENTER);
+  tile.setPadding(a.dp(6),a.dp(11),a.dp(6),a.dp(10));tile.setMinimumHeight(a.dp(91));
+  MotoDesign.ripple(a,tile,surface,stroke,14);
+  NavIcon icon=new NavIcon(a,glyph,a.accent);
+  LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(a.dp(25),a.dp(25));
+  iconLp.bottomMargin=a.dp(9);tile.addView(icon,iconLp);
+  TextView text=a.text(label,13,light,true);text.setGravity(Gravity.CENTER);
+  text.setMaxLines(2);tile.addView(text);
+  tile.setClickable(true);tile.setFocusable(true);
+  tile.setContentDescription(label+" 열기");
+  tile.setOnClickListener(v->{if(nav)NavigationApps.openPreferred(a);
+    else if(fuel)new QuickEntryUi(a).fuel();else new QuickEntryUi(a).maintenance();});
+  if(nav)tile.setOnLongClickListener(v->{NavigationApps.choose(a);return true;});
+  return tile;
+ }
+ void homeLink(LinearLayout parent,String label,Runnable action){
+  TextView link=a.text(label+"  ›",14,light,false);
+  link.setGravity(Gravity.CENTER_VERTICAL);
+  link.setPadding(a.dp(6),a.dp(12),a.dp(6),a.dp(12));
+  link.setMinHeight(a.dp(48));link.setClickable(true);link.setFocusable(true);
+  link.setOnClickListener(v->action.run());
+  parent.addView(link);
+  View divider=new View(a);divider.setBackgroundColor(stroke);
+  parent.addView(divider,new LinearLayout.LayoutParams(-1,a.dp(1)));
  }
  /** Scan local GPS metadata off the UI thread and ignore results for disposed home screens. */
  void interruptedRideShortcut(){
@@ -442,53 +512,18 @@ final class GarageHomeUi {
   }
   a.content.addView(surfaceCard);
  }
+ /** Single prominent trip action. All consent and GPS state controls remain in RideUi. */
  void rideAction(){
-  // Keep consent and stop confirmation; idle GPS action is deliberately secondary.
-  boolean recording=RideService.running, armed=RideService.autoArmed;
-  String title=armed?"OBD 자동 감지 관리":recording?"GPS 기록 종료":"GPS 기록 시작";
-  if(recording||armed){
-  Button btn=a.button(title,false,()->{
-   if(RideService.autoArmed){
-    a.navigate("라이딩");a.toast("자동 감지는 라이딩 탭에서 중지할 수 있어요.");
-   }else if(RideService.running){
-    new AlertDialog.Builder(a).setTitle("주행 기록을 종료할까요?")
-     .setMessage("기록을 종료하면 현재 GPS 위치 수집을 중단합니다.")
-     .setNegativeButton("취소",null)
-     .setPositiveButton("종료",(d,w)->{
-      new RideUi(a).finishWithSummary();
-      a.root.postDelayed(()->{if(!a.isFinishing())a.render();},750);
-     }).show();
-   }else{a.navigate("라이딩");new RideUi(a).requestStart();}
+  boolean running=RideService.running,armed=RideService.autoArmed;
+  String label=running?"라이딩 진행 중 · 상태 보기":armed?"OBD 자동 출발 감지 관리":"라이딩 시작";
+  Button button=a.button(label,true,()->{
+   a.navigate("라이딩");
+   if(!RideService.running&&!RideService.autoArmed)new RideUi(a).requestStart(true);
   });
-  btn.setTextColor(recording?(a.dark?0xFFFFC5BE:0xFF8F352E):light);btn.setTextSize(14);btn.setMinHeight(a.dp(48));
-  btn.setBackground(a.shape(recording?(a.dark?0xFF372422:0xFFFCE8E6):surface,
-   recording?(a.dark?0xFFAD615B:0xFFD99792):stroke,16));
-  a.content.addView(btn,new LinearLayout.LayoutParams(-1,-2));
-  }
-  if(!recording&&!armed){
-   LinearLayout panel=a.col();
-   panel.setPadding(a.dp(16),a.dp(15),a.dp(16),a.dp(16));
-   panel.setBackground(a.shape(a.highlight,a.line,18));
-   LinearLayout caption=new LinearLayout(a);caption.setGravity(Gravity.CENTER_VERTICAL);
-   TextView kicker=a.text("READY TO RIDE",11,orange,true);
-   kicker.setLetterSpacing(.08f);caption.addView(kicker,new LinearLayout.LayoutParams(0,-2,1));
-   TextView gps=a.text("GPS  ·  내비 연동",12,soft,true);caption.addView(gps);
-   panel.addView(caption);
-   TextView heading=a.text("오늘의 라이딩을 기록해",18,light,true);
-   LinearLayout.LayoutParams hlp=new LinearLayout.LayoutParams(-1,-2);
-   hlp.topMargin=a.dp(7);panel.addView(heading,hlp);
-   TextView hint=a.text("주행 기록을 켠 뒤 선택한 내비를 실행해.",12,soft,false);
-   LinearLayout.LayoutParams hintLp=new LinearLayout.LayoutParams(-1,-2);
-   hintLp.topMargin=a.dp(3);hintLp.bottomMargin=a.dp(12);panel.addView(hint,hintLp);
-   Button go=a.button("GPS 기록 + 내비 시작  ↗",true,()->{
-    a.navigate("라이딩");
-    new RideUi(a).requestStart(true);
-   });
-   go.setMinHeight(a.dp(56));
-   go.setContentDescription("위치 기록 동의 확인 후 GPS 시작 및 기본 내비 실행");
-   panel.addView(go,new LinearLayout.LayoutParams(-1,-2));
-   a.content.addView(panel);
-  }
+  button.setMinHeight(a.dp(56));
+  button.setContentDescription(running?"현재 GPS 라이딩 화면 열기":armed?
+    "OBD 자동 출발 감지 화면 열기":"위치 접근 동의 후 GPS 라이딩 및 기본 내비 시작");
+  a.content.addView(button);
  }
  void quickNavigation(){
   NavigationChoice preferred=NavigationApps.preferred(a);

@@ -59,10 +59,11 @@ test('new QuickEntryUi(a).fuel()' in garage and
      'new QuickEntryUi(a).maintenance()' in garage,
      "functional quick-entry actions must be retained")
 rideui=get("RideUi.java")
-test('new RideUi(a).requestStart()' in garage and
-     'new RideUi(a).finishWithSummary()' in garage and
+test('new RideUi(a).requestStart(true)' in garage and
+     'void finishWithSummary()' in rideui and
+     'setPositiveButton("저장하고 종료"' in rideui and
      'RideService.STOP' in rideui and '".done"' in rideui,
      "ride start consent, stop confirmation and verified finish still wired")
-test('switchBike(direction)' in garage and 'changeHeroPhoto(bike,own)' in garage,
+test('switchBike(direction)' in garage and 'changeHeroPhoto(bike,owned)' in garage,
      "photo editing and multi-bike switching still wired")
 print(f"PASS UX39 typography / graphics / actions: {checks} checks")

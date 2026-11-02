@@ -78,11 +78,18 @@ final class HubScreens {
   block.setMinimumHeight(a.dp(settingCard?66:70));
   if(settingCard)block.setBackground(a.shape(a.panel,a.line,16));
   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);
+  if(settingCard){
+   int iconKind=title.contains("내비")||title.contains("위치")?3:
+    title.contains("백업")||title.contains("검사")||title.contains("업데이트")?2:4;
+   NavIcon glyph=new NavIcon(a,iconKind,a.muted);
+   LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(a.dp(24),a.dp(24));
+   iconLp.rightMargin=a.dp(14);head.addView(glyph,iconLp);
+  }
   boolean largeText=a.getResources().getConfiguration().fontScale>=1.35f;
   if(largeText)head.setOrientation(LinearLayout.VERTICAL);
   TextView label=a.text(title,16,a.fg,true);label.setMaxLines(2);label.setEllipsize(android.text.TextUtils.TruncateAt.END);
   head.addView(label,largeText?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
-  if(value!=null&&!value.isEmpty()){
+  if(!settingCard&&value!=null&&!value.isEmpty()){
    boolean monetary=value.endsWith("원");
    TextView hint=monetary?MotoDesign.figure(a,value,16,a.fg):a.text(value,13,a.muted,true);
    hint.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
@@ -98,6 +105,10 @@ final class HubScreens {
    LinearLayout.LayoutParams sp=new LinearLayout.LayoutParams(a.dp(46),a.dp(44));
    sp.leftMargin=a.dp(6);head.addView(star,sp);
   }
+  if(settingCard){
+   TextView chevron=a.text("›",23,a.muted,false);
+   chevron.setGravity(Gravity.CENTER);head.addView(chevron);
+  }
   block.addView(head);
   if(detail!=null&&!detail.isEmpty()){
    TextView summary=a.text(detail,13,a.muted,false);summary.setMaxLines(3);
@@ -105,7 +116,7 @@ final class HubScreens {
   }
   if(click!=null){
    block.setFocusable(true);block.setClickable(true);
-   MotoDesign.ripple(a,block,settingCard?a.panel:a.bg,settingCard?a.line:0,settingCard?18:10);
+   MotoDesign.ripple(a,block,settingCard?a.panel:a.bg,0,settingCard?11:10);
    block.setOnClickListener(v->click.run());
    block.setContentDescription(title+", "+detail+", "+value);
   }
@@ -346,8 +357,8 @@ final class HubScreens {
   if(UndoLastSave.available(a)){
    a.action(a.content,"↶ 방금 저장한 기록 취소 · 2분",false,()->UndoLastSave.undo(a));
   }
-  LinearLayout actions=a.col();actions.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(6));actions.setBackground(a.shape(a.panel,a.line,8));
-  a.label(actions,"기록 추가",15,a.fg,true);
+  a.section("기록 추가");
+  LinearLayout actions=a.col();actions.setPadding(0,0,0,0);
   a.pair(actions,"간편 주유",()->new QuickEntryUi(a).fuel(),"정비주기 설정",()->new QuickEntryUi(a).maintenance());
   LinearLayout details=a.col();details.setVisibility(View.GONE);
   a.action(details,"정비 완료 내역 상세 입력",false,()->a.edit("services",null));
@@ -361,7 +372,7 @@ final class HubScreens {
   actions.addView(reveal);actions.addView(details);
   a.action(actions,"전체 기록 검색 · 주유 / 정비 / 비용 / GPS",false,this::searchAllRecords);
   a.content.addView(actions);a.gap(a.content,16);
-  new ServiceStatusUi(a).render(a.content);a.gap(a.content,15);
+  a.section("정비 상태");new ServiceStatusUi(a).render(a.content);a.gap(a.content,15);
   String bikeId=a.bike().optString("id");
   JSONObject lastFuel=null;
   for(JSONObject record:a.items("expenses"))if(bikeId.equals(record.optString("vehicleId"))&&"주유".equals(record.optString("type"))){
@@ -476,7 +487,7 @@ final class HubScreens {
   a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
- void settings(){title("설정과 도구","내비 · 기록 보호 · 기기 환경을 관리해");a.section("데이터 관리");line("백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해","열기",this::basicBackup);
+ void settings(){title("설정","");a.section("데이터 관리");line("백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해","열기",this::basicBackup);
  final TextView backupState=a.text("백업 상태 확인 중…",12,a.muted,false);
  a.content.addView(backupState);
  final String settingsSnapshot=backupJsonSnapshot();

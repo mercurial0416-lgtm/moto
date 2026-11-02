@@ -33,8 +33,8 @@ assert 'optString("theme","light")' in main and 'theme.equals("dark")' in main
 assert "MotoDesign.addHeader(this,root)" in main and "MotoDesign.addNavigation(this,root)" in main
 assert "static void spinnerField(" in design and "MotoDesign.spinnerField(this,p,s,12)" in main
 assert "MotoDesign.spinnerField(a,body,spinner,14)" in quick
-assert "HomeShortcutOrder.parse(" in home and "quickActionPair(" in home
-assert 'case "ride":rideAction();' in home and 'case "nav":quickNavigation();' in home
+assert "HomeShortcutOrder.parse(" in home and "homeShortcutTile(key)" in home
+assert 'if(shortcut("ride"))rideAction();' in home and 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
 assert "RideService.running" in ride and "finishWithSummary()" in ride and "requestStart()" in ride
 assert "RideService.STOP" in main or "RideService.STOP" in ride
 assert "void updateOdo(" in status and "void complete(" in status

@@ -18,7 +18,7 @@ assert 'RideBikeBinding.readStrict(track)' in hub
 assert 'String[] indexed=new String[tracks.size()]' in ride
 assert 'for(int i=0;i<indexed.length;i++)' in ride
 assert 'settingsNeedReview' in main and '설정 일부 복구 실패' in main
-assert '활동·유지비 더 보기' in home
+assert '유지비 요약 보기' in home and 'recent(bike)' in home
 assert 'ObdTelemetryFreshness.speedFresh(' in status
 assert 'motoReleaseCode="$CODE"' in Path("../.github/workflows/moto-ux-validation.yml").read_text()
 print("PASS UX76 ledger filters, GPS index, backup warnings, home and OBD diagnostics")

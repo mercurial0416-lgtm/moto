@@ -18,20 +18,21 @@ import android.widget.Spinner;
  */
 final class MotoDesign {
  private MotoDesign(){}
+ // Quiet system-like surfaces: one accent, no decorative brand gradients.
  static final int DARK_BACKGROUND=0xFF101318;
- static final int DARK_SURFACE=0xFF1B2028;
- static final int DARK_STROKE=0xFF343B44;
- static final int DARK_TEXT=0xFFF5F5F3;
- static final int DARK_MUTED=0xFFA6ADB6;
- static final int DARK_ACCENT=0xFFFF873B;
- static final int DARK_TINT=0xFF38281F;
- static final int LIGHT_BACKGROUND=0xFFF5F4F1;
+ static final int DARK_SURFACE=0xFF1D2229;
+ static final int DARK_STROKE=0xFF303944;
+ static final int DARK_TEXT=0xFFF3F5F8;
+ static final int DARK_MUTED=0xFFA6B0BD;
+ static final int DARK_ACCENT=0xFF80ADFF;
+ static final int DARK_TINT=0xFF263953;
+ static final int LIGHT_BACKGROUND=0xFFF7F8FA;
  static final int LIGHT_SURFACE=0xFFFFFFFF;
- static final int LIGHT_STROKE=0xFFE4E1DB;
- static final int LIGHT_TEXT=0xFF1B222B;
- static final int LIGHT_MUTED=0xFF626C76;
- static final int LIGHT_ACCENT=0xFFB64D17;
- static final int LIGHT_TINT=0xFFFFF0E5;
+ static final int LIGHT_STROKE=0xFFE5E9EF;
+ static final int LIGHT_TEXT=0xFF202733;
+ static final int LIGHT_MUTED=0xFF667381;
+ static final int LIGHT_ACCENT=0xFF2869C8;
+ static final int LIGHT_TINT=0xFFE9F1FC;
  static int[] colors(boolean dark){
   return dark?new int[]{DARK_BACKGROUND,DARK_TEXT,DARK_MUTED,DARK_STROKE,DARK_ACCENT,DARK_SURFACE,DARK_TINT}:
    new int[]{LIGHT_BACKGROUND,LIGHT_TEXT,LIGHT_MUTED,LIGHT_STROKE,LIGHT_ACCENT,LIGHT_SURFACE,LIGHT_TINT};
@@ -52,43 +53,34 @@ final class MotoDesign {
  static String heading(String tab){
   switch(tab){
    case "홈":return "내 차고";
-   case "차고":return "정비와 주유";
+   case "차고":return "정비 · 주유";
    case "라이딩":return "라이딩";
-   default:return "설정과 도구";
+   default:return "설정";
   }
  }
  /** Brand is subordinate to the current task, not another large title. */
+ /** Standard Android toolbar: clear destination, one optional contextual action. */
  static void addHeader(MainActivity a,LinearLayout root){
-  LinearLayout header=new LinearLayout(a);
-  header.setGravity(Gravity.CENTER_VERTICAL);
-  header.setPadding(a.dp(21),a.dp(13),a.dp(18),a.dp(13));
-  LinearLayout identity=new LinearLayout(a);
-  identity.setOrientation(LinearLayout.VERTICAL);
-  LinearLayout eyebrow=new LinearLayout(a);
-  eyebrow.setGravity(Gravity.CENTER_VERTICAL);
-  View signal=new View(a);signal.setBackground(a.shape(a.accent,0,2));
-  LinearLayout.LayoutParams signalLp=new LinearLayout.LayoutParams(a.dp(4),a.dp(12));
-  signalLp.rightMargin=a.dp(8);eyebrow.addView(signal,signalLp);
-  TextView brand=a.text("MOTO HUB   /   RIDER LIFE",11,a.accent,true);
-  brand.setLetterSpacing(.065f);eyebrow.addView(brand);
-  identity.addView(eyebrow);
-  TextView title=a.text(heading(a.tab),25,a.fg,true);
-  title.setTypeface(display());title.setLetterSpacing(-.02f);
-  LinearLayout.LayoutParams titleLp=new LinearLayout.LayoutParams(-1,-2);
-  titleLp.topMargin=a.dp(5);identity.addView(title,titleLp);
-  header.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
+  LinearLayout bar=new LinearLayout(a);
+  bar.setGravity(Gravity.CENTER_VERTICAL);
+  bar.setPadding(a.dp(20),a.dp(12),a.dp(16),a.dp(10));
+  bar.setMinimumHeight(a.dp(62));
+  TextView heading=a.text(heading(a.tab),23,a.fg,true);
+  heading.setTypeface(display());
+  heading.setLetterSpacing(-.018f);
+  bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
   if("홈".equals(a.tab)){
    TextView notice=headerAction(a,"알림");
    notice.setContentDescription("정비 알림 열기");
    notice.setOnClickListener(v->new GarageHomeUi(a).showNotices());
-   header.addView(notice);
+   bar.addView(notice);
   }else if(!"더보기".equals(a.tab)){
-   TextView settings=headerAction(a,"설정");
-   settings.setContentDescription("설정과 도구로 이동");
-   settings.setOnClickListener(v->a.navigate("더보기"));
-   header.addView(settings);
+   TextView options=headerAction(a,"설정");
+   options.setContentDescription("설정 화면 열기");
+   options.setOnClickListener(v->a.navigate("더보기"));
+   bar.addView(options);
   }
-  root.addView(header);
+  root.addView(bar);
  }
  static TextView headerAction(MainActivity a,String label){
   TextView view=a.text(label,13,a.fg,true);
@@ -96,7 +88,7 @@ final class MotoDesign {
   view.setMinWidth(a.dp(48));
   view.setMinHeight(a.dp(44));
   view.setPadding(a.dp(10),0,a.dp(10),0);
-  ripple(a,view,a.highlight,0,16);
+  ripple(a,view,a.panel,a.line,12);
   view.setClickable(true);view.setFocusable(true);
   return view;
  }

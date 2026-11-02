@@ -13,6 +13,12 @@ final class NavIcon extends View {
   c.drawPath(tag,p);c.drawCircle(9,10,1.35f,p);break;
  case 2:c.drawRoundRect(5,3,20,21,2,2,p);for(int y=7;y<=17;y+=5)c.drawLine(10,y,16,y,p);c.drawLine(3,8,7,8,p);c.drawLine(3,16,7,16,p);break;
  case 3:Path m=path;m.reset();m.moveTo(12,22);m.cubicTo(9,17,4,13,4,9);m.cubicTo(4,-1,20,-1,20,9);m.cubicTo(20,13,15,17,12,22);c.drawPath(m,p);c.drawCircle(12,9,2.7f,p);break;
+ case 5: // Fuel pump, consistent with common vehicle-manager navigation.
+  c.drawRoundRect(4,3,14,21,1.5f,1.5f,p);
+  c.drawRect(6.5f,6,11.5f,11,p);
+  c.drawLine(14,9,18,10,p);c.drawLine(18,10,19.5f,14,p);
+  c.drawLine(19.5f,14,19.5f,19,p);
+  c.drawLine(4,21,15,21,p);break;
  default: // Settings: eight-tooth gear, replacing the misleading people icon.
   Path gear=path;gear.reset();
   for(int i=0;i<24;i++){

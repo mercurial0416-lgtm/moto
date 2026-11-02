@@ -20,10 +20,9 @@ assert 'final int[] icons={0,3,2,4};' in design
 assert 'case"매물":listings()' not in main and 'case"차고":garage()' in main
 assert 'a.action(p,"보관된 옛 매물 데이터"' in settings and 'a.items("listings")' in settings
 assert 'a.action(p,"저장한 수동 코스"' in settings
-assert 'final boolean extras=a.getSharedPreferences("ride_ui",0).getBoolean("extras",false);' in ride
-assert 'if(extras){' in ride and 'GPX 가져오기' in ride
-assert '라이딩 2건 통합' in ride
-assert ('a.label(a.content,"기록된 라이딩"' in ride or 'a.label(a.content,"나의 라이딩 기록"' in ride)
+assert 'rideTools.setOnClickListener' in ride and 'GPX 가져오기' in ride
+assert '라이딩 2건 통합' in ride and 'chooseMerge()' in ride
+assert 'a.label(a.content,"라이딩 기록"' in ride
 assert 'renderPreservingPosition()' in main
 assert 'rideStateSignature()!=lastRenderedRideState' in main and 'renderPreservingPosition();' in main
 assert 'target.scrollTo(0,restoreY)' in main

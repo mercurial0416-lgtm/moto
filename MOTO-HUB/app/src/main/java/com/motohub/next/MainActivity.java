@@ -498,12 +498,12 @@ public class MainActivity extends Activity {
  void label(LinearLayout p,String s,int size,int color,boolean bold){TextView t=text(s,size,color,bold);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(t,lp);}
  void gap(LinearLayout p,int n){p.addView(new Space(this),new LinearLayout.LayoutParams(1,dp(n)));}
  void divider(LinearLayout p){View v=new View(this);v.setBackgroundColor(line);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(1));lp.topMargin=dp(12);lp.bottomMargin=dp(12);p.addView(v,lp);}
- Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(14);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(50));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?(dark?0xFF10203D:Color.WHITE):fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,17);b.setPadding(dp(16),dp(10),dp(16),dp(10));b.setOnClickListener(v->r.run());return b;}
+ Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(primary?15:14);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(primary?54:48));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?Color.WHITE:fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,primary?16:13);b.setPadding(dp(16),dp(10),dp(16),dp(10));b.setOnClickListener(v->r.run());return b;}
  void action(LinearLayout p,String s,boolean primary,Runnable r){if(p==formBody&&s.equals("저장")&&formFooter!=null)p=formFooter;LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(button(s,primary,r),lp);}
  void pair(LinearLayout p,String a,Runnable ra,String b,Runnable rb){LinearLayout row=new LinearLayout(this);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(0,0,dp(4),dp(8));row.addView(button(a,true,ra),lp);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);rp.setMargins(dp(4),0,0,dp(8));row.addView(button(b,false,rb),rp);p.addView(row);}
  void heading(String t,String sub){gap(content,8);if(!t.equals(MotoDesign.heading(tab))){TextView title=text(t,22,fg,true);title.setTypeface(MotoDesign.display());content.addView(title);gap(content,6);}if(sub!=null&&!sub.isEmpty())label(content,sub,13,muted,false);gap(content,13);}
  void section(String s){
-  gap(content,22);
+  gap(content,14);
   TextView heading=text(s,15,fg,true);
   heading.setLetterSpacing(.012f);
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
@@ -781,11 +781,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    offline.setPadding(dp(20),dp(7),dp(20),dp(7));root.addView(offline);
   }
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);content=col();content.setPadding(dp(18),dp(14),dp(18),dp(28));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-  LinearLayout dock=col();dock.setPadding(dp(18),dp(8),dp(18),0);dock.setBackgroundColor(panel);
-  // Home contains contextual quick actions; keep the bottom dock uncluttered.
-  if(tab.equals("차고")&&bike()!=null)pair(dock,"간편 주유",()->new QuickEntryUi(this).fuel(),"정비주기",()->new QuickEntryUi(this).maintenance());
-  // Home quick actions are inside its content, not repeated above the navigation.
-  root.addView(dock);
+  // Tab-level quick actions belong in their screens; do not repeat them above navigation.
   MotoDesign.addNavigation(this,root);
   // Render immediately. Avoid fading the full screen on every tab selection or live GPS refresh.
   if(readOnly)note("저장 오류 · 원본을 보호하고 있습니다");
@@ -1119,19 +1115,17 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   close();dialog=new Dialog(this);
   LinearLayout outer=col();outer.setBackgroundColor(bg);
   outer.setPadding(dp(20),dp(14),dp(20),dp(14));
+  // Full-screen task page: standard title and dismiss affordance, no AI-style overline.
   LinearLayout toolbar=new LinearLayout(this);toolbar.setGravity(Gravity.CENTER_VERTICAL);
-  LinearLayout identity=col();
-  TextView overline=text("MOTO HUB  /  RECORD",11,accent,true);
-  overline.setLetterSpacing(.065f);identity.addView(overline);
-  TextView caption=text(title,24,fg,true);caption.setTypeface(MotoDesign.display());
-  caption.setMaxLines(2);
-  LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);
-  cp.topMargin=dp(7);identity.addView(caption,cp);
-  toolbar.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
-  Button done=button("닫기  ×",false,this::close);
+  toolbar.setMinimumHeight(dp(56));
+  TextView caption=text(title,21,fg,true);caption.setTypeface(MotoDesign.display());
+  caption.setMaxLines(2);caption.setEllipsize(android.text.TextUtils.TruncateAt.END);
+  toolbar.addView(caption,new LinearLayout.LayoutParams(0,-2,1));
+  Button done=button("닫기",false,this::close);
   done.setContentDescription(title+" 화면 닫기");
   done.setMinHeight(dp(44));done.setTextSize(13);
-  done.setBackground(shape(panel,line,13));toolbar.addView(done);
+  done.setBackground(shape(panel,line,11));
+  toolbar.addView(done,new LinearLayout.LayoutParams(-2,-2));
   outer.addView(toolbar);
   View separator=new View(this);separator.setBackgroundColor(line);
   LinearLayout.LayoutParams sep=new LinearLayout.LayoutParams(-1,dp(1));
