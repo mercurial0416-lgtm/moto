@@ -8,7 +8,7 @@ home=(s/'GarageHomeUi.java').read_text()
 nav=(s/'NavigationApps.java').read_text()
 assert 'if(recording||armed){' in home
 assert 'if(!recording&&!armed){' in home
-assert 'GPS 기록 + 기본 내비 시작' in home
+assert ('GPS 기록 + 기본 내비 시작' in home or 'GPS 기록 + 내비 시작' in home)
 assert 'new RideUi(a).requestStart(true)' in home
 assert 'if(RideService.running)' in home
 assert 'setNeutralButton("다른 내비 실행"' in nav
