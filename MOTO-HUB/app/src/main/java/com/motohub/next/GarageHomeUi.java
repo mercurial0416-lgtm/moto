@@ -152,7 +152,16 @@ final class GarageHomeUi {
    undo.setContentDescription("방금 저장한 기록 실행 취소");
    a.content.addView(undo);a.gap(a.content,5);
   }
-  a.action(a.content,UndoLastSave.available(a)?"빠른 도구 · 저장 취소 가능":"빠른 도구 · 주차·기록·소모품",false,()->showQuickTools(b));
+  // Secondary management lives behind one compact entry, never as a competing primary CTA.
+  TextView utilities=a.text("주차 · 소모품 · 기록 도구   ›",13,soft,true);
+  utilities.setGravity(Gravity.CENTER_VERTICAL);
+  utilities.setPadding(a.dp(15),a.dp(13),a.dp(15),a.dp(13));
+  utilities.setMinHeight(a.dp(48));
+  MotoDesign.ripple(a,utilities,surface,stroke,14);
+  utilities.setClickable(true);utilities.setFocusable(true);
+  utilities.setContentDescription("주차 위치, 최근 기록, 소모품과 기타 도구 열기");
+  utilities.setOnClickListener(v->showQuickTools(b));
+  a.content.addView(utilities);
   a.gap(a.content,6);
   // Recent activity is optional rather than always visible on the first screen.
   // Keep daily home focused on navigation and maintenance; secondary cards opt-in.
