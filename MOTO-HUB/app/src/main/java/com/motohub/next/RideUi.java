@@ -194,7 +194,13 @@ final class RideUi {
   Button launch=a.button("열기",false,()->NavigationApps.openPreferred(a));
   launch.setMinHeight(a.dp(44));launch.setContentDescription(chosen.label+" 외부 내비 앱 실행");
   navRow.addView(launch,new LinearLayout.LayoutParams(a.dp(78),-2));
-  a.content.addView(navRow);a.gap(a.content,13);
+  a.content.addView(navRow);
+  if(!focus){
+   TextView navHint=a.text("외부 내비를 열어도 GPS 기록은 계속됩니다. 이륜차 통행 제한은 확인하세요.",12,a.muted,false);
+   navHint.setPadding(a.dp(5),a.dp(7),a.dp(5),a.dp(3));
+   a.content.addView(navHint);
+  }
+  a.gap(a.content,13);
 
   // A two-action row replaces the stacked ROUTE & INSIGHTS promotion.
   LinearLayout routesBar=new LinearLayout(a);routesBar.setGravity(Gravity.CENTER_VERTICAL);
