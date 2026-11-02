@@ -25,7 +25,7 @@ assert 'a.pickDate(date)' in ui and 'a.pickDate(nextDate)' in ui
 assert 'maintenance_opt_in' in ui and 'requestPermissions(' in ui and 'DailyMaintenanceJob.schedule(a)' in ui
 assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
 assert 'new QuickEntryUi(a).fuel()' in records and 'new QuickEntryUi(a).maintenance()' in records
-assert 'new QuickEntryUi(this).fuel()' in main and 'new QuickEntryUi(this).maintenance()' in main
+assert 'tab.equals("차고")&&bike()!=null)pair(dock' not in main, 'obsolete duplicate footer input actions must remain removed'
 assert main.count('DailyMaintenanceJob.checkSoon(this)')>=4, 'original editor changes retrigger deadline checks'
 assert 'MaintenanceNotificationSummary.from(db,today)' in job
 assert '.setContentText(reminder.detail)' in job and '.setVisibility(Notification.VISIBILITY_PRIVATE)' in job

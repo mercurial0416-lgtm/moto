@@ -18,7 +18,7 @@ checks={
  'category selector attached to insights':'RideCategory.write(track,categories[which])' in activity,
  'stats exclude archived merge':'RideTrackMerge.archived(track))continue' in ride,
  'existing GPS records still opened':'a.openRideInsights(f)' in ride,
- 'privacy of rides in history':'기기에 GPS 경로를 기록' in ride,
+ 'privacy of rides in history':'GPS 기록은 이 기기에 저장됩니다' in ride,
 }
 for name,ok in checks.items():print(('PASS' if ok else 'FAIL')+': '+name)
 assert all(checks.values())

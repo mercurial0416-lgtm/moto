@@ -11,22 +11,20 @@ screen=(root/'HubScreens.java').read_text()
 main=(root/'MainActivity.java').read_text()
 
 # No URL or remote dependency in the new native presentation.
-assert ('TextView brand=a.text("MOTO HUB",12,a.accent,true)' in design or 'TextView brand=a.text("MOTO HUB   /   RIDER LIFE",11,a.accent,true)' in design)
+assert 'TextView heading=a.text(heading(a.tab),23,a.fg,true)' in design
 assert 'FrameLayout pill=new FrameLayout(a)' in design
 assert any('pill.setBackground(a.shape(selected?a.highlight:a.panel,0,'+str(r)+'))' in design for r in (14,16))
 assert ('cell.setMinimumHeight(a.dp(62))' in design or 'cell.setMinimumHeight(a.dp(59))' in design)
 assert 'if(!destination.equals(a.tab))a.navigate(destination)' in design
 assert 'setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"))' in design
 
-render=home.split(' void render(){',1)[1].split(' void interruptedRideShortcut(){',1)[0]
-for marker in ('addHero(b)', 'stats(b)', 'HomeShortcutOrder.parse(', 'quickActionPair(key,ordered[i+1])',
-               'case "ride":rideAction()', 'case "nav":quickNavigation()', 'case "fuel":quickAction("fuel")',
-               'case "service":quickAction("service")'):
+render=home.split(' void render(){',1)[1].split(' /** Scan local GPS metadata',1)[0]
+for marker in ('compactVehicleHeader(bike)', 'stats(bike)', 'HomeShortcutOrder.parse(',
+               'homeShortcutTile(key)', 'if(shortcut("ride"))rideAction()', 'recent(bike)'):
  assert marker in render, marker
-assert 'fontScale>=1.35f' in render and 'screenWidthDp<360' in render
-assert 'if(!shortcut(key))continue;' in render
-assert 'i++;' in render and 'quickActionPair(key,ordered[i+1])' in render
-assert 'void quickActionPair(String left,String right)' in home
+assert 'fontScale>=1.45f' in render and 'screenWidthDp<320' in render
+assert 'if(!"ride".equals(key)&&shortcut(key))visible.add(key);' in render
+assert 'LinearLayout homeShortcutTile(String key)' in home
 assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
 assert 'surfaceCard.setBackground(a.shape(surface,stroke,19))' in home
 assert 'MotoDesign.figure(a,values[i],24,light)' in home
@@ -45,14 +43,14 @@ assert 'Button disarm=a.button("OBD만 중지 · GPS 기록은 계속"' in ride
 assert 'RideService.AUTO_DISARM' in ride and 'RideService.STOP' in ride
 assert 'finishWithSummary();' in ride
 assert 'setPositiveButton("저장하고 종료"' in ride
-assert 'narrowMetrics' in ride and 'narrowNav' in ride
+assert 'narrowMetrics' in ride and 'navRow' in ride
 assert 'NavigationApps.openPreferred(a)' in ride and 'NavigationApps.choose(a)' in ride
 assert 'RideScreenRefreshPolicy.interval(' in ride
 
 assert 'settingCard=target==a.content&&"더보기".equals(a.tab)' in screen
 assert 'MotoDesign.ripple(a,block,settingCard?a.panel:a.bg' in screen
 assert 'block.setOnClickListener(v->click.run())' in screen
-assert 'MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,17)' in main
+assert 'MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,primary?16:13)' in main
 
 # Explicitly preserve no unapproved ECU changes and all local persistence APIs.
 assert 'Sharing.start(' not in ride and 'Sharing.start(' not in home
