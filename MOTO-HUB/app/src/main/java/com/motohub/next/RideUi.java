@@ -174,101 +174,55 @@ final class RideUi {
    hero.addView(disarm);
   }
   a.content.addView(hero);a.gap(a.content,12);
-  // Riding view prioritizes the phone's selected navigation; OBD diagnostics
-  // are tucked into opt-in advanced settings instead of duplicating the TFT.
-  // Safe launcher: changing the default does not unexpectedly open an external app.
+  // The navigation provider is a compact utility row, not a second hero card.
   NavigationChoice chosen=NavigationApps.preferred(a);
-  LinearLayout navigation=a.col();navigation.setPadding(a.dp(16),a.dp(14),a.dp(16),a.dp(14));
-  navigation.setBackground(a.shape(a.panel,a.line,19));
-  navigation.addView(a.text("내비게이션",16,a.fg,true));a.gap(navigation,9);
-  LinearLayout launchRow=new LinearLayout(a);launchRow.setGravity(Gravity.CENTER_VERTICAL);
-  boolean narrowNav=a.getResources().getConfiguration().fontScale>=1.35f||
-    a.getResources().getConfiguration().screenWidthDp<360;
-  if(narrowNav)launchRow.setOrientation(LinearLayout.VERTICAL);
-  Button openNav=a.button(chosen.label+" 실행",true,()->NavigationApps.openPreferred(a));
-  openNav.setMinHeight(a.dp(54));openNav.setContentDescription(chosen.label+" 앱 실행");
-  launchRow.addView(openNav,narrowNav?new LinearLayout.LayoutParams(-1,-2):
-    new LinearLayout.LayoutParams(0,-2,1));
-  Button changeNav=a.button("변경",false,()->NavigationApps.choose(a));
-  changeNav.setMinHeight(a.dp(54));changeNav.setContentDescription("기본 내비 설정 · 카카오 / 네이버 / 티맵");
-  LinearLayout.LayoutParams navLp=narrowNav?new LinearLayout.LayoutParams(-1,-2):
-    new LinearLayout.LayoutParams(a.dp(94),-2);
-  if(narrowNav)navLp.topMargin=a.dp(8);else navLp.leftMargin=a.dp(9);
-  launchRow.addView(changeNav,navLp);navigation.addView(launchRow);
-  if(!focus){
-   TextView hint=a.text("내비를 실행해도 GPS 기록은 계속됩니다. 이륜차 통행 제한은 직접 확인하세요.",12,a.muted,false);
-   LinearLayout.LayoutParams hintLp=new LinearLayout.LayoutParams(-1,-2);hintLp.topMargin=a.dp(11);
-   navigation.addView(hint,hintLp);
-  }
-  a.content.addView(navigation);a.gap(a.content,12);
-  // Route planning uses explicit user-entered waypoints. No claim of
-  // turn-by-turn motorcycle routing without an external navigation provider.
-  LinearLayout tripTools=a.col();
-  tripTools.setPadding(a.dp(14),a.dp(14),a.dp(14),a.dp(12));
-  tripTools.setBackground(a.shape(a.panel,a.line,19));
-  LinearLayout toolsHead=new LinearLayout(a);toolsHead.setGravity(Gravity.CENTER_VERTICAL);
-  LinearLayout toolsTitle=a.col();
-  TextView toolsOverline=a.text("ROUTE & INSIGHTS",11,a.accent,true);
-  toolsOverline.setLetterSpacing(.06f);toolsTitle.addView(toolsOverline);
-  TextView toolsLabel=a.text("코스와 주행 분석",17,a.fg,true);
-  LinearLayout.LayoutParams labelLp=new LinearLayout.LayoutParams(-1,-2);
-  labelLp.topMargin=a.dp(5);toolsTitle.addView(toolsLabel,labelLp);
-  toolsHead.addView(toolsTitle,new LinearLayout.LayoutParams(0,-2,1));
-  final boolean[] toolsOpen={a.getSharedPreferences("ride_ui",0).getBoolean("route_tools_open",false)};
-  LinearLayout toolsBody=a.col();toolsBody.setVisibility(toolsOpen[0]?View.VISIBLE:View.GONE);
-  Button toolsToggle=a.button(toolsOpen[0]?"접기  −":"펼치기  +",false,()->{});
-  toolsToggle.setOnClickListener(v->{
-   boolean next=!toolsOpen[0];
-   if(!a.getSharedPreferences("ride_ui",0).edit().putBoolean("route_tools_open",next).commit()){
-    a.toast("코스 도구 표시 설정을 저장하지 못했어.");return;
-   }
-   toolsOpen[0]=next;
-   toolsBody.setVisibility(next?View.VISIBLE:View.GONE);
-   toolsToggle.setText(next?"접기  −":"펼치기  +");
-  });
-  toolsToggle.setMinHeight(a.dp(44));toolsToggle.setTextSize(12);
-  toolsHead.addView(toolsToggle);tripTools.addView(toolsHead);
-  a.gap(toolsBody,13);
-  int saved=a.items("routes").size();
-  boolean narrowTrip=a.getResources().getConfiguration().fontScale>=1.35f||
-    a.getResources().getConfiguration().screenWidthDp<360;
-  LinearLayout tripRow=new LinearLayout(a);
-  if(narrowTrip)tripRow.setOrientation(LinearLayout.VERTICAL);
-  Button savedRoutes=a.button("저장한 코스 "+saved+"개",false,a::savedRoutes);
-  savedRoutes.setContentDescription("저장한 수동 코스 "+saved+"개 관리");
-  tripRow.addView(savedRoutes,narrowTrip?new LinearLayout.LayoutParams(-1,-2):
-    new LinearLayout.LayoutParams(0,-2,1));
-  Button importRoute=a.button("GPX 가져오기",false,a::pickGpx);
-  LinearLayout.LayoutParams importLp=narrowTrip?new LinearLayout.LayoutParams(-1,-2):
-    new LinearLayout.LayoutParams(0,-2,1);
-  if(narrowTrip)importLp.topMargin=a.dp(8);else importLp.leftMargin=a.dp(9);
-  tripRow.addView(importRoute,importLp);toolsBody.addView(tripRow);
-  a.gap(toolsBody,9);
-  a.action(toolsBody,"최근 30일 주행 통계 · 바이크별",false,this::chooseRideReport);
-  a.action(toolsBody,"최근 6개월 라이딩 그래프 · 현재 바이크",false,()->RideStatsUi.open(a));
-  tripTools.addView(toolsBody);
-  a.content.addView(tripTools);a.gap(a.content,12);
+  LinearLayout navRow=new LinearLayout(a);navRow.setGravity(Gravity.CENTER_VERTICAL);
+  navRow.setPadding(a.dp(13),a.dp(11),a.dp(12),a.dp(11));
+  MotoDesign.ripple(a,navRow,a.panel,a.line,15);
+  NavIcon navIcon=new NavIcon(a,3,a.accent);
+  LinearLayout.LayoutParams nIcon=new LinearLayout.LayoutParams(a.dp(25),a.dp(25));
+  nIcon.rightMargin=a.dp(13);navRow.addView(navIcon,nIcon);
+  LinearLayout navDescription=a.col();
+  navDescription.addView(a.text("내비게이션",15,a.fg,true));
+  TextView preferred=a.text(chosen.label+" · 기본 앱 변경  ›",12,a.muted,false);
+  LinearLayout.LayoutParams descriptionLp=new LinearLayout.LayoutParams(-1,-2);
+  descriptionLp.topMargin=a.dp(5);navDescription.addView(preferred,descriptionLp);
+  navDescription.setClickable(true);navDescription.setFocusable(true);
+  navDescription.setContentDescription("기본 내비 앱 변경 · "+chosen.label);
+  navDescription.setOnClickListener(v->NavigationApps.choose(a));
+  navRow.addView(navDescription,new LinearLayout.LayoutParams(0,-2,1));
+  Button launch=a.button("열기",false,()->NavigationApps.openPreferred(a));
+  launch.setMinHeight(a.dp(44));launch.setContentDescription(chosen.label+" 외부 내비 앱 실행");
+  navRow.addView(launch,new LinearLayout.LayoutParams(a.dp(78),-2));
+  a.content.addView(navRow);a.gap(a.content,13);
+
+  // A two-action row replaces the stacked ROUTE & INSIGHTS promotion.
+  LinearLayout routesBar=new LinearLayout(a);routesBar.setGravity(Gravity.CENTER_VERTICAL);
+  Button routeButton=a.button("내 코스",false,a::savedRoutes);
+  Button analysisButton=a.button("라이딩 통계",false,()->RideStatsUi.open(a));
+  routesBar.addView(routeButton,new LinearLayout.LayoutParams(0,-2,1));
+  LinearLayout.LayoutParams analysisLp=new LinearLayout.LayoutParams(0,-2,1);
+  analysisLp.leftMargin=a.dp(9);routesBar.addView(analysisButton,analysisLp);
+  a.content.addView(routesBar);
+  TextView rideTools=a.text("GPX 가져오기 · 기간별 리포트 · 더 많은 도구  ›",12,a.muted,false);
+  rideTools.setGravity(Gravity.CENTER_VERTICAL);rideTools.setMinHeight(a.dp(48));
+  rideTools.setClickable(true);rideTools.setFocusable(true);
+  rideTools.setContentDescription("GPX 가져오기와 최근 30일 바이크별 주행 통계");
+  rideTools.setOnClickListener(v->new AlertDialog.Builder(a)
+   .setTitle("라이딩 도구")
+   .setItems(new String[]{"GPX 가져오기","최근 30일 바이크별 통계","최근 6개월 그래프","라이딩 2건 통합"},(dialog,which)->{
+    switch(which){
+     case 0:a.pickGpx();break;
+     case 1:chooseRideReport();break;
+     case 2:RideStatsUi.open(a);break;
+     default:chooseMerge();break;
+    }
+   }).setNegativeButton("취소",null).show());
+  a.content.addView(rideTools);
   if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
-  // Live OBD sensor dashboard intentionally hidden here: the KTM's TFT already
-  // displays RPM, speed and coolant. The Bluetooth adapter and recorded data
-  // remain supported via the opt-in advanced tools.
-  // Advanced GPX import, manual merging and statistics are intentionally
-  // collapsed; the normal ride view focuses on record, navigation and history.
-  final boolean extras=a.getSharedPreferences("ride_ui",0).getBoolean("extras",false);
-  Button extrasToggle=a.button(extras?"고급 기록 도구 접기":"고급 기록 도구 · 라이딩 통합",false,()->{
-   a.getSharedPreferences("ride_ui",0).edit().putBoolean("extras",!extras).apply();
-   a.renderPreservingPosition();
-  });
-  extrasToggle.setMinHeight(a.dp(42));a.content.addView(extrasToggle);
-  if(extras){
-   a.gap(a.content,8);
-   a.label(a.content,"선택한 두 라이딩의 GPS 원본을 보존한 채 하나의 경로로 합칠 수 있어요.",12,a.muted,false);
-   a.action(a.content,"라이딩 2건 통합 · 원본 보존",false,this::chooseMerge);
-  }
-  a.gap(a.content,8);
-  TextView historyOverline=a.text("RIDE ARCHIVE",11,a.accent,true);
-  historyOverline.setLetterSpacing(.07f);a.content.addView(historyOverline);
-  a.gap(a.content,5);a.label(a.content,"나의 라이딩 기록",20,a.fg,true);
+  // GPS, navigation, and recent tracks are the three primary responsibilities.
+  a.gap(a.content,9);
+  a.label(a.content,"라이딩 기록",19,a.fg,true);
   // Render controls immediately and read track/sidecar metadata on one background worker.
   // A new render invalidates the previous snapshot; no GPS file is modified here.
   LinearLayout historyPanel=a.col();
@@ -276,7 +230,7 @@ final class RideUi {
   a.content.addView(historyPanel);
   loadHistoryAsync(historyPanel,a.content);
   a.gap(a.content,12);
-  a.label(a.content,"GPS 기록은 이 휴대폰에만 저장됩니다. 주행 중에는 휴대폰을 조작하지 마세요.",13,a.muted,false);
+  a.label(a.content,"GPS 기록은 이 기기에 저장됩니다. 주행 중 화면 조작은 피하세요.",12,a.muted,false);
  }
  /** Snapshot all filesystem metadata off the Android UI thread. Stale screen loads are discarded. */
  void loadHistoryAsync(LinearLayout historyPanel,LinearLayout requestedContent){
