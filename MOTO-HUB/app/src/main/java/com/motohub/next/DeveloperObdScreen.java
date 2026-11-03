@@ -64,7 +64,7 @@ final class DeveloperObdScreen {
   activity.action(p,"Bluetooth 페어링 설정",false,this::openBluetoothSettings);
   activity.gap(p,12);
   activity.label(p,"2  동글 선택 · 센서 검사",16,activity.fg,true);
-  activity.label(p,"아래 버튼에서 페어링된 동글을 고르면 RPM·속도·수온·전압 등 읽기 전용 PID를 조회합니다. 차량 미지원 항목은 미지원으로 표시됩니다.",13,activity.muted,false);
+  activity.label(p,"아래 버튼에서 페어링된 동글을 고르면 RPM·속도·수온·전압 등 읽기 전용 PID를 조회합니다. ECU가 미지원으로 확정한 항목은 숨기고, 미확인 항목은 그대로 표시합니다.",13,activity.muted,false);
   status=activity.text("장치 선택 전 · ECU 데이터 미검증",14,activity.muted,true);p.addView(status);
   for(int i=0;i<fields.length;i++){
    fields[i]=activity.text(ObdReadOnlyProtocol.SENSOR_NAMES[i]+": —",15,activity.fg,false);
@@ -506,6 +506,7 @@ final class DeveloperObdScreen {
       String result=ObdReadOnlyProtocol.decode(pid,request(in,out,ObdReadOnlyProtocol.query(pid),2500));
       if(!"지원 안 함".equals(result)){
        successThisCycle++;validSensors++;if("010D".equals(pid))gotSpeed=true;
+       ObdLocalDiagnosticLog.observed(activity,pid);
        if(!loggedSensor){ObdLocalDiagnosticLog.record(activity,"SENSOR_OK");loggedSensor=true;}
       }
       updateField(i,result);
@@ -544,12 +545,22 @@ final class DeveloperObdScreen {
   throw new java.io.IOException("OBD2 응답이 완료되지 않았습니다.");
  }
  private void updateField(int index,String result){activity.runOnUiThread(()->{
-  if(!stopped&&owner!=null&&owner.isShowing()&&activity.dialog==owner)fields[index].setText(ObdReadOnlyProtocol.SENSOR_NAMES[index]+": "+result);
+  if(!stopped&&owner!=null&&owner.isShowing()&&activity.dialog==owner){
+   // Hide only a definitive ECU NO, never an unknown PID or temporary timeout.
+   boolean unsupported="미지원 (PID 목록)".equals(result);
+   fields[index].setVisibility(unsupported?android.view.View.GONE:android.view.View.VISIBLE);
+   fields[index].setText(ObdReadOnlyProtocol.SENSOR_NAMES[index]+": "+result);
+  }
  });}
  private void setStatus(String message){activity.runOnUiThread(()->{
   if(owner!=null&&owner.isShowing()&&activity.dialog==owner)status.setText(message);
  });}
  synchronized void stop(){stopped=true;closeSocket();for(int i=0;i<fields.length;i++)updateStopped(i);setStatus("연결 끊김");}
- private void updateStopped(int index){activity.runOnUiThread(()->{if(owner!=null&&owner.isShowing()&&activity.dialog==owner)fields[index].setText(ObdReadOnlyProtocol.SENSOR_NAMES[index]+": —");});}
+ private void updateStopped(int index){activity.runOnUiThread(()->{
+  if(owner!=null&&owner.isShowing()&&activity.dialog==owner){
+   fields[index].setVisibility(android.view.View.VISIBLE);
+   fields[index].setText(ObdReadOnlyProtocol.SENSOR_NAMES[index]+": —");
+  }
+ });}
  private void closeSocket(){BluetoothSocket old=socket;socket=null;if(old!=null)try{old.close();}catch(Exception ignored){}}
 }
