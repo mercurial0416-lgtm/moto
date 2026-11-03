@@ -1968,7 +1968,17 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          // from the copy-time check. Never undo a committed restore from this audit.
          String postRestoreReport;
          boolean postRestoreOk=true;
-         try{postRestoreReport=ready.verifyInstalled(getFilesDir());}
+         try{
+          // The Store parser is Android-dependent; the ZIP asset verifier stays pure Java.
+          byte[] actualBytes=new AtomicFile(new File(getFilesDir(),"motohub-v3.json")).readFully();
+          if(actualBytes.length>BackupFormat.MAX_JSON_BYTES)
+           throw new IOException("복원된 JSON 크기 제한 초과");
+          String actualHash=JsonCanonicalDigest.hash(Store.parse(new String(actualBytes,StandardCharsets.UTF_8)));
+          String expectedHash=JsonCanonicalDigest.hash(Store.parse(ready.json));
+          if(!actualHash.equals(expectedHash))
+           throw new IOException("복원 후 JSON 기록이 백업 원본과 다릅니다.");
+          postRestoreReport="JSON 기록 SHA-256 일치 · "+ready.verifyInstalled(getFilesDir());
+         }
          catch(Exception failure){
           postRestoreOk=false;
           postRestoreReport="복원 후 파일 재검증 실패: "+failure.getMessage()+
