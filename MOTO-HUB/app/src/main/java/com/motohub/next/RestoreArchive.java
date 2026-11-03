@@ -82,16 +82,8 @@ public final class RestoreArchive {
    */
   public String verifyInstalled(File internal)throws Exception{
    if(isSplit())throw new IOException("전체 ZIP 검증은 전체 복원 전용입니다.");
-   File live=new File(internal,"motohub-v3.json");
-   if(Files.isSymbolicLink(live.toPath())||
-      !Files.isRegularFile(live.toPath(),LinkOption.NOFOLLOW_LINKS)||
-      live.length()>BackupFormat.MAX_JSON_BYTES)
-    throw new IOException("복원된 JSON을 안전하게 읽을 수 없습니다.");
-   byte[] current=Files.readAllBytes(live.toPath());
-   org.json.JSONObject parsed=Store.parse(new String(current,StandardCharsets.UTF_8));
-   org.json.JSONObject expected=Store.parse(json);
-   if(!JsonCanonicalDigest.hash(parsed).equals(JsonCanonicalDigest.hash(expected)))
-    throw new IOException("복원 후 JSON 기록이 백업 내용과 다릅니다.");
+   // JSON schema/canonical digest is verified by MainActivity, which owns
+   // the Android Store. This pure-Java verifier checks every staged asset.
    int checked=0;
    for(String relative:stagedAssets(staging)){
     File from=new File(staging,relative),installed=new File(internal,relative);
@@ -101,7 +93,7 @@ public final class RestoreArchive {
      throw new IOException("복원 후 파일 내용 불일치: "+relative);
     checked++;
    }
-   return "복원 후 기록·파일 재검증 통과 · GPS "+rides+"개 · 사진 "+photos+
+   return "복원 후 첨부 파일 재검증 통과 · GPS "+rides+"개 · 사진 "+photos+
     "개 · 영수증 "+receipts+"개 · 첨부 파일 "+checked+"개";
   }
   /** Additive partition restore. Never overwrites current assets or JSON, even on partial failure. */
