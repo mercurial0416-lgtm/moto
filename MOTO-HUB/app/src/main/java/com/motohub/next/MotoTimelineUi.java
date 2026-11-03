@@ -77,11 +77,12 @@ final class MotoTimelineUi {
     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);
     cp.bottomMargin=a.dp(8);entries.addView(card,cp);
    }
-   final int remaining=Math.max(0,count-visibleLimit[0]);
+   final int totalMatches=count;
+   final int remaining=Math.max(0,totalMatches-visibleLimit[0]);
    if(remaining>0){
     a.gap(entries,8);
     Button more=a.button("활동 더 보기 · 남은 "+remaining+"건",false,()->{
-     visibleLimit[0]=Math.min(count,visibleLimit[0]+40);
+     visibleLimit[0]=Math.min(totalMatches,visibleLimit[0]+40);
      repaintHolder[0].run();
     });
     more.setMinHeight(a.dp(48));
