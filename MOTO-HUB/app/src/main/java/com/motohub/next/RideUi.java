@@ -306,6 +306,7 @@ final class RideUi {
      distanceInfo="GPS 거리 "+distanceRange+" · 전체 대상 분석 · 원본 손상·크기 초과 "+unreadable+
       "건 제외 · 계기판 거리와 다를 수 있어요.";
     }
+    Map<String,Integer> sessionCounts=RideSegmentGroup.counts(rides);
     List<HistoryEntry> entries=new ArrayList<>();
     for(File file:visible){
      if(generation!=HISTORY_GENERATION.get())return;
@@ -316,6 +317,8 @@ final class RideUi {
       (RideTrackMerge.mergedSource(file)?" · 통합 원본":"")+
       (RideTrackMerge.archived(file)?" · 통합 취소 보관본":"")+
       (RideCategory.AUTO.equals(category)?"":" · "+category)+
+      (sessionCounts.getOrDefault(RideSegmentGroup.id(file),0)>1?
+       " · 연속 GPS "+sessionCounts.get(RideSegmentGroup.id(file))+"구간":"")+
       " · "+RideHistoryBikeLabel.label(file,bikeNames);
      entries.add(new HistoryEntry(file,label,RideHistoryFilter.status(file,activeName,recording),savedMemo));
     }
@@ -685,7 +688,14 @@ final class RideUi {
    }).setNegativeButton("취소",null).show();
  }
  void rideReport(String bikeScope,String scopeLabel){
-  a.toast("기기에 저장된 경로를 분석합니다.");
+  final android.app.AlertDialog progress=new android.app.AlertDialog.Builder(a)
+   .setTitle("최근 60일 GPS 분석")
+   .setMessage("분석할 기록을 확인 중…")
+   .setNegativeButton("취소",(dialog,which)->REPORT_GENERATION.incrementAndGet())
+   .create();
+  progress.setOnCancelListener(dialog->REPORT_GENERATION.incrementAndGet());
+  progress.show();
+  progress.setCanceledOnTouchOutside(false);
   final long request=REPORT_GENERATION.incrementAndGet();
   REPORT_EXECUTOR.execute(()->{
    if(request!=REPORT_GENERATION.get())return;
@@ -705,6 +715,13 @@ final class RideUi {
      catch(IOException invalidBinding){report.skipped++;continue;}
      if(a.isFinishing()||a.isDestroyed())return;
      scanned++;
+     if(scanned%25==0){
+      final int examined=scanned,excluded=report.skipped;
+      a.runOnUiThread(()->{
+       if(request==REPORT_GENERATION.get()&&!a.isFinishing()&&!a.isDestroyed()&&progress.isShowing())
+        progress.setMessage("GPS "+examined+"건 확인 · 손상/제외 "+excluded+"건 · 취소 가능");
+      });
+     }
      try{
       RideDistanceCache.Summary data=RideDistanceCache.read(track);
       report.add(track,now,data.distanceKm,data.durationMillis);
@@ -714,7 +731,8 @@ final class RideUi {
    }catch(Exception ignored){report.skipped++;}
    final int analyzedCandidates=scanned;
    a.runOnUiThread(()->{
-    if(request!=REPORT_GENERATION.get()||a.isFinishing()||a.isDestroyed()||!"라이딩".equals(a.tab))return;
+    if(request!=REPORT_GENERATION.get()||a.isFinishing()||a.isDestroyed()||!"라이딩".equals(a.tab)||!progress.isShowing())return;
+    progress.dismiss();
     String text="대상: "+scopeLabel+"\n최근 30일: "+report.current.count+"회 · "+String.format(Locale.KOREA,"%.1f km",report.current.km)
      +" · "+(report.current.minutes/60)+"시간 "+(report.current.minutes%60)+"분"
      +"\n이전 30일: "+report.previous.count+"회 · "+String.format(Locale.KOREA,"%.1f km",report.previous.km)

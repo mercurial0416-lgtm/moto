@@ -18,7 +18,7 @@ assert 'bikeId.equals(item.optString("vehicleId"))' in timeline
 assert 'expectedBike.equals(RideBikeBinding.readStrict(track))' in timeline
 assert 'RideMileageIntegrity.validCompleted(track)' in timeline
 assert 'RideHistoryLabel.startTime(track)' in timeline
-assert 'MotoTimeline.sort(merged)' in ui
+assert 'RideSegmentGroup.collapse(merged)' in ui and 'MotoTimeline.newest(merged,120)' in ui
 assert 'RideHistorySort.order(TrackFile.tracks(' in ui
 assert 'if(inspected++>=200)break;' not in ui
 assert 'if(++inspected%64==0' in ui

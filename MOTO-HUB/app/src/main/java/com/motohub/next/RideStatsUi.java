@@ -91,7 +91,7 @@ final class RideStatsUi {
        data.excluded++;data.oversize++;continue;
       }
       RideDistanceCache.Summary x=RideDistanceCache.read(ride);
-      if(!data.add(t,x.distanceKm,x.durationMillis))data.invalidMetrics++;
+      if(!data.add(RideSegmentGroup.id(ride),t,x.distanceKm,x.durationMillis))data.invalidMetrics++;
      }catch(Exception ignored){data.excluded++;data.unreadable++;}
     }
    }catch(Exception e){data.excluded++;data.unreadable++;}

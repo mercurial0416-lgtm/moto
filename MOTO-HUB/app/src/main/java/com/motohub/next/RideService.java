@@ -86,7 +86,11 @@ public final class RideService extends Service implements LocationListener {
  }
  final RideNotificationRate notificationRate=new RideNotificationRate();
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
- String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();final ObdSpeedSanityPolicy speedSanity=new ObdSpeedSanityPolicy();LocationManager manager;FileOutputStream output;File track;long lastTime;volatile long lastFixElapsed;volatile Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
+ String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();final ObdSpeedSanityPolicy speedSanity=new ObdSpeedSanityPolicy();LocationManager manager;FileOutputStream output;File track;
+ /** Original UUID is reused for sequential 25MB sections, so legacy ZIP formats still work. */
+ String activeRideSession="";
+ int segmentPoints=0,completedSegments=0;
+ long lastTime;volatile long lastFixElapsed;volatile Location lastGood;final Handler handler=new Handler(Looper.getMainLooper());
  HandlerThread gpsIoThread;
  Handler gpsWriteHandler;
  boolean gpsSyncScheduled=false;
@@ -217,11 +221,12 @@ public final class RideService extends Service implements LocationListener {
  private synchronized void openRideTrack()throws Exception{
   // Must be checked here as well as the UI: OBD auto-start has no foreground confirmation screen.
   GpsStorageSpacePolicy.require(getFilesDir());
-  track=new File(TrackFile.directory(getFilesDir()),System.currentTimeMillis()+"-"+UUID.randomUUID()+".track");
+  activeRideSession=UUID.randomUUID().toString();
+  track=new File(TrackFile.directory(getFilesDir()),System.currentTimeMillis()+"-"+activeRideSession+".track");
   output=new FileOutputStream(track);
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
   catch(IOException error){output.close();output=null;track.delete();throw error;}
-  count=0;lastTime=0;lastFixElapsed=0;lastGood=null;gpsSync.reset();
+  count=0;segmentPoints=0;completedSegments=0;lastTime=0;lastFixElapsed=0;lastGood=null;gpsSync.reset();
   lastStorageCheckElapsed=-60_000L;lowStorageWarned=false;
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);gpsSyncScheduled=false;
   startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;liveMovingMillis=0;liveStationaryMillis=0;lastWidgetRefreshElapsed=0;gpsOnlyAfterObd=false;
@@ -371,6 +376,10 @@ public final class RideService extends Service implements LocationListener {
   if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
    boolean verified=closeTrack(true);
    if(verified)RideCompletionInbox.record(getApplicationContext(),savedTrack);
+   // Reconcile previous sections in the derived GPS ledger, never the vehicle ODO.
+   if(verified&&completedSegments>0)new Thread(()->{
+    try{RideMileageEstimate.rebuild(getApplicationContext());}catch(IOException ignored){}
+   },"moto-rollover-distance-reconcile").start();
    handler.post(()->{
     if(!finishPending)return;finishPending=false;
     stopWith(verified?"사용자가 라이딩 기록을 저장하고 종료했습니다.":"GPS 기록 검증 실패 · 복구 화면에서 원본을 확인하세요.",false);
@@ -395,6 +404,10 @@ public final class RideService extends Service implements LocationListener {
   if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
    boolean verified=closeTrack(true);
    if(verified)RideCompletionInbox.record(getApplicationContext(),savedTrack);
+   // Reconcile previous sections in the derived GPS ledger, never the vehicle ODO.
+   if(verified&&completedSegments>0)new Thread(()->{
+    try{RideMileageEstimate.rebuild(getApplicationContext());}catch(IOException ignored){}
+   },"moto-rollover-distance-reconcile").start();
    handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,verified);});
   })){
    completeAutoTrack(savedTrack,closeTrack(true));
@@ -430,6 +443,8 @@ public final class RideService extends Service implements LocationListener {
   // No guessing: do not finish or split a moving ride when Bluetooth fails.
   // Keep an already-running GPS session in the same foreground service until its
   // user explicitly ends it. Never auto-arm again or enable group sharing.
+  ObdLocalDiagnosticLog.automaticSession(this,obdConnectionAttempts,
+   obdConnectionSuccesses,obdReconnects,obdQueryFailures,obdSpeedSamples,reason);
   obdLastError="OBD2 · "+reason;
   obdLink="연결 종료 · "+ObdFailureGuide.classify(reason);MotoWidgetProvider.refresh(this);speedSanity.reset();ObdLocalDiagnosticLog.record(this,"AUTO_OFF");obdSpeedKmh=-1;obdLastSampleElapsed=0;
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
@@ -486,11 +501,56 @@ public final class RideService extends Service implements LocationListener {
   }else if(!GpsStorageSpacePolicy.warn(free))lowStorageWarned=false;
   return running;
  }
+ /**
+  * Atomically settle an existing full part before opening the next part.
+  * The same session UUID ties together legacy-compatible track files.
+  * If rotation fails, the previous committed .done remains intact.
+  */
+ private synchronized void rotateRideSection()throws Exception{
+  if(output==null||track==null||segmentPoints<1||activeRideSession.isEmpty())
+   throw new IOException("연속 GPS 구간 상태가 유효하지 않습니다.");
+  GpsStorageSpacePolicy.require(getFilesDir());
+  File previous=track;
+  output.getFD().sync();output.close();output=null;
+  TrackCompletion.mark(previous,segmentPoints);
+  long timestamp=lastTime>0?lastTime:System.currentTimeMillis();
+  File next=new File(previous.getParentFile(),timestamp+"-"+activeRideSession+".track");
+  if(!next.createNewFile())throw new IOException("다음 GPS 구간 파일 이름 충돌");
+  FileOutputStream nextOutput=null;
+  int nextPoints=0;
+  try{
+   nextOutput=new FileOutputStream(next);
+   if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(next,pendingBikeId);
+   // Repeat exactly one boundary fix to include its next travel interval.
+   // The prior segment and next one have no duplicated distance interval.
+   if(lastGood!=null){
+    byte[] boundary=TrackFile.point(lastGood.getLatitude(),lastGood.getLongitude(),
+      lastGood.getAccuracy(),lastGood.getTime()).getBytes(StandardCharsets.UTF_8);
+    nextOutput.write(boundary);nextOutput.flush();nextOutput.getFD().sync();
+    nextPoints=1;
+   }
+  }catch(Exception error){
+   if(nextOutput!=null)try{nextOutput.close();}catch(Exception ignored){}
+   new File(next.getPath()+".bike").delete();
+   if(next.length()==0)next.delete();
+   throw error;
+  }
+  track=next;output=nextOutput;active=next.getName();
+  segmentPoints=nextPoints;completedSegments++;
+  gpsSync.reset();
+  if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);
+  gpsSyncScheduled=false;
+  status="GPS "+(completedSegments+1)+"번째 구간 기록 중 · 이전 구간 저장 완료";
+ }
  @Override public synchronized void onLocationChanged(Location location){
   if(!running||output==null||!checkRuntimeStorage())return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
   if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
-  try{if(track.length()>TrackFile.MAX_BYTES-512)throw new IOException("경로 최대 크기에 도달했습니다.");output.write(TrackFile.point(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime()).getBytes(StandardCharsets.UTF_8));output.flush();
+  try{
+   byte[] point=TrackFile.point(location.getLatitude(),location.getLongitude(),
+    location.getAccuracy(),location.getTime()).getBytes(StandardCharsets.UTF_8);
+   if(point.length>TrackFile.MAX_BYTES-track.length())rotateRideSection();
+   output.write(point);output.flush();
    long writeAt=SystemClock.elapsedRealtime();
    if(gpsSync.shouldSync(writeAt)){
     output.getFD().sync();
@@ -500,7 +560,7 @@ public final class RideService extends Service implements LocationListener {
     gpsSyncScheduled=true;
     gpsWriteHandler.postDelayed(syncPendingGps,GpsSyncPolicy.MAX_DIRTY_MS);
    }
-   lastTime=location.getTime();lastFixElapsed=SystemClock.elapsedRealtime();count++;
+   lastTime=location.getTime();lastFixElapsed=SystemClock.elapsedRealtime();count++;segmentPoints++;
    if(lastGood!=null){long dt=location.getTime()-lastGood.getTime();float metres=location.distanceTo(lastGood);
     // Estimate only GPS-observed time; long gaps, poor accuracy and spikes
     // are not silently counted as either moving or stopped.
@@ -564,8 +624,8 @@ public final class RideService extends Service implements LocationListener {
    try{
     // A successful close alone does not imply a valid, complete GPS track.
     output.getFD().sync();output.close();output=null;
-    if(completed&&count>0&&track!=null){TrackCompletion.mark(track,count);verified=true;}
-    else if(count==0&&track!=null)TrackFile.discardEmptySession(track);
+    if(completed&&segmentPoints>0&&track!=null){TrackCompletion.mark(track,segmentPoints);verified=true;}
+    else if(segmentPoints==0&&track!=null)TrackFile.discardEmptySession(track);
    }catch(Exception e){
     // Keep any nonempty original .track without a .done marker for recovery.
     status="GPS 저장 검증 실패 · 원본 기록을 복구 화면에서 확인해 주세요";
@@ -588,7 +648,7 @@ public final class RideService extends Service implements LocationListener {
   autoGate.reset();running=false;handler.removeCallbacksAndMessages(null);
   if(manager!=null)try{manager.removeUpdates(this);}catch(Exception ignored){}
   boolean verified=closeTrack(completed);
-  if(completed&&!verified&&count>0)status="GPS 기록 검증 실패 · 복구 화면에서 원본 기록을 확인해 주세요";
+  if(completed&&!verified&&segmentPoints>0)status="GPS 기록 검증 실패 · 복구 화면에서 원본 기록을 확인해 주세요";
   stopForeground(STOP_FOREGROUND_REMOVE);
   try{NotificationManager nm=getSystemService(NotificationManager.class);if(nm!=null)nm.cancel(405);}catch(Exception ignored){}
   MotoWidgetProvider.refresh(this);

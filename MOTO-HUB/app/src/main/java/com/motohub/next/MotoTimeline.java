@@ -89,6 +89,23 @@ final class MotoTimeline {
    return cmp!=0?cmp:x.recordId.compareTo(y.recordId);
   });
  }
+ /** Select most recent N in O(total log N) without sorting the whole archive on every progress update. */
+ static List<Event> newest(List<Event> events,int limit){
+  ArrayList<Event> result=new ArrayList<>();
+  if(events==null||limit<=0)return result;
+  java.util.Comparator<Event> oldest=(x,y)->{
+   int c=Long.compare(x.time,y.time);
+   if(c!=0)return c;
+   c=y.kind.compareTo(x.kind);
+   return c!=0?c:y.recordId.compareTo(x.recordId);
+  };
+  java.util.PriorityQueue<Event> heap=new java.util.PriorityQueue<>(Math.min(limit,64),oldest);
+  for(Event e:events){
+   if(heap.size()<limit)heap.add(e);
+   else if(oldest.compare(e,heap.peek())>0){heap.poll();heap.add(e);}
+  }
+  result.addAll(heap);sort(result);return result;
+ }
  static List<Event> filtered(List<Event> events,String filter,int max){
   ArrayList<Event> selected=new ArrayList<>();
   if(events==null||max<=0)return selected;
