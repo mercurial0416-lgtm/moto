@@ -20,16 +20,16 @@ final class RideDistanceCache {
    this.distanceKm=distanceKm;this.durationMillis=durationMillis;
   }
  }
- private static final class Entry {
+ private static final class CacheEntry {
   final long size,modified;
   final Summary value;
-  Entry(long size,long modified,Summary value){
+  CacheEntry(long size,long modified,Summary value){
    this.size=size;this.modified=modified;this.value=value;
   }
  }
- private static final LinkedHashMap<String,Entry> CACHE=
-  new LinkedHashMap<String,Entry>(64,.75f,true){
-   @Override protected boolean removeEldestEntry(Map.Entry<String,Entry> eldest){
+ private static final LinkedHashMap<String,CacheEntry> CACHE=
+  new LinkedHashMap<String,CacheEntry>(64,.75f,true){
+   @Override protected boolean removeEldestEntry(Map.Entry<String,CacheEntry> eldest){
     return size()>MAX_ENTRIES;
    }
   };
@@ -43,7 +43,7 @@ final class RideDistanceCache {
   if(size<=0||size>MAX_ANALYSIS_BYTES)throw new IOException("GPS 분석 크기 제한");
   String path=track.getCanonicalPath();
   synchronized(CACHE){
-   Entry cached=CACHE.get(path);
+   CacheEntry cached=CACHE.get(path);
    if(cached!=null&&cached.size==size&&cached.modified==modified){
     hits++;
     return cached.value;
@@ -55,7 +55,7 @@ final class RideDistanceCache {
    throw new IOException("GPS 분석 중 원본 파일이 변경됨");
   Summary value=new Summary(details.distanceKm,details.durationMillis);
   synchronized(CACHE){
-   CACHE.put(path,new Entry(size,modified,value));
+   CACHE.put(path,new CacheEntry(size,modified,value));
    analyses++;
   }
   return value;
