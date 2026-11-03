@@ -1986,6 +1986,9 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          }
          final boolean restoreAuditOk=postRestoreOk;
          final String restoreAuditMessage=postRestoreReport;
+         // Store only status/date/counts; never retain the GPS/media paths or hashes.
+         final boolean restoreAuditSaved=RestoreVerificationAudit.record(this,postRestoreOk,
+          ready.verifiedFiles(),ready.rides,ready.photos,ready.receipts);
          // Full restore replaces garage and GPS assets. Old ECU baselines and
          // queued ODO readings must never overwrite the restored garage.
          boolean odometerCleared=false,gpsLedgerCleared=false;
@@ -2015,6 +2018,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           if(mileageResetOk)rebuildGpsEstimateAsync();
           toast("복원 완료 · GPS "+ready.rides+"개 · 사진 "+ready.photos+"개"+
            (restoreAuditOk?" · 내용 재검증 통과":" · 복원 후 재검증 실패 · 주의")+
+           (restoreAuditSaved?"":" · 복원 검사 이력 저장 실패")+
            (checkpointReady?"":" · 자동 안전 백업 갱신 실패")+
            (odoResetOk?"":" · 기존 ODO 자동 동기화 해제 저장 실패 · 확인 필요")+
            (mileageResetOk?"":" · GPS 누적거리 재계산 준비 실패")+

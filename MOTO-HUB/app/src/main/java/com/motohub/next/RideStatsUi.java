@@ -23,7 +23,7 @@ final class RideStatsUi {
   new java.util.concurrent.atomic.AtomicLong();
  static void open(MainActivity a){
   LinearLayout body=a.page("라이딩 통계 · 최근 6개월");
-  a.label(body,"실제 GPS 기록 시간을 기준으로 집계합니다. 가져온 날짜나 파일 수정일은 사용하지 않아요.",13,a.muted,false);
+  a.label(body,"GPS 기록의 실제 시각을 휴대폰 현지 시간대로 표시합니다. 파일을 가져온 날짜나 수정 날짜는 사용하지 않아요.",13,a.muted,false);
   TextView status=a.text("GPS 기록 분석 중…",14,a.muted,false);
   body.addView(status);a.gap(body,12);
   RideBarChart chart=new RideBarChart(a);
@@ -35,14 +35,17 @@ final class RideStatsUi {
   body.addView(foot);a.show();
   Dialog owner=a.dialog;
   final String selected=a.bike()==null?"":a.bike().optString("id");
-  final RideStatsSeries data=new RideStatsSeries(YearMonth.now(ZoneId.of("Asia/Seoul")));
+  final ZoneId localZone=ZoneId.systemDefault();
+  final java.time.LocalDate reportDay=java.time.LocalDate.now(localZone);
+  final RideStatsSeries data=new RideStatsSeries(YearMonth.from(reportDay),localZone);
   // A per-bike, same-month ledger snapshot. Never divide all-bike expenses by one bike's GPS.
   final double sixMonthExpense;
   final int unpaidExcluded;
   if(selected.isEmpty()){sixMonthExpense=0;unpaidExcluded=0;}
   else{
-   RecordMonthlySummary ledger=RecordMonthlySummary.forBike(
-    a.items("expenses"),a.items("services"),selected,data.anchor);
+   RecordMonthlySummary ledger=RecordMonthlySummary.forBikeAsOf(
+    a.items("expenses"),a.items("services"),selected,data.anchor,
+    reportDay);
    sixMonthExpense=CostDashboard.add(ledger.sumFuelAndOther(),ledger.sumService());
    unpaidExcluded=ledger.scheduledOrFuture;
   }
@@ -67,7 +70,18 @@ final class RideStatsUi {
          new File(ride.getPath()+".recovered").isFile())data.excluded++;
       continue;
      }
-     if(inspected++>=180){data.scanned++;continue;}
+     // Analyze all matching tracks, not only the newest 180. The entire scan is
+     // on the dedicated worker; progress is posted in bounded batches.
+     inspected++;
+     if(inspected%40==0){
+      final int progress=inspected;
+      a.runOnUiThread(()->{
+       if(generation==STATS_GENERATION.get()&&!a.isFinishing()&&!a.isDestroyed()&&
+          a.dialog==owner&&owner.isShowing())
+        status.setText("GPS 기록 분석 중… "+progress+"건 확인");
+      });
+      Thread.yield();
+     }
      try{
       if(ride.length()>5_000_000){data.excluded++;continue;}
       long size=ride.length(),modified=ride.lastModified();
@@ -88,7 +102,6 @@ final class RideStatsUi {
     costEstimate.setText(RideCostPerKm.caption(selected,sixMonthExpense,data.totalKm,data.scanned+data.excluded));
     foot.setText("바이크 "+(selected.isEmpty()?"전체":a.bikeName(selected))+
       " · 손상·기준 초과 제외 "+data.excluded+"건"+
-      (data.scanned>0?" · 처리 제한으로 제외 "+data.scanned+"건":"")+
       (unpaidExcluded>0?" · 미지출·미래 비용 "+unpaidExcluded+"건 제외":"")+
       "\nGPS 추정값이며 실주행거리·계기판 ODO를 자동 수정하지 않습니다. 월별 주행횟수 "+
       Arrays.toString(data.count)+"회 · 총 분석 시간 "+data.totalMinutes()+"분");

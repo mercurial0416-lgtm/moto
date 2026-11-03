@@ -476,11 +476,14 @@ final class DeveloperObdScreen {
   worker=new Thread(()->runConnection(device),"moto-obd-read-only");worker.setDaemon(true);worker.start();
  }
  private void runConnection(BluetoothDevice device){
+  long latencyMs=0,lastSampleAt=0;
+  int received=0,failed=0;
+  boolean connected=false;
   try{
    if(stopped)return;
    BluetoothSocket created=device.createRfcommSocketToServiceRecord(SPP);
    socket=created;if(stopped){created.close();return;}
-   created.connect();if(stopped)return;
+   created.connect();connected=true;if(stopped)return;
    InputStream in=created.getInputStream();OutputStream out=created.getOutputStream();
    // AT commands configure only the ELM adapter. All vehicle requests are whitelisted mode 01 reads.
    for(String setup:new String[]{"ATZ\r","ATE0\r","ATL0\r","ATS0\r","ATSP0\r"}){
@@ -504,21 +507,28 @@ final class DeveloperObdScreen {
      if(capabilities.forPid(pid)==ObdPidCapabilities.Support.NO){updateField(i,"미지원 (PID 목록)");continue;}
      if("012F".equals(pid)&&capabilities.forPid(pid)!=ObdPidCapabilities.Support.YES){updateField(i,"지원 미확인 · 연료 조회 생략");continue;}
      try{
+      long queryStart=System.nanoTime();
       String result=ObdReadOnlyProtocol.decode(pid,request(in,out,ObdReadOnlyProtocol.query(pid),2500));
       if(!"지원 안 함".equals(result)){
+       latencyMs+=Math.max(0,Math.min(60_000,(System.nanoTime()-queryStart)/1_000_000));
+       received++;lastSampleAt=System.currentTimeMillis();
        successThisCycle++;validSensors++;if("010D".equals(pid))gotSpeed=true;
        if(!observedPid[i]){
         observedPid[i]=true;
         ObdLocalDiagnosticLog.observed(activity,pid);
        }
        if(!loggedSensor){ObdLocalDiagnosticLog.record(activity,"SENSOR_OK");loggedSensor=true;}
-      }
+      }else failed++;
       updateField(i,result);
      }catch(InterruptedException interrupted){throw interrupted;}
-     catch(Exception temporary){if(stopped)return;updateField(i,"응답 지연 · 다음 주기 재시도");}
+     catch(Exception temporary){
+      if(stopped)return;failed++;updateField(i,"응답 지연 · 다음 주기 재시도");
+     }
     }
     if(stopped)break;
-    setStatus(ObdFirstConnectionGuide.result(capabilities.forPid("010D"),gotSpeed,validSensors)+"\n"+capabilities.summary());
+    setStatus(ObdFirstConnectionGuide.result(capabilities.forPid("010D"),gotSpeed,validSensors)+"\n"+
+     capabilities.summary()+"\n실제 수신 "+received+"회 · 평균 응답 "+
+     (received==0?"미측정":(latencyMs/received)+"ms")+" · 응답 실패 "+failed+"회");
     if(successThisCycle==0){
      if(++noDataCycles>=3){
       ObdLocalDiagnosticLog.record(activity,"NO_ECU");
@@ -532,7 +542,11 @@ final class DeveloperObdScreen {
    ObdLocalDiagnosticLog.record(activity,"ERROR");
    setStatus(ObdFirstConnectionGuide.failure(e));
   }}
-  finally{closeSocket();stopped=true;}
+  finally{
+   ObdLocalDiagnosticLog.probeMetrics(activity,connected,received,failed,
+    received==0?-1:latencyMs/received,lastSampleAt);
+   closeSocket();stopped=true;
+  }
  }
  private String request(InputStream in,OutputStream out,String command,long timeoutMs)throws Exception{
   if(stopped)throw new java.io.IOException("연결이 종료됐습니다.");

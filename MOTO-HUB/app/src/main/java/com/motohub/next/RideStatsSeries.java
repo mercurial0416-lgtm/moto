@@ -9,11 +9,13 @@ final class RideStatsSeries {
  final long[] minutes=new long[6];
  final String[] labels=new String[6];
  final YearMonth anchor;
+ final ZoneId zone;
  int excluded=0, scanned=0;
  double totalKm=0;
- RideStatsSeries(YearMonth anchor){
-  if(anchor==null)throw new IllegalArgumentException("기준 월 없음");
-  this.anchor=anchor;
+ RideStatsSeries(YearMonth anchor){this(anchor,ZoneId.systemDefault());}
+ RideStatsSeries(YearMonth anchor,ZoneId zone){
+  if(anchor==null||zone==null)throw new IllegalArgumentException("기준 월 또는 시간대 없음");
+  this.anchor=anchor;this.zone=zone;
   for(int i=0;i<6;i++){
    YearMonth month=anchor.minusMonths(5-i);
    labels[i]=month.getMonthValue()+"월";
@@ -23,14 +25,14 @@ final class RideStatsSeries {
   if(startMs<=0||!Double.isFinite(distanceKm)||distanceKm<0||distanceKm>1000||elapsedMs<0||elapsedMs>4L*24*3600*1000){
    excluded++;return false;
   }
-  YearMonth month=YearMonth.from(Instant.ofEpochMilli(startMs).atZone(ZoneId.of("Asia/Seoul")));
+  YearMonth month=YearMonth.from(Instant.ofEpochMilli(startMs).atZone(zone));
   long index=ChronoUnit.MONTHS.between(anchor.minusMonths(5),month);
   if(index<0||index>=6)return false;
   int i=(int)index;count[i]++;km[i]+=distanceKm;minutes[i]+=elapsedMs/60000;totalKm+=distanceKm;return true;
  }
- /** Inclusive start of the six displayed calendar months, in the app's Korea time zone. */
+ /** Inclusive start of the six displayed local calendar months, including DST boundaries. */
  long earliestStartMs(){
-  return anchor.minusMonths(5).atDay(1).atStartOfDay(ZoneId.of("Asia/Seoul"))
+  return anchor.minusMonths(5).atDay(1).atStartOfDay(zone)
    .toInstant().toEpochMilli();
  }
  /** A fixed-day rolling cutoff can silently discard the first days of six calendar months. */

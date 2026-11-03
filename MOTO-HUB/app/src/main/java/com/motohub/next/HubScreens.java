@@ -670,6 +670,7 @@ final class HubScreens {
  void updateRecoveryReport(){
   LinearLayout page=a.page("업데이트 후 데이터 검사");
   a.label(page,UpdateInstallSnapshot.lastReport(a),15,a.fg,false);
+  a.label(page,RestoreVerificationAudit.summary(a),12,a.muted,false);
   a.label(page,"검사 결과는 참고 정보입니다. 정상으로 표시돼도 전체 ZIP 백업을 따로 보관하세요. 자동 복원은 실행하지 않습니다.",13,a.muted,false);
   a.action(page,"전체 ZIP 백업 만들기",true,a::exportBundle);
   a.action(page,"보존된 로컬 복구 지점 확인",false,this::advancedBackup);
@@ -682,6 +683,8 @@ final class HubScreens {
   final TextView freshness=a.text(BackupGpsProof.fullStatus(a)+"\nGPS 원본 백업 상태 검사 중…"+
    "\n바이크 영구 삭제는 현재 데이터와 일치하는 검증된 전체 ZIP이 있어야 가능합니다.",13,a.muted,false);
   p.addView(freshness);
+  a.label(p,RestoreVerificationAudit.summary(a),12,
+   RestoreVerificationAudit.failed(a)?a.accent:a.muted,false);
   final String backupSnapshot=backupJsonSnapshot(); // Same JSON serialization as the verified ZIP.
   LOCAL_BACKUP_IO.execute(()->{
    String status=BackupGpsProof.fullCurrentStatus(a,backupSnapshot);

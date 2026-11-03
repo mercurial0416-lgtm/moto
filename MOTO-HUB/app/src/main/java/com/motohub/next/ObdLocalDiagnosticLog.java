@@ -37,6 +37,18 @@ final class ObdLocalDiagnosticLog {
   int previous=preferences.getInt("observed_mask",0);
   if((previous&bit)==0)preferences.edit().putInt("observed_mask",previous|bit).apply();
  }
+ /** Store one bounded diagnostic summary at session end, never MAC, raw payload or coordinates. */
+ static void probeMetrics(Context c,boolean connected,int validReplies,int failures,
+                          long averageLatencyMs,long lastReceivedAt){
+  c.getSharedPreferences(PREFS,0).edit()
+   .putLong("probe_at",System.currentTimeMillis())
+   .putBoolean("probe_connected",connected)
+   .putInt("probe_valid",Math.max(0,Math.min(validReplies,1_000_000)))
+   .putInt("probe_failed",Math.max(0,Math.min(failures,1_000_000)))
+   .putLong("probe_latency_ms",Math.max(-1,Math.min(averageLatencyMs,60_000)))
+   .putLong("probe_last_received",lastReceivedAt>0&&lastReceivedAt<=System.currentTimeMillis()?lastReceivedAt:0)
+   .apply();
+ }
  static void record(Context c,String code){
   if(!ObdDiagnosticEventPolicy.valid(code))return;
   SharedPreferences p=c.getSharedPreferences(PREFS,0);
@@ -75,6 +87,29 @@ final class ObdLocalDiagnosticLog {
    }
    text.append(samples);
   }else text.append("\n실제 센서값 수신 기록 없음 · PID 목록만 확인됨");
+  long probeAt=p.getLong("probe_at",0),lastReply=p.getLong("probe_last_received",0);
+  if(probeAt>0&&probeAt<=System.currentTimeMillis()){
+   text.append("\n\n마지막 수동 OBD 센서 검사: ")
+    .append(new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.KOREA).format(new Date(probeAt)))
+    .append("\n연결: ").append(p.getBoolean("probe_connected",false)?"Bluetooth 성공":"실패/중단")
+    .append(" · 센서 응답 ").append(Math.max(0,p.getInt("probe_valid",0))).append("회")
+    .append(" · 실패 ").append(Math.max(0,p.getInt("probe_failed",0))).append("회")
+    .append(" · 자동 재연결 0회 (수동 검사)");
+   long latency=p.getLong("probe_latency_ms",-1);
+   text.append("\n평균 ECU 응답: ").append(latency>=0?latency+"ms":"측정 불가");
+   if(lastReply>0&&lastReply<=System.currentTimeMillis())
+    text.append("\n마지막 정상 센서 수신: ")
+     .append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss",Locale.KOREA).format(new Date(lastReply)));
+  }
+  if(RideService.autoArmed){
+   text.append("\n\n현재 OBD 자동 기록 · 연결 시도 ")
+    .append(Math.max(0,RideService.obdConnectionAttempts)).append("회 · 성공 ")
+    .append(Math.max(0,RideService.obdConnectionSuccesses)).append("회 · 재연결 ")
+    .append(Math.max(0,RideService.obdReconnects)).append("회 · 쿼리 실패 ")
+    .append(Math.max(0,RideService.obdQueryFailures)).append("회");
+   text.append("\n최근 측정 응답: ")
+    .append(RideService.obdAverageLatencyMs>=0?RideService.obdAverageLatencyMs+"ms":"측정 불가");
+  }
   String events=p.getString("events","");
   if(events!=null&&!events.isEmpty())text.append("\n\n최근 연결 점검\n").append(events);
   return text.toString();

@@ -19,7 +19,7 @@ public final class Ux109RideJournalChartObdTest {
   catch(IllegalArgumentException expected){}
  }
  @Test public void sixMonthStatsGroupByRealRideDateInSeoul(){
-  RideStatsSeries series=new RideStatsSeries(YearMonth.of(2026,11));
+  RideStatsSeries series=new RideStatsSeries(YearMonth.of(2026,11),ZoneId.of("Asia/Seoul"));
   long october=LocalDate.of(2026,10,30).atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant().toEpochMilli();
   long june=LocalDate.of(2026,6,1).atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant().toEpochMilli();
   long april=LocalDate.of(2026,4,30).atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant().toEpochMilli();
