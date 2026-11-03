@@ -496,6 +496,7 @@ final class DeveloperObdScreen {
    setStatus("Bluetooth 연결됨 · 차량 센서 응답 확인 중…");
    int noDataCycles=0,validSensors=0;
    boolean gotSpeed=false,loggedSensor=false;
+   boolean[] observedPid=new boolean[ObdReadOnlyProtocol.SENSOR_PIDS.length];
    while(!stopped){
     int successThisCycle=0;
     for(int i=0;i<ObdReadOnlyProtocol.SENSOR_PIDS.length&&!stopped;i++){
@@ -506,7 +507,10 @@ final class DeveloperObdScreen {
       String result=ObdReadOnlyProtocol.decode(pid,request(in,out,ObdReadOnlyProtocol.query(pid),2500));
       if(!"지원 안 함".equals(result)){
        successThisCycle++;validSensors++;if("010D".equals(pid))gotSpeed=true;
-       ObdLocalDiagnosticLog.observed(activity,pid);
+       if(!observedPid[i]){
+        observedPid[i]=true;
+        ObdLocalDiagnosticLog.observed(activity,pid);
+       }
        if(!loggedSensor){ObdLocalDiagnosticLog.record(activity,"SENSOR_OK");loggedSensor=true;}
       }
       updateField(i,result);
