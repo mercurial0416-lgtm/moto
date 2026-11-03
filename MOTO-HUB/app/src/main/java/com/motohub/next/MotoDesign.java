@@ -24,15 +24,15 @@ final class MotoDesign {
  static final int DARK_STROKE=0xFF303944;
  static final int DARK_TEXT=0xFFF3F5F8;
  static final int DARK_MUTED=0xFFA6B0BD;
- static final int DARK_ACCENT=0xFF80ADFF;
- static final int DARK_TINT=0xFF263953;
+ static final int DARK_ACCENT=0xFFFFA25A;
+ static final int DARK_TINT=0xFF36291F;
  static final int LIGHT_BACKGROUND=0xFFF7F8FA;
  static final int LIGHT_SURFACE=0xFFFFFFFF;
  static final int LIGHT_STROKE=0xFFE5E9EF;
  static final int LIGHT_TEXT=0xFF202733;
  static final int LIGHT_MUTED=0xFF667381;
- static final int LIGHT_ACCENT=0xFF2869C8;
- static final int LIGHT_TINT=0xFFE9F1FC;
+ static final int LIGHT_ACCENT=0xFF9C4E1E;
+ static final int LIGHT_TINT=0xFFF9EEE6;
  static int[] colors(boolean dark){
   return dark?new int[]{DARK_BACKGROUND,DARK_TEXT,DARK_MUTED,DARK_STROKE,DARK_ACCENT,DARK_SURFACE,DARK_TINT}:
    new int[]{LIGHT_BACKGROUND,LIGHT_TEXT,LIGHT_MUTED,LIGHT_STROKE,LIGHT_ACCENT,LIGHT_SURFACE,LIGHT_TINT};
@@ -74,11 +74,6 @@ final class MotoDesign {
    notice.setContentDescription("정비 알림 열기");
    notice.setOnClickListener(v->new GarageHomeUi(a).showNotices());
    bar.addView(notice);
-  }else if(!"더보기".equals(a.tab)){
-   TextView options=headerAction(a,"설정");
-   options.setContentDescription("설정 화면 열기");
-   options.setOnClickListener(v->a.navigate("더보기"));
-   bar.addView(options);
   }
   root.addView(bar);
  }
