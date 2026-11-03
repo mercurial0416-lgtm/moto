@@ -22,7 +22,7 @@ checks={
  "shared in-memory capped LRU": "MAX_ENTRIES=4096" in cache and "removeEldestEntry" in cache,
  "cache read-only no odometer": "NEVER evidence for odometer" in cache and "RideMileageIntegrity.validCompleted(track)" in cache,
  "cache detects changed file": "track.lastModified()!=modified" in cache and "track.length()!=size" in cache,
- "six-month chart uses same cached summary": "RideDistanceCache.read(ride)" in stats and "ride.length()>5_000_000" in stats,
+ "six-month chart accepts full 25MB safe GPS": "RideDistanceCache.read(ride)" in stats and "ride.length()>5_000_000" not in stats and "TrackFile.MAX_BYTES" in stats,
  "full restore invalidates derived distance": "RideDistanceCache.clear();" in main,
  "cost dashboard uses local snapshot day": "ZoneId.systemDefault()" in cost and "YearMonth.from(today)" in cost and "RecordMonthlySummary.forBikeAsOf" in cost and "localToday=today.toString()" in cost,
  "original data scheme unchanged": "atomic(disk,next.toString(2)" in main and "Sharing.start(" not in timeline

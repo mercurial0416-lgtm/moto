@@ -17,7 +17,11 @@ s=Path('app/src/main/java/com/motohub/next/RideUi.java').read_text()
 assert 'rideReport(scope,choices[which])' in s
 assert 'RideHistorySort.order(TrackFile.tracks' in s
 assert 'RideReportScope.include(track,bikeScope)' in s
-assert '분석 제한(최신 150건)' in s
+assert '분석 제한(최신 150건)' not in s
+assert 'if(inspected>=150)' not in s
+assert 'RideDistanceCache.read(track)' in s
+assert 'categoryComparison.add(track,now,data)' in s
+assert '최근 60일 대상' in s
 assert 'Sharing.start(' not in s
-print('PASS: report UI wiring, bounded analysis and no automatic sharing')
+print('PASS: report UI wiring, full 60-day analysis via verified cache and no automatic sharing')
 PYTEST

@@ -11,6 +11,7 @@ final class RideStatsSeries {
  final YearMonth anchor;
  final ZoneId zone;
  int excluded=0, scanned=0;
+ int invalidCompleted=0,oversize=0,unreadable=0,invalidMetrics=0;
  double totalKm=0;
  RideStatsSeries(YearMonth anchor){this(anchor,ZoneId.systemDefault());}
  RideStatsSeries(YearMonth anchor,ZoneId zone){
