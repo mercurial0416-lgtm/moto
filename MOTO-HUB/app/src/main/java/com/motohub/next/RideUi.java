@@ -258,6 +258,8 @@ final class RideUi {
   final String rideNotesSnapshot=liveNotes==null?"{}":liveNotes.toString();
   final String distanceRange=RideHistoryDistanceFilter.normalize(
    a.getSharedPreferences("ride_history_ui",0).getString("distance_filter",RideHistoryDistanceFilter.ALL));
+  final String categoryRange=RideCategoryFilter.normalize(
+   a.getSharedPreferences("ride_history_ui",0).getString("category_filter",RideCategoryFilter.ALL));
   HISTORY_EXECUTOR.execute(()->{
    if(generation!=HISTORY_GENERATION.get())return;
    try{
@@ -272,6 +274,8 @@ final class RideUi {
     // 7-day view can claim hundreds of rides even when only two are visible.
     // Imported GPX dates come from their first committed GPS point.
     bikeRides.removeIf(file->!RideHistoryPeriod.include(file,now,period));
+    // Saved category is a separate exact-match filter. Never erase user's text query.
+    bikeRides.removeIf(file->!RideCategoryFilter.matches(categoryRange,RideCategory.read(file)));
     Map<String,Integer> counts=RideHistoryFilter.counts(bikeRides,activeName,recording);
     List<File> visible=RideHistorySort.order(RideHistoryFilter.select(bikeRides,selected,activeName,recording),sort);
     String distanceInfo="";
@@ -449,15 +453,18 @@ final class RideUi {
    periodButton.setContentDescription("라이딩 기간 "+a.rideHistoryPeriod+", 변경하기");
    LinearLayout.LayoutParams periodLp=new LinearLayout.LayoutParams(-2,a.dp(44));periodLp.leftMargin=a.dp(6);
    historyTools.addView(periodButton,periodLp);
-   Button categoryButton=a.button("종류: 검색  ▾",false,()->{
-    String[] labels={"전체 종류","일상","출퇴근","와인딩","장거리","투어"};
-    new AlertDialog.Builder(a).setTitle("라이딩 종류 검색")
-     .setMessage("사용자가 지정한 라이딩 종류와 제목·메모에 적힌 용어를 검색합니다. 자동 추천은 기록 상세에서 확인하세요.")
-     .setItems(labels,(dialog,index)->{
-      a.rideHistoryQuery=index==0?"":labels[index];
-      a.render();
-     }).setNegativeButton("취소",null).show();
-   });
+   final String selectedCategory=RideCategoryFilter.normalize(a.getSharedPreferences("ride_history_ui",0)
+     .getString("category_filter",RideCategoryFilter.ALL));
+   Button categoryButton=a.button("종류: "+selectedCategory+"  ▾",false,()->
+    new AlertDialog.Builder(a).setTitle("저장한 라이딩 종류")
+     .setMessage("저장된 종류만 정확하게 필터링합니다. 제목·메모 검색어는 그대로 유지되고 자동 분류는 추측하지 않습니다.")
+     .setSingleChoiceItems(RideCategoryFilter.OPTIONS,
+      Math.max(0,Arrays.asList(RideCategoryFilter.OPTIONS).indexOf(selectedCategory)),(dialog,index)->{
+       dialog.dismiss();
+       a.getSharedPreferences("ride_history_ui",0).edit()
+        .putString("category_filter",RideCategoryFilter.OPTIONS[index]).apply();
+       a.render();
+      }).setNegativeButton("취소",null).show());
    categoryButton.setMinHeight(a.dp(44));
    LinearLayout.LayoutParams categoryLp=new LinearLayout.LayoutParams(-2,a.dp(44));categoryLp.leftMargin=a.dp(6);
    historyTools.addView(categoryButton,categoryLp);
@@ -483,7 +490,7 @@ final class RideUi {
     boolean expand=historyControlStrip.getVisibility()!=View.VISIBLE;
     historyControlStrip.setVisibility(expand?View.VISIBLE:View.GONE);
    });
-   filterToggle.setContentDescription("날짜, 바이크, 정렬 상세 필터 열기 또는 접기");
+   filterToggle.setContentDescription("날짜, 바이크, 종류, GPS 거리, 정렬 상세 필터 열기 또는 접기");
    historyPanel.addView(filterToggle);
    if(damagedBindings>0){
     TextView warning=a.text("주의: 바이크 연결 정보 손상 "+damagedBindings+"건 · 미지정으로 분류하지 않음",12,0xffe7a04e,false);
