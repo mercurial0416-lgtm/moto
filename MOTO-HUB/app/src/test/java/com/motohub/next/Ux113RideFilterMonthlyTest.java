@@ -19,8 +19,8 @@ public final class Ux113RideFilterMonthlyTest {
   assertEquals(7,RideCategoryFilter.OPTIONS.length);
  }
  @Test public void sixCalendarMonthsCoverTheFirstDayAndRejectPriorMonth(){
-  RideStatsSeries s=new RideStatsSeries(YearMonth.of(2026,11));
   ZoneId zone=ZoneId.of("Asia/Seoul");
+  RideStatsSeries s=new RideStatsSeries(YearMonth.of(2026,11),zone);
   long first=YearMonth.of(2026,6).atDay(1).atStartOfDay(zone).toInstant().toEpochMilli();
   long now=YearMonth.of(2026,11).atDay(3).atStartOfDay(zone).toInstant().toEpochMilli();
   assertEquals(first,s.earliestStartMs());
