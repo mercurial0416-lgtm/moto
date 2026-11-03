@@ -28,6 +28,11 @@ final class RideUi {
  });
  private static final AtomicLong HISTORY_GENERATION=new AtomicLong();
  private static final AtomicLong MERGE_GENERATION=new AtomicLong();
+ /** Latest-request-wins: only one 60-day report analyzes GPS at a time. */
+ private static final ExecutorService REPORT_EXECUTOR=Executors.newSingleThreadExecutor(r->{
+  Thread thread=new Thread(r,"moto-ride-report-reader");thread.setDaemon(true);return thread;
+ });
+ private static final AtomicLong REPORT_GENERATION=new AtomicLong();
  private int historyVisibleLimit=RideHistoryPage.PAGE_SIZE;
  private static final class HistoryData {
   final List<File> rides;final List<HistoryEntry> entries;
@@ -681,7 +686,9 @@ final class RideUi {
  }
  void rideReport(String bikeScope,String scopeLabel){
   a.toast("기기에 저장된 경로를 분석합니다.");
-  new Thread(()->{
+  final long request=REPORT_GENERATION.incrementAndGet();
+  REPORT_EXECUTOR.execute(()->{
+   if(request!=REPORT_GENERATION.get())return;
    RideMonthlyReport report=new RideMonthlyReport();
    RideTypeComparison categoryComparison=new RideTypeComparison();
    int scanned=0;
@@ -690,6 +697,7 @@ final class RideUi {
     // Imported GPX uses actual first point time, not the date it was imported.
     // Include EVERY eligible record over the 60-day window, on a worker.
     for(File track:RideHistorySort.order(TrackFile.tracks(a.getFilesDir()),RideHistorySort.NEWEST)){
+     if(request!=REPORT_GENERATION.get()||a.isFinishing()||a.isDestroyed())return;
      if(!RideMonthlyReport.recent(track,now,60))continue;
      if(RideService.running&&track.getName().equals(RideService.active))continue;
      if(RideTrackMerge.mergedSource(track)||RideTrackMerge.archived(track))continue;
@@ -706,7 +714,7 @@ final class RideUi {
    }catch(Exception ignored){report.skipped++;}
    final int analyzedCandidates=scanned;
    a.runOnUiThread(()->{
-    if(a.isFinishing()||a.isDestroyed())return;
+    if(request!=REPORT_GENERATION.get()||a.isFinishing()||a.isDestroyed()||!"라이딩".equals(a.tab))return;
     String text="대상: "+scopeLabel+"\n최근 30일: "+report.current.count+"회 · "+String.format(Locale.KOREA,"%.1f km",report.current.km)
      +" · "+(report.current.minutes/60)+"시간 "+(report.current.minutes%60)+"분"
      +"\n이전 30일: "+report.previous.count+"회 · "+String.format(Locale.KOREA,"%.1f km",report.previous.km)
@@ -717,7 +725,7 @@ final class RideUi {
      "\n최근 60일 대상 "+analyzedCandidates+"건 검사 · 손상·미완료·크기 초과 "+report.skipped+"건 제외";
     new AlertDialog.Builder(a).setTitle("내 라이딩 통계").setMessage(text+"\n\nGPS 계산값이며 현재 기록 중인 라이딩은 제외합니다. GPX는 가져온 날짜가 아닌 실제 기록 날짜를 사용합니다.").setPositiveButton("확인",null).show();
    });
-  },"moto-local-ride-summary").start();
+  });
  }
  void handleReadiness(RideReadiness.State state){
   if(state==RideReadiness.State.GPS_DISABLED){

@@ -22,7 +22,7 @@ checks={
  "monthly chart preserves cost division exclusion gate": "RideCostPerKm.caption(selected,sixMonthExpense,data.totalKm,data.scanned+data.excluded)" in stats,
  "time zone is not fixed to Korea for timeline": 'ZoneId.of("Asia/Seoul")' not in timeline and 'ZoneId.systemDefault()' in timeline,
  "timeline snapshots zone once per screen": "localZone=java.time.ZoneId.systemDefault()" in timeline_ui and "MotoTimeline.ledger(snapshot,bikeId,localZone)" in timeline_ui and "MotoTimeline.ride(track,snapshot,bikeId,localZone)" in timeline_ui,
- "cache SHA-256 prevents matching-size matching-mtime rewrite": "RideMileageIntegrity.fingerprint(track)" in cache and "cached.sha256.equals(before)" in cache and "!before.equals(after)" in cache,
+ "cache SHA-256 prevents matching-size matching-mtime rewrite": "RideMileageIntegrity.fingerprint(track)" in cache and "cached.sha256.equals(currentHash)" in cache and "!parsed.equals(after)" in cache,
  "cached summary contains no identifying coordinates": "peakLatitude" not in cache and "peakLongitude" not in cache,
  "cache still bounded and read-only": "MAX_ENTRIES=4096" in cache and "removeEldestEntry" in cache and "NEVER evidence for odometer" in cache,
  "stats and other safe 25MB limit unchanged": "TrackFile.MAX_BYTES" in cache and "invalidCompleted=0,oversize=0,unreadable=0,invalidMetrics=0" in summary,

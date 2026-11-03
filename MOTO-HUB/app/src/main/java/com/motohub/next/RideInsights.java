@@ -46,7 +46,8 @@ public final class RideInsights {
   double h=Math.pow(Math.sin(lat/2),2)+Math.cos(r1)*Math.cos(r2)*Math.pow(Math.sin(lon/2),2);
   return 6371000.0*2*Math.atan2(Math.sqrt(Math.min(1,h)),Math.sqrt(Math.max(0,1-h)));
  }
- public static Result analyze(File track)throws Exception{
+ public static Result analyze(File track)throws Exception{return analyze(track,null);}
+ static Result analyze(File track,java.security.MessageDigest digest)throws Exception{
   final int[] count={0},bad={0},gaps={0},rests={0};final long[] start={0},end={0},last={0},lastObserved={0},observed={0},stopLast={0},stopRun={0};final boolean[] gapPending={false};
   final double[] lat={0},lon={0},previousAccuracy={0},km={0},max={0},peakLat={Double.NaN},peakLon={Double.NaN},stopLat={0},stopLon={0},stopAccuracy={0};
   final long[] moving={0};final boolean[] have={false},restCounted={false};
@@ -92,7 +93,7 @@ public final class RideInsights {
    }
    // Rest streak is separately bounded to consecutive fixes, never across a GPS gap.
    lat[0]=x;lon[0]=y;last[0]=t;previousAccuracy[0]=accuracy;have[0]=true;
-  });
+  },digest);
   return new Result(count[0],bad[0],km[0],max[0],start[0],end[0],moving[0],observed[0],
    peakLat[0],peakLon[0],gaps[0],rests[0]);
  }

@@ -12,6 +12,8 @@ import org.xml.sax.helpers.DefaultHandler;
 /** Bounded GPX 1.0/1.1 importer. Rejects DTD/entities, out-of-order and fabricated timestamps. */
 public final class GpxImporter {
  private GpxImporter(){}
+ static final long MAX_INPUT_BYTES=TrackFile.MAX_BYTES;
+ static final int MAX_IMPORT_POINTS=200_000;
  public static final class Imported {
   public final String name;public final int count;
   Imported(String n,int c){name=n;count=c;}
@@ -20,14 +22,14 @@ public final class GpxImporter {
   if(!rides.isDirectory()&&!rides.mkdirs())throw new IOException("GPS 저장 폴더 생성 실패");
   File temp=File.createTempFile("import-", ".part",rides);
   try{
-   final int[] count={0};final long[] last={0};
+   final int[] count={0};final long[] last={0},written={0};
    try(OutputStream out=new BufferedOutputStream(new FileOutputStream(temp))){
     SAXParserFactory factory=SAXParserFactory.newInstance();factory.setNamespaceAware(true);factory.setXIncludeAware(false);
     factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
     factory.setFeature("http://xml.org/sax/features/external-general-entities",false);
     factory.setFeature("http://xml.org/sax/features/external-parameter-entities",false);
     factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd",false);
-    factory.newSAXParser().parse(new BoundedInputStream(stream,8_000_000),new DefaultHandler(){
+    factory.newSAXParser().parse(new BoundedInputStream(stream,MAX_INPUT_BYTES),new DefaultHandler(){
      boolean inPoint=false,inTime=false;double lat,lon;StringBuilder text=new StringBuilder();long stamp=0;
      @Override public void startElement(String uri,String local,String qName,Attributes attrs)throws SAXException{
       String tag=local.isEmpty()?qName:local;
@@ -51,9 +53,13 @@ public final class GpxImporter {
       if(inPoint&&(tag.equals("trkpt")||tag.equals("rtept"))){
        if(stamp==0)throw new SAXException("시간 없는 GPX 코스는 라이딩 기록으로 가져올 수 없어요");
        if(stamp<=last[0])throw new SAXException("시간 역순 또는 중복 GPX 기록입니다");
-       if(++count[0]>50000)throw new SAXException("GPX 좌표 최대 5만 개까지 지원합니다");
-       try{out.write(TrackFile.point(lat,lon,0,stamp).getBytes(StandardCharsets.UTF_8));}
-       catch(Exception e){throw new SAXException("GPS 기록 저장 실패",e);}last[0]=stamp;inPoint=false;
+       if(++count[0]>MAX_IMPORT_POINTS)throw new SAXException("GPX 좌표 최대 20만 개까지 지원합니다");
+       try{
+        byte[] point=TrackFile.point(lat,lon,0,stamp).getBytes(StandardCharsets.UTF_8);
+        if(point.length>TrackFile.MAX_BYTES-written[0])throw new IOException("변환된 GPS 원본 25MB 한도 초과");
+        out.write(point);written[0]+=point.length;
+       }catch(Exception e){throw new SAXException("GPS 기록 저장 실패",e);}
+       last[0]=stamp;inPoint=false;
       }
      }
     });out.flush();
@@ -88,7 +94,7 @@ public final class GpxImporter {
  private static final class BoundedInputStream extends FilterInputStream {
   long count=0;final long max;
   BoundedInputStream(InputStream in,long m){super(in);max=m;}
-  @Override public int read()throws IOException{int v=super.read();if(v!=-1&&++count>max)throw new IOException("GPX 파일은 8MB 이하만 지원해요");return v;}
-  @Override public int read(byte[] b,int off,int len)throws IOException{int n=super.read(b,off,(int)Math.min(len,Math.max(1,max-count+1)));if(n>0&&(count+=n)>max)throw new IOException("GPX 파일은 8MB 이하만 지원해요");return n;}
+  @Override public int read()throws IOException{int v=super.read();if(v!=-1&&++count>max)throw new IOException("GPX 파일은 25MB 이하만 지원해요");return v;}
+  @Override public int read(byte[] b,int off,int len)throws IOException{int n=super.read(b,off,(int)Math.min(len,Math.max(1,max-count+1)));if(n>0&&(count+=n)>max)throw new IOException("GPX 파일은 25MB 이하만 지원해요");return n;}
  }
 }

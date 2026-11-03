@@ -2,6 +2,7 @@ package com.motohub.next;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.MessageDigest;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -45,26 +46,26 @@ final class RideDistanceCache {
   long size=track.length(),modified=track.lastModified();
   if(size<=0||size>MAX_ANALYSIS_BYTES)throw new IOException("GPS 분석 크기 제한");
   String path=track.getCanonicalPath();
-  // mtime and length can be preserved by a same-size replacement or a rewrite.
-  // Hash every prospective cache hit on this worker thread, never on the UI.
-  // Unlike a GPS replay, streaming SHA-256 doesn't parse every location point.
-  String before=RideMileageIntegrity.fingerprint(track);
-  if(!RideMileageIntegrity.validCompleted(track)||
-     track.length()!=size||track.lastModified()!=modified)
-   throw new IOException("GPS 확인 중 원본 파일이 변경됨");
-  synchronized(CACHE){
-   CacheEntry cached=CACHE.get(path);
-   if(cached!=null&&cached.size==size&&cached.modified==modified&&
-      cached.sha256.equals(before)){
-    hits++;
-    return cached.value;
+  // A hit still requires full SHA verification: never trust mtime or size
+  // after file restore, an external rewrite or a same-size replacement.
+  CacheEntry cached;
+  synchronized(CACHE){cached=CACHE.get(path);}
+  if(cached!=null&&cached.size==size&&cached.modified==modified){
+   String currentHash=RideMileageIntegrity.fingerprint(track);
+   if(!RideMileageIntegrity.validCompleted(track)||
+      track.length()!=size||track.lastModified()!=modified)
+    throw new IOException("GPS 확인 중 원본 파일이 변경됨");
+   if(cached.sha256.equals(currentHash)){
+    synchronized(CACHE){if(CACHE.get(path)==cached){hits++;return cached.value;}}
    }
-   // A stale value must not be reused if it has the same size/mtime.
-   CACHE.remove(path);
   }
-  RideInsights.Result details=RideInsights.analyze(track);
+  // A cache MISS hashes the same bytes the parser actually consumed, rather
+  // than performing a separate pre-parse read (previously three full passes).
+  MessageDigest parsedDigest=MessageDigest.getInstance("SHA-256");
+  RideInsights.Result details=RideInsights.analyze(track,parsedDigest);
+  String parsed=toHex(parsedDigest.digest());
   String after=RideMileageIntegrity.fingerprint(track);
-  if(!before.equals(after)||!RideMileageIntegrity.validCompleted(track)||
+  if(!parsed.equals(after)||!RideMileageIntegrity.validCompleted(track)||
      track.length()!=size||track.lastModified()!=modified)
    throw new IOException("GPS 분석 중 원본 파일이 변경됨");
   Summary value=new Summary(details.distanceKm,details.durationMillis,details.movingMillis);
@@ -73,6 +74,15 @@ final class RideDistanceCache {
    analyses++;
   }
   return value;
+ }
+ private static String toHex(byte[] digest){
+  char[] digits="0123456789abcdef".toCharArray();
+  char[] chars=new char[digest.length*2];
+  for(int i=0;i<digest.length;i++){
+   chars[2*i]=digits[(digest[i]>>4)&15];
+   chars[2*i+1]=digits[digest[i]&15];
+  }
+  return new String(chars);
  }
  /** Clear only derived display values, never raw GPS or stored ride data. */
  static void clear(){

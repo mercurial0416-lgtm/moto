@@ -1,5 +1,5 @@
 package com.motohub.next;
-import java.io.*;import java.nio.charset.StandardCharsets;import java.nio.file.Files;import java.nio.file.LinkOption;import java.time.Instant;import java.util.*;
+import java.io.*;import java.security.DigestInputStream;import java.security.MessageDigest;import java.nio.charset.StandardCharsets;import java.nio.file.Files;import java.nio.file.LinkOption;import java.time.Instant;import java.util.*;
 /** Append-only local tracks. Never synthesizes or uploads coordinates. */
 final class TrackFile {
  static final long MAX_BYTES=25_000_000;
@@ -27,10 +27,13 @@ final class TrackFile {
   list.sort((x,y)->y.getName().compareTo(x.getName()));return list;
  }
  interface Consumer{void point(double lat,double lon,double accuracy,long time)throws Exception;}
- static int read(File f,Consumer consumer)throws Exception{
+ static int read(File f,Consumer consumer)throws Exception{return read(f,consumer,null);}
+ /** Optional digest hashes exactly the source bytes parsed, with no third read. */
+ static int read(File f,Consumer consumer,MessageDigest digest)throws Exception{
   if(f==null||Files.isSymbolicLink(f.toPath())||!Files.isRegularFile(f.toPath(),LinkOption.NOFOLLOW_LINKS))throw new IOException("안전하지 않은 GPS 원본 파일입니다.");
   if(f.length()>MAX_BYTES)throw new IOException("경로 파일 크기 초과");int count=0;long previous=0;
-  try(BufferedInputStream in=new BufferedInputStream(new FileInputStream(f))){ByteArrayOutputStream line=new ByteArrayOutputStream();int b;while((b=in.read())!=-1){if(b!='\n'){if(line.size()>256)throw new IOException("손상된 경로 행");line.write(b);continue;}String[] s=line.toString("UTF-8").split(",",-1);line.reset();if(s.length!=4)throw new IOException("손상된 경로");double lat=Double.parseDouble(s[0]),lon=Double.parseDouble(s[1]),accuracy=Double.parseDouble(s[2]);long time=Long.parseLong(s[3]);if(!valid(lat,lon,accuracy,time)||time<=previous)throw new IOException("유효하지 않은 경로 순서");consumer.point(lat,lon,accuracy,time);previous=time;count++;}/* A crash may leave an incomplete final row. Only newline-committed points are exported. */}return count;
+  try(BufferedInputStream in=new BufferedInputStream(
+    digest==null?new FileInputStream(f):new DigestInputStream(new FileInputStream(f),digest))){ByteArrayOutputStream line=new ByteArrayOutputStream();int b;while((b=in.read())!=-1){if(b!='\n'){if(line.size()>256)throw new IOException("손상된 경로 행");line.write(b);continue;}String[] s=line.toString("UTF-8").split(",",-1);line.reset();if(s.length!=4)throw new IOException("손상된 경로");double lat=Double.parseDouble(s[0]),lon=Double.parseDouble(s[1]),accuracy=Double.parseDouble(s[2]);long time=Long.parseLong(s[3]);if(!valid(lat,lon,accuracy,time)||time<=previous)throw new IOException("유효하지 않은 경로 순서");consumer.point(lat,lon,accuracy,time);previous=time;count++;}/* A crash may leave an incomplete final row. Only newline-committed points are exported. */}return count;
  }
  static int gpx(File source,OutputStream output)throws Exception{
   // Validate first so corrupted records never become a seemingly complete GPX.
