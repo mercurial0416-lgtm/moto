@@ -67,7 +67,7 @@ final class RideStatsUi {
     totals.setText(String.format(Locale.KOREA,
      "6개월 %d회 · %.1f km  |  월 평균 %.1f km",
      data.rides(),data.totalKm,data.totalKm/6));
-    costEstimate.setText(RideCostPerKm.caption(selected,sixMonthExpense,data.totalKm,data.scanned));
+    costEstimate.setText(RideCostPerKm.caption(selected,sixMonthExpense,data.totalKm,data.scanned+data.excluded));
     foot.setText("바이크 "+(selected.isEmpty()?"전체":a.bikeName(selected))+
       " · 손상·기준 초과 제외 "+data.excluded+"건"+
       (data.scanned>0?" · 처리 제한으로 제외 "+data.scanned+"건":"")+
