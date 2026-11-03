@@ -375,7 +375,7 @@ final class DeveloperObdScreen {
   try{
    BluetoothSocket created=device.createRfcommSocketToServiceRecord(SPP);socket=created;
    if(stopped)return;
-   created.connect();connected=true;if(stopped)return;
+   created.connect();if(stopped)return;
    InputStream in=created.getInputStream();OutputStream out=created.getOutputStream();
    for(String setup:new String[]{"ATZ\r","ATE0\r","ATL0\r","ATS0\r","ATSP0\r"}){
     request(in,out,setup,4000);if(stopped)return;
@@ -483,7 +483,7 @@ final class DeveloperObdScreen {
    if(stopped)return;
    BluetoothSocket created=device.createRfcommSocketToServiceRecord(SPP);
    socket=created;if(stopped){created.close();return;}
-   created.connect();if(stopped)return;
+   created.connect();connected=true;if(stopped)return;
    InputStream in=created.getInputStream();OutputStream out=created.getOutputStream();
    // AT commands configure only the ELM adapter. All vehicle requests are whitelisted mode 01 reads.
    for(String setup:new String[]{"ATZ\r","ATE0\r","ATL0\r","ATS0\r","ATSP0\r"}){
