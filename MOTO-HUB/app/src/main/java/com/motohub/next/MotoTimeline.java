@@ -10,7 +10,8 @@ import org.json.*;
 final class MotoTimeline {
  static final String ALL="전체",RIDE="라이딩",SERVICE="정비",FUEL="주유",OTHER="비용";
  static final String[] FILTERS={ALL,RIDE,SERVICE,FUEL,OTHER};
- private static final ZoneId SEOUL=ZoneId.of("Asia/Seoul");
+ // Activity passes one snapshot ZoneId for consistent GPS/ledger ordering.
+ // No hard-coded Korean zone: travel screens must agree with ride history.
  static final class Event {
   final String kind,day,title,detail,collection,recordId,trackName;
   final long time;
@@ -21,8 +22,9 @@ final class MotoTimeline {
   boolean matches(String filter){return ALL.equals(filter)||kind.equals(filter);}
  }
  private MotoTimeline(){}
- static long startOfDay(String date){
-  try{return LocalDate.parse(date).atStartOfDay(SEOUL).toInstant().toEpochMilli();}
+ static long startOfDay(String date){return startOfDay(date,ZoneId.systemDefault());}
+ static long startOfDay(String date,ZoneId zone){
+  try{return LocalDate.parse(date).atStartOfDay(zone).toInstant().toEpochMilli();}
   catch(Exception ignored){return -1;}
  }
  static String safeText(String raw,int max){
@@ -30,6 +32,9 @@ final class MotoTimeline {
   return raw.replace('\n',' ').replace('\r',' ').replace('\t',' ').trim().substring(0,Math.min(max,raw.replace('\n',' ').replace('\r',' ').replace('\t',' ').trim().length()));
  }
  static List<Event> ledger(JSONObject snapshot,String bikeId){
+  return ledger(snapshot,bikeId,ZoneId.systemDefault());
+ }
+ static List<Event> ledger(JSONObject snapshot,String bikeId,ZoneId zone){
   ArrayList<Event> events=new ArrayList<>();
   if(snapshot==null||!RideBikeBinding.valid(bikeId))return events;
   for(String collection:new String[]{"services","expenses"}){
@@ -39,7 +44,7 @@ final class MotoTimeline {
     JSONObject item=rows.optJSONObject(i);
     if(item==null||!bikeId.equals(item.optString("vehicleId")))continue;
     String day=item.optString("date","");
-    long timestamp=startOfDay(day);
+    long timestamp=startOfDay(day,zone);
     if(timestamp<0)continue;
     String kind="services".equals(collection)?SERVICE:
       ("주유".equals(item.optString("type"))?FUEL:OTHER);
@@ -60,11 +65,14 @@ final class MotoTimeline {
   return events;
  }
  static Event ride(File track,JSONObject db,String expectedBike)throws java.io.IOException{
+  return ride(track,db,expectedBike,ZoneId.systemDefault());
+ }
+ static Event ride(File track,JSONObject db,String expectedBike,ZoneId zone)throws java.io.IOException{
   if(track==null||!RideMileageIntegrity.validCompleted(track))return null;
   if(!expectedBike.equals(RideBikeBinding.readStrict(track)))return null;
   Long started=RideHistoryLabel.startTime(track);
   if(started==null||started<=0)return null;
-  String date=java.time.Instant.ofEpochMilli(started).atZone(SEOUL).toLocalDate().toString();
+  String date=java.time.Instant.ofEpochMilli(started).atZone(zone).toLocalDate().toString();
   String title=safeText(RideNotes.title(db,track),65);
   if(title.isEmpty())title="GPS 라이딩";
   String category=RideCategory.read(track);
