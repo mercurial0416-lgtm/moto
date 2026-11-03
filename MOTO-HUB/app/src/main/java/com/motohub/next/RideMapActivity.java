@@ -27,23 +27,27 @@ public final class RideMapActivity extends Activity {
  private List<Long> replayTimes=Collections.emptyList();
  private final Handler replayHandler=new Handler(Looper.getMainLooper());
  private boolean replayPlaying=false;
+ private long replayStartedElapsed=0,replayRemainingDurationMs=30_000;
+ private int replayStartProgress=0;
  private final Runnable replayTick=new Runnable(){@Override public void run(){
   if(!alive||!replayPlaying||replaySeek==null)return;
-  int next=Math.min(replaySeek.getMax(),replaySeek.getProgress()+Math.max(1,replaySeek.getMax()/240));
+  long elapsed=Math.max(0,SystemClock.elapsedRealtime()-replayStartedElapsed);
+  int next=RideReplayTimeline.progressAt(elapsed,replayRemainingDurationMs,replayStartProgress);
   replaySeek.setProgress(next);
-  if(next>=replaySeek.getMax()){pauseReplay();return;}
-  replayHandler.postDelayed(this,150);
+  if(next>=RideReplayTimeline.MAX_PROGRESS){pauseReplay();return;}
+  replayHandler.postDelayed(this,120);
  }};
  private void pauseReplay(){
   replayPlaying=false;replayHandler.removeCallbacks(replayTick);
   if(replayButton!=null)replayButton.setText("▶ 경로 재생");
  }
- private void moveReplayMarker(int index){
+ private void moveReplayMarker(int progress){
+  int index=RideReplayTimeline.indexAt(replayTimes,progress);
   if(!alive||replayMarker==null||index<0||index>=replayPoints.size()||map==null)return;
   replayMarker.setPosition(replayPoints.get(index));
   if(replayStatus!=null){
    String time=new java.text.SimpleDateFormat("HH:mm:ss",Locale.KOREA).format(new Date(replayTimes.get(index)));
-   replayStatus.setText("기록 시각 "+time+" · "+(index+1)+"/"+replayPoints.size()+" 지점 · 샘플 기반 재생");
+   replayStatus.setText("기록 시각 "+time+" · "+(index+1)+"/"+replayPoints.size()+" 지점 · 실제 시각 비율 재생");
   }
   map.invalidate();
  }
@@ -93,17 +97,21 @@ public final class RideMapActivity extends Activity {
   replayButton.setOnClickListener(v->{
    if(replayPlaying){pauseReplay();return;}
    if(replaySeek==null||replayPoints.size()<2)return;
-   if(replaySeek.getProgress()>=replaySeek.getMax())replaySeek.setProgress(0);
+   if(replaySeek.getProgress()>=RideReplayTimeline.MAX_PROGRESS)replaySeek.setProgress(0);
+   replayStartProgress=replaySeek.getProgress();
+   long fullDuration=RideReplayTimeline.durationMs(replayTimes);
+   replayRemainingDurationMs=Math.max(1,fullDuration*(RideReplayTimeline.MAX_PROGRESS-replayStartProgress)/RideReplayTimeline.MAX_PROGRESS);
+   replayStartedElapsed=SystemClock.elapsedRealtime();
    replayPlaying=true;replayButton.setText("❚❚ 일시정지");replayHandler.post(replayTick);
   });playback.addView(replayButton);
-  replaySeek=new SeekBar(this);replaySeek.setMax(1);replaySeek.setEnabled(false);
+  replaySeek=new SeekBar(this);replaySeek.setMax(RideReplayTimeline.MAX_PROGRESS);replaySeek.setEnabled(false);
   replaySeek.setContentDescription("저장된 GPS 경로 재생 위치");
   replaySeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
    @Override public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){moveReplayMarker(progress);}
    @Override public void onStartTrackingTouch(SeekBar bar){pauseReplay();}
    @Override public void onStopTrackingTouch(SeekBar bar){}
   });playback.addView(replaySeek);
-  replayStatus=new TextView(this);replayStatus.setText("재생 준비 중 · 저장된 좌표만 사용");
+  replayStatus=new TextView(this);replayStatus.setText("저장된 GPS의 실제 시간 비율을 빠르게 재생합니다.");
   replayStatus.setTextSize(12);replayStatus.setTextColor(0xffc1ccd6);
   playback.addView(replayStatus);base.addView(playback);
   TextView legend=new TextView(this);legend.setText("속도 범례  ● 느림(초록)  ● 보통(노랑)  ● 빠름(빨강)");legend.setTextSize(12);legend.setTextColor(0xffe8c985);
@@ -211,7 +219,7 @@ public final class RideMapActivity extends Activity {
       replayPoints=new ArrayList<>(route);replayTimes=new ArrayList<>(times);
       replayMarker=new Marker(map);replayMarker.setTitle("현재 재생 위치 · 기기 내부 GPS 기록");
       replayMarker.setPosition(route.get(0));map.getOverlays().add(replayMarker);
-      replaySeek.setMax(route.size()-1);replaySeek.setProgress(0);
+      replaySeek.setMax(RideReplayTimeline.MAX_PROGRESS);replaySeek.setProgress(0);
       replaySeek.setEnabled(true);replayButton.setEnabled(true);
       moveReplayMarker(0);
      }
