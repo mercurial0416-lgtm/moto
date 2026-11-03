@@ -11,7 +11,7 @@ import java.util.Map;
  * track deletion, or signed-update integrity checks.
  */
 final class RideDistanceCache {
- static final long MAX_ANALYSIS_BYTES=5_000_000L;
+ static final long MAX_ANALYSIS_BYTES=TrackFile.MAX_BYTES;
  private static final int MAX_ENTRIES=4096;
  static final class Summary {
   final double distanceKm;
