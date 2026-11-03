@@ -420,6 +420,18 @@ final class RideUi {
    periodButton.setContentDescription("라이딩 기간 "+a.rideHistoryPeriod+", 변경하기");
    LinearLayout.LayoutParams periodLp=new LinearLayout.LayoutParams(-2,a.dp(44));periodLp.leftMargin=a.dp(6);
    historyTools.addView(periodButton,periodLp);
+   Button categoryButton=a.button("종류: 검색  ▾",false,()->{
+    String[] labels={"전체 종류","일상","출퇴근","와인딩","장거리","투어"};
+    new AlertDialog.Builder(a).setTitle("라이딩 종류 검색")
+     .setMessage("사용자가 지정한 라이딩 종류와 제목·메모에 적힌 용어를 검색합니다. 자동 추천은 기록 상세에서 확인하세요.")
+     .setItems(labels,(dialog,index)->{
+      a.rideHistoryQuery=index==0?"":labels[index];
+      a.render();
+     }).setNegativeButton("취소",null).show();
+   });
+   categoryButton.setMinHeight(a.dp(44));
+   LinearLayout.LayoutParams categoryLp=new LinearLayout.LayoutParams(-2,a.dp(44));categoryLp.leftMargin=a.dp(6);
+   historyTools.addView(categoryButton,categoryLp);
    // Show only search and status by default. The other controls expand on demand.
    historyPanel.addView(summary);
    HorizontalScrollView historyControlStrip=new HorizontalScrollView(a);
