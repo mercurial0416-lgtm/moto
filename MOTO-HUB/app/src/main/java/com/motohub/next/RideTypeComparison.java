@@ -32,7 +32,7 @@ final class RideTypeComparison {
   if(stamp<=0||stamp>now||now-stamp>60L*24*3600000)return;
   String category=RideCategory.read(file);
   boolean current=now-stamp<30L*24*3600000;
-  String session=RideSegmentGroup.id(file);
+  String session=RideMonthlyReport.sessionKey(file);
   if(RideCategory.COMMUTE.equals(category))(current?commuteNow:commutePrev).add(session,distanceKm,movingMillis);
   else if(RideCategory.WINDING.equals(category))(current?windingNow:windingPrev).add(session,distanceKm,movingMillis);
  }
