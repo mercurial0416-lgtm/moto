@@ -28,6 +28,7 @@ final class RideStatsSeries {
   if(index<0||index>=6)return false;
   int i=(int)index;count[i]++;km[i]+=distanceKm;minutes[i]+=elapsedMs/60000;totalKm+=distanceKm;return true;
  }
+ long totalMinutes(){long sum=0;for(long value:minutes)sum+=value;return sum;}
  int rides(){int sum=0;for(int countValue:count)sum+=countValue;return sum;}
  double maxKm(){double result=0;for(double d:km)result=Math.max(result,d);return result;}
 }

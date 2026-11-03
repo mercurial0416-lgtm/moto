@@ -23,11 +23,20 @@ final class RideStatsUi {
   chart.setMinimumHeight(a.dp(260));
   body.addView(chart,new LinearLayout.LayoutParams(-1,a.dp(260)));
   TextView totals=a.text("",14,a.fg,true);body.addView(totals);
+  TextView costEstimate=a.text("",13,a.muted,false);body.addView(costEstimate);
   TextView foot=a.text("통계는 GPS 계산값이며 실제 계기판 주행거리를 수정하지 않습니다.",12,a.muted,false);
   body.addView(foot);a.show();
   Dialog owner=a.dialog;
   final String selected=a.bike()==null?"":a.bike().optString("id");
   final RideStatsSeries data=new RideStatsSeries(YearMonth.now(ZoneId.of("Asia/Seoul")));
+  // A per-bike, same-month ledger snapshot. Never divide all-bike expenses by one bike's GPS.
+  final double sixMonthExpense;
+  if(selected.isEmpty())sixMonthExpense=0;
+  else{
+   RecordMonthlySummary ledger=RecordMonthlySummary.forBike(
+    a.items("expenses"),a.items("services"),selected,data.anchor);
+   sixMonthExpense=CostDashboard.add(ledger.sumFuelAndOther(),ledger.sumService());
+  }
   new Thread(()->{
    try{
     long now=System.currentTimeMillis();int inspected=0;
@@ -58,10 +67,12 @@ final class RideStatsUi {
     totals.setText(String.format(Locale.KOREA,
      "6개월 %d회 · %.1f km  |  월 평균 %.1f km",
      data.rides(),data.totalKm,data.totalKm/6));
+    costEstimate.setText(RideCostPerKm.caption(selected,sixMonthExpense,data.totalKm,data.scanned+data.excluded));
     foot.setText("바이크 "+(selected.isEmpty()?"전체":a.bikeName(selected))+
       " · 손상·기준 초과 제외 "+data.excluded+"건"+
       (data.scanned>0?" · 처리 제한으로 제외 "+data.scanned+"건":"")+
-      "\nGPS 추정값이며 실주행거리·계기판 ODO를 자동 수정하지 않습니다.");
+      "\nGPS 추정값이며 실주행거리·계기판 ODO를 자동 수정하지 않습니다. 월별 주행횟수 "+
+      Arrays.toString(data.count)+"회 · 총 분석 시간 "+data.totalMinutes()+"분");
    });
   },"moto-ride-6month-bars").start();
  }

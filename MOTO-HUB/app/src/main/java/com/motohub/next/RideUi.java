@@ -32,9 +32,10 @@ final class RideUi {
  private static final class HistoryData {
   final List<File> rides;final List<HistoryEntry> entries;
   final Map<String,Integer> counts;final String selected;final int damaged,unfinished;
-  final File latestUnapplied;final int unappliedCount;
+  final File latestUnapplied;final int unappliedCount;final String distanceInfo;
   HistoryData(List<File> rides,List<HistoryEntry> entries,Map<String,Integer> counts,String selected,int damaged,int unfinished,
-              File latestUnapplied,int unappliedCount){
+              File latestUnapplied,int unappliedCount,String distanceInfo){
+   this.distanceInfo=distanceInfo;
    this.rides=rides;this.entries=entries;this.counts=counts;this.selected=selected;this.damaged=damaged;this.unfinished=unfinished;
    this.latestUnapplied=latestUnapplied;this.unappliedCount=unappliedCount;
   }
@@ -210,19 +211,16 @@ final class RideUi {
   LinearLayout.LayoutParams analysisLp=new LinearLayout.LayoutParams(0,-2,1);
   analysisLp.leftMargin=a.dp(9);routesBar.addView(analysisButton,analysisLp);
   a.content.addView(routesBar);
-  TextView rideTools=a.text("GPX 가져오기 · 기간별 리포트 · 더 많은 도구  ›",12,a.muted,false);
+  TextView rideTools=a.text("GPX · 리포트 · 기록 도구  ›",12,a.muted,false);
   rideTools.setGravity(Gravity.CENTER_VERTICAL);rideTools.setMinHeight(a.dp(48));
   rideTools.setClickable(true);rideTools.setFocusable(true);
   rideTools.setContentDescription("GPX 가져오기와 최근 30일 바이크별 주행 통계");
   rideTools.setOnClickListener(v->new AlertDialog.Builder(a)
    .setTitle("라이딩 도구")
-   .setItems(new String[]{"GPX 가져오기","최근 30일 바이크별 통계","최근 6개월 그래프","라이딩 2건 통합"},(dialog,which)->{
-    switch(which){
-     case 0:a.pickGpx();break;
-     case 1:chooseRideReport();break;
-     case 2:RideStatsUi.open(a);break;
-     default:chooseMerge();break;
-    }
+   .setItems(new String[]{"GPX 가져오기","최근 30일 리포트","라이딩 2건 통합"},(dialog,which)->{
+    if(which==0)a.pickGpx();
+    else if(which==1)chooseRideReport();
+    else chooseMerge();
    }).setNegativeButton("취소",null).show());
   a.content.addView(rideTools);
   if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
@@ -258,6 +256,8 @@ final class RideUi {
   // Freeze only ride notes, not the whole database, while the Activity still owns JSON mutations.
   final org.json.JSONObject liveNotes=a.settings().optJSONObject("rideNotes");
   final String rideNotesSnapshot=liveNotes==null?"{}":liveNotes.toString();
+  final String distanceRange=RideHistoryDistanceFilter.normalize(
+   a.getSharedPreferences("ride_history_ui",0).getString("distance_filter",RideHistoryDistanceFilter.ALL));
   HISTORY_EXECUTOR.execute(()->{
    if(generation!=HISTORY_GENERATION.get())return;
    try{
@@ -274,6 +274,28 @@ final class RideUi {
     bikeRides.removeIf(file->!RideHistoryPeriod.include(file,now,period));
     Map<String,Integer> counts=RideHistoryFilter.counts(bikeRides,activeName,recording);
     List<File> visible=RideHistorySort.order(RideHistoryFilter.select(bikeRides,selected,activeName,recording),sort);
+    String distanceInfo="";
+    if(!RideHistoryDistanceFilter.ALL.equals(distanceRange)){
+     if(!RideHistoryDistanceFilter.withinBudget(visible)){
+      // Never show a truncated subset as if it was a complete search result.
+      distanceInfo="거리 필터를 적용하지 못했어요. 기록이 많아 기간·바이크 범위를 먼저 좁혀 주세요 (최대 150건·80MB).";
+     }else{
+      List<File> matched=new ArrayList<>();
+      int unreadable=0;
+      for(File file:visible){
+       if(generation!=HISTORY_GENERATION.get())return;
+       try{
+        if(!RideMileageIntegrity.validCompleted(file)){unreadable++;continue;}
+        long length=file.length(),modified=file.lastModified();
+        RideInsights.Result info=RideInsights.analyze(file);
+        if(file.length()!=length||file.lastModified()!=modified){unreadable++;continue;}
+        if(RideHistoryDistanceFilter.accepts(distanceRange,info.distanceKm))matched.add(file);
+       }catch(Exception ignored){unreadable++;}
+      }
+      visible=matched;
+      distanceInfo="GPS 거리 "+distanceRange+" · 분석 불가 "+unreadable+"건 제외 · 계기판 거리와 다를 수 있어요.";
+     }
+    }
     List<HistoryEntry> entries=new ArrayList<>();
     for(File file:visible){
      if(generation!=HISTORY_GENERATION.get())return;
@@ -299,7 +321,7 @@ final class RideUi {
       if(unapplied==null)unapplied=file;
      }
     }
-    final HistoryData data=new HistoryData(rides,entries,counts,selected,damagedBindings,unfinished,unapplied,unappliedCount);
+    final HistoryData data=new HistoryData(rides,entries,counts,selected,damagedBindings,unfinished,unapplied,unappliedCount,distanceInfo);
     a.runOnUiThread(()->{
      if(generation!=HISTORY_GENERATION.get()||a.isFinishing()||a.isDestroyed()||
         !"라이딩".equals(a.tab)||a.content!=requestedContent||historyPanel.getParent()!=requestedContent)return;
@@ -339,36 +361,29 @@ final class RideUi {
   Map<String,Integer> counts=data.counts;
   String selected=data.selected;
   int damagedBindings=data.damaged;
+  if(!data.distanceInfo.isEmpty()){
+   TextView info=a.text(data.distanceInfo,12,a.muted,false);
+   historyPanel.addView(info);a.gap(historyPanel,7);
+  }
   if(data.unfinished>0){
    Button recover=a.button("중단된 주행 "+data.unfinished+"건 확인 · 복구하기",false,()->a.selectRideHistoryFilter(RideHistoryFilter.INTERRUPTED));
    recover.setContentDescription("중단된 GPS 기록 "+data.unfinished+"건 필터 열기");
    historyPanel.addView(recover);a.gap(historyPanel,10);
   }
-   // Horizontally scrollable, labelled status chips avoid squeezing six actions onto a phone screen.
-   HorizontalScrollView strip=new HorizontalScrollView(a);
-   strip.setHorizontalScrollBarEnabled(false);
-   strip.setFillViewport(false);
-   LinearLayout chips=new LinearLayout(a);
-   chips.setOrientation(LinearLayout.HORIZONTAL);
-   chips.setPadding(0,a.dp(4),0,a.dp(6));
-   for(String option:RideHistoryFilter.OPTIONS){
-    int count=counts.get(option);
-    boolean checked=option.equals(selected);
-    Button chip=a.button(option+"  "+count,checked,()->{a.selectRideHistoryFilter(option);});
-    chip.setTextSize(13);
-    chip.setMinHeight(a.dp(44));
-    chip.setContentDescription("라이딩 "+option+" 필터, "+count+"건"+(checked?", 선택됨":""));
-    chip.setSelected(checked);
-    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-2,a.dp(44));
-    cp.rightMargin=a.dp(7);
-    chips.addView(chip,cp);
-   }
-   strip.addView(chips);
-   historyPanel.addView(strip);
+   // One state selector replaces six always-visible horizontal chips.
+   String[] statusOptions=RideHistoryFilter.OPTIONS;
+   Button statusButton=a.button("상태 · "+selected+"  ("+counts.getOrDefault(selected,0)+")  ▾",false,()->
+    new AlertDialog.Builder(a).setTitle("라이딩 상태")
+     .setSingleChoiceItems(statusOptions,Math.max(0,Arrays.asList(statusOptions).indexOf(selected)),
+      (dialog,index)->{dialog.dismiss();a.selectRideHistoryFilter(statusOptions[index]);})
+     .setNegativeButton("취소",null).show());
+   statusButton.setContentDescription("라이딩 상태 필터 "+selected+", 변경하기");
+   statusButton.setMinHeight(a.dp(48));
+   historyPanel.addView(statusButton);a.gap(historyPanel,8);
    LinearLayout searchBar=new LinearLayout(a);searchBar.setGravity(Gravity.CENTER_VERTICAL);
    EditText search=new EditText(a);search.setSingleLine(true);search.setTextSize(15);
    search.setTextColor(a.fg);search.setHintTextColor(a.muted);
-   search.setHint("날짜·바이크·상태 검색 (예: 10/17 GPX)");
+   search.setHint("날짜·바이크·상태 검색 (예: 와인딩)");
    search.setContentDescription("라이딩 기록 검색");
    search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
    search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
@@ -434,15 +449,49 @@ final class RideUi {
    periodButton.setContentDescription("라이딩 기간 "+a.rideHistoryPeriod+", 변경하기");
    LinearLayout.LayoutParams periodLp=new LinearLayout.LayoutParams(-2,a.dp(44));periodLp.leftMargin=a.dp(6);
    historyTools.addView(periodButton,periodLp);
-   // Keep the summary readable on narrow phones; controls scroll horizontally.
+   Button categoryButton=a.button("종류: 검색  ▾",false,()->{
+    String[] labels={"전체 종류","일상","출퇴근","와인딩","장거리","투어"};
+    new AlertDialog.Builder(a).setTitle("라이딩 종류 검색")
+     .setMessage("사용자가 지정한 라이딩 종류와 제목·메모에 적힌 용어를 검색합니다. 자동 추천은 기록 상세에서 확인하세요.")
+     .setItems(labels,(dialog,index)->{
+      a.rideHistoryQuery=index==0?"":labels[index];
+      a.render();
+     }).setNegativeButton("취소",null).show();
+   });
+   categoryButton.setMinHeight(a.dp(44));
+   LinearLayout.LayoutParams categoryLp=new LinearLayout.LayoutParams(-2,a.dp(44));categoryLp.leftMargin=a.dp(6);
+   historyTools.addView(categoryButton,categoryLp);
+   final String distancePref=RideHistoryDistanceFilter.normalize(a.getSharedPreferences("ride_history_ui",0)
+     .getString("distance_filter",RideHistoryDistanceFilter.ALL));
+   Button distanceButton=a.button("거리: "+distancePref+"  ▾",false,()->
+    new AlertDialog.Builder(a).setTitle("GPS 주행거리 범위")
+     .setMessage("완료된 GPS 기록의 실제 저장 좌표로만 계산해요. 많은 기록은 성능 보호를 위해 거리 필터를 적용하지 않고 안내합니다.")
+     .setSingleChoiceItems(RideHistoryDistanceFilter.OPTIONS,
+      Math.max(0,Arrays.asList(RideHistoryDistanceFilter.OPTIONS).indexOf(distancePref)),(dialog,index)->{
+       dialog.dismiss();
+       a.getSharedPreferences("ride_history_ui",0).edit().putString("distance_filter",
+        RideHistoryDistanceFilter.OPTIONS[index]).apply();
+       a.render();
+      }).setNegativeButton("취소",null).show());
+   distanceButton.setMinHeight(a.dp(44));
+   LinearLayout.LayoutParams distanceLp=new LinearLayout.LayoutParams(-2,a.dp(44));
+   distanceLp.leftMargin=a.dp(6);historyTools.addView(distanceButton,distanceLp);
+   // Show only search and status by default. The other controls expand on demand.
    historyPanel.addView(summary);
+   HorizontalScrollView historyControlStrip=new HorizontalScrollView(a);
+   Button filterToggle=a.button("날짜 · 바이크 · 종류 · 거리  ▾",false,()->{
+    boolean expand=historyControlStrip.getVisibility()!=View.VISIBLE;
+    historyControlStrip.setVisibility(expand?View.VISIBLE:View.GONE);
+   });
+   filterToggle.setContentDescription("날짜, 바이크, 정렬 상세 필터 열기 또는 접기");
+   historyPanel.addView(filterToggle);
    if(damagedBindings>0){
     TextView warning=a.text("주의: 바이크 연결 정보 손상 "+damagedBindings+"건 · 미지정으로 분류하지 않음",12,0xffe7a04e,false);
     historyPanel.addView(warning);
    }
-   HorizontalScrollView historyControlStrip=new HorizontalScrollView(a);
    historyControlStrip.setHorizontalScrollBarEnabled(false);
    historyControlStrip.addView(historyTools);
+   historyControlStrip.setVisibility(View.GONE);
    historyPanel.addView(historyControlStrip);
    LinearLayout results=a.col();historyPanel.addView(results);
    search.setText(a.rideHistoryQuery);

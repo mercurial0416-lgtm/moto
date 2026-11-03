@@ -41,7 +41,7 @@ needs(design,'String[] labels={"홈","라이딩","정비","설정"}','a.navigate
 needs(home,'compactVehicleHeader(bike)','homeShortcutTile(key)','라이딩 시작','requestStart(true)','editHomeShortcuts()')
 needs(ride,'라이딩 기록','rideTools.setOnClickListener','RideStatsUi.open(a)',
       'chooseRideReport()','a.pickGpx()','if(focus&&RideService.running)return')
-needs(screens,'title("설정","")','if(Sharing.enabled){a.section("안전 · 위치 공유")',
+needs(screens,'void settings(){a.section("데이터 보호")','if(Sharing.enabled){a.section("안전 · 위치 공유")',
       'line("백업 · 복원"','AppUpdater(a).show()','this::advancedSettings')
 needs(main,'LinearLayout page(String title)','toolbar.setMinimumHeight(dp(56))',
       'formBody=col()','formFooter=col()','this::close',

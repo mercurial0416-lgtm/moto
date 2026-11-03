@@ -834,7 +834,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  void garage(){new HubScreens(this).records();}
  void friendsMap(){more();}
  void ride(){
-  heading("라이딩","기록 · 내비 · 주행 이력");
+  // The native toolbar already names this tab.
   new RideUi(this).render();
  }
  // Saved manual routes are preserved under advanced tools; data is never deleted.

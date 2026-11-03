@@ -487,23 +487,28 @@ final class HubScreens {
   a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
- void settings(){title("설정","");a.section("데이터 관리");line("백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해","열기",this::basicBackup);
- final TextView backupState=a.text("백업 상태 확인 중…",12,a.muted,false);
+ void settings(){a.section("데이터 보호");line("백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해","열기",this::basicBackup);
+ // Keep ZIP freshness visible as one small line, not another large settings card.
+ final TextView backupState=a.text("백업 확인 중…",12,a.muted,false);
+ backupState.setSingleLine(true);backupState.setEllipsize(android.text.TextUtils.TruncateAt.END);
+ backupState.setContentDescription("현재 저장 기록과 전체 ZIP 백업 일치 여부 확인 중");
  a.content.addView(backupState);
  final String settingsSnapshot=backupJsonSnapshot();
  LOCAL_BACKUP_IO.execute(()->{
   String status=BackupGpsProof.fullCurrentStatus(a,settingsSnapshot);
   a.runOnUiThread(()->{
-   if(!a.isFinishing()&&!a.isDestroyed()&&backupState.getParent()!=null)
+   if(!a.isFinishing()&&!a.isDestroyed()&&backupState.getParent()!=null){
     backupState.setText(status);
+    backupState.setContentDescription("현재 백업 상태: "+status);
+   }
   });
  });
- line("데이터 연결 검사","주유·정비 기록의 바이크 연결, 계기판, 중복 점검","검사",()->a.auditGarageSoon(true));
+ line("앱 진단 · OBD 연결","GPS·OBD·백업 상태와 기록 오류 검사","열기",this::selfCheck);
   line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":
     "현재 "+BuildConfig.VERSION_CODE+" · "+(UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256)?
     "서명 확인 · 업데이트 확인 가능":"서명 불일치 · 기존 앱 삭제 금지"),"열기",()->new AppUpdater(a).show());
 
-  a.section("라이딩 환경");
+  a.section("라이딩 설정");
 
 
   line("기본 내비 선택","현재: "+NavigationApps.preferred(a).label+" · 카카오내비 / 네이버지도 / 티맵","변경",()->NavigationApps.choose(a));
@@ -532,12 +537,12 @@ final class HubScreens {
     .setNegativeButton("취소",null).setPositiveButton("즉시 중지",(d,w)->{Sharing.stop();a.render();}).show();
    else a.toast("위치 공유는 라이딩 화면에서 동의한 경우에만 시작됩니다.");
   });}
-  a.section("화면 · 개인화");
+  a.section("일반");
   line("화면 테마","밝게 · 어둡게 · 기기 설정에 맞추기","변경",()->a.choose("화면 테마",new String[]{"system","light","dark"},v->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("theme",v);a.write(next);a.render();})));
 
   // The data structures for gear/trade-in and diagnostic reports stay untouched.
   // Hidden extras can be opened in version-tap developer settings without cluttering normal UI.
-  line("고급 도구","위젯 · 데이터 검사 · 유지비 통계","열기",this::advancedSettings);
+  line("고급 도구","위젯 · 통계 · 내보내기","열기",this::advancedSettings);
   a.section("MOTO HUB");
   // Deliberately hidden until the user taps the version label seven times.
   TextView version=a.text("MOTO HUB " + BuildConfig.VERSION_NAME + " · 기기별 독립 저장 · 계정 불필요",16,a.muted,false);
@@ -560,7 +565,7 @@ final class HubScreens {
   a.action(p,"기본 위젯 추가 (4×1)",false,()->MotoWidgetPin.request(a,false));
   a.action(p,"선택한 내비 실행",false,()->NavigationApps.openPreferred(a));
   a.action(p,"업데이트 데이터 검사",false,this::updateRecoveryReport);
-  a.action(p,"라이딩 통합 자가진단",false,this::selfCheck);
+  // 앱 진단은 설정 첫 화면의 한 항목에서 바로 열 수 있습니다.
   a.action(p,"유지비 통계",false,this::costDashboard);
   a.action(p,"바이크별 통합 활동",false,()->new MotoTimelineUi(a).open());
   a.action(p,"바이크 판매용 정비 이력 PDF",false,()->{
@@ -612,13 +617,22 @@ final class HubScreens {
    (android.os.Build.VERSION.SDK_INT<33||a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED);
   boolean battery=pm!=null&&pm.isIgnoringBatteryOptimizations(a.getPackageName());
   final boolean fineReady=fine,gpsReady=gpsOn,notifyReady=notify,batteryReady=battery;
+  final boolean bluetoothReady=android.os.Build.VERSION.SDK_INT<31||
+   a.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)==android.content.pm.PackageManager.PERMISSION_GRANTED;
+  final boolean verifiedSigner=UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256);
   LinearLayout p=a.page("MOTO HUB 통합 자가진단");
-  a.label(p,"기기 상태와 로컬 백업 파일만 점검합니다. 블루투스 페어링/ECU 쓰기, 위치 전송은 하지 않습니다.",14,a.muted,false);
+  a.label(p,"기기 상태와 로컬 백업 파일만 점검합니다. 블루투스 페어링/ECU 쓰기, 위치 전송은 하지 않습니다. 정상 표시만으로 실차 호환성이 확인되는 것은 아닙니다.",14,a.muted,false);
   TextView result=a.text("저장된 GPS 및 백업 상태 점검 중…",15,a.fg,false);
   p.addView(result);
   a.action(p,"위치·알림 권한 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
    android.net.Uri.parse("package:"+a.getPackageName()))));
   a.action(p,"배터리 최적화 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
+  a.action(p,"Bluetooth · 주변 기기 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+   android.net.Uri.parse("package:"+a.getPackageName()))));
+  a.action(p,"OBD 동글 연결·지원 센서 확인",false,()->DeveloperObdScreen.launchQuick(a));
+  a.action(p,"데이터 연결 검사 · 주유·정비",false,()->a.auditGarageSoon(true));
+  a.action(p,"업데이트 기록 비교 결과",false,this::updateRecoveryReport);
+  a.action(p,"외부 전체 ZIP 백업 만들기",false,a::exportBundle);
   a.show();
   final android.app.Dialog opened=a.dialog;
   new Thread(()->{
@@ -630,7 +644,14 @@ final class HubScreens {
     detail=backup?"파일 수·크기 사전 점검 통과 · 전체 ZIP 복구 가능 여부는 내보내기 후 확인":"파일 수·용량에 주의 필요 · 백업/복원 화면에서 확인";
    }catch(Exception err){detail="백업 사전 점검 실패 · 원본 삭제 금지";}
    final String report=RideDiagnostics.summarize(fineReady,gpsReady,notifyReady,batteryReady,
-    RideService.autoArmed,"없음".equals(RideService.obdLastError)?"오류 없음":ObdFailureGuide.classify(RideService.obdLastError),backup)+"\n"+detail;
+    RideService.autoArmed,"없음".equals(RideService.obdLastError)?"오류 없음":ObdFailureGuide.classify(RideService.obdLastError),backup)+"\n"+detail+
+    "\nBluetooth 연결 권한: "+(bluetoothReady?"허용 또는 미요구":"주변 기기 권한 필요")+
+    "\nGPS 기록: "+(RideService.running?"진행 중 · 저장 좌표 "+Math.max(0,RideService.count)+"개":"꺼짐")+
+    "\nOBD 연결 시도 "+Math.max(0,RideService.obdConnectionAttempts)+"회 · 성공 "+
+      Math.max(0,RideService.obdConnectionSuccesses)+"회 · 재연결 "+Math.max(0,RideService.obdReconnects)+"회"+
+    "\nOBD PID: "+(RideService.autoArmed?RideService.obdPidSupport:"연결을 시작하지 않아 실차 지원 여부 확인 불가")+
+    "\n업데이트 인증서: "+(verifiedSigner?"기존 고정 서명과 일치":"불일치 또는 확인 불가 · 덮어쓰기 금지")+
+    "\n업데이트 후 데이터: "+(UpdateInstallSnapshot.lastProblem(a)?"주의 기록 있음 · 업데이트 데이터 검사에서 확인":"최근 감사 경고 없음 · 설치 검증은 별도");
    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()&&a.dialog==opened&&opened.isShowing())result.setText(report);});
   },"moto-ondevice-health-check").start();
  }

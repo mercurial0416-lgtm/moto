@@ -42,6 +42,49 @@ final class DeveloperObdScreen {
  private volatile BluetoothSocket socket;
  private Thread worker;
  DeveloperObdScreen(MainActivity activity){this.activity=activity;}
+ /** A short, opt-in first-connection flow. Reuses the existing read-only SPP engine. */
+ static void launchQuick(MainActivity a){
+  if(RideService.running||RideService.autoArmed||RideService.saving()||RestoreRideGate.isRestoring()){
+   a.toast("라이딩·복원을 종료한 뒤 정차 상태에서 OBD를 확인해 주세요.");return;
+  }
+  new AlertDialog.Builder(a).setTitle("OBD 연결 검사")
+   .setMessage("정차 상태에서만 진행해 주세요. 페어링된 ELM327 Bluetooth Classic 동글을 선택해 표준 센서를 읽습니다. ECU 설정 변경·고장코드 삭제·자동 출발은 하지 않습니다. KTM 390 DUKE 실차 호환성은 아직 확인되지 않았습니다.")
+   .setNegativeButton("취소",null)
+   .setPositiveButton("읽기 전용 검사 시작",(d,w)->{
+    if(a.developerObd!=null)a.developerObd.stop();
+    a.developerObd=new DeveloperObdScreen(a);
+    a.developerObd.showQuick();
+   }).show();
+ }
+ void showQuick(){
+  if(RideService.running||RideService.autoArmed||RideService.saving())return;
+  LinearLayout p=activity.page("OBD 연결 · 3단계");
+  activity.label(p,"1  준비",16,activity.fg,true);
+  activity.label(p,"바이크 정차 → 진단 케이블·동글 장착 → 시동 ON → 갤럭시 Bluetooth 페어링",13,activity.muted,false);
+  activity.action(p,"Bluetooth 페어링 설정",false,this::openBluetoothSettings);
+  activity.gap(p,12);
+  activity.label(p,"2  동글 선택 · 센서 검사",16,activity.fg,true);
+  activity.label(p,"아래 버튼에서 페어링된 동글을 고르면 RPM·속도·수온·전압 등 읽기 전용 PID를 조회합니다. 차량 미지원 항목은 미지원으로 표시됩니다.",13,activity.muted,false);
+  status=activity.text("장치 선택 전 · ECU 데이터 미검증",14,activity.muted,true);p.addView(status);
+  for(int i=0;i<fields.length;i++){
+   fields[i]=activity.text(ObdReadOnlyProtocol.SENSOR_NAMES[i]+": —",15,activity.fg,false);
+   fields[i].setMinHeight(activity.dp(40));p.addView(fields[i]);
+  }
+  activity.action(p,"페어링된 OBD 동글 선택",true,()->{
+   if(RideService.running||RideService.autoArmed){setStatus("라이딩 중에는 별도 ECU 연결을 시작하지 않습니다.");return;}
+   loadPaired();
+  });
+  activity.gap(p,12);
+  activity.label(p,"3  지원 결과 확인",16,activity.fg,true);
+  activity.label(p,"연결 결과·PID 지원 메모는 이 기기에만 저장되고, 실제 센서값을 확인하지 못했다면 지원 확정으로 보지 않습니다.",13,activity.muted,false);
+  activity.action(p,"지난 연결 검사·지원 PID 확인",false,()->new AlertDialog.Builder(activity)
+   .setTitle("OBD 센서 검사 결과")
+   .setMessage(ObdLocalDiagnosticLog.summary(activity))
+   .setPositiveButton("닫기",null).show());
+  activity.action(p,"연결 끊기",false,this::stop);
+  activity.show();owner=activity.dialog;
+  owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
+ }
  void show(){
   if(!activity.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))return;
   LinearLayout p=activity.page("개발자 · OBD2 실험실");
