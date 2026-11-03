@@ -15,6 +15,10 @@ import static org.junit.Assert.*;
 public final class Ux112CleanUiSafetyTest {
  @Test public void replayUsesRecordedTimeRatherThanPointCount(){
   List<Long> times=Arrays.asList(1_000L,2_000L,10_000L,11_000L);
+  assertTrue(RideReplayTimeline.validTimes(times));
+  assertFalse(RideReplayTimeline.validTimes(Arrays.asList(1000L,3000L,2000L)));
+  assertFalse(RideReplayTimeline.validTimes(Arrays.asList(1000L,1000L)));
+  assertFalse(RideReplayTimeline.validTimes(Arrays.asList(0L,1000L)));
   assertEquals(0,RideReplayTimeline.indexAt(times,0));
   assertEquals(1,RideReplayTimeline.indexAt(times,500));
   assertEquals(2,RideReplayTimeline.indexAt(times,900));
