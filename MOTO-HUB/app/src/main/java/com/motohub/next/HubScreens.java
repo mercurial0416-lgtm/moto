@@ -482,7 +482,10 @@ final class HubScreens {
    }
    double currentMonth=totals.monthTotal(0),previousMonth=totals.monthTotal(1);
    a.label(page,"이번 달 "+a.won(currentMonth)+" · "+CostTrend.caption(currentMonth,previousMonth),14,a.accent,true);
-   a.label(page,"최근 6개월 합계  "+a.won(allFuel+allService),16,a.fg,true);a.divider(page);
+   a.label(page,"최근 6개월 합계  "+a.won(allFuel+allService),16,a.fg,true);
+   if(totals.scheduledOrFuture>0)
+    a.label(page,"예정·미래 날짜 지출 "+totals.scheduledOrFuture+"건은 실제 지출 합계에서 제외",12,a.muted,false);
+   a.divider(page);
   }
   a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();

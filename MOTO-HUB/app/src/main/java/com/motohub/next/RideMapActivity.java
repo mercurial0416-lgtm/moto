@@ -25,6 +25,7 @@ public final class RideMapActivity extends Activity {
  private Marker replayMarker;
  private List<GeoPoint> replayPoints=Collections.emptyList();
  private List<Long> replayTimes=Collections.emptyList();
+ private List<Integer> replaySections=Collections.emptyList();
  private final Handler replayHandler=new Handler(Looper.getMainLooper());
  private boolean replayPlaying=false;
  private long replayStartedElapsed=0,replayRemainingDurationMs=30_000;
@@ -47,7 +48,8 @@ public final class RideMapActivity extends Activity {
   replayMarker.setPosition(replayPoints.get(index));
   if(replayStatus!=null){
    String time=new java.text.SimpleDateFormat("HH:mm:ss",Locale.KOREA).format(new Date(replayTimes.get(index)));
-   replayStatus.setText("기록 시각 "+time+" · "+(index+1)+"/"+replayPoints.size()+" 지점 · 실제 시각 비율 재생");
+   replayStatus.setText("기록 시각 "+time+" · "+(index+1)+"/"+replayPoints.size()+" 지점"+
+    (RideReplayTimeline.gapAt(replaySections,index)?" · GPS 신호 공백 뒤 재개 (경로 연결 안 함)":" · 실제 시각 비율 재생"));
   }
   map.invalidate();
  }
@@ -227,6 +229,7 @@ public final class RideMapActivity extends Activity {
      Marker finish=new Marker(map);finish.setPosition(route.get(route.size()-1));finish.setTitle("② 도착 지점");map.getOverlays().add(finish);
      if(route.size()>=2&&RideReplayTimeline.validTimes(times)){
       replayPoints=new ArrayList<>(route);replayTimes=new ArrayList<>(times);
+      replaySections=new ArrayList<>(sectionIndices);
       replayMarker=new Marker(map);replayMarker.setTitle("현재 재생 위치 · 기기 내부 GPS 기록");
       replayMarker.setPosition(route.get(0));map.getOverlays().add(replayMarker);
       replaySeek.setMax(RideReplayTimeline.MAX_PROGRESS);replaySeek.setProgress(0);
@@ -261,7 +264,7 @@ public final class RideMapActivity extends Activity {
  @Override protected void onPause(){pauseReplay();if(map!=null)map.onPause();super.onPause();}
  @Override protected void onDestroy(){
   alive=false;pauseReplay();replayHandler.removeCallbacksAndMessages(null);
-  replayPoints=Collections.emptyList();replayTimes=Collections.emptyList();
+  replayPoints=Collections.emptyList();replayTimes=Collections.emptyList();replaySections=Collections.emptyList();
   if(map!=null)map.onDetach();super.onDestroy();
   if(clearMapCacheOnExit)new Thread(()->{
    try{MapCachePolicy.scan(MapCachePolicy.target(getCacheDir()),true);}

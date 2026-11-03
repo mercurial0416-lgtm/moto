@@ -18,6 +18,11 @@ final class RideReplayTimeline {
   }
   return previous>first;
  }
+ /** A playback jump between disjoint GPS sections is not a travelled route. */
+ static boolean gapAt(List<Integer> sectionIds,int index){
+  return sectionIds!=null&&index>0&&index<sectionIds.size()&&
+   !sectionIds.get(index).equals(sectionIds.get(index-1));
+ }
  static int indexAt(List<Long> times,int progress){
   if(times==null||times.isEmpty())return -1;
   if(times.size()==1||progress<=0)return 0;

@@ -1964,6 +1964,28 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));
           db=next;readOnly=false; // no fallible work after the JSON commit
          });
+         // Verify the committed JSON and all staged GPS/media bytes again, separately
+         // from the copy-time check. Never undo a committed restore from this audit.
+         String postRestoreReport;
+         boolean postRestoreOk=true;
+         try{
+          // The Store parser is Android-dependent; the ZIP asset verifier stays pure Java.
+          byte[] actualBytes=new AtomicFile(new File(getFilesDir(),"motohub-v3.json")).readFully();
+          if(actualBytes.length>BackupFormat.MAX_JSON_BYTES)
+           throw new IOException("복원된 JSON 크기 제한 초과");
+          String actualHash=JsonCanonicalDigest.hash(Store.parse(new String(actualBytes,StandardCharsets.UTF_8)));
+          String expectedHash=JsonCanonicalDigest.hash(Store.parse(ready.json));
+          if(!actualHash.equals(expectedHash))
+           throw new IOException("복원 후 JSON 기록이 백업 원본과 다릅니다.");
+          postRestoreReport="JSON 기록 SHA-256 일치 · "+ready.verifyInstalled(getFilesDir());
+         }
+         catch(Exception failure){
+          postRestoreOk=false;
+          postRestoreReport="복원 후 파일 재검증 실패: "+failure.getMessage()+
+           "\n기존 복원 전 JSON은 before-import.json에 보관됩니다. 앱을 삭제하거나 재복원하지 말고 먼저 전체 ZIP을 별도 보관하세요.";
+         }
+         final boolean restoreAuditOk=postRestoreOk;
+         final String restoreAuditMessage=postRestoreReport;
          // Full restore replaces garage and GPS assets. Old ECU baselines and
          // queued ODO readings must never overwrite the restored garage.
          boolean odometerCleared=false,gpsLedgerCleared=false;
@@ -1992,11 +2014,16 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           selected="";compare.clear();render();auditGarageSoon(false);
           if(mileageResetOk)rebuildGpsEstimateAsync();
           toast("복원 완료 · GPS "+ready.rides+"개 · 사진 "+ready.photos+"개"+
+           (restoreAuditOk?" · 내용 재검증 통과":" · 복원 후 재검증 실패 · 주의")+
            (checkpointReady?"":" · 자동 안전 백업 갱신 실패")+
            (odoResetOk?"":" · 기존 ODO 자동 동기화 해제 저장 실패 · 확인 필요")+
            (mileageResetOk?"":" · GPS 누적거리 재계산 준비 실패")+
            (settingsReady?"":settingsNeedReview?" · 설정 일부 복구 실패 · 확인 필요":" · 홈/내비 설정 복원 실패 · 이전 설정 유지/복구 시도"));
-          if(!settingsReady)new AlertDialog.Builder(this).setTitle("백업의 기기 설정 확인")
+          if(!restoreAuditOk)new AlertDialog.Builder(this)
+           .setTitle("복원 완료 · 자료 재검증 주의")
+           .setMessage(restoreAuditMessage)
+           .setPositiveButton("확인",null).show();
+          else if(!settingsReady)new AlertDialog.Builder(this).setTitle("백업의 기기 설정 확인")
            .setMessage(settingsNeedReview?"일부 설정의 자동 복구도 실패했습니다. 기존 기록은 복원됐지만 홈 버튼·기본 내비·알림을 직접 확인하세요.":
             "바이크·GPS 데이터 복원은 완료됐습니다. 다만 홈 버튼·내비·알림 설정은 복원되지 않았거나 이전 상태로 되돌렸습니다.")
            .setNegativeButton("닫기",null).setPositiveButton("설정 열기",(preferencesDialog,preferencesChoice)->navigate("더보기")).show();});
