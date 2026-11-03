@@ -682,10 +682,10 @@ final class HubScreens {
     if(snapshot==null)throw new java.io.IOException("JSON 상태를 확인할 수 없습니다.");
     JSONObject data=Store.parse(snapshot);
     int rides=0,damaged=0;
-    for(File file:TrackFile.tracks(a.getFilesDir())){
+    for(java.io.File file:TrackFile.tracks(a.getFilesDir())){
      if(RideMileageIntegrity.validCompleted(file))rides++;
-     else if(new File(file.getPath()+".done").isFile()||
-             new File(file.getPath()+".recovered").isFile())damaged++;
+     else if(new java.io.File(file.getPath()+".done").isFile()||
+             new java.io.File(file.getPath()+".recovered").isFile())damaged++;
     }
     result=GarageIntegrity.report(data)+
      "\\nGPS 완료·복구 기록 "+rides+"건 · 완료 상태 점검 필요 "+damaged+"건"+
