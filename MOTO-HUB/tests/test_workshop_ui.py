@@ -52,9 +52,11 @@ render = home[home.index(" void render(){"):home.index(" /** Scan local GPS meta
 for marker in [
     "compactVehicleHeader(bike)", "stats(bike)", "HomeShortcutOrder.parse(",
     "rideAction()", "homeShortcutTile(key)", "recent(bike)", "insights(bike)",
-    "interruptedRideShortcut()", "showQuickTools(bike)"
+    "interruptedRideShortcut()", "showHomeTools(bike)"
 ]:
     check(marker in render, "missing modern home action " + marker)
+check("void showQuickTools(JSONObject bike)" in home and "void showHomeTools(JSONObject bike)" in home,
+      "secondary garage tools must remain reachable via the compact tools menu")
 check(render.index("compactVehicleHeader(bike)") < render.index("stats(bike)") <
       render.index("HomeShortcutOrder.parse(") < render.index("recent(bike)"),
       "vehicle, status, shortcuts and latest activity should have clear hierarchy")
