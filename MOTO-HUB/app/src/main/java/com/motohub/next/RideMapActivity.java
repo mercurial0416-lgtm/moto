@@ -19,6 +19,34 @@ public final class RideMapActivity extends Activity {
  private final ArrayList<Polyline> speedLines=new ArrayList<>();
  private boolean speedVisible=false;private final ArrayList<Polyline> baseLines=new ArrayList<>();
  private Button speedButton;
+ private SeekBar replaySeek;
+ private Button replayButton;
+ private TextView replayStatus;
+ private Marker replayMarker;
+ private List<GeoPoint> replayPoints=Collections.emptyList();
+ private List<Long> replayTimes=Collections.emptyList();
+ private final Handler replayHandler=new Handler(Looper.getMainLooper());
+ private boolean replayPlaying=false;
+ private final Runnable replayTick=new Runnable(){@Override public void run(){
+  if(!alive||!replayPlaying||replaySeek==null)return;
+  int next=Math.min(replaySeek.getMax(),replaySeek.getProgress()+Math.max(1,replaySeek.getMax()/240));
+  replaySeek.setProgress(next);
+  if(next>=replaySeek.getMax()){pauseReplay();return;}
+  replayHandler.postDelayed(this,150);
+ }};
+ private void pauseReplay(){
+  replayPlaying=false;replayHandler.removeCallbacks(replayTick);
+  if(replayButton!=null)replayButton.setText("▶ 경로 재생");
+ }
+ private void moveReplayMarker(int index){
+  if(!alive||replayMarker==null||index<0||index>=replayPoints.size()||map==null)return;
+  replayMarker.setPosition(replayPoints.get(index));
+  if(replayStatus!=null){
+   String time=new java.text.SimpleDateFormat("HH:mm:ss",Locale.KOREA).format(new Date(replayTimes.get(index)));
+   replayStatus.setText("기록 시각 "+time+" · "+(index+1)+"/"+replayPoints.size()+" 지점 · 샘플 기반 재생");
+  }
+  map.invalidate();
+ }
  private Button tileButton;private boolean onlineTiles=false,clearMapCacheOnExit=false;
  @Override public void onCreate(Bundle b){super.onCreate(b);
   String filename=getIntent().getStringExtra("track");
@@ -46,6 +74,26 @@ public final class RideMapActivity extends Activity {
   zoomOut.setOnClickListener(v->{if(map!=null)map.getController().zoomOut();});
   zoom.addView(zoomIn,new LinearLayout.LayoutParams(0,48,1));zoom.addView(zoomOut,new LinearLayout.LayoutParams(0,48,1));
   base.addView(zoom);
+  // GPS playback is local-only; the marker never publishes or requests saved track coordinates.
+  LinearLayout playback=new LinearLayout(this);playback.setOrientation(LinearLayout.VERTICAL);
+  playback.setPadding(12,4,12,6);
+  replayButton=new Button(this);replayButton.setText("▶ 경로 재생");replayButton.setEnabled(false);
+  replayButton.setOnClickListener(v->{
+   if(replayPlaying){pauseReplay();return;}
+   if(replaySeek==null||replayPoints.size()<2)return;
+   if(replaySeek.getProgress()>=replaySeek.getMax())replaySeek.setProgress(0);
+   replayPlaying=true;replayButton.setText("❚❚ 일시정지");replayHandler.post(replayTick);
+  });playback.addView(replayButton);
+  replaySeek=new SeekBar(this);replaySeek.setMax(1);replaySeek.setEnabled(false);
+  replaySeek.setContentDescription("저장된 GPS 경로 재생 위치");
+  replaySeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+   @Override public void onProgressChanged(SeekBar bar,int progress,boolean fromUser){moveReplayMarker(progress);}
+   @Override public void onStartTrackingTouch(SeekBar bar){pauseReplay();}
+   @Override public void onStopTrackingTouch(SeekBar bar){}
+  });playback.addView(replaySeek);
+  replayStatus=new TextView(this);replayStatus.setText("재생 준비 중 · 저장된 좌표만 사용");
+  replayStatus.setTextSize(12);replayStatus.setTextColor(0xffc1ccd6);
+  playback.addView(replayStatus);base.addView(playback);
   TextView legend=new TextView(this);legend.setText("속도 범례  ● 느림(초록)  ● 보통(노랑)  ● 빠름(빨강)");legend.setTextSize(12);legend.setTextColor(0xffe8c985);
   legend.setPadding(12,6,12,6);base.addView(legend);
   tileButton=new Button(this);tileButton.setText("온라인 배경지도 켜기 (선택)");
@@ -147,6 +195,14 @@ public final class RideMapActivity extends Activity {
      speedButton.setEnabled(!speedLines.isEmpty());
      Marker start=new Marker(map);start.setPosition(route.get(0));start.setTitle("① 출발 지점");map.getOverlays().add(start);
      Marker finish=new Marker(map);finish.setPosition(route.get(route.size()-1));finish.setTitle("② 도착 지점");map.getOverlays().add(finish);
+     if(route.size()>=2){
+      replayPoints=new ArrayList<>(route);replayTimes=new ArrayList<>(times);
+      replayMarker=new Marker(map);replayMarker.setTitle("현재 재생 위치 · 기기 내부 GPS 기록");
+      replayMarker.setPosition(route.get(0));map.getOverlays().add(replayMarker);
+      replaySeek.setMax(route.size()-1);replaySeek.setProgress(0);
+      replaySeek.setEnabled(true);replayButton.setEnabled(true);
+      moveReplayMarker(0);
+     }
      if(RideMapOverlayPolicy.validPeak(info.peakKmh,info.peakLatitude,info.peakLongitude)){
       Marker peak=new Marker(map);peak.setPosition(new GeoPoint(info.peakLatitude,info.peakLongitude));
       peak.setTitle(String.format(java.util.Locale.KOREA,"최고속도 위치 · %.0f km/h (GPS 추정)",info.peakKmh));
@@ -158,7 +214,10 @@ public final class RideMapActivity extends Activity {
      caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\nGPS 공백 "+info.gpsGaps+"구간 · 추정 휴식 "+info.restStops+"곳 · 최고속도 마커 (GPS 추정)"+"\nGPS 품질: "+info.gpsQuality()+" · 정차 추정: "+info.stationaryConfidence()+"\n초록 <30 · 노랑 30~69 · 빨강 ≥70km/h (GPS 추정)");
      map.invalidate();
     });
-   }catch(Exception e){runOnUiThread(()->{if(alive&&caption!=null)caption.setText("경로를 열지 못했어요: "+e.getMessage());});}
+   }catch(Exception e){runOnUiThread(()->{if(alive&&caption!=null){
+    caption.setText("경로를 열지 못했어요: "+e.getMessage());
+    if(replayStatus!=null)replayStatus.setText("재생할 GPS 좌표를 확인하지 못했습니다.");
+   }});}
   },"MOTO-route-load").start();
  }
  private void setOnlineTiles(boolean allowed){
@@ -167,9 +226,11 @@ public final class RideMapActivity extends Activity {
   if(tileButton!=null)tileButton.setText(allowed?"온라인 배경지도 끄기":"온라인 배경지도 켜기 (선택)");
  }
  @Override protected void onResume(){super.onResume();if(map!=null)map.onResume();}
- @Override protected void onPause(){if(map!=null)map.onPause();super.onPause();}
+ @Override protected void onPause(){pauseReplay();if(map!=null)map.onPause();super.onPause();}
  @Override protected void onDestroy(){
-  alive=false;if(map!=null)map.onDetach();super.onDestroy();
+  alive=false;pauseReplay();replayHandler.removeCallbacksAndMessages(null);
+  replayPoints=Collections.emptyList();replayTimes=Collections.emptyList();
+  if(map!=null)map.onDetach();super.onDestroy();
   if(clearMapCacheOnExit)new Thread(()->{
    try{MapCachePolicy.scan(MapCachePolicy.target(getCacheDir()),true);}
    catch(Exception ignored){ /* Fail closed on links/large caches, never touch rides. */ }
