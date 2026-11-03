@@ -24,6 +24,17 @@ public final class Ux112CleanUiSafetyTest {
   assertEquals(180_000L,RideReplayTimeline.durationMs(Arrays.asList(1L,1_000_000_000L)));
   assertEquals(750,RideReplayTimeline.progressAt(1000,2000,500));
  }
+ @Test public void gpsDistanceRangesHaveNoAmbiguousBoundaries(){
+  assertTrue(RideHistoryDistanceFilter.accepts(RideHistoryDistanceFilter.SHORT,9.99));
+  assertFalse(RideHistoryDistanceFilter.accepts(RideHistoryDistanceFilter.SHORT,10));
+  assertTrue(RideHistoryDistanceFilter.accepts(RideHistoryDistanceFilter.MEDIUM,10));
+  assertFalse(RideHistoryDistanceFilter.accepts(RideHistoryDistanceFilter.MEDIUM,50));
+  assertTrue(RideHistoryDistanceFilter.accepts(RideHistoryDistanceFilter.LONG,50));
+  assertFalse(RideHistoryDistanceFilter.accepts(RideHistoryDistanceFilter.LONG,Double.NaN));
+  assertFalse(RideHistoryDistanceFilter.accepts(RideHistoryDistanceFilter.SHORT,-5));
+  assertFalse(RideHistoryDistanceFilter.withinBudget(null));
+  assertTrue(RideHistoryDistanceFilter.withinBudget(Collections.emptyList()));
+ }
  @Test public void scheduledServiceNeverCountsAsMoneyAlreadySpent()throws Exception{
   String bike="11111111-2222-4333-8444-555555555555";
   String other="bbbbbbbb-2222-4333-8444-555555555555";
