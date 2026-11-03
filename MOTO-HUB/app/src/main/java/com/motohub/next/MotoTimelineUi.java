@@ -33,6 +33,7 @@ final class MotoTimelineUi {
   final String[] selected={MotoTimeline.ALL};
   final List<MotoTimeline.Event> events=new ArrayList<>();
   final boolean[] loaded={false};
+  final boolean[] loading={true};
   final int[] visibleLimit={40};
   LinearLayout entries=a.col();
   TextView summary=a.text("이 바이크의 기록을 확인하고 있어요…",13,a.muted,false);
@@ -49,7 +50,8 @@ final class MotoTimelineUi {
    int count=0;
    for(MotoTimeline.Event e:events)if(e.matches(selected[0]))count++;
    summary.setText(selected[0]+" · "+count+"건"+
-    (count>visibleLimit[0]?" · "+visibleLimit[0]+"건 표시":""));
+    (count>visibleLimit[0]?" · "+visibleLimit[0]+"건 표시":"")+
+    (loading[0]?" · GPS 기록 계속 불러오는 중":""));
    if(count==0){a.label(entries,"이 분류에 표시할 기록이 없습니다.",14,a.muted,false);return;}
    String lastMonth="";
    for(MotoTimeline.Event e:MotoTimeline.filtered(events,selected[0],visibleLimit[0])){
@@ -104,6 +106,12 @@ final class MotoTimelineUi {
   final Dialog opened=a.dialog;
   new Thread(()->{
    List<MotoTimeline.Event> merged=new ArrayList<>(MotoTimeline.ledger(snapshot,bikeId,localZone));
+   // Show the ledger immediately; long GPS archives continue in the worker.
+   final List<MotoTimeline.Event> initial=new ArrayList<>(merged);
+   a.runOnUiThread(()->{
+    if(a.isFinishing()||a.isDestroyed()||a.dialog!=opened||!opened.isShowing())return;
+    events.clear();events.addAll(initial);loaded[0]=true;repaint.run();
+   });
    int skipped=0,inspected=0;
    try{
     for(File track:RideHistorySort.order(TrackFile.tracks(a.getFilesDir()),RideHistorySort.NEWEST)){
@@ -114,13 +122,23 @@ final class MotoTimelineUi {
       MotoTimeline.Event e=MotoTimeline.ride(track,snapshot,bikeId,localZone);
       if(e!=null)merged.add(e);
      }catch(Exception ignored){skipped++;}
+     // Keep screen responsive while indexing large local GPS archives.
+     // Counts are explicitly provisional until the final complete scan.
+     if(inspected==64||inspected%256==0){
+      MotoTimeline.sort(merged);
+      final List<MotoTimeline.Event> partial=new ArrayList<>(merged);
+      a.runOnUiThread(()->{
+       if(a.isFinishing()||a.isDestroyed()||a.dialog!=opened||!opened.isShowing())return;
+       events.clear();events.addAll(partial);loaded[0]=true;repaint.run();
+      });
+     }
     }
    }catch(Exception ignored){skipped++;}
    MotoTimeline.sort(merged);
    final int exclusions=skipped;
    a.runOnUiThread(()->{
     if(a.isFinishing()||a.isDestroyed()||a.dialog!=opened||!opened.isShowing())return;
-    events.addAll(merged);loaded[0]=true;repaint.run();
+    events.clear();events.addAll(merged);loaded[0]=true;loading[0]=false;repaint.run();
     invalid.setText(exclusions>0?"손상되거나 연결을 확인할 수 없는 GPS 기록 "+exclusions+"건 제외":"");
    });
   },"moto-unified-timeline").start();
