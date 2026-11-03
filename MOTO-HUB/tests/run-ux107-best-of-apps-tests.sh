@@ -20,9 +20,11 @@ assert 'RideMileageIntegrity.validCompleted(track)' in timeline
 assert 'RideHistoryLabel.startTime(track)' in timeline
 assert 'MotoTimeline.sort(merged)' in ui
 assert 'RideHistorySort.order(TrackFile.tracks(' in ui
-assert 'if(inspected++>=200)break;' in ui
+assert 'if(inspected++>=200)break;' not in ui
+assert 'if(++inspected%64==0' in ui
 assert 'if(count>40' not in ui # count bound handled in filtered display
-assert 'MotoTimeline.filtered(events,selected[0],40)' in ui
+assert 'MotoTimeline.filtered(events,selected[0],visibleLimit[0])' in ui
+assert '활동 더 보기' in ui and 'visibleLimit[0]=40' in ui
 assert 'new Thread(()->{' in ui and 'a.runOnUiThread(()->{' in ui
 assert 'a.dialog!=opened||!opened.isShowing()' in ui
 assert 'a.openRideInsights(track)' in ui and 'a.edit(e.collection,item)' in ui

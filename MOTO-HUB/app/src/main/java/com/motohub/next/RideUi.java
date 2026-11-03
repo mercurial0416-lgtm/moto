@@ -284,25 +284,22 @@ final class RideUi {
     List<File> visible=RideHistorySort.order(RideHistoryFilter.select(bikeRides,selected,activeName,recording),sort);
     String distanceInfo="";
     if(!RideHistoryDistanceFilter.ALL.equals(distanceRange)){
-     if(!RideHistoryDistanceFilter.withinBudget(visible)){
-      // Never show a truncated subset as if it was a complete search result.
-      distanceInfo="거리 필터를 적용하지 못했어요. 기록이 많아 기간·바이크 범위를 먼저 좁혀 주세요 (최대 150건·80MB).";
-     }else{
-      List<File> matched=new ArrayList<>();
-      int unreadable=0;
-      for(File file:visible){
-       if(generation!=HISTORY_GENERATION.get())return;
-       try{
-        if(!RideMileageIntegrity.validCompleted(file)){unreadable++;continue;}
-        long length=file.length(),modified=file.lastModified();
-        RideInsights.Result info=RideInsights.analyze(file);
-        if(file.length()!=length||file.lastModified()!=modified){unreadable++;continue;}
-        if(RideHistoryDistanceFilter.accepts(distanceRange,info.distanceKm))matched.add(file);
-       }catch(Exception ignored){unreadable++;}
-      }
-      visible=matched;
-      distanceInfo="GPS 거리 "+distanceRange+" · 분석 불가 "+unreadable+"건 제외 · 계기판 거리와 다를 수 있어요.";
+     // The complete filtered list is evaluated off the UI thread. Never drop
+     // the user's filter merely because there are over 150 tracks or 80MB.
+     // Shared bounded cache skips unchanged GPS analyses on subsequent views.
+     List<File> matched=new ArrayList<>();
+     int unreadable=0;
+     for(File file:visible){
+      if(generation!=HISTORY_GENERATION.get())return;
+      try{
+       RideDistanceCache.Summary distance=RideDistanceCache.read(file);
+       if(RideHistoryDistanceFilter.accepts(distanceRange,distance.distanceKm))
+        matched.add(file);
+      }catch(Exception ignored){unreadable++;}
      }
+     visible=matched;
+     distanceInfo="GPS 거리 "+distanceRange+" · 전체 대상 분석 · 원본 손상·크기 초과 "+unreadable+
+      "건 제외 · 계기판 거리와 다를 수 있어요.";
     }
     List<HistoryEntry> entries=new ArrayList<>();
     for(File file:visible){

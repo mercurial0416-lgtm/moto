@@ -84,9 +84,7 @@ final class RideStatsUi {
      }
      try{
       if(ride.length()>5_000_000){data.excluded++;continue;}
-      long size=ride.length(),modified=ride.lastModified();
-      RideInsights.Result x=RideInsights.analyze(ride);
-      if(ride.length()!=size||ride.lastModified()!=modified){data.excluded++;continue;}
+      RideDistanceCache.Summary x=RideDistanceCache.read(ride);
       data.add(t,x.distanceKm,x.durationMillis);
      }catch(Exception ignored){data.excluded++;}
     }

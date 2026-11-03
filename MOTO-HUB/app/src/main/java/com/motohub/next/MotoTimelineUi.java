@@ -32,8 +32,11 @@ final class MotoTimelineUi {
   final String[] selected={MotoTimeline.ALL};
   final List<MotoTimeline.Event> events=new ArrayList<>();
   final boolean[] loaded={false};
+  final int[] visibleLimit={40};
   LinearLayout entries=a.col();
   TextView summary=a.text("이 바이크의 기록을 확인하고 있어요…",13,a.muted,false);
+  TextView invalid=a.text("",12,a.muted,false);
+  final Runnable[] repaintHolder=new Runnable[1];
   Runnable repaint=()->{
    for(Map.Entry<String,Button> chip:chips.entrySet()){
     boolean on=chip.getKey().equals(selected[0]);
@@ -44,10 +47,11 @@ final class MotoTimelineUi {
    entries.removeAllViews();
    int count=0;
    for(MotoTimeline.Event e:events)if(e.matches(selected[0]))count++;
-   summary.setText(selected[0]+" · "+count+"건"+(count>40?" · 최근 40건 표시":""));
+   summary.setText(selected[0]+" · "+count+"건"+
+    (count>visibleLimit[0]?" · "+visibleLimit[0]+"건 표시":""));
    if(count==0){a.label(entries,"이 분류에 표시할 기록이 없습니다.",14,a.muted,false);return;}
    String lastMonth="";
-   for(MotoTimeline.Event e:MotoTimeline.filtered(events,selected[0],40)){
+   for(MotoTimeline.Event e:MotoTimeline.filtered(events,selected[0],visibleLimit[0])){
     String month=e.day.length()>=7?e.day.substring(0,7):"";
     if(!lastMonth.equals(month)){
      lastMonth=month;
@@ -73,15 +77,28 @@ final class MotoTimelineUi {
     LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,-2);
     cp.bottomMargin=a.dp(8);entries.addView(card,cp);
    }
+   final int totalMatches=count;
+   final int remaining=Math.max(0,totalMatches-visibleLimit[0]);
+   if(remaining>0){
+    a.gap(entries,8);
+    Button more=a.button("활동 더 보기 · 남은 "+remaining+"건",false,()->{
+     visibleLimit[0]=Math.min(totalMatches,visibleLimit[0]+40);
+     repaintHolder[0].run();
+    });
+    more.setMinHeight(a.dp(48));
+    more.setContentDescription("바이크 활동 "+Math.min(40,remaining)+"건 더 보기");
+    entries.addView(more);
+   }
   };
+  repaintHolder[0]=repaint;
   for(String kind:MotoTimeline.FILTERS){
-   Button item=a.button(kind,false,()->{selected[0]=kind;repaint.run();});
+   Button item=a.button(kind,false,()->{selected[0]=kind;visibleLimit[0]=40;repaint.run();});
    item.setMinHeight(a.dp(44));item.setTextSize(13);item.setContentDescription(kind+" 활동 필터");
    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-2,-2);lp.rightMargin=a.dp(7);
    filters.addView(item,lp);chips.put(kind,item);
   }
   scroll.addView(filters);body.addView(scroll);
-  a.gap(body,12);body.addView(summary);a.gap(body,8);body.addView(entries);
+  a.gap(body,12);body.addView(summary);body.addView(invalid);a.gap(body,8);body.addView(entries);
   a.show();repaint.run();
   final Dialog opened=a.dialog;
   new Thread(()->{
@@ -89,7 +106,8 @@ final class MotoTimelineUi {
    int skipped=0,inspected=0;
    try{
     for(File track:RideHistorySort.order(TrackFile.tracks(a.getFilesDir()),RideHistorySort.NEWEST)){
-     if(inspected++>=200)break;
+     if(++inspected%64==0&&(a.isFinishing()||a.isDestroyed()||
+        a.dialog!=opened||!opened.isShowing()))return;
      if(RideService.running&&track.getName().equals(RideService.active))continue;
      try{
       MotoTimeline.Event e=MotoTimeline.ride(track,snapshot,bikeId);
@@ -102,9 +120,7 @@ final class MotoTimelineUi {
    a.runOnUiThread(()->{
     if(a.isFinishing()||a.isDestroyed()||a.dialog!=opened||!opened.isShowing())return;
     events.addAll(merged);loaded[0]=true;repaint.run();
-    if(exclusions>0){
-     a.label(entries,"손상되거나 연결을 확인할 수 없는 GPS 기록 "+exclusions+"건은 제외했어요.",12,a.muted,false);
-    }
+    invalid.setText(exclusions>0?"손상되거나 연결을 확인할 수 없는 GPS 기록 "+exclusions+"건 제외":"");
    });
   },"moto-unified-timeline").start();
  }
