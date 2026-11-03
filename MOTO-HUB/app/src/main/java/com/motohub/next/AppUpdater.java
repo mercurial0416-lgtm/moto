@@ -25,6 +25,8 @@ final class AppUpdater {
  void show(){
   LinearLayout p=a.page("앱 업데이트");owner=a.dialog;
   a.label(p,"현재 버전  "+BuildConfig.VERSION_NAME+" ("+BuildConfig.VERSION_CODE+")",20,a.fg,true);
+  a.action(p,"최근 업데이트 기록·GPS·백업 검사",false,
+   ()->new HubScreens(a).updateRecoveryReport());
   if(BuildConfig.STORE_DISTRIBUTION){
    a.label(p,"Google Play 설치 버전입니다. 업데이트는 Google Play에서 관리합니다.",15,a.fg,true);
    a.label(p,"기존 GPS·정비 데이터를 보호하기 위해 이 버전에서는 별도 APK 다운로드와 알 수 없는 앱 설치를 사용하지 않습니다.",13,a.muted,false);

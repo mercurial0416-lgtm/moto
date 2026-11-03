@@ -101,7 +101,15 @@ public class MainActivity extends Activity {
    final boolean loaded=!readOnly;
    new Thread(()->{
     String audit=UpdateInstallSnapshot.afterStartup(this,BuildConfig.VERSION_CODE,loaded);
-    if(audit!=null)runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())toast(audit);});
+    if(audit!=null)runOnUiThread(()->{
+     if(isFinishing()||isDestroyed())return;
+     toast(audit);
+     if(dialog==null&&!RideService.running&&!RideService.autoArmed)
+      new AlertDialog.Builder(this).setTitle("앱 업데이트 후 기록 점검")
+       .setMessage(audit+"\\n\\n원본을 자동 복원하거나 수정하지 않았습니다.")
+       .setPositiveButton("GPS·정비·백업 상세 검사",(d,w)->new HubScreens(this).updateRecoveryReport())
+       .setNegativeButton("닫기",null).show();
+    });
    },"moto-post-update-data-audit").start();
   }
   if(state==null&&!readOnly)auditGarageSoon(false);

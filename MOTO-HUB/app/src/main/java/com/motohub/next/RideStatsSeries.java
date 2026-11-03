@@ -13,6 +13,7 @@ final class RideStatsSeries {
  int excluded=0, scanned=0;
  int invalidCompleted=0,oversize=0,unreadable=0,invalidMetrics=0;
  double totalKm=0;
+ private final java.util.Set<String> countedSessions=new java.util.HashSet<>();
  RideStatsSeries(YearMonth anchor){this(anchor,ZoneId.systemDefault());}
  RideStatsSeries(YearMonth anchor,ZoneId zone){
   if(anchor==null||zone==null)throw new IllegalArgumentException("기준 월 또는 시간대 없음");
@@ -23,13 +24,18 @@ final class RideStatsSeries {
   }
  }
  boolean add(long startMs,double distanceKm,long elapsedMs){
+  return add("",startMs,distanceKm,elapsedMs);
+ }
+ boolean add(String session,long startMs,double distanceKm,long elapsedMs){
   if(startMs<=0||!Double.isFinite(distanceKm)||distanceKm<0||distanceKm>1000||elapsedMs<0||elapsedMs>4L*24*3600*1000){
    excluded++;return false;
   }
   YearMonth month=YearMonth.from(Instant.ofEpochMilli(startMs).atZone(zone));
   long index=ChronoUnit.MONTHS.between(anchor.minusMonths(5),month);
   if(index<0||index>=6)return false;
-  int i=(int)index;count[i]++;km[i]+=distanceKm;minutes[i]+=elapsedMs/60000;totalKm+=distanceKm;return true;
+  int i=(int)index;
+  if(session==null||session.isEmpty()||countedSessions.add(session))count[i]++;
+  km[i]+=distanceKm;minutes[i]+=elapsedMs/60000;totalKm+=distanceKm;return true;
  }
  /** Inclusive start of the six displayed local calendar months, including DST boundaries. */
  long earliestStartMs(){

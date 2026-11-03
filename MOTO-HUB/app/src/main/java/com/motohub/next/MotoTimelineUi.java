@@ -124,9 +124,11 @@ final class MotoTimelineUi {
      }catch(Exception ignored){skipped++;}
      // Keep screen responsive while indexing large local GPS archives.
      // Counts are explicitly provisional until the final complete scan.
-     if(inspected==64||inspected%256==0){
-      MotoTimeline.sort(merged);
-      final List<MotoTimeline.Event> partial=new ArrayList<>(merged);
+     if(inspected==64||inspected%1024==0){
+      // Keep only a bounded top-window during discovery; full stable sort
+      // happens once when the complete ride index has loaded.
+      final List<MotoTimeline.Event> partial=RideSegmentGroup.collapse(
+       MotoTimeline.newest(merged,120));
       a.runOnUiThread(()->{
        if(a.isFinishing()||a.isDestroyed()||a.dialog!=opened||!opened.isShowing())return;
        events.clear();events.addAll(partial);loaded[0]=true;repaint.run();
@@ -134,11 +136,11 @@ final class MotoTimelineUi {
      }
     }
    }catch(Exception ignored){skipped++;}
-   MotoTimeline.sort(merged);
+   final List<MotoTimeline.Event> grouped=RideSegmentGroup.collapse(merged);
    final int exclusions=skipped;
    a.runOnUiThread(()->{
     if(a.isFinishing()||a.isDestroyed()||a.dialog!=opened||!opened.isShowing())return;
-    events.clear();events.addAll(merged);loaded[0]=true;loading[0]=false;repaint.run();
+    events.clear();events.addAll(grouped);loaded[0]=true;loading[0]=false;repaint.run();
     invalid.setText(exclusions>0?"손상되거나 연결을 확인할 수 없는 GPS 기록 "+exclusions+"건 제외":"");
    });
   },"moto-unified-timeline").start();
@@ -146,12 +148,31 @@ final class MotoTimelineUi {
  private void openEvent(MotoTimeline.Event e){
   a.close();
   if(!e.trackName.isEmpty()){
-   a.attempt(()->{
-    if(!e.trackName.matches(BackupFormat.TRACK))throw new java.io.IOException("잘못된 GPS 파일입니다.");
-    File track=new File(TrackFile.directory(a.getFilesDir()),e.trackName);
-    if(!RideMileageIntegrity.validCompleted(track))throw new java.io.IOException("GPS 원본이 변경됐습니다.");
-    a.openRideInsights(track);
-   });
+   // File enumeration stays off the UI thread, even on very large archives.
+   new Thread(()->{
+    try{
+     final java.util.List<File> sections=RideSegmentGroup.members(a.getFilesDir(),e.trackName);
+     a.runOnUiThread(()->{
+      if(a.isFinishing()||a.isDestroyed())return;
+      if(sections.isEmpty()){a.error("완료된 GPS 구간이 없어요.");return;}
+      if(sections.size()==1){a.openRideInsights(sections.get(0));return;}
+      String[] choices=new String[sections.size()];
+      for(int i=0;i<sections.size();i++)
+       choices[i]=(i+1)+" / "+sections.size()+" · "+
+        RideHistoryLabel.title(sections.get(i),java.time.ZoneId.systemDefault());
+      new android.app.AlertDialog.Builder(a)
+       .setTitle("연속 라이딩 · GPS "+sections.size()+"구간")
+       .setMessage("원본은 구간별로 안전하게 저장돼요. 통계의 주행거리는 합산됩니다.")
+       .setItems(choices,(dialog,index)->{
+        File track=sections.get(index);
+        if(!RideMileageIntegrity.validCompleted(track)){a.error("해당 구간 원본을 확인할 수 없습니다.");return;}
+        a.openRideInsights(track);
+       }).setNegativeButton("닫기",null).show();
+     });
+    }catch(Exception invalid){
+     a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 구간을 확인할 수 없습니다.");});
+    }
+   },"moto-segment-detail-index").start();
    return;
   }
   a.attempt(()->{

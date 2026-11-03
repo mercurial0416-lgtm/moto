@@ -37,6 +37,21 @@ final class ObdLocalDiagnosticLog {
   int previous=preferences.getInt("observed_mask",0);
   if((previous&bit)==0)preferences.edit().putInt("observed_mask",previous|bit).apply();
  }
+ /** End-of-session auto OBD report: bounded counters and one allowlisted diagnosis.
+  * Never store adapter MAC, connection address, raw ECU response or GPX coordinates. */
+ static void automaticSession(Context c,int attempts,int successes,int reconnects,
+                              int queryFailures,long speedSamples,String reason){
+  String safe=ObdFailureGuide.classify(reason);
+  c.getSharedPreferences(PREFS,0).edit()
+   .putLong("auto_at",System.currentTimeMillis())
+   .putInt("auto_attempts",Math.max(0,Math.min(attempts,10_000)))
+   .putInt("auto_successes",Math.max(0,Math.min(successes,10_000)))
+   .putInt("auto_reconnects",Math.max(0,Math.min(reconnects,10_000)))
+   .putInt("auto_failures",Math.max(0,Math.min(queryFailures,1_000_000)))
+   .putLong("auto_samples",Math.max(0,Math.min(speedSamples,10_000_000L)))
+   .putString("auto_reason",safe)
+   .apply();
+ }
  /** Store one bounded diagnostic summary at session end, never MAC, raw payload or coordinates. */
  static void probeMetrics(Context c,boolean connected,int validReplies,int failures,
                           long averageLatencyMs,long lastReceivedAt){
@@ -109,6 +124,18 @@ final class ObdLocalDiagnosticLog {
     .append(Math.max(0,RideService.obdQueryFailures)).append("회");
    text.append("\n최근 측정 응답: ")
     .append(RideService.obdAverageLatencyMs>=0?RideService.obdAverageLatencyMs+"ms":"측정 불가");
+  }
+  long ended=p.getLong("auto_at",0);
+  if(ended>0&&ended<=System.currentTimeMillis()){
+   text.append("\\n\\n마지막 OBD 자동 연결: ")
+    .append(new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.KOREA).format(new Date(ended)))
+    .append("\\n연결 시도 ").append(p.getInt("auto_attempts",0)).append("회 · 성공 ")
+    .append(p.getInt("auto_successes",0)).append("회 · 재시도 ")
+    .append(p.getInt("auto_reconnects",0)).append("회")
+    .append("\\n속도 응답 ").append(p.getLong("auto_samples",0)).append("회 · 쿼리 오류 ")
+    .append(p.getInt("auto_failures",0)).append("회")
+    .append("\\n진단: ").append(p.getString("auto_reason","확인되지 않음"))
+    .append("\\n실차 ECU 호환성은 연결 상태에서 직접 확인해야 합니다.");
   }
   String events=p.getString("events","");
   if(events!=null&&!events.isEmpty())text.append("\n\n최근 연결 점검\n").append(events);

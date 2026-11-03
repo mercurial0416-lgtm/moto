@@ -4,6 +4,7 @@ import java.io.File;
 final class RideMonthlyReport {
  static final class Totals {int count;double km;long minutes;}
  final Totals current=new Totals(),previous=new Totals();int skipped;
+ private final java.util.Set<String> countedNow=new java.util.HashSet<>(),countedBefore=new java.util.HashSet<>();
  static long timestamp(File track){
   // Imported GPX tracks are saved under an import-time filename. Use the first
   // recorded point instead, or an old ride imported today appears as a new ride.
@@ -15,6 +16,9 @@ final class RideMonthlyReport {
  void add(File track,long now,double distance,long duration){
   if(!recent(track,now,60)||!Double.isFinite(distance)||distance<0||distance>1000||duration<0)return;
   Totals target=recent(track,now,30)?current:previous;
-  target.count++;target.km+=distance;target.minutes+=duration/60000;
+  String session=RideSegmentGroup.id(track);
+  java.util.Set<String> seen=target==current?countedNow:countedBefore;
+  if(session.isEmpty()||seen.add(session))target.count++;
+  target.km+=distance;target.minutes+=duration/60000;
  }
 }

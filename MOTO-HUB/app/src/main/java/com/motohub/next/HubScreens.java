@@ -673,6 +673,29 @@ final class HubScreens {
   LinearLayout page=a.page("업데이트 후 데이터 검사");
   a.label(page,UpdateInstallSnapshot.lastReport(a),15,a.fg,false);
   a.label(page,RestoreVerificationAudit.summary(a),12,a.muted,false);
+  TextView verified=a.text("현재 바이크·정비·GPS·백업 상태 확인 중…",13,a.muted,false);
+  page.addView(verified);
+  final String snapshot=backupJsonSnapshot();
+  LOCAL_BACKUP_IO.execute(()->{
+   String result;
+   try{
+    if(snapshot==null)throw new java.io.IOException("JSON 상태를 확인할 수 없습니다.");
+    JSONObject data=Store.parse(snapshot);
+    int rides=0,damaged=0;
+    for(File file:TrackFile.tracks(a.getFilesDir())){
+     if(RideMileageIntegrity.validCompleted(file))rides++;
+     else if(new File(file.getPath()+".done").isFile()||
+             new File(file.getPath()+".recovered").isFile())damaged++;
+    }
+    result=GarageIntegrity.report(data)+
+     "\\nGPS 완료·복구 기록 "+rides+"건 · 완료 상태 점검 필요 "+damaged+"건"+
+     "\\n"+BackupGpsProof.fullCurrentStatus(a,snapshot);
+   }catch(Exception invalid){result="기록 점검 중 읽기 오류 · GPS 원본과 외부 ZIP을 보존하세요.";}
+   final String summary=result;
+   a.runOnUiThread(()->{
+    if(!a.isFinishing()&&!a.isDestroyed()&&verified.getParent()!=null)verified.setText(summary);
+   });
+  });
   a.label(page,"검사 결과는 참고 정보입니다. 정상으로 표시돼도 전체 ZIP 백업을 따로 보관하세요. 자동 복원은 실행하지 않습니다.",13,a.muted,false);
   a.action(page,"전체 ZIP 백업 만들기",true,a::exportBundle);
   a.action(page,"보존된 로컬 복구 지점 확인",false,this::advancedBackup);
