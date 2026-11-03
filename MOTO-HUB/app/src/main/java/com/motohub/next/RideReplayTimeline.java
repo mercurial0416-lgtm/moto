@@ -7,6 +7,17 @@ final class RideReplayTimeline {
  static final int MAX_PROGRESS=1000;
  private RideReplayTimeline(){}
 
+ /** Reject corrupted or out-of-order timestamps before enabling binary-search playback. */
+ static boolean validTimes(List<Long> times){
+  if(times==null||times.size()<2)return false;
+  long previous=0,first=0;
+  for(Long value:times){
+   if(value==null||value<=0||value<previous)return false;
+   if(first==0)first=value;
+   previous=value;
+  }
+  return previous>first;
+ }
  static int indexAt(List<Long> times,int progress){
   if(times==null||times.isEmpty())return -1;
   if(times.size()==1||progress<=0)return 0;
