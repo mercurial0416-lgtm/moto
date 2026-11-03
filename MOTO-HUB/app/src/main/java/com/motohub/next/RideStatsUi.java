@@ -14,6 +14,13 @@ import java.util.*;
 
 /** Six-month offline chart assembled from the same completed GPS tracks as existing reports. */
 final class RideStatsUi {
+ // Opening the report repeatedly must not launch parallel file-system scans.
+ private static final java.util.concurrent.ExecutorService STATS_EXECUTOR=
+  java.util.concurrent.Executors.newSingleThreadExecutor(task->{
+   Thread thread=new Thread(task,"moto-ride-stats");thread.setDaemon(true);return thread;
+  });
+ private static final java.util.concurrent.atomic.AtomicLong STATS_GENERATION=
+  new java.util.concurrent.atomic.AtomicLong();
  static void open(MainActivity a){
   LinearLayout body=a.page("라이딩 통계 · 최근 6개월");
   a.label(body,"실제 GPS 기록 시간을 기준으로 집계합니다. 가져온 날짜나 파일 수정일은 사용하지 않아요.",13,a.muted,false);
@@ -37,19 +44,27 @@ final class RideStatsUi {
     a.items("expenses"),a.items("services"),selected,data.anchor);
    sixMonthExpense=CostDashboard.add(ledger.sumFuelAndOther(),ledger.sumService());
   }
-  new Thread(()->{
+  final long generation=STATS_GENERATION.incrementAndGet();
+  STATS_EXECUTOR.execute(()->{
+   if(generation!=STATS_GENERATION.get())return;
    try{
     long now=System.currentTimeMillis();int inspected=0;
     for(File ride:RideHistorySort.order(TrackFile.tracks(a.getFilesDir()),RideHistorySort.NEWEST)){
+     if(generation!=STATS_GENERATION.get())return;
      if(RideService.running&&ride.getName().equals(RideService.active))continue;
      if(RideTrackMerge.mergedSource(ride)||RideTrackMerge.archived(ride))continue;
-     if(!RideMileageIntegrity.validCompleted(ride))continue;
+     Long t=RideHistoryLabel.startTime(ride);
+     if(t==null||!data.inDisplayedPeriod(t,now))continue;
      if(!selected.isEmpty()){
       try{if(!selected.equals(RideBikeBinding.readStrict(ride)))continue;}
       catch(Exception ignored){data.excluded++;continue;}
      }
-     Long t=RideHistoryLabel.startTime(ride);
-     if(t==null||t<=0||t>now||!RideMonthlyReport.recent(ride,now,190))continue;
+     if(!RideMileageIntegrity.validCompleted(ride)){
+      // A nominally completed but corrupt track makes GPS-km cost division unsafe.
+      if(new File(ride.getPath()+".done").isFile()||
+         new File(ride.getPath()+".recovered").isFile())data.excluded++;
+      continue;
+     }
      if(inspected++>=180){data.scanned++;continue;}
      try{
       if(ride.length()>5_000_000){data.excluded++;continue;}
@@ -61,7 +76,8 @@ final class RideStatsUi {
     }
    }catch(Exception e){data.excluded++;}
    a.runOnUiThread(()->{
-    if(a.isFinishing()||a.isDestroyed()||a.dialog!=owner||!owner.isShowing())return;
+    if(generation!=STATS_GENERATION.get()||a.isFinishing()||a.isDestroyed()||
+       a.dialog!=owner||!owner.isShowing())return;
     status.setText(data.rides()==0?"최근 6개월에 분석 가능한 라이딩이 없어요.":"GPS 주행거리 · 월별");
     chart.setData(data,a.dark);
     totals.setText(String.format(Locale.KOREA,
@@ -74,12 +90,16 @@ final class RideStatsUi {
       "\nGPS 추정값이며 실주행거리·계기판 ODO를 자동 수정하지 않습니다. 월별 주행횟수 "+
       Arrays.toString(data.count)+"회 · 총 분석 시간 "+data.totalMinutes()+"분");
    });
-  },"moto-ride-6month-bars").start();
+  });
  }
  static final class RideBarChart extends View{
   RideStatsSeries data;boolean dark;final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
   RideBarChart(Context c){super(c);}
-  void setData(RideStatsSeries d,boolean isDark){data=d;dark=isDark;invalidate();}
+  void setData(RideStatsSeries d,boolean isDark){
+   data=d;dark=isDark;
+   setContentDescription("월별 GPS 주행거리 "+Arrays.toString(d.labels)+" "+Arrays.toString(d.km)+" km");
+   invalidate();
+  }
   @Override protected void onDraw(Canvas c){
    super.onDraw(c);
    int w=getWidth(),h=getHeight();if(w<=0||h<=0)return;
@@ -105,7 +125,6 @@ final class RideStatsUi {
    }
    paint.setColor(dark?MotoDesign.DARK_MUTED:MotoDesign.LIGHT_MUTED);paint.setTextSize(10*scale);paint.setTextAlign(Paint.Align.LEFT);
    c.drawText("km",12*scale,17*scale,paint);
-   setContentDescription("월별 GPS 주행거리 "+Arrays.toString(data.labels)+" "+Arrays.toString(data.km)+" km");
   }
  }
 }

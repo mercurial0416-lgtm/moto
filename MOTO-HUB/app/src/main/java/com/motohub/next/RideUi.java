@@ -258,6 +258,8 @@ final class RideUi {
   final String rideNotesSnapshot=liveNotes==null?"{}":liveNotes.toString();
   final String distanceRange=RideHistoryDistanceFilter.normalize(
    a.getSharedPreferences("ride_history_ui",0).getString("distance_filter",RideHistoryDistanceFilter.ALL));
+  final String categoryRange=RideCategoryFilter.normalize(
+   a.getSharedPreferences("ride_history_ui",0).getString("category_filter",RideCategoryFilter.ALL));
   HISTORY_EXECUTOR.execute(()->{
    if(generation!=HISTORY_GENERATION.get())return;
    try{
@@ -272,6 +274,12 @@ final class RideUi {
     // 7-day view can claim hundreds of rides even when only two are visible.
     // Imported GPX dates come from their first committed GPS point.
     bikeRides.removeIf(file->!RideHistoryPeriod.include(file,now,period));
+    // Recovery warning must not disappear just because an unrelated category was selected.
+    int unfinished=0;
+    for(File file:bikeRides)
+     if(RideHistoryFilter.INTERRUPTED.equals(RideHistoryFilter.status(file,activeName,recording)))unfinished++;
+    // Saved category is a separate exact-match filter. Never erase user's text query.
+    bikeRides.removeIf(file->!RideCategoryFilter.matches(categoryRange,RideCategory.read(file)));
     Map<String,Integer> counts=RideHistoryFilter.counts(bikeRides,activeName,recording);
     List<File> visible=RideHistorySort.order(RideHistoryFilter.select(bikeRides,selected,activeName,recording),sort);
     String distanceInfo="";
@@ -309,8 +317,6 @@ final class RideUi {
       " · "+RideHistoryBikeLabel.label(file,bikeNames);
      entries.add(new HistoryEntry(file,label,RideHistoryFilter.status(file,activeName,recording),savedMemo));
     }
-    int unfinished=0;
-    for(File file:bikeRides)if(RideHistoryFilter.INTERRUPTED.equals(RideHistoryFilter.status(file,activeName,recording)))unfinished++;
     File unapplied=null;int unappliedCount=0;
     if(!currentBike.isEmpty())for(File file:rides){
      if(generation!=HISTORY_GENERATION.get())return;
@@ -449,15 +455,18 @@ final class RideUi {
    periodButton.setContentDescription("라이딩 기간 "+a.rideHistoryPeriod+", 변경하기");
    LinearLayout.LayoutParams periodLp=new LinearLayout.LayoutParams(-2,a.dp(44));periodLp.leftMargin=a.dp(6);
    historyTools.addView(periodButton,periodLp);
-   Button categoryButton=a.button("종류: 검색  ▾",false,()->{
-    String[] labels={"전체 종류","일상","출퇴근","와인딩","장거리","투어"};
-    new AlertDialog.Builder(a).setTitle("라이딩 종류 검색")
-     .setMessage("사용자가 지정한 라이딩 종류와 제목·메모에 적힌 용어를 검색합니다. 자동 추천은 기록 상세에서 확인하세요.")
-     .setItems(labels,(dialog,index)->{
-      a.rideHistoryQuery=index==0?"":labels[index];
-      a.render();
-     }).setNegativeButton("취소",null).show();
-   });
+   final String selectedCategory=RideCategoryFilter.normalize(a.getSharedPreferences("ride_history_ui",0)
+     .getString("category_filter",RideCategoryFilter.ALL));
+   Button categoryButton=a.button("종류: "+selectedCategory+"  ▾",false,()->
+    new AlertDialog.Builder(a).setTitle("저장한 라이딩 종류")
+     .setMessage("저장된 종류만 정확하게 필터링합니다. 제목·메모 검색어는 그대로 유지되고 자동 분류는 추측하지 않습니다.")
+     .setSingleChoiceItems(RideCategoryFilter.OPTIONS,
+      Math.max(0,Arrays.asList(RideCategoryFilter.OPTIONS).indexOf(selectedCategory)),(dialog,index)->{
+       dialog.dismiss();
+       a.getSharedPreferences("ride_history_ui",0).edit()
+        .putString("category_filter",RideCategoryFilter.OPTIONS[index]).apply();
+       a.render();
+      }).setNegativeButton("취소",null).show());
    categoryButton.setMinHeight(a.dp(44));
    LinearLayout.LayoutParams categoryLp=new LinearLayout.LayoutParams(-2,a.dp(44));categoryLp.leftMargin=a.dp(6);
    historyTools.addView(categoryButton,categoryLp);
@@ -476,14 +485,25 @@ final class RideUi {
    distanceButton.setMinHeight(a.dp(44));
    LinearLayout.LayoutParams distanceLp=new LinearLayout.LayoutParams(-2,a.dp(44));
    distanceLp.leftMargin=a.dp(6);historyTools.addView(distanceButton,distanceLp);
-   // Show only search and status by default. The other controls expand on demand.
+   // Show only search and status by default, but keep the user's expanded state on refresh.
    historyPanel.addView(summary);
+   final android.content.SharedPreferences historyUiPrefs=a.getSharedPreferences("ride_history_ui",0);
+   final boolean wasExpanded=historyUiPrefs.getBoolean("advanced_expanded",false);
+   final int applied=(RideHistoryPeriod.ALL.equals(a.rideHistoryPeriod)?0:1)
+    +(RideHistoryBikeFilter.ALL.equals(a.rideHistoryBike)?0:1)
+    +(RideHistorySort.NEWEST.equals(a.rideHistorySort)?0:1)
+    +(RideCategoryFilter.ALL.equals(selectedCategory)?0:1)
+    +(RideHistoryDistanceFilter.ALL.equals(distancePref)?0:1);
+   final String summaryFilters="상세 필터"+(applied==0?"":" · "+applied+"개 적용");
    HorizontalScrollView historyControlStrip=new HorizontalScrollView(a);
-   Button filterToggle=a.button("날짜 · 바이크 · 종류 · 거리  ▾",false,()->{
+   Button filterToggle=a.button(summaryFilters+(wasExpanded?"  ▴":"  ▾"),false,()->{});
+   filterToggle.setOnClickListener(view->{
     boolean expand=historyControlStrip.getVisibility()!=View.VISIBLE;
     historyControlStrip.setVisibility(expand?View.VISIBLE:View.GONE);
+    historyUiPrefs.edit().putBoolean("advanced_expanded",expand).apply();
+    filterToggle.setText(summaryFilters+(expand?"  ▴":"  ▾"));
    });
-   filterToggle.setContentDescription("날짜, 바이크, 정렬 상세 필터 열기 또는 접기");
+   filterToggle.setContentDescription("날짜, 바이크, 종류, GPS 거리, 정렬 상세 필터 "+applied+"개 적용. 열기 또는 접기");
    historyPanel.addView(filterToggle);
    if(damagedBindings>0){
     TextView warning=a.text("주의: 바이크 연결 정보 손상 "+damagedBindings+"건 · 미지정으로 분류하지 않음",12,0xffe7a04e,false);
@@ -491,7 +511,7 @@ final class RideUi {
    }
    historyControlStrip.setHorizontalScrollBarEnabled(false);
    historyControlStrip.addView(historyTools);
-   historyControlStrip.setVisibility(View.GONE);
+   historyControlStrip.setVisibility(wasExpanded?View.VISIBLE:View.GONE);
    historyPanel.addView(historyControlStrip);
    LinearLayout results=a.col();historyPanel.addView(results);
    search.setText(a.rideHistoryQuery);
