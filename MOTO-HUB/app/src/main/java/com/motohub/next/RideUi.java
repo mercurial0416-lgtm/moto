@@ -32,9 +32,10 @@ final class RideUi {
  private static final class HistoryData {
   final List<File> rides;final List<HistoryEntry> entries;
   final Map<String,Integer> counts;final String selected;final int damaged,unfinished;
-  final File latestUnapplied;final int unappliedCount;
+  final File latestUnapplied;final int unappliedCount;final String distanceInfo;
   HistoryData(List<File> rides,List<HistoryEntry> entries,Map<String,Integer> counts,String selected,int damaged,int unfinished,
-              File latestUnapplied,int unappliedCount){
+              File latestUnapplied,int unappliedCount,String distanceInfo){
+   this.distanceInfo=distanceInfo;
    this.rides=rides;this.entries=entries;this.counts=counts;this.selected=selected;this.damaged=damaged;this.unfinished=unfinished;
    this.latestUnapplied=latestUnapplied;this.unappliedCount=unappliedCount;
   }
@@ -255,6 +256,8 @@ final class RideUi {
   // Freeze only ride notes, not the whole database, while the Activity still owns JSON mutations.
   final org.json.JSONObject liveNotes=a.settings().optJSONObject("rideNotes");
   final String rideNotesSnapshot=liveNotes==null?"{}":liveNotes.toString();
+  final String distanceRange=RideHistoryDistanceFilter.normalize(
+   a.getSharedPreferences("ride_history_ui",0).getString("distance_filter",RideHistoryDistanceFilter.ALL));
   HISTORY_EXECUTOR.execute(()->{
    if(generation!=HISTORY_GENERATION.get())return;
    try{
@@ -271,6 +274,28 @@ final class RideUi {
     bikeRides.removeIf(file->!RideHistoryPeriod.include(file,now,period));
     Map<String,Integer> counts=RideHistoryFilter.counts(bikeRides,activeName,recording);
     List<File> visible=RideHistorySort.order(RideHistoryFilter.select(bikeRides,selected,activeName,recording),sort);
+    String distanceInfo="";
+    if(!RideHistoryDistanceFilter.ALL.equals(distanceRange)){
+     if(!RideHistoryDistanceFilter.withinBudget(visible)){
+      // Never show a truncated subset as if it was a complete search result.
+      distanceInfo="거리 필터를 적용하지 못했어요. 기록이 많아 기간·바이크 범위를 먼저 좁혀 주세요 (최대 150건·80MB).";
+     }else{
+      List<File> matched=new ArrayList<>();
+      int unreadable=0;
+      for(File file:visible){
+       if(generation!=HISTORY_GENERATION.get())return;
+       try{
+        if(!RideMileageIntegrity.validCompleted(file)){unreadable++;continue;}
+        long length=file.length(),modified=file.lastModified();
+        RideInsights.Result info=RideInsights.analyze(file);
+        if(file.length()!=length||file.lastModified()!=modified){unreadable++;continue;}
+        if(RideHistoryDistanceFilter.accepts(distanceRange,info.distanceKm))matched.add(file);
+       }catch(Exception ignored){unreadable++;}
+      }
+      visible=matched;
+      distanceInfo="GPS 거리 "+distanceRange+" · 분석 불가 "+unreadable+"건 제외 · 계기판 거리와 다를 수 있어요.";
+     }
+    }
     List<HistoryEntry> entries=new ArrayList<>();
     for(File file:visible){
      if(generation!=HISTORY_GENERATION.get())return;
@@ -296,7 +321,7 @@ final class RideUi {
       if(unapplied==null)unapplied=file;
      }
     }
-    final HistoryData data=new HistoryData(rides,entries,counts,selected,damagedBindings,unfinished,unapplied,unappliedCount);
+    final HistoryData data=new HistoryData(rides,entries,counts,selected,damagedBindings,unfinished,unapplied,unappliedCount,distanceInfo);
     a.runOnUiThread(()->{
      if(generation!=HISTORY_GENERATION.get()||a.isFinishing()||a.isDestroyed()||
         !"라이딩".equals(a.tab)||a.content!=requestedContent||historyPanel.getParent()!=requestedContent)return;
@@ -336,6 +361,10 @@ final class RideUi {
   Map<String,Integer> counts=data.counts;
   String selected=data.selected;
   int damagedBindings=data.damaged;
+  if(!data.distanceInfo.isEmpty()){
+   TextView info=a.text(data.distanceInfo,12,a.muted,false);
+   historyPanel.addView(info);a.gap(historyPanel,7);
+  }
   if(data.unfinished>0){
    Button recover=a.button("중단된 주행 "+data.unfinished+"건 확인 · 복구하기",false,()->a.selectRideHistoryFilter(RideHistoryFilter.INTERRUPTED));
    recover.setContentDescription("중단된 GPS 기록 "+data.unfinished+"건 필터 열기");
@@ -432,10 +461,25 @@ final class RideUi {
    categoryButton.setMinHeight(a.dp(44));
    LinearLayout.LayoutParams categoryLp=new LinearLayout.LayoutParams(-2,a.dp(44));categoryLp.leftMargin=a.dp(6);
    historyTools.addView(categoryButton,categoryLp);
+   final String distancePref=RideHistoryDistanceFilter.normalize(a.getSharedPreferences("ride_history_ui",0)
+     .getString("distance_filter",RideHistoryDistanceFilter.ALL));
+   Button distanceButton=a.button("거리: "+distancePref+"  ▾",false,()->
+    new AlertDialog.Builder(a).setTitle("GPS 주행거리 범위")
+     .setMessage("완료된 GPS 기록의 실제 저장 좌표로만 계산해요. 많은 기록은 성능 보호를 위해 거리 필터를 적용하지 않고 안내합니다.")
+     .setSingleChoiceItems(RideHistoryDistanceFilter.OPTIONS,
+      Math.max(0,Arrays.asList(RideHistoryDistanceFilter.OPTIONS).indexOf(distancePref)),(dialog,index)->{
+       dialog.dismiss();
+       a.getSharedPreferences("ride_history_ui",0).edit().putString("distance_filter",
+        RideHistoryDistanceFilter.OPTIONS[index]).apply();
+       a.render();
+      }).setNegativeButton("취소",null).show());
+   distanceButton.setMinHeight(a.dp(44));
+   LinearLayout.LayoutParams distanceLp=new LinearLayout.LayoutParams(-2,a.dp(44));
+   distanceLp.leftMargin=a.dp(6);historyTools.addView(distanceButton,distanceLp);
    // Show only search and status by default. The other controls expand on demand.
    historyPanel.addView(summary);
    HorizontalScrollView historyControlStrip=new HorizontalScrollView(a);
-   Button filterToggle=a.button("날짜 · 바이크 · 정렬  ▾",false,()->{
+   Button filterToggle=a.button("날짜 · 바이크 · 종류 · 거리  ▾",false,()->{
     boolean expand=historyControlStrip.getVisibility()!=View.VISIBLE;
     historyControlStrip.setVisibility(expand?View.VISIBLE:View.GONE);
    });
