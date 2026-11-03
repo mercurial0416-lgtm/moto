@@ -487,8 +487,22 @@ final class HubScreens {
   a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
- void settings(){a.section("데이터 보호");line("백업 · 복원","GPS·사진·정비 기록 전체 백업","열기",this::basicBackup);
- // Detailed backup freshness checks belong in the backup screen, not in the main menu.
+ void settings(){a.section("데이터 보호");line("백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해","열기",this::basicBackup);
+ // Keep ZIP freshness visible as one small line, not another large settings card.
+ final TextView backupState=a.text("백업 확인 중…",12,a.muted,false);
+ backupState.setSingleLine(true);backupState.setEllipsize(android.text.TextUtils.TruncateAt.END);
+ backupState.setContentDescription("현재 저장 기록과 전체 ZIP 백업 일치 여부 확인 중");
+ a.content.addView(backupState);
+ final String settingsSnapshot=backupJsonSnapshot();
+ LOCAL_BACKUP_IO.execute(()->{
+  String status=BackupGpsProof.fullCurrentStatus(a,settingsSnapshot);
+  a.runOnUiThread(()->{
+   if(!a.isFinishing()&&!a.isDestroyed()&&backupState.getParent()!=null){
+    backupState.setText(status);
+    backupState.setContentDescription("현재 백업 상태: "+status);
+   }
+  });
+ });
  line("앱 진단 · OBD 연결","GPS·OBD·백업 상태와 기록 오류 검사","열기",this::selfCheck);
   line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":
     "현재 "+BuildConfig.VERSION_CODE+" · "+(UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256)?
