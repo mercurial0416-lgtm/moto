@@ -21,8 +21,21 @@ final class ObdLocalDiagnosticLog {
    bitmap.append(value==ObdPidCapabilities.Support.YES?'Y':value==ObdPidCapabilities.Support.NO?'N':'?');
   }
   c.getSharedPreferences(PREFS,0).edit().putString("capabilities",bitmap.toString())
-   .putLong("capability_time",System.currentTimeMillis()).apply();
+   .putInt("observed_mask",0).putLong("capability_time",System.currentTimeMillis()).apply();
   record(c,"PID");
+ }
+ /** A capability bitmap says a PID exists; only a decoded reply proves that we received values. */
+ static int bitForPid(String pid){
+  for(int i=0;i<ObdReadOnlyProtocol.SENSOR_PIDS.length;i++)
+   if(ObdReadOnlyProtocol.SENSOR_PIDS[i].equals(pid))return 1<<i;
+  return 0;
+ }
+ static void observed(Context c,String pid){
+  int bit=bitForPid(pid);
+  if(bit==0)return;
+  SharedPreferences preferences=c.getSharedPreferences(PREFS,0);
+  int previous=preferences.getInt("observed_mask",0);
+  if((previous&bit)==0)preferences.edit().putInt("observed_mask",previous|bit).apply();
  }
  static void record(Context c,String code){
   if(!ObdDiagnosticEventPolicy.valid(code))return;
@@ -41,7 +54,7 @@ final class ObdLocalDiagnosticLog {
  static String summary(Context c){
   SharedPreferences p=c.getSharedPreferences(PREFS,0);
   String caps=p.getString("capabilities","");
-  StringBuilder text=new StringBuilder("마지막 ECU 지원 목록: ");
+  StringBuilder text=new StringBuilder("마지막 ECU PID 선언 목록 (실제 수신과 별개): ");
   if(caps!=null&&caps.matches("[YN?]{4}")){
    String[] names={"속도","RPM","수온","전압"};
    for(int i=0;i<4;i++){
@@ -53,6 +66,15 @@ final class ObdLocalDiagnosticLog {
     text.append("\n확인일: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.KOREA).format(new Date(ms)));
   }else text.append("기록 없음");
   text.append("\n※ 이전 검사 참고값입니다. 다음 연결 때 ECU에서 다시 확인합니다.");
+  int observed=p.getInt("observed_mask",0);
+  if(observed!=0){
+   StringBuilder samples=new StringBuilder("\n이 기기에서 실제 수신한 센서: ");
+   for(int i=0;i<ObdReadOnlyProtocol.SENSOR_PIDS.length;i++)if((observed&(1<<i))!=0){
+    if(samples.charAt(samples.length()-1)!=' ')samples.append(" · ");
+    samples.append(ObdReadOnlyProtocol.SENSOR_NAMES[i]);
+   }
+   text.append(samples);
+  }else text.append("\n실제 센서값 수신 기록 없음 · PID 목록만 확인됨");
   String events=p.getString("events","");
   if(events!=null&&!events.isEmpty())text.append("\n\n최근 연결 점검\n").append(events);
   return text.toString();
