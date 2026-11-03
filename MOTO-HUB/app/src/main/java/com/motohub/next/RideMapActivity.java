@@ -76,13 +76,23 @@ public final class RideMapActivity extends Activity {
   Button replayToggle=new Button(this);replayToggle.setText("▶ 리플레이 펼치기");
   mapActions.addView(replayToggle,new LinearLayout.LayoutParams(0,48,1));
   base.addView(mapActions);
+  // Advanced map options are collapsed by default so the saved route gets the screen space.
+  LinearLayout mapExtras=new LinearLayout(this);mapExtras.setOrientation(LinearLayout.VERTICAL);
+  mapExtras.setVisibility(View.GONE);
+  Button mapOptions=new Button(this);mapOptions.setText("지도 옵션  ▾");
+  mapOptions.setOnClickListener(v->{
+   boolean expanded=mapExtras.getVisibility()!=View.VISIBLE;
+   mapExtras.setVisibility(expanded?View.VISIBLE:View.GONE);
+   mapOptions.setText(expanded?"지도 옵션 접기  ▴":"지도 옵션  ▾");
+  });
+  base.addView(mapOptions);base.addView(mapExtras);
   LinearLayout zoom=new LinearLayout(this);zoom.setOrientation(LinearLayout.HORIZONTAL);
   Button zoomIn=new Button(this);zoomIn.setText("＋ 확대");zoomIn.setContentDescription("지도 확대");
   zoomIn.setOnClickListener(v->{if(map!=null)map.getController().zoomIn();});
   Button zoomOut=new Button(this);zoomOut.setText("－ 축소");zoomOut.setContentDescription("지도 축소");
   zoomOut.setOnClickListener(v->{if(map!=null)map.getController().zoomOut();});
   zoom.addView(zoomIn,new LinearLayout.LayoutParams(0,48,1));zoom.addView(zoomOut,new LinearLayout.LayoutParams(0,48,1));
-  base.addView(zoom);
+  mapExtras.addView(zoom);
   // GPS playback is local-only; the marker never publishes or requests saved track coordinates.
   LinearLayout playback=new LinearLayout(this);playback.setOrientation(LinearLayout.VERTICAL);
   playback.setPadding(12,4,12,6);
@@ -115,7 +125,7 @@ public final class RideMapActivity extends Activity {
   replayStatus.setTextSize(12);replayStatus.setTextColor(0xffc1ccd6);
   playback.addView(replayStatus);base.addView(playback);
   TextView legend=new TextView(this);legend.setText("속도 범례  ● 느림(초록)  ● 보통(노랑)  ● 빠름(빨강)");legend.setTextSize(12);legend.setTextColor(0xffe8c985);
-  legend.setPadding(12,6,12,6);base.addView(legend);
+  legend.setPadding(12,6,12,6);mapExtras.addView(legend);
   tileButton=new Button(this);tileButton.setText("온라인 배경지도 켜기 (선택)");
   tileButton.setOnClickListener(v->{
    if(onlineTiles){setOnlineTiles(false);return;}
@@ -123,7 +133,7 @@ public final class RideMapActivity extends Activity {
     .setMessage("OpenStreetMap 타일 서버에 지도 위치 주변의 영역 요청이 전달됩니다. 저장된 GPS 원본은 전송하지 않습니다. Wi-Fi/모바일 데이터가 사용될 수 있습니다. 배경지도 없이도 경로를 볼 수 있습니다.")
     .setNegativeButton("오프라인 유지",null)
     .setPositiveButton("배경지도 켜기",(d,w)->setOnlineTiles(true)).show();
-  });base.addView(tileButton);
+  });mapExtras.addView(tileButton);
 
   caption=new TextView(this);caption.setText("저장된 경로를 불러오는 중…");caption.setPadding(18,12,14,14);caption.setTextColor(0xff9caebd);caption.setTextSize(14);base.addView(caption);
   map=new MapView(this);map.setTileSource(TileSourceFactory.MAPNIK);map.setMultiTouchControls(true);
@@ -145,7 +155,7 @@ public final class RideMapActivity extends Activity {
      .setTitle("지도 캐시 확인 불가").setMessage("안전하지 않은 경로 또는 너무 많은 파일이 감지됐습니다. 파일은 삭제하지 않았어요.")
      .setPositiveButton("확인",null).show();});}
   },"moto-map-cache-measure").start());
-  base.addView(cacheButton);
+  mapExtras.addView(cacheButton);
   map.getOverlayManager().getTilesOverlay().setColorFilter(org.osmdroid.views.overlay.TilesOverlay.INVERT_COLORS);
   map.getController().setZoom(10.0);base.addView(map,new LinearLayout.LayoutParams(-1,0,1));
   TextView attribution=new TextView(this);attribution.setText("오프라인 경로 표시 · 배경지도는 캐시에 있을 때만 표시 · © OpenStreetMap contributors");attribution.setTextColor(0xff9caebd);attribution.setPadding(12,8,12,14);base.addView(attribution);
@@ -231,7 +241,7 @@ public final class RideMapActivity extends Activity {
      double north=-90,south=90,east=-180,west=180;for(GeoPoint p:route){north=Math.max(north,p.getLatitude());south=Math.min(south,p.getLatitude());east=Math.max(east,p.getLongitude());west=Math.min(west,p.getLongitude());}
      if(north-south<.0005){north+=.002;south-=.002;}if(east-west<.0005){east+=.002;west-=.002;}
      map.zoomToBoundingBox(new BoundingBox(north,east,south,west),true,72);
-     caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\nGPS 공백 "+info.gpsGaps+"구간 · 추정 휴식 "+info.restStops+"곳 · 최고속도 마커 (GPS 추정)"+"\nGPS 품질: "+info.gpsQuality()+" · 정차 추정: "+info.stationaryConfidence()+"\n초록 <30 · 노랑 30~69 · 빨강 ≥70km/h (GPS 추정)");
+     caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\nGPS 공백 "+info.gpsGaps+"구간 · 품질 "+info.gpsQuality());
      map.invalidate();
     });
    }catch(Exception e){runOnUiThread(()->{if(alive&&caption!=null){
