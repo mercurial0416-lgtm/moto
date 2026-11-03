@@ -83,6 +83,7 @@ final class RideStatsUi {
       Thread.yield();
      }
      try{
+      if(ride.length()>5_000_000){data.excluded++;continue;}
       RideDistanceCache.Summary x=RideDistanceCache.read(ride);
       data.add(t,x.distanceKm,x.durationMillis);
      }catch(Exception ignored){data.excluded++;}
