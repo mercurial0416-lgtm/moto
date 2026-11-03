@@ -225,13 +225,15 @@ public final class RideMapActivity extends Activity {
      speedButton.setEnabled(!speedLines.isEmpty());
      Marker start=new Marker(map);start.setPosition(route.get(0));start.setTitle("① 출발 지점");map.getOverlays().add(start);
      Marker finish=new Marker(map);finish.setPosition(route.get(route.size()-1));finish.setTitle("② 도착 지점");map.getOverlays().add(finish);
-     if(route.size()>=2){
+     if(route.size()>=2&&RideReplayTimeline.validTimes(times)){
       replayPoints=new ArrayList<>(route);replayTimes=new ArrayList<>(times);
       replayMarker=new Marker(map);replayMarker.setTitle("현재 재생 위치 · 기기 내부 GPS 기록");
       replayMarker.setPosition(route.get(0));map.getOverlays().add(replayMarker);
       replaySeek.setMax(RideReplayTimeline.MAX_PROGRESS);replaySeek.setProgress(0);
       replaySeek.setEnabled(true);replayButton.setEnabled(true);
       moveReplayMarker(0);
+     }else if(replayStatus!=null){
+      replayStatus.setText("리플레이 불가 · 유효한 GPS 시각이 2개 이상 필요합니다.");
      }
      if(RideMapOverlayPolicy.validPeak(info.peakKmh,info.peakLatitude,info.peakLongitude)){
       Marker peak=new Marker(map);peak.setPosition(new GeoPoint(info.peakLatitude,info.peakLongitude));
