@@ -38,11 +38,13 @@ final class RideStatsUi {
   final RideStatsSeries data=new RideStatsSeries(YearMonth.now(ZoneId.of("Asia/Seoul")));
   // A per-bike, same-month ledger snapshot. Never divide all-bike expenses by one bike's GPS.
   final double sixMonthExpense;
-  if(selected.isEmpty())sixMonthExpense=0;
+  final int unpaidExcluded;
+  if(selected.isEmpty()){sixMonthExpense=0;unpaidExcluded=0;}
   else{
    RecordMonthlySummary ledger=RecordMonthlySummary.forBike(
     a.items("expenses"),a.items("services"),selected,data.anchor);
    sixMonthExpense=CostDashboard.add(ledger.sumFuelAndOther(),ledger.sumService());
+   unpaidExcluded=ledger.scheduledOrFuture;
   }
   final long generation=STATS_GENERATION.incrementAndGet();
   STATS_EXECUTOR.execute(()->{
@@ -87,6 +89,7 @@ final class RideStatsUi {
     foot.setText("바이크 "+(selected.isEmpty()?"전체":a.bikeName(selected))+
       " · 손상·기준 초과 제외 "+data.excluded+"건"+
       (data.scanned>0?" · 처리 제한으로 제외 "+data.scanned+"건":"")+
+      (unpaidExcluded>0?" · 미지출·미래 비용 "+unpaidExcluded+"건 제외":"")+
       "\nGPS 추정값이며 실주행거리·계기판 ODO를 자동 수정하지 않습니다. 월별 주행횟수 "+
       Arrays.toString(data.count)+"회 · 총 분석 시간 "+data.totalMinutes()+"분");
    });
