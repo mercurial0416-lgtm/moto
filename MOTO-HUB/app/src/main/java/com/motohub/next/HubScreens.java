@@ -454,19 +454,21 @@ final class HubScreens {
   LinearLayout page=a.page("바이크별 유지비");
   java.util.List<JSONObject> bikes=a.items("vehicles");
   if(bikes.isEmpty()){a.label(page,"먼저 바이크를 등록해 주세요.",16,a.muted,false);a.show();return;}
-  java.time.YearMonth now=java.time.YearMonth.now(java.time.ZoneId.of("Asia/Seoul"));
+  java.time.ZoneId localZone=java.time.ZoneId.systemDefault();
+  java.time.LocalDate today=java.time.LocalDate.now(localZone);
+  java.time.YearMonth now=java.time.YearMonth.from(today);
   // Snapshot each collection once, instead of decoding it repeatedly for every month and bike.
   java.util.List<JSONObject> allExpenses=a.items("expenses"),allServices=a.items("services");
   for(JSONObject bike:bikes){
    a.label(page,bike.optString("name","내 바이크"),21,a.fg,true);
    String id=bike.optString("id");
-   RecordMonthlySummary totals=RecordMonthlySummary.forBike(allExpenses,allServices,id,now);
+   RecordMonthlySummary totals=RecordMonthlySummary.forBikeAsOf(allExpenses,allServices,id,now,today);
    double allFuel=totals.sumFuelAndOther(),allService=totals.sumService();
    a.label(page,"계기판 기록 "+a.num(bike.optDouble("odo"))+" km · 실제 계기판과 대조 필요",14,a.muted,false);
    int dueCount=0,upcoming=0;
    // An older oil-change record must not create a second overdue warning.
    // Reuse the same latest-per-type policy as MY GARAGE and its reminders.
-   String localToday=java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).toString();
+   String localToday=today.toString();
    for(JSONObject service:LatestServiceByType.latest(allServices,id).values()){
     if(Store.due(service,bike,localToday))dueCount++;
     else if(service.optDouble("nextKm",0)>bike.optDouble("odo",0)&&service.optDouble("nextKm",0)-bike.optDouble("odo",0)<=1000)upcoming++;
@@ -487,7 +489,7 @@ final class HubScreens {
     a.label(page,"예정·미래 날짜 지출 "+totals.scheduledOrFuture+"건은 실제 지출 합계에서 제외",12,a.muted,false);
    a.divider(page);
   }
-  a.label(page,"기기에 직접 입력한 기록만 계산합니다. 주유, 기타(보험·부품 등), 정비를 분리했으며 실제 영수증과 대조하세요.",12,a.muted,false);
+  a.label(page,"휴대폰 현지 시간대("+localZone+") 기준의 6개월 지출입니다. 직접 입력한 주유·보험·부품·정비 기록이며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
  void settings(){a.section("데이터 보호");line("백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해","열기",this::basicBackup);
