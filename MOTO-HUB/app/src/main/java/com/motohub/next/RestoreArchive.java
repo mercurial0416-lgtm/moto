@@ -83,7 +83,11 @@ public final class RestoreArchive {
   public String verifyInstalled(File internal)throws Exception{
    if(isSplit())throw new IOException("전체 ZIP 검증은 전체 복원 전용입니다.");
    File live=new File(internal,"motohub-v3.json");
-   byte[] current=new android.util.AtomicFile(live).readFully();
+   if(Files.isSymbolicLink(live.toPath())||
+      !Files.isRegularFile(live.toPath(),LinkOption.NOFOLLOW_LINKS)||
+      live.length()>BackupFormat.MAX_JSON_BYTES)
+    throw new IOException("복원된 JSON을 안전하게 읽을 수 없습니다.");
+   byte[] current=Files.readAllBytes(live.toPath());
    org.json.JSONObject parsed=Store.parse(new String(current,StandardCharsets.UTF_8));
    org.json.JSONObject expected=Store.parse(json);
    if(!JsonCanonicalDigest.hash(parsed).equals(JsonCanonicalDigest.hash(expected)))
