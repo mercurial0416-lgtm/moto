@@ -41,13 +41,13 @@ assert 'VerifiedDocumentExport.save(getContentResolver(),uri,MotoOwnershipReport
 assert 'RestoreRideGate.beginExport(' in main and 'RestoreRideGate.endExport()' in main
 
 # Core actions are accessible: navigation/GPX, manual route entry, ride stats.
-assert 'a::savedRoutes' in home and 'new MotoTimelineUi(a).open()' in home
+assert 'void showHomeTools(JSONObject bike)' in home and 'a.savedRoutes()' in home and 'new MotoTimelineUi(a).open()' in home
 assert 'new MotoTimelineUi(a).open()' in hub and 'a.exportOwnershipPdf(b.optString("id"))' in hub
 assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
 assert 'NavigationApps.openPreferred(a)' in ride and 'NavigationApps.choose(a)' in ride
 assert 'Button routeButton=a.button("내 코스"' in ride
 assert 'new String[]{"GPX 가져오기"' in ride and 'a.pickGpx()' in ride
-assert '최근 30일 바이크별 통계' in ride and 'chooseRideReport()' in ride
+assert '최근 30일 리포트' in ride and 'chooseRideReport()' in ride
 assert 'RideService.running?"라이딩 저장 후 종료"' in ride
 
 # Live status banner is a read-only shortcut, not a second GPS controller.
