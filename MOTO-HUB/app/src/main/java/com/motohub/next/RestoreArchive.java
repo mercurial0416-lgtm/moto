@@ -16,6 +16,8 @@ public final class RestoreArchive {
  public interface DataWriter {void write(String json)throws Exception;}
  public static final class Prepared implements AutoCloseable {
   private final File staging; public final String json,preferences,batchRecord; public final int photos,receipts,rides; public final String part;
+  private volatile int verifiedFiles=0;
+  public int verifiedFiles(){return verifiedFiles;}
   private Prepared(File dir,String data,int p,int receipts,int r,String part,String preferences,String batchRecord){staging=dir;json=data;photos=p;this.receipts=receipts;rides=r;this.part=part;this.preferences=preferences;this.batchRecord=batchRecord;}
   public boolean isSplit(){return !"FULL".equals(part);}
   /** Snapshot disk-space requirement before replacing any of the current assets. */
@@ -81,6 +83,7 @@ public final class RestoreArchive {
    * The staging directory stays available until Prepared.close().
    */
   public String verifyInstalled(File internal)throws Exception{
+   verifiedFiles=0;
    if(isSplit())throw new IOException("전체 ZIP 검증은 전체 복원 전용입니다.");
    // JSON schema/canonical digest is verified by MainActivity, which owns
    // the Android Store. This pure-Java verifier checks every staged asset.
@@ -93,6 +96,7 @@ public final class RestoreArchive {
      throw new IOException("복원 후 파일 내용 불일치: "+relative);
     checked++;
    }
+   verifiedFiles=checked;
    return "복원 후 첨부 파일 재검증 통과 · GPS "+rides+"개 · 사진 "+photos+
     "개 · 영수증 "+receipts+"개 · 첨부 파일 "+checked+"개";
   }
