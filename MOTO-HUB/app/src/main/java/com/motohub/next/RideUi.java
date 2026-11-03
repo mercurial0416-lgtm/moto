@@ -483,14 +483,24 @@ final class RideUi {
    distanceButton.setMinHeight(a.dp(44));
    LinearLayout.LayoutParams distanceLp=new LinearLayout.LayoutParams(-2,a.dp(44));
    distanceLp.leftMargin=a.dp(6);historyTools.addView(distanceButton,distanceLp);
-   // Show only search and status by default. The other controls expand on demand.
+   // Show only search and status by default, but keep the user's expanded state on refresh.
    historyPanel.addView(summary);
+   final android.content.SharedPreferences historyUiPrefs=a.getSharedPreferences("ride_history_ui",0);
+   final boolean wasExpanded=historyUiPrefs.getBoolean("advanced_expanded",false);
+   final int applied=(RideHistoryPeriod.ALL.equals(a.rideHistoryPeriod)?0:1)
+    +(RideHistoryBikeFilter.ALL.equals(a.rideHistoryBike)?0:1)
+    +(RideHistorySort.NEWEST.equals(a.rideHistorySort)?0:1)
+    +(RideCategoryFilter.ALL.equals(selectedCategory)?0:1)
+    +(RideHistoryDistanceFilter.ALL.equals(distancePref)?0:1);
+   final String summaryFilters="상세 필터"+(applied==0?"":" · "+applied+"개 적용");
    HorizontalScrollView historyControlStrip=new HorizontalScrollView(a);
-   Button filterToggle=a.button("날짜 · 바이크 · 종류 · 거리  ▾",false,()->{
+   Button filterToggle=a.button(summaryFilters+(wasExpanded?"  ▴":"  ▾"),false,()->{
     boolean expand=historyControlStrip.getVisibility()!=View.VISIBLE;
     historyControlStrip.setVisibility(expand?View.VISIBLE:View.GONE);
+    historyUiPrefs.edit().putBoolean("advanced_expanded",expand).apply();
+    filterToggle.setText(summaryFilters+(expand?"  ▴":"  ▾"));
    });
-   filterToggle.setContentDescription("날짜, 바이크, 종류, GPS 거리, 정렬 상세 필터 열기 또는 접기");
+   filterToggle.setContentDescription("날짜, 바이크, 종류, GPS 거리, 정렬 상세 필터 "+applied+"개 적용. 열기 또는 접기");
    historyPanel.addView(filterToggle);
    if(damagedBindings>0){
     TextView warning=a.text("주의: 바이크 연결 정보 손상 "+damagedBindings+"건 · 미지정으로 분류하지 않음",12,0xffe7a04e,false);
@@ -498,7 +508,7 @@ final class RideUi {
    }
    historyControlStrip.setHorizontalScrollBarEnabled(false);
    historyControlStrip.addView(historyTools);
-   historyControlStrip.setVisibility(View.GONE);
+   historyControlStrip.setVisibility(wasExpanded?View.VISIBLE:View.GONE);
    historyPanel.addView(historyControlStrip);
    LinearLayout results=a.col();historyPanel.addView(results);
    search.setText(a.rideHistoryQuery);
