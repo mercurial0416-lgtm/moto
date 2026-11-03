@@ -616,7 +616,7 @@ final class HubScreens {
   a.action(p,"Bluetooth · 주변 기기 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
    android.net.Uri.parse("package:"+a.getPackageName()))));
   a.action(p,"OBD 동글 연결·지원 센서 확인",false,()->DeveloperObdScreen.launchQuick(a));
-  a.action(p,"주유·정비 기록 연결 검사",false,()->a.auditGarageSoon(true));
+  a.action(p,"데이터 연결 검사 · 주유·정비",false,()->a.auditGarageSoon(true));
   a.action(p,"업데이트 기록 비교 결과",false,this::updateRecoveryReport);
   a.action(p,"외부 전체 ZIP 백업 만들기",false,a::exportBundle);
   a.show();
