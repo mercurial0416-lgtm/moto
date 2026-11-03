@@ -494,7 +494,8 @@ final class RideUi {
     +(RideHistoryDistanceFilter.ALL.equals(distancePref)?0:1);
    final String summaryFilters="상세 필터"+(applied==0?"":" · "+applied+"개 적용");
    HorizontalScrollView historyControlStrip=new HorizontalScrollView(a);
-   Button filterToggle=a.button(summaryFilters+(wasExpanded?"  ▴":"  ▾"),false,()->{
+   Button filterToggle=a.button(summaryFilters+(wasExpanded?"  ▴":"  ▾"),false,()->{});
+   filterToggle.setOnClickListener(view->{
     boolean expand=historyControlStrip.getVisibility()!=View.VISIBLE;
     historyControlStrip.setVisibility(expand?View.VISIBLE:View.GONE);
     historyUiPrefs.edit().putBoolean("advanced_expanded",expand).apply();
