@@ -7,6 +7,7 @@ import java.util.Map;
 
 /**
  * Session-only, bounded cache for read-only GPS distance charts and filters.
+ * Strong SHA-256 revalidation prevents stale hits after same-size/same-mtime rewrites.
  * This is deliberately NEVER evidence for odometer edits, GPS backups, exports,
  * track deletion, or signed-update integrity checks.
  */
@@ -15,16 +16,18 @@ final class RideDistanceCache {
  private static final int MAX_ENTRIES=4096;
  static final class Summary {
   final double distanceKm;
-  final long durationMillis;
-  Summary(double distanceKm,long durationMillis){
+  final long durationMillis,movingMillis;
+  Summary(double distanceKm,long durationMillis,long movingMillis){
    this.distanceKm=distanceKm;this.durationMillis=durationMillis;
+   this.movingMillis=movingMillis;
   }
  }
  private static final class CacheEntry {
   final long size,modified;
+  final String sha256;
   final Summary value;
-  CacheEntry(long size,long modified,Summary value){
-   this.size=size;this.modified=modified;this.value=value;
+  CacheEntry(long size,long modified,String sha256,Summary value){
+   this.size=size;this.modified=modified;this.sha256=sha256;this.value=value;
   }
  }
  private static final LinkedHashMap<String,CacheEntry> CACHE=
@@ -42,20 +45,31 @@ final class RideDistanceCache {
   long size=track.length(),modified=track.lastModified();
   if(size<=0||size>MAX_ANALYSIS_BYTES)throw new IOException("GPS 분석 크기 제한");
   String path=track.getCanonicalPath();
+  // mtime and length can be preserved by a same-size replacement or a rewrite.
+  // Hash every prospective cache hit on this worker thread, never on the UI.
+  // Unlike a GPS replay, streaming SHA-256 doesn't parse every location point.
+  String before=RideMileageIntegrity.fingerprint(track);
+  if(!RideMileageIntegrity.validCompleted(track)||
+     track.length()!=size||track.lastModified()!=modified)
+   throw new IOException("GPS 확인 중 원본 파일이 변경됨");
   synchronized(CACHE){
    CacheEntry cached=CACHE.get(path);
-   if(cached!=null&&cached.size==size&&cached.modified==modified){
+   if(cached!=null&&cached.size==size&&cached.modified==modified&&
+      cached.sha256.equals(before)){
     hits++;
     return cached.value;
    }
+   // A stale value must not be reused if it has the same size/mtime.
+   CACHE.remove(path);
   }
   RideInsights.Result details=RideInsights.analyze(track);
-  if(!RideMileageIntegrity.validCompleted(track)||
+  String after=RideMileageIntegrity.fingerprint(track);
+  if(!before.equals(after)||!RideMileageIntegrity.validCompleted(track)||
      track.length()!=size||track.lastModified()!=modified)
    throw new IOException("GPS 분석 중 원본 파일이 변경됨");
-  Summary value=new Summary(details.distanceKm,details.durationMillis);
+  Summary value=new Summary(details.distanceKm,details.durationMillis,details.movingMillis);
   synchronized(CACHE){
-   CACHE.put(path,new CacheEntry(size,modified,value));
+   CACHE.put(path,new CacheEntry(size,modified,after,value));
    analyses++;
   }
   return value;
