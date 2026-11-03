@@ -210,19 +210,16 @@ final class RideUi {
   LinearLayout.LayoutParams analysisLp=new LinearLayout.LayoutParams(0,-2,1);
   analysisLp.leftMargin=a.dp(9);routesBar.addView(analysisButton,analysisLp);
   a.content.addView(routesBar);
-  TextView rideTools=a.text("GPX 가져오기 · 기간별 리포트 · 더 많은 도구  ›",12,a.muted,false);
+  TextView rideTools=a.text("GPX · 리포트 · 기록 도구  ›",12,a.muted,false);
   rideTools.setGravity(Gravity.CENTER_VERTICAL);rideTools.setMinHeight(a.dp(48));
   rideTools.setClickable(true);rideTools.setFocusable(true);
   rideTools.setContentDescription("GPX 가져오기와 최근 30일 바이크별 주행 통계");
   rideTools.setOnClickListener(v->new AlertDialog.Builder(a)
    .setTitle("라이딩 도구")
-   .setItems(new String[]{"GPX 가져오기","최근 30일 바이크별 통계","최근 6개월 그래프","라이딩 2건 통합"},(dialog,which)->{
-    switch(which){
-     case 0:a.pickGpx();break;
-     case 1:chooseRideReport();break;
-     case 2:RideStatsUi.open(a);break;
-     default:chooseMerge();break;
-    }
+   .setItems(new String[]{"GPX 가져오기","최근 30일 리포트","라이딩 2건 통합"},(dialog,which)->{
+    if(which==0)a.pickGpx();
+    else if(which==1)chooseRideReport();
+    else chooseMerge();
    }).setNegativeButton("취소",null).show());
   a.content.addView(rideTools);
   if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
@@ -344,31 +341,20 @@ final class RideUi {
    recover.setContentDescription("중단된 GPS 기록 "+data.unfinished+"건 필터 열기");
    historyPanel.addView(recover);a.gap(historyPanel,10);
   }
-   // Horizontally scrollable, labelled status chips avoid squeezing six actions onto a phone screen.
-   HorizontalScrollView strip=new HorizontalScrollView(a);
-   strip.setHorizontalScrollBarEnabled(false);
-   strip.setFillViewport(false);
-   LinearLayout chips=new LinearLayout(a);
-   chips.setOrientation(LinearLayout.HORIZONTAL);
-   chips.setPadding(0,a.dp(4),0,a.dp(6));
-   for(String option:RideHistoryFilter.OPTIONS){
-    int count=counts.get(option);
-    boolean checked=option.equals(selected);
-    Button chip=a.button(option+"  "+count,checked,()->{a.selectRideHistoryFilter(option);});
-    chip.setTextSize(13);
-    chip.setMinHeight(a.dp(44));
-    chip.setContentDescription("라이딩 "+option+" 필터, "+count+"건"+(checked?", 선택됨":""));
-    chip.setSelected(checked);
-    LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-2,a.dp(44));
-    cp.rightMargin=a.dp(7);
-    chips.addView(chip,cp);
-   }
-   strip.addView(chips);
-   historyPanel.addView(strip);
+   // One state selector replaces six always-visible horizontal chips.
+   String[] statusOptions=RideHistoryFilter.OPTIONS;
+   Button statusButton=a.button("상태 · "+selected+"  ("+counts.getOrDefault(selected,0)+")  ▾",false,()->
+    new AlertDialog.Builder(a).setTitle("라이딩 상태")
+     .setSingleChoiceItems(statusOptions,Math.max(0,Arrays.asList(statusOptions).indexOf(selected)),
+      (dialog,index)->{dialog.dismiss();a.selectRideHistoryFilter(statusOptions[index]);})
+     .setNegativeButton("취소",null).show());
+   statusButton.setContentDescription("라이딩 상태 필터 "+selected+", 변경하기");
+   statusButton.setMinHeight(a.dp(48));
+   historyPanel.addView(statusButton);a.gap(historyPanel,8);
    LinearLayout searchBar=new LinearLayout(a);searchBar.setGravity(Gravity.CENTER_VERTICAL);
    EditText search=new EditText(a);search.setSingleLine(true);search.setTextSize(15);
    search.setTextColor(a.fg);search.setHintTextColor(a.muted);
-   search.setHint("날짜·바이크·상태 검색 (예: 10/17 GPX)");
+   search.setHint("날짜·바이크·상태 검색 (예: 와인딩)");
    search.setContentDescription("라이딩 기록 검색");
    search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
    search.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
@@ -434,8 +420,14 @@ final class RideUi {
    periodButton.setContentDescription("라이딩 기간 "+a.rideHistoryPeriod+", 변경하기");
    LinearLayout.LayoutParams periodLp=new LinearLayout.LayoutParams(-2,a.dp(44));periodLp.leftMargin=a.dp(6);
    historyTools.addView(periodButton,periodLp);
-   // Keep the summary readable on narrow phones; controls scroll horizontally.
+   // Show only search and status by default. The other controls expand on demand.
    historyPanel.addView(summary);
+   Button filterToggle=a.button("날짜 · 바이크 · 정렬  ▾",false,()->{
+    boolean expand=historyControlStrip.getVisibility()!=View.VISIBLE;
+    historyControlStrip.setVisibility(expand?View.VISIBLE:View.GONE);
+   });
+   filterToggle.setContentDescription("날짜, 바이크, 정렬 상세 필터 열기 또는 접기");
+   historyPanel.addView(filterToggle);
    if(damagedBindings>0){
     TextView warning=a.text("주의: 바이크 연결 정보 손상 "+damagedBindings+"건 · 미지정으로 분류하지 않음",12,0xffe7a04e,false);
     historyPanel.addView(warning);
@@ -443,6 +435,7 @@ final class RideUi {
    HorizontalScrollView historyControlStrip=new HorizontalScrollView(a);
    historyControlStrip.setHorizontalScrollBarEnabled(false);
    historyControlStrip.addView(historyTools);
+   historyControlStrip.setVisibility(View.GONE);
    historyPanel.addView(historyControlStrip);
    LinearLayout results=a.col();historyPanel.addView(results);
    search.setText(a.rideHistoryQuery);
