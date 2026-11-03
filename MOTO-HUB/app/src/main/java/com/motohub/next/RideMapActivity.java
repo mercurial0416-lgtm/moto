@@ -66,7 +66,12 @@ public final class RideMapActivity extends Activity {
    for(Polyline line:speedLines)line.setVisible(speedVisible);
    for(Polyline lineItem:baseLines)lineItem.getOutlinePaint().setColor(speedVisible?0xff596572:0xffff6b1b);
    speedButton.setText(speedVisible?"단색 경로 보기":"속도별 경로 보기");map.invalidate();
-  });base.addView(speedButton);
+  });
+  LinearLayout mapActions=new LinearLayout(this);mapActions.setOrientation(LinearLayout.HORIZONTAL);
+  mapActions.addView(speedButton,new LinearLayout.LayoutParams(0,48,1));
+  Button replayToggle=new Button(this);replayToggle.setText("▶ 리플레이 펼치기");
+  mapActions.addView(replayToggle,new LinearLayout.LayoutParams(0,48,1));
+  base.addView(mapActions);
   LinearLayout zoom=new LinearLayout(this);zoom.setOrientation(LinearLayout.HORIZONTAL);
   Button zoomIn=new Button(this);zoomIn.setText("＋ 확대");zoomIn.setContentDescription("지도 확대");
   zoomIn.setOnClickListener(v->{if(map!=null)map.getController().zoomIn();});
@@ -77,6 +82,13 @@ public final class RideMapActivity extends Activity {
   // GPS playback is local-only; the marker never publishes or requests saved track coordinates.
   LinearLayout playback=new LinearLayout(this);playback.setOrientation(LinearLayout.VERTICAL);
   playback.setPadding(12,4,12,6);
+  playback.setVisibility(View.GONE);
+  replayToggle.setOnClickListener(v->{
+   boolean expand=playback.getVisibility()!=View.VISIBLE;
+   if(!expand)pauseReplay();
+   playback.setVisibility(expand?View.VISIBLE:View.GONE);
+   replayToggle.setText(expand?"▲ 리플레이 접기":"▶ 리플레이 펼치기");
+  });
   replayButton=new Button(this);replayButton.setText("▶ 경로 재생");replayButton.setEnabled(false);
   replayButton.setOnClickListener(v->{
    if(replayPlaying){pauseReplay();return;}
