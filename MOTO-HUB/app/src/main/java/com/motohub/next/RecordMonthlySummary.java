@@ -20,7 +20,7 @@ final class RecordMonthlySummary {
    else totals.other[i]=CostDashboard.add(totals.other[i],amount);
   }
   if(services!=null)for(JSONObject item:services){
-   if(!bikeId.equals(item.optString("vehicleId")))continue;
+   if(!bikeId.equals(item.optString("vehicleId"))||item.optBoolean("scheduleOnly",false))continue;
    int i=index(item.optString("date"),months);if(i<0)continue;
    totals.service[i]=CostDashboard.add(totals.service[i],item.optDouble("cost",Double.NaN));
   }
