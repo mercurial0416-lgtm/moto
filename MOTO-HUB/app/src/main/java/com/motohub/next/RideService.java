@@ -380,10 +380,6 @@ public final class RideService extends Service implements LocationListener {
    if(verified&&completedSegments>0)new Thread(()->{
     try{RideMileageEstimate.rebuild(getApplicationContext());}catch(IOException ignored){}
    },"moto-rollover-distance-reconcile").start();
-   // Reconcile previous sections in the derived GPS ledger, never the vehicle ODO.
-   if(verified&&completedSegments>0)new Thread(()->{
-    try{RideMileageEstimate.rebuild(getApplicationContext());}catch(IOException ignored){}
-   },"moto-rollover-distance-reconcile").start();
    handler.post(()->{
     if(!finishPending)return;finishPending=false;
     stopWith(verified?"사용자가 라이딩 기록을 저장하고 종료했습니다.":"GPS 기록 검증 실패 · 복구 화면에서 원본을 확인하세요.",false);
@@ -408,6 +404,10 @@ public final class RideService extends Service implements LocationListener {
   if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
    boolean verified=closeTrack(true);
    if(verified)RideCompletionInbox.record(getApplicationContext(),savedTrack);
+   // Reconcile previous sections in the derived GPS ledger, never the vehicle ODO.
+   if(verified&&completedSegments>0)new Thread(()->{
+    try{RideMileageEstimate.rebuild(getApplicationContext());}catch(IOException ignored){}
+   },"moto-rollover-distance-reconcile").start();
    handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,verified);});
   })){
    completeAutoTrack(savedTrack,closeTrack(true));
