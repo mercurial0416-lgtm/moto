@@ -528,7 +528,7 @@ final class HubScreens {
 
   // The data structures for gear/trade-in and diagnostic reports stay untouched.
   // Hidden extras can be opened in version-tap developer settings without cluttering normal UI.
-  line("기타 도구","위젯 · 통계 · 내보내기","열기",this::advancedSettings);
+  line("고급 도구","위젯 · 통계 · 내보내기","열기",this::advancedSettings);
   a.section("MOTO HUB");
   // Deliberately hidden until the user taps the version label seven times.
   TextView version=a.text("MOTO HUB " + BuildConfig.VERSION_NAME + " · 기기별 독립 저장 · 계정 불필요",16,a.muted,false);
