@@ -127,12 +127,8 @@ final class GarageHomeUi {
 
   // Real existing activity, not placeholder dashboard metrics.
   recent(bike);a.gap(a.content,16);
-  LinearLayout links=new LinearLayout(a);
-  links.setOrientation(LinearLayout.VERTICAL);
-  homeLink(links,"라이딩 · 주유 · 정비 통합 일지",()->new MotoTimelineUi(a).open());
-  homeLink(links,"저장한 라이딩 코스",a::savedRoutes);
-  homeLink(links,"주차 · 소모품 · 기타 관리",()->showQuickTools(bike));
-  a.content.addView(links);
+  // Secondary features behind one menu: no wall of competing home actions.
+  homeLink(a.content,"내 기록 · 코스 · 기타 도구",()->showHomeTools(bike));
 
   String condition=condition(bike);
   if("점검 필요".equals(condition)||"곧 점검".equals(condition)){
@@ -607,6 +603,15 @@ final class GarageHomeUi {
   });
   button.setMinHeight(a.dp(54));
   a.content.addView(button,new LinearLayout.LayoutParams(-1,-2));
+ }
+ void showHomeTools(JSONObject bike){
+  final String[] names={"주행 · 주유 · 정비 통합 기록","저장한 라이딩 코스","주차 · 소모품 · 기타 관리"};
+  new AlertDialog.Builder(a).setTitle("내 기록 · 도구")
+   .setItems(names,(dialog,index)->{
+    if(index==0)new MotoTimelineUi(a).open();
+    else if(index==1)a.savedRoutes();
+    else showQuickTools(bike);
+   }).setNegativeButton("닫기",null).show();
  }
  void showQuickTools(JSONObject bike){
   java.util.List<String> labels=new java.util.ArrayList<>();
