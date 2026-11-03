@@ -422,6 +422,7 @@ final class RideUi {
    historyTools.addView(periodButton,periodLp);
    // Show only search and status by default. The other controls expand on demand.
    historyPanel.addView(summary);
+   HorizontalScrollView historyControlStrip=new HorizontalScrollView(a);
    Button filterToggle=a.button("날짜 · 바이크 · 정렬  ▾",false,()->{
     boolean expand=historyControlStrip.getVisibility()!=View.VISIBLE;
     historyControlStrip.setVisibility(expand?View.VISIBLE:View.GONE);
@@ -432,7 +433,6 @@ final class RideUi {
     TextView warning=a.text("주의: 바이크 연결 정보 손상 "+damagedBindings+"건 · 미지정으로 분류하지 않음",12,0xffe7a04e,false);
     historyPanel.addView(warning);
    }
-   HorizontalScrollView historyControlStrip=new HorizontalScrollView(a);
    historyControlStrip.setHorizontalScrollBarEnabled(false);
    historyControlStrip.addView(historyTools);
    historyControlStrip.setVisibility(View.GONE);
