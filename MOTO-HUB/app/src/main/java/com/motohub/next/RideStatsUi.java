@@ -43,13 +43,18 @@ final class RideStatsUi {
     for(File ride:RideHistorySort.order(TrackFile.tracks(a.getFilesDir()),RideHistorySort.NEWEST)){
      if(RideService.running&&ride.getName().equals(RideService.active))continue;
      if(RideTrackMerge.mergedSource(ride)||RideTrackMerge.archived(ride))continue;
-     if(!RideMileageIntegrity.validCompleted(ride))continue;
+     Long t=RideHistoryLabel.startTime(ride);
+     if(t==null||!data.inDisplayedPeriod(t,now))continue;
      if(!selected.isEmpty()){
       try{if(!selected.equals(RideBikeBinding.readStrict(ride)))continue;}
       catch(Exception ignored){data.excluded++;continue;}
      }
-     Long t=RideHistoryLabel.startTime(ride);
-     if(t==null||t<=0||t>now||!RideMonthlyReport.recent(ride,now,190))continue;
+     if(!RideMileageIntegrity.validCompleted(ride)){
+      // A nominally completed but corrupt track makes GPS-km cost division unsafe.
+      if(new File(ride.getPath()+".done").isFile()||
+         new File(ride.getPath()+".recovered").isFile())data.excluded++;
+      continue;
+     }
      if(inspected++>=180){data.scanned++;continue;}
      try{
       if(ride.length()>5_000_000){data.excluded++;continue;}
