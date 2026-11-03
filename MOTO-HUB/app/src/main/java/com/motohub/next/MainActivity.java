@@ -1964,6 +1964,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           atomic(disk,next.toString(2).getBytes(StandardCharsets.UTF_8));
           db=next;readOnly=false; // no fallible work after the JSON commit
          });
+         // Old UI-only distance summaries must not survive a complete GPS replacement.
+         RideDistanceCache.clear();
          // Verify the committed JSON and all staged GPS/media bytes again, separately
          // from the copy-time check. Never undo a committed restore from this audit.
          String postRestoreReport;
