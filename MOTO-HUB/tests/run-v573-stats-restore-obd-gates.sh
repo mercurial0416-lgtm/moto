@@ -16,7 +16,7 @@ log=read("ObdLocalDiagnosticLog.java")
 checks={
  "unlimited GPS scan, no artificial 180-ride truncation": "if(inspected++>=180)" not in stats and 'inspected%40==0' in stats,
  "worker-only GPS scanning and stale-screen cancellation": 'STATS_EXECUTOR.execute(' in stats and 'generation==STATS_GENERATION.get()' in stats,
- "travel-local month boundary in GPS stats": 'YearMonth.now(localZone)' in stats and 'ZoneId.systemDefault()' in stats and 'atZone(zone)' in series and 'atStartOfDay(zone)' in series,
+ "travel-local month boundary in GPS stats": 'YearMonth.from(reportDay)' in stats and 'java.time.LocalDate.now(localZone)' in stats and 'ZoneId.systemDefault()' in stats and 'atZone(zone)' in series and 'atStartOfDay(zone)' in series,
  "ride date filter already uses device zone": 'ZoneId.systemDefault()' in read("RideHistoryPeriod.java"),
  "last restore outcome is retained without paths or hashes": 'RestoreVerificationAudit.record(this,postRestoreOk' in main and 'verifiedFiles=checked' in rest and '"full_restore_verification"' in audit and 'GPS coordinates' in audit,
  "last restore status visible in existing backup screen": 'RestoreVerificationAudit.summary(a)' in hub,
