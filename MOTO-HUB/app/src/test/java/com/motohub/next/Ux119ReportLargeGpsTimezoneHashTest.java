@@ -84,7 +84,7 @@ public final class Ux119ReportLargeGpsTimezoneHashTest {
    String original=TrackFile.point(37.000,127.000,5,1700000000000L)+
     TrackFile.point(37.001,127.000,5,1700000010000L);
    String replacement=TrackFile.point(37.000,127.000,5,1700000000000L)+
-    TrackFile.point(37.009,127.000,5,1700000010000L);
+    TrackFile.point(37.002,127.000,5,1700000010000L);
    assertEquals(original.length(),replacement.length());
    completed(file,original);
    long time=file.lastModified();
