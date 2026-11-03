@@ -11,7 +11,7 @@ final class RideCostPerKm {
   if(!Double.isFinite(sixMonthWon)||sixMonthWon<0||!Double.isFinite(recordedGpsKm)||recordedGpsKm<0)
    return "입력 비용 또는 GPS 기록을 확인할 수 없습니다.";
   if(unscanned>0)
-   return "GPS 분석 건수 제한으로 비용/km 비교를 생략합니다.";
+   return "누락·손상·처리 제한 GPS 기록이 있어 비용/km 비교를 생략합니다.";
   if(recordedGpsKm<1)
    return "비용/km 비교는 최근 6개월 GPS 주행 기록이 1km 이상일 때 표시합니다.";
   if(sixMonthWon<=0)
