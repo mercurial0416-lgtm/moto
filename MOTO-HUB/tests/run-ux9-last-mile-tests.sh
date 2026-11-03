@@ -28,7 +28,7 @@ assert 'private synchronized boolean closeTrack(boolean completed)' in service
 assert 'if(!finishPending)return;finishPending=false;' in service and 'stopWith(verified?' in service
 assert 'autoFinishPending=false;running=false;' in service
 assert 'if(!autoArmed||autoFinishPending||finishPending)return;' in service
-assert 'gpsIoThread.quitSafely()' in service and 'TrackCompletion.mark(track,count)' in service
+assert 'gpsIoThread.quitSafely()' in service and 'TrackCompletion.mark(track,segmentPoints)' in service and 'TrackCompletion.mark(previous,segmentPoints)' in service
 assert 'final boolean saving=RideService.saving();' in ride and 's.finishPending||s.autoFinishPending' in service
 assert 'start.setEnabled(!saving);' in ride
 assert 'disarm.setEnabled(!saving);' in ride and 'RideService.running?"라이딩 저장 후 종료"' in ride
