@@ -499,6 +499,7 @@ final class HubScreens {
   });
  });
  line("데이터 연결 검사","주유·정비 기록의 바이크 연결, 계기판, 중복 점검","검사",()->a.auditGarageSoon(true));
+ line("라이딩 · OBD · 백업 진단","GPS·Bluetooth 권한, 기록, 서명, 백업 사전 점검","진단",this::selfCheck);
   line("앱 업데이트",BuildConfig.UPDATE_MANIFEST_URL.isEmpty()?"서버 미연동":
     "현재 "+BuildConfig.VERSION_CODE+" · "+(UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256)?
     "서명 확인 · 업데이트 확인 가능":"서명 불일치 · 기존 앱 삭제 금지"),"열기",()->new AppUpdater(a).show());
@@ -612,13 +613,19 @@ final class HubScreens {
    (android.os.Build.VERSION.SDK_INT<33||a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED);
   boolean battery=pm!=null&&pm.isIgnoringBatteryOptimizations(a.getPackageName());
   final boolean fineReady=fine,gpsReady=gpsOn,notifyReady=notify,batteryReady=battery;
+  final boolean bluetoothReady=android.os.Build.VERSION.SDK_INT<31||
+   a.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)==android.content.pm.PackageManager.PERMISSION_GRANTED;
+  final boolean verifiedSigner=UpdateReadiness.fixedIdentity(SigningIdentity.current(a),UpdateManifest.PINNED_CERT_SHA256);
   LinearLayout p=a.page("MOTO HUB 통합 자가진단");
-  a.label(p,"기기 상태와 로컬 백업 파일만 점검합니다. 블루투스 페어링/ECU 쓰기, 위치 전송은 하지 않습니다.",14,a.muted,false);
+  a.label(p,"기기 상태와 로컬 백업 파일만 점검합니다. 블루투스 페어링/ECU 쓰기, 위치 전송은 하지 않습니다. 정상 표시만으로 실차 호환성이 확인되는 것은 아닙니다.",14,a.muted,false);
   TextView result=a.text("저장된 GPS 및 백업 상태 점검 중…",15,a.fg,false);
   p.addView(result);
   a.action(p,"위치·알림 권한 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
    android.net.Uri.parse("package:"+a.getPackageName()))));
   a.action(p,"배터리 최적화 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
+  a.action(p,"Bluetooth · 주변 기기 설정",false,()->a.startActivity(new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+   android.net.Uri.parse("package:"+a.getPackageName()))));
+  a.action(p,"외부 전체 ZIP 백업 만들기",false,a::exportBundle);
   a.show();
   final android.app.Dialog opened=a.dialog;
   new Thread(()->{
@@ -630,7 +637,14 @@ final class HubScreens {
     detail=backup?"파일 수·크기 사전 점검 통과 · 전체 ZIP 복구 가능 여부는 내보내기 후 확인":"파일 수·용량에 주의 필요 · 백업/복원 화면에서 확인";
    }catch(Exception err){detail="백업 사전 점검 실패 · 원본 삭제 금지";}
    final String report=RideDiagnostics.summarize(fineReady,gpsReady,notifyReady,batteryReady,
-    RideService.autoArmed,"없음".equals(RideService.obdLastError)?"오류 없음":ObdFailureGuide.classify(RideService.obdLastError),backup)+"\n"+detail;
+    RideService.autoArmed,"없음".equals(RideService.obdLastError)?"오류 없음":ObdFailureGuide.classify(RideService.obdLastError),backup)+"\n"+detail+
+    "\nBluetooth 연결 권한: "+(bluetoothReady?"허용 또는 미요구":"주변 기기 권한 필요")+
+    "\nGPS 기록: "+(RideService.running?"진행 중 · 저장 좌표 "+Math.max(0,RideService.count)+"개":"꺼짐")+
+    "\nOBD 연결 시도 "+Math.max(0,RideService.obdConnectionAttempts)+"회 · 성공 "+
+      Math.max(0,RideService.obdConnectionSuccesses)+"회 · 재연결 "+Math.max(0,RideService.obdReconnects)+"회"+
+    "\nOBD PID: "+(RideService.autoArmed?RideService.obdPidSupport:"연결을 시작하지 않아 실차 지원 여부 확인 불가")+
+    "\n업데이트 인증서: "+(verifiedSigner?"기존 고정 서명과 일치":"불일치 또는 확인 불가 · 덮어쓰기 금지")+
+    "\n업데이트 후 데이터: "+(UpdateInstallSnapshot.lastProblem(a)?"주의 기록 있음 · 업데이트 데이터 검사에서 확인":"최근 감사 경고 없음 · 설치 검증은 별도");
    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()&&a.dialog==opened&&opened.isShowing())result.setText(report);});
   },"moto-ondevice-health-check").start();
  }
