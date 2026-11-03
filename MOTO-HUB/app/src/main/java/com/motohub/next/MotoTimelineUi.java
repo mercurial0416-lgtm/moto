@@ -17,12 +17,13 @@ final class MotoTimelineUi {
   JSONObject active=a.bike();
   if(active==null){a.toast("바이크를 먼저 등록해 주세요.");return;}
   final String bikeId=active.optString("id");
+  final java.time.ZoneId localZone=java.time.ZoneId.systemDefault();
   final JSONObject snapshot;
   try{snapshot=new JSONObject(a.db.toString());}
   catch(Exception e){a.error("현재 바이크 기록을 읽을 수 없습니다.");return;}
   LinearLayout body=a.page("바이크 활동");
   a.label(body,active.optString("name")+" · 라이딩 / 정비 / 주유 / 비용",14,a.fg,true);
-  a.label(body,"GPS는 완료·복구된 바이크 연결 기록만 표시합니다. 계기판 km를 추정해 수정하지 않습니다.",12,a.muted,false);
+  a.label(body,"휴대폰 현지 시간대("+localZone+")로 GPS 날짜와 정비·주유 날짜를 함께 표시합니다. 계기판 km는 자동 수정하지 않습니다.",12,a.muted,false);
   a.action(body,"판매·정비 이력 PDF 내보내기",false,()->a.exportOwnershipPdf(bikeId));
   a.gap(body,10);
   HorizontalScrollView scroll=new HorizontalScrollView(a);
@@ -102,7 +103,7 @@ final class MotoTimelineUi {
   a.show();repaint.run();
   final Dialog opened=a.dialog;
   new Thread(()->{
-   List<MotoTimeline.Event> merged=new ArrayList<>(MotoTimeline.ledger(snapshot,bikeId));
+   List<MotoTimeline.Event> merged=new ArrayList<>(MotoTimeline.ledger(snapshot,bikeId,localZone));
    int skipped=0,inspected=0;
    try{
     for(File track:RideHistorySort.order(TrackFile.tracks(a.getFilesDir()),RideHistorySort.NEWEST)){
@@ -110,7 +111,7 @@ final class MotoTimelineUi {
         a.dialog!=opened||!opened.isShowing()))return;
      if(RideService.running&&track.getName().equals(RideService.active))continue;
      try{
-      MotoTimeline.Event e=MotoTimeline.ride(track,snapshot,bikeId);
+      MotoTimeline.Event e=MotoTimeline.ride(track,snapshot,bikeId,localZone);
       if(e!=null)merged.add(e);
      }catch(Exception ignored){skipped++;}
     }
