@@ -36,7 +36,8 @@ final class RideStatsUi {
   Dialog owner=a.dialog;
   final String selected=a.bike()==null?"":a.bike().optString("id");
   final ZoneId localZone=ZoneId.systemDefault();
-  final RideStatsSeries data=new RideStatsSeries(YearMonth.now(localZone),localZone);
+  final java.time.LocalDate reportDay=java.time.LocalDate.now(localZone);
+  final RideStatsSeries data=new RideStatsSeries(YearMonth.from(reportDay),localZone);
   // A per-bike, same-month ledger snapshot. Never divide all-bike expenses by one bike's GPS.
   final double sixMonthExpense;
   final int unpaidExcluded;
@@ -44,7 +45,7 @@ final class RideStatsUi {
   else{
    RecordMonthlySummary ledger=RecordMonthlySummary.forBikeAsOf(
     a.items("expenses"),a.items("services"),selected,data.anchor,
-    java.time.LocalDate.now(localZone));
+    reportDay);
    sixMonthExpense=CostDashboard.add(ledger.sumFuelAndOther(),ledger.sumService());
    unpaidExcluded=ledger.scheduledOrFuture;
   }
