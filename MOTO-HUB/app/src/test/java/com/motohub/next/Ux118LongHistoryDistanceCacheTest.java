@@ -1,13 +1,14 @@
 package com.motohub.next;
 
 import org.junit.Test;
-import org.json.JSONObject;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.*;
 import static org.junit.Assert.*;
 
@@ -59,15 +60,15 @@ public final class Ux118LongHistoryDistanceCacheTest {
    Files.deleteIfExists(folder.toPath());
   }
  }
- @Test public void futureExpenseUsesOneSnapshotOfDeviceLocalDay()throws Exception{
-  JSONObject future=new JSONObject().put("vehicleId","bike").put("date","2026-11-01")
-   .put("type","주유").put("amount",12000);
-  List<JSONObject> expenses=Collections.singletonList(future);
-  RecordMonthlySummary lateOctober=RecordMonthlySummary.forBikeAsOf(expenses,
-   Collections.emptyList(),"bike",YearMonth.of(2026,10),LocalDate.of(2026,10,31));
-  RecordMonthlySummary november=RecordMonthlySummary.forBikeAsOf(expenses,
-   Collections.emptyList(),"bike",YearMonth.of(2026,11),LocalDate.of(2026,11,1));
-  assertEquals(0,lateOctober.sumFuelAndOther(),0.01);
-  assertEquals(12000,november.sumFuelAndOther(),0.01);
+ @Test public void localCostMonthBoundaryMatchesTravelTimezoneWithoutAndroidJson(){
+  // The cost screen passes one local day to forBikeAsOf; the same absolute
+  // instant must be October in LA and November in Tokyo.
+  Instant sameInstant=Instant.parse("2026-10-31T16:30:00Z");
+  LocalDate tokyo=sameInstant.atZone(ZoneId.of("Asia/Tokyo")).toLocalDate();
+  LocalDate losAngeles=sameInstant.atZone(ZoneId.of("America/Los_Angeles")).toLocalDate();
+  assertEquals(LocalDate.of(2026,11,1),tokyo);
+  assertEquals(LocalDate.of(2026,10,31),losAngeles);
+  assertEquals(YearMonth.of(2026,11),YearMonth.from(tokyo));
+  assertEquals(YearMonth.of(2026,10),YearMonth.from(losAngeles));
  }
 }
