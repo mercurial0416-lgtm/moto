@@ -75,6 +75,31 @@ public final class RestoreArchive {
     throw failure;
    }finally{if(!preserveRollback)clean(backup);}
   }
+  /**
+   * Read-only verification AFTER a committed full restore. A failed check reports
+   * a warning, never rewrites newly restored records or destroys rollback data.
+   * The staging directory stays available until Prepared.close().
+   */
+  public String verifyInstalled(File internal)throws Exception{
+   if(isSplit())throw new IOException("전체 ZIP 검증은 전체 복원 전용입니다.");
+   File live=new File(internal,"motohub-v3.json");
+   byte[] current=new android.util.AtomicFile(live).readFully();
+   org.json.JSONObject parsed=Store.parse(new String(current,StandardCharsets.UTF_8));
+   org.json.JSONObject expected=Store.parse(json);
+   if(!JsonCanonicalDigest.hash(parsed).equals(JsonCanonicalDigest.hash(expected)))
+    throw new IOException("복원 후 JSON 기록이 백업 내용과 다릅니다.");
+   int checked=0;
+   for(String relative:stagedAssets(staging)){
+    File from=new File(staging,relative),installed=new File(internal,relative);
+    if(Files.isSymbolicLink(installed.toPath())||
+       !Files.isRegularFile(installed.toPath(),LinkOption.NOFOLLOW_LINKS)||
+       !sameContent(from,installed))
+     throw new IOException("복원 후 파일 내용 불일치: "+relative);
+    checked++;
+   }
+   return "복원 후 기록·파일 재검증 통과 · GPS "+rides+"개 · 사진 "+photos+
+    "개 · 영수증 "+receipts+"개 · 첨부 파일 "+checked+"개";
+  }
   /** Additive partition restore. Never overwrites current assets or JSON, even on partial failure. */
   public int installPart(File internal)throws Exception{
    if(!isSplit())throw new IOException("전체 ZIP은 분할 추가 복원으로 가져올 수 없습니다.");
