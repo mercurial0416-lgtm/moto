@@ -274,6 +274,10 @@ final class RideUi {
     // 7-day view can claim hundreds of rides even when only two are visible.
     // Imported GPX dates come from their first committed GPS point.
     bikeRides.removeIf(file->!RideHistoryPeriod.include(file,now,period));
+    // Recovery warning must not disappear just because an unrelated category was selected.
+    int unfinished=0;
+    for(File file:bikeRides)
+     if(RideHistoryFilter.INTERRUPTED.equals(RideHistoryFilter.status(file,activeName,recording)))unfinished++;
     // Saved category is a separate exact-match filter. Never erase user's text query.
     bikeRides.removeIf(file->!RideCategoryFilter.matches(categoryRange,RideCategory.read(file)));
     Map<String,Integer> counts=RideHistoryFilter.counts(bikeRides,activeName,recording);
@@ -313,8 +317,6 @@ final class RideUi {
       " · "+RideHistoryBikeLabel.label(file,bikeNames);
      entries.add(new HistoryEntry(file,label,RideHistoryFilter.status(file,activeName,recording),savedMemo));
     }
-    int unfinished=0;
-    for(File file:bikeRides)if(RideHistoryFilter.INTERRUPTED.equals(RideHistoryFilter.status(file,activeName,recording)))unfinished++;
     File unapplied=null;int unappliedCount=0;
     if(!currentBike.isEmpty())for(File file:rides){
      if(generation!=HISTORY_GENERATION.get())return;
