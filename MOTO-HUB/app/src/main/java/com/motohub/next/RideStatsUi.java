@@ -67,7 +67,9 @@ final class RideStatsUi {
      if(!RideMileageIntegrity.validCompleted(ride)){
       // A nominally completed but corrupt track makes GPS-km cost division unsafe.
       if(new File(ride.getPath()+".done").isFile()||
-         new File(ride.getPath()+".recovered").isFile())data.excluded++;
+         new File(ride.getPath()+".recovered").isFile()){
+       data.excluded++;data.invalidCompleted++;
+      }
       continue;
      }
      // Analyze all matching tracks, not only the newest 180. The entire scan is
@@ -83,12 +85,16 @@ final class RideStatsUi {
       Thread.yield();
      }
      try{
-      if(ride.length()>5_000_000){data.excluded++;continue;}
+      // The underlying TrackFile reader already enforces the 25MB per-track
+      // safety limit. Do not silently drop valid rides at the old 5MB threshold.
+      if(ride.length()<=0||ride.length()>TrackFile.MAX_BYTES){
+       data.excluded++;data.oversize++;continue;
+      }
       RideDistanceCache.Summary x=RideDistanceCache.read(ride);
-      data.add(t,x.distanceKm,x.durationMillis);
-     }catch(Exception ignored){data.excluded++;}
+      if(!data.add(t,x.distanceKm,x.durationMillis))data.invalidMetrics++;
+     }catch(Exception ignored){data.excluded++;data.unreadable++;}
     }
-   }catch(Exception e){data.excluded++;}
+   }catch(Exception e){data.excluded++;data.unreadable++;}
    a.runOnUiThread(()->{
     if(generation!=STATS_GENERATION.get()||a.isFinishing()||a.isDestroyed()||
        a.dialog!=owner||!owner.isShowing())return;
@@ -99,7 +105,9 @@ final class RideStatsUi {
      data.rides(),data.totalKm,data.totalKm/6));
     costEstimate.setText(RideCostPerKm.caption(selected,sixMonthExpense,data.totalKm,data.scanned+data.excluded));
     foot.setText("바이크 "+(selected.isEmpty()?"전체":a.bikeName(selected))+
-      " · 손상·기준 초과 제외 "+data.excluded+"건"+
+      " · GPS 제외 "+data.excluded+"건 (완료 상태 "+data.invalidCompleted+
+      " · 크기·빈 파일 "+data.oversize+" · 읽기 오류 "+data.unreadable+
+      " · 거리·시간 기준 "+data.invalidMetrics+")"+
       (unpaidExcluded>0?" · 미지출·미래 비용 "+unpaidExcluded+"건 제외":"")+
       "\nGPS 추정값이며 실주행거리·계기판 ODO를 자동 수정하지 않습니다. 월별 주행횟수 "+
       Arrays.toString(data.count)+"회 · 총 분석 시간 "+data.totalMinutes()+"분");
