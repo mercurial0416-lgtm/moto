@@ -20,7 +20,7 @@ assert 'setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"))
 
 render=home.split(' void render(){',1)[1].split(' /** Scan local GPS metadata',1)[0]
 for marker in ('compactVehicleHeader(bike)', 'stats(bike)', 'HomeShortcutOrder.parse(',
-               'homeShortcutTile(key)', 'if(shortcut("ride"))rideAction()', 'recent(bike)'):
+               'homeShortcutTile(key)', 'if(shortcut("ride")||RideService.running||RideService.autoArmed){', 'recent(bike)'):
  assert marker in render, marker
 assert 'fontScale>=1.45f' in render and 'screenWidthDp<320' in render
 assert 'if(!"ride".equals(key)&&shortcut(key))visible.add(key);' in render
