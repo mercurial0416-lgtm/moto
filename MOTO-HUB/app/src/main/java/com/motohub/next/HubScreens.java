@@ -364,9 +364,13 @@ final class HubScreens {
   a.action(details,"정비 완료 내역 상세 입력",false,()->a.edit("services",null));
   a.action(details,"기타 비용·영수증 상세 입력",false,()->a.edit("expenses",null));
   a.action(details,"정비 항목 일괄 등록",false,a::batchServiceEntry);
-  Button reveal=a.button("상세 입력·영수증 도구 보기",false,()->{
+  Button reveal=a.button("상세 입력·영수증 도구 보기",false,()->{});
+  reveal.setOnClickListener(v->{
    boolean visible=details.getVisibility()==View.VISIBLE;
    details.setVisibility(visible?View.GONE:View.VISIBLE);
+   Button control=(Button)v;
+   control.setText(visible?"상세 입력·영수증 도구 보기":"상세 입력·영수증 도구 닫기");
+   control.setContentDescription(visible?"추가 비용·영수증·일괄 정비 입력 도구 펼치기":"추가 비용·영수증·일괄 정비 입력 도구 접기");
   });
   reveal.setContentDescription("추가 비용·영수증·일괄 정비 입력 도구 펼치기");
   actions.addView(reveal);actions.addView(details);

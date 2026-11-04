@@ -107,6 +107,7 @@ final class MotoDesign {
   View rule=new View(a);rule.setBackgroundColor(a.line);
   root.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
   LinearLayout bar=new LinearLayout(a);
+  bar.setBaselineAligned(false);
   bar.setPadding(a.dp(12),a.dp(5),a.dp(12),a.dp(5));
   bar.setBackgroundColor(a.panel);
   String[] labels={"홈","라이딩","정비·주유","설정"};
@@ -123,16 +124,20 @@ final class MotoDesign {
    FrameLayout.LayoutParams iconParams=new FrameLayout.LayoutParams(a.dp(21),a.dp(21),Gravity.CENTER);
    pill.addView(graphic,iconParams);
    cell.addView(pill,new LinearLayout.LayoutParams(a.dp(57),a.dp(31)));
-   String visibleLabel=i==2&&a.getResources().getConfiguration().fontScale>=1.3f?"정비\n주유":labels[i];
+   // The destination heading and spoken label retain the full meaning. Keep
+   // the visual tab short enough for narrow screens and enlarged system text.
+   String visibleLabel=i==2?"기록":labels[i];
    TextView name=a.text(visibleLabel,13,selected?a.accent:a.muted,selected);
    name.setGravity(Gravity.CENTER);
+   name.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+   graphic.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
    lp.topMargin=a.dp(3);cell.addView(name,lp);
    cell.setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"));
    cell.setClickable(true);cell.setFocusable(true);cell.setSelected(selected);
    ripple(a,cell,a.panel,0,14);
    cell.setOnClickListener(v->{if(!destination.equals(a.tab))a.navigate(destination);});
-   bar.addView(cell,new LinearLayout.LayoutParams(0,-2,1));
+   bar.addView(cell,new LinearLayout.LayoutParams(0,-1,1));
   }
   root.addView(bar);
  }

@@ -48,3 +48,19 @@ GitHub Releases 웹 페이지에는 `moto-hub-v575-offline`, `moto-hub-v575` 등
 ## 다음 실행
 
 `DEVELOPMENT_BACKLOG.md` 순서로 실제 증거를 재확인한다. 기존 checkout을 사용하고 worktree는 명시 요청이 있을 때만 만든다. 커밋 SHA는 Git의 실제 HEAD를 읽고 이 문서의 기준 SHA와 구분한다.
+
+## 재개 실행: 2026-11-05 00:50~ Asia/Seoul
+
+- 원격 main/release/design/작업 브랜치 SHA 재조회: 앞서 기록한 커밋과 일치. 사용자 변경 없는 checkout에서 계속 작업.
+- 이번 수정 기준: `6d0d0a2511eb2c04fbf7fc6edf2127512e35baa8`.
+- 320dp 큰 글꼴 프리뷰에서 하단 `정비·주유`가 세 줄로 나뉘는 실제 UI 문제를 기준으로 수정.
+- 하단 표시를 `기록`으로 단순화. 실제 목적지 ID `차고`, 화면 제목 `정비 · 주유`, 음성 설명 `정비·주유`는 유지. 모든 탭의 실제 높이 일치, 텍스트 중복 접근성 노출 방지.
+- 공통 2개 버튼 배치를 360dp 미만 또는 글꼴 130% 이상이면 세로로 전환. 버튼 클릭 기능/색/최소 터치 영역 유지.
+- 기록 화면 상세 도구의 펼침·접힘에 맞게 버튼 문구와 음성 설명 변경. 기존에 펼친 후에도 `보기/펼치기`가 남던 문제 수정.
+- `AccessibleNavigationTest` 추가: 320/393dp 및 100/130/150/200% 글꼴에서 실제 Android 뷰 측정·높이·라벨 잘림·음성 설명·탭 이동·두 버튼 클릭·펼침/접힘·DB 무변경 확인. 새 테스트 3개 통과.
+- Android `assembleDebug`, `lintDebug`, `testDebugUnitTest`: BUILD SUCCESSFUL. 81 suites 총 227개: 통과 224, 건너뜀 3, 실패/오류 0. Lint 경고 93, 오류 0.
+- UI 정적 검사 48개 및 관련 기존 UI 구조 검사 3개 스크립트 통과.
+- 디버그 APK 생성 및 apksigner 검증 성공. SHA256 `fe6add3bbfbdb3f688ad70bc15e7748a32a485d65461b4f14c954a154c318271`. 정식 고정 서명 배포본이 아니며 사용자 설치본 업데이트용으로 안내하지 않음.
+- 새 하단 메뉴 PNG 8개: `MOTO-HUB/app/build/reports/ui-review/navigation-{320,393}-{1.0,1.3,1.5,2.0}.png`. 320dp/150%, 200% 이미지를 직접 확인.
+- 실기기 상호작용·TalkBack 종단 간 검사는 미실행. 자동 예약 및 GitHub API 차단 상태는 앞선 미완료 항목과 동일.
+- 기존 전체 `tests/run-*.sh` 176개 재실행 모두 PASS. 이번 실행에서 실패한 최종 검사 없음.

@@ -508,7 +508,17 @@ public class MainActivity extends Activity {
  void divider(LinearLayout p){View v=new View(this);v.setBackgroundColor(line);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(1));lp.topMargin=dp(12);lp.bottomMargin=dp(12);p.addView(v,lp);}
  Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(primary?16:14);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(primary?54:48));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?MotoDesign.onAccent(dark):fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,primary?16:13);b.setPadding(dp(16),dp(10),dp(16),dp(10));b.setOnClickListener(v->r.run());return b;}
  void action(LinearLayout p,String s,boolean primary,Runnable r){if(p==formBody&&s.equals("저장")&&formFooter!=null)p=formFooter;LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(button(s,primary,r),lp);}
- void pair(LinearLayout p,String a,Runnable ra,String b,Runnable rb){LinearLayout row=new LinearLayout(this);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(0,0,dp(4),dp(8));row.addView(button(a,true,ra),lp);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(0,-2,1);rp.setMargins(dp(4),0,0,dp(8));row.addView(button(b,false,rb),rp);p.addView(row);}
+ void pair(LinearLayout p,String a,Runnable ra,String b,Runnable rb){
+  LinearLayout row=new LinearLayout(this);
+  Configuration config=getResources().getConfiguration();
+  boolean stacked=config.fontScale>=1.3f||config.screenWidthDp<360;
+  row.setOrientation(stacked?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
+  LinearLayout.LayoutParams lp=stacked?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1);
+  lp.setMargins(0,0,stacked?0:dp(4),dp(8));row.addView(button(a,true,ra),lp);
+  LinearLayout.LayoutParams rp=stacked?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1);
+  rp.setMargins(stacked?0:dp(4),0,0,dp(8));row.addView(button(b,false,rb),rp);
+  p.addView(row);
+ }
  void heading(String t,String sub){gap(content,8);if(!t.equals(MotoDesign.heading(tab))){TextView title=text(t,22,fg,true);title.setTypeface(MotoDesign.display());content.addView(title);gap(content,6);}if(sub!=null&&!sub.isEmpty())label(content,sub,13,muted,false);gap(content,13);}
  void section(String s){
   gap(content,14);
