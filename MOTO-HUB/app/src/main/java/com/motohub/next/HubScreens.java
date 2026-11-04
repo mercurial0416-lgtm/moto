@@ -380,7 +380,12 @@ final class HubScreens {
    if(!month.equals(last)){a.section(month);last=month;}
    boolean receipt=a.receiptCount(x.optString("id"))>0;
    final String collection=visibleLedgerCollections.getOrDefault(x,"services");
-   line(x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km"+(receipt?" · 영수증":""),
+   String detail=x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km"+(receipt?" · 영수증":"");
+   if("expenses".equals(collection)&&"주유".equals(x.optString("type")))try{
+    FuelRecordValidation.requireFuel(x.optDouble("amount"),x.optDouble("liters"));
+    detail+=" · "+EntryAssist.volume(x.optDouble("liters"))+" L · "+FuelEntryMath.unitPrice(x.optString("amount"),x.optString("liters"));
+   }catch(IllegalArgumentException invalidFuel){/* Keep legacy entries visible without inventing missing liters. */}
+   line(x.optString("type"),detail,
     a.won(x.optDouble("expenses".equals(collection)?"amount":"cost")),
     ()->a.edit(collection,x));
   }

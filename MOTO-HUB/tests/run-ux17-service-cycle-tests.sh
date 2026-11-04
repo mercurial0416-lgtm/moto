@@ -18,7 +18,7 @@ job=(root/'DailyMaintenanceJob.java').read_text()
 garage=(root/'HubScreens.java').read_text()
 assert 'FuelAutoAmount fuelAuto=new FuelAutoAmount()' in quick
 assert 'fuelAuto.update(' in quick and 'amount.setText(nextAmount)' in quick
-assert 'fuelAuto.reset()' in quick and quick.index('calculator.setVisibility(View.GONE);\n    fuelAuto.reset();') < quick.index('amount.setText(String.valueOf((long)previous.optDouble("amount")))'), 'last fill restore cannot be overwritten by active calculator'
+assert 'fuelAuto.reset()' in quick and quick.index('calculator.setVisibility(View.GONE);\n    fuelAuto.reset();') < quick.index('amount.setText(java.math.BigDecimal.valueOf(previous.optDouble("amount")).stripTrailingZeros().toPlainString())'), 'last fill restore cannot be overwritten by active calculator'
 assert 'if(full.isChecked()){extra.setVisibility(View.VISIBLE);return;}' in quick, 'full tank requires visible odometer field'
 assert '지난 주유 금액·리터 불러오기' in quick
 assert 'alertKmBefore' in quick and 'alertDaysBefore' in quick

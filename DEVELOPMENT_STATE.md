@@ -1,5 +1,16 @@
 # MOTO HUB 개발 상태
 
+## 주유 입력 편의성 및 최종 통합 검증
+
+- 정비 개선 묶음 `c0355e4`와 별도로 주유 흐름 개선. 1만/2만/3만원 빠른 선택, 기본 화면의 지난 금액·리터 불러오기, 바로 보이는 날짜·계기판 수정, 리터당 가격 강조, 고정 저장 요약 추가. 가득 주유와 실제 계기판 확인을 주유량 바로 아래에 배치.
+- 소수 리터를 반올림 없이 표시하고, 지난 기록 재사용 시 금액/리터의 소수 값을 보존. 기록 타임라인에도 주유량·리터당 가격 표시. 재사용은 현재 날짜/계기판/가득 체크를 이전 값으로 바꾸지 않음.
+- 직접 입력 후 처음 계산기를 켜면 실제 결제액을 덮어쓰던 FuelAutoAmount 오류 수정. 기존 코드에서 20,100원이 20,000원으로 바뀌는 실패를 `/workspace/setup-results/fuel-original-regression.log`에 재현. 현재 Java 회귀 21개 통과. 금액을 직접 비운 경우에만 자동 계산을 다시 허용.
+- 주유 신규 네이티브 검사 6개 통과: 빠른 금액/요약과 실제 저장 일치, 명시적 재사용·소수 보존, 직접 금액 우선, 필수 입력 필드 오류, 가득 주유 계기판 확인, 320dp 큰 글씨·다크·소수 리터 타임라인. 기존 임시저장·중복/이상값 경고·날짜/바이크 연결·저장 형식 보존.
+- 최종 build/lint/unit BUILD SUCCESSFUL: 92 suites 총 296개 = 통과 293 / 건너뜀 3 / 실패·오류 0. Lint 오류 0 / 경고 90. 정비/주유 신규 12개 포함. 기존 회귀 스크립트 176개 모두 PASS, UI 정적 조건 48개 PASS.
+- 로그: `/workspace/setup-results/entry-convenience-full-android.log`, `entry-convenience-regressions.log`, `entry-convenience-regression-status.tsv`, `entry-service-regression.log`. 네이티브 입력 화면 프리뷰: `MOTO-HUB/app/build/reports/entry-review`; 테스트 생성 기타 프리뷰는 `/workspace/setup-results/entry-convenience-native-previews`로 이동.
+- 검토용 APK SHA256 `b92433d0d4ac951a0fff3f990566e15f3148eaa9120bc9672e8782f609a029ed`, Android v2 디버그 서명 검증 성공. package `com.motohub.next`, debug versionCode 518. 정식 설치본 업데이트용이 아니며 기존 앱 삭제 금지.
+- 프리뷰·APK는 별도 `artifacts/entry-<최종 소스 SHA>` 브랜치로 전달하고 불변 링크의 전체 다운로드 SHA256을 확인. 공식 배포/업데이트 매니페스트/서명 키 변경 없음. 실기기·키보드·TalkBack·실제 설치 업데이트는 미검증.
+
 ## 정비주기 편의성·가독성 개선
 
 - 사용자 최신 요청: 정비주기와 주유 기록의 편의성/시인성 개선. 기준 소스 `8ec2c80`, 기존 checkout/데이터 형식과 사용자 변경 없음 확인.

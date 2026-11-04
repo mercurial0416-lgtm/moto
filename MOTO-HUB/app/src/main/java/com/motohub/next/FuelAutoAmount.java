@@ -10,11 +10,10 @@ final class FuelAutoAmount {
   * Do not overwrite a user's correction while the calculator remains open. */
  void noteAmountEdited(String amount){
   String current=amount==null?"":amount.trim();
-  if(!lastAuto.isEmpty()&&!lastAuto.equals(current)){
-   manuallyEdited=!current.isEmpty();
-   lastAuto="";
-  }else if(current.isEmpty()){
-   manuallyEdited=false;
+  if(current.isEmpty()){
+   manuallyEdited=false;lastAuto="";
+  }else if(!lastAuto.equals(current)){
+   manuallyEdited=true;lastAuto="";
   }
  }
  String update(String enteredAmount,String litersText,String priceText){

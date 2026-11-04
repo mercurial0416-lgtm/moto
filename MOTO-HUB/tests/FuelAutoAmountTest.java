@@ -32,6 +32,12 @@ public final class FuelAutoAmountTest {
   entry.noteAmountEdited("10200");
   entry.reset();
   eq("9000",entry.update("","5","1800"),"reset starts a new automatic session");
+  entry.reset();
+  entry.noteAmountEdited("20100");
+  eq("20100",entry.update("20100","10","2000"),"manual payment entered before opening calculator survives");
+  eq("20100",entry.update("20100","11","2200"),"later formula edits preserve original payment");
+  entry.noteAmountEdited("");
+  eq("24200",entry.update("","11","2200"),"explicit clearing resumes calculation after original manual payment");
   System.out.println("PASS safe auto fuel amount: "+assertions+" cases");
  }
 }

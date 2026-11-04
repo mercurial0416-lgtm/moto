@@ -47,10 +47,11 @@ final class QuickEntryUi {
  }
  void fuel(){
   JSONObject bike=a.bike();if(bike==null||a.readOnly){a.toast("기록 가능한 바이크를 먼저 등록해 주세요.");return;}
-  LinearLayout body=a.page("주유 기록");a.label(body,bike.optString("name")+" · 오늘",13,a.muted,false);
+  LinearLayout body=a.page("주유 기록");a.label(body,bike.optString("name"),13,a.muted,false);
   a.gap(body,12);
   EditText amount=number(body,"주유 금액 (원)","","예: 12000");
   amount.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_NEXT);
+  EntryAssist.amountChips(a,body,amount);
   EditText liters=number(body,"실제 주유량 (L)","","예: 4.5");
   liters.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
   LinearLayout tools=a.col();tools.setVisibility(View.GONE);
@@ -59,7 +60,7 @@ final class QuickEntryUi {
   a.label(calculator,"리터당 가격 × 주유량으로 예상 금액을 자동 채웁니다. 실제 결제액이 다르면 금액을 수정하세요.",12,a.muted,false);
   Button calcToggle=a.button("리터당 가격으로 자동 계산",false,
    ()->calculator.setVisibility(calculator.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));
-  tools.addView(calcToggle);tools.addView(calculator);
+  body.addView(calcToggle);body.addView(calculator);
   FuelAutoAmount fuelAuto=new FuelAutoAmount();
   amount.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence value,int start,int count,int after){}
@@ -79,8 +80,8 @@ final class QuickEntryUi {
    public void afterTextChanged(android.text.Editable text){}
   };
   unitPrice.addTextChangedListener(autoCalc);liters.addTextChangedListener(autoCalc);
-  TextView costPerLiter=a.text("금액·주유량을 입력하면 리터당 가격을 표시합니다",12,a.muted,false);
-  body.addView(costPerLiter);
+  TextView costPerLiter=EntryAssist.preview(a,body,"fuel-unit-price");
+  costPerLiter.setText("금액·주유량을 입력하면 리터당 가격을 표시합니다");
   android.text.TextWatcher unitHint=new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence value,int start,int count,int after){}
    public void onTextChanged(CharSequence value,int start,int before,int count){
@@ -97,6 +98,7 @@ final class QuickEntryUi {
      " · "+typicalPrice+"원/L 적용",false,()->{
     calculator.setVisibility(View.GONE);
     fuelAuto.reset();
+    fuelAuto.noteAmountEdited(amount.getText().toString());
     liters.setText(String.valueOf(recentFuelLitersSafe(recentFuel)));
     if(typicalPrice>0)unitPrice.setText(String.valueOf(typicalPrice));
     a.toast("지난 주유량과 단가를 참고값으로 채웠어요. 실제 결제 금액은 직접 확인하세요.");
@@ -109,10 +111,11 @@ final class QuickEntryUi {
     // Hide the calculator first: liters.setText triggers listeners synchronously.
     calculator.setVisibility(View.GONE);
     fuelAuto.reset();
-    amount.setText(String.valueOf((long)previous.optDouble("amount")));
-    liters.setText(String.valueOf(previous.optDouble("liters")));
+    amount.setText(java.math.BigDecimal.valueOf(previous.optDouble("amount")).stripTrailingZeros().toPlainString());
+    liters.setText(java.math.BigDecimal.valueOf(previous.optDouble("liters")).stripTrailingZeros().toPlainString());
    });
-   tools.addView(reuse);
+   TextView recentSummary=a.text("최근 주유 · "+previous.optString("date")+" · "+a.won(previous.optDouble("amount"))+" · "+EntryAssist.volume(previous.optDouble("liters"))+" L",13,a.muted,false);
+   recentSummary.setTag("recent-fuel-summary");body.addView(recentSummary);body.addView(reuse);
    double lastLiters=previous.optDouble("liters",Double.NaN);
    double lastAmount=previous.optDouble("amount",Double.NaN);
    if(Double.isFinite(lastLiters)&&lastLiters>0&&Double.isFinite(lastAmount)&&lastAmount>0){
@@ -134,7 +137,7 @@ final class QuickEntryUi {
   body.addView(toolsToggle);body.addView(tools);
   a.label(body,"금액·리터만 입력하면 오늘 날짜와 현재 계기판으로 저장합니다.",12,a.muted,false);
   CheckBox full=new CheckBox(a);full.setText("가득 주유했어요 (연비 계산용)");
-  full.setTextColor(a.fg);full.setTextSize(14);full.setMinHeight(a.dp(50));body.addView(full);
+  full.setTextColor(a.fg);full.setTextSize(14);full.setMinHeight(a.dp(50));body.addView(full,body.indexOfChild(liters)+1);
   LinearLayout extra=a.col();extra.setVisibility(View.GONE);
   EditText odo=number(extra,"현재 계기판 (km)",java.math.BigDecimal.valueOf(bike.optDouble("odo")).stripTrailingZeros().toPlainString(),"현재 주행거리");
   // Reuse the bundled offline OCR model; nothing is sent to a server or saved before confirmation.
@@ -159,7 +162,7 @@ final class QuickEntryUi {
   CheckBox odoConfirmed=new CheckBox(a);
   odoConfirmed.setText("실제 계기판 "+odo.getText().toString()+" km를 확인했어요");
   odoConfirmed.setTextColor(a.fg);odoConfirmed.setTextSize(14);odoConfirmed.setMinHeight(a.dp(46));
-  odoConfirmed.setVisibility(View.GONE);body.addView(odoConfirmed);
+  odoConfirmed.setVisibility(View.GONE);body.addView(odoConfirmed,body.indexOfChild(full)+1);
   odo.addTextChangedListener(new android.text.TextWatcher(){
    public void beforeTextChanged(CharSequence t,int start,int count,int after){}
    public void onTextChanged(CharSequence t,int start,int before,int count){
@@ -167,11 +170,6 @@ final class QuickEntryUi {
     odoConfirmed.setText("실제 계기판 "+t.toString()+" km를 확인했어요");
    }
    public void afterTextChanged(android.text.Editable e){}
-  });
-  full.setOnCheckedChangeListener((button,checked)->{
-   if(checked)extra.setVisibility(View.VISIBLE);
-   odoConfirmed.setVisibility(checked?View.VISIBLE:View.GONE);
-   if(!checked)odoConfirmed.setChecked(false);
   });
   // Keep an isolated draft while switching to navigation or after Android process restart.
   final String bikeId=bike.optString("id");
@@ -200,12 +198,7 @@ final class QuickEntryUi {
   };
   amount.addTextChangedListener(draftWatcher);liters.addTextChangedListener(draftWatcher);
   unitPrice.addTextChangedListener(draftWatcher);odo.addTextChangedListener(draftWatcher);
-  date.addTextChangedListener(draftWatcher);full.setOnCheckedChangeListener((v,checked)->{
-   if(checked)extra.setVisibility(View.VISIBLE);
-   odoConfirmed.setVisibility(checked?View.VISIBLE:View.GONE);
-   if(!checked)odoConfirmed.setChecked(false);
-   persistDraft.run();
-  });
+  date.addTextChangedListener(draftWatcher);
   a.label(body,"입력하는 동안 자동으로 임시저장합니다. 저장 전 바이크·금액·날짜를 확인하세요.",12,a.muted,false);
   JSONObject previouslyTyped=FuelDraft.read(a,bikeId);
   if(previouslyTyped!=null){
@@ -240,6 +233,21 @@ final class QuickEntryUi {
     a.toast("임시 주유 기록만 삭제했어요. 현재 입력칸은 그대로 유지됩니다.");
    });
   }
+  TextView context=a.text("",14,a.fg,true);context.setTag("fuel-date-odometer");context.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(12));context.setMinHeight(a.dp(48));context.setBackground(a.shape(a.highlight,0,14));
+  context.setClickable(true);context.setFocusable(true);context.setContentDescription("주유 날짜와 계기판 수정");context.setOnClickListener(v->{extra.setVisibility(View.VISIBLE);odo.requestFocus();});body.addView(context,1);
+  TextView footerSummary=a.text("",14,a.fg,true);footerSummary.setTag("fuel-save-summary");footerSummary.setPadding(0,0,0,a.dp(8));footerSummary.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);a.formFooter.addView(footerSummary);
+  Runnable updateSummary=()->{
+   context.setText(date.getText()+" · 계기판 "+odo.getText()+" km  ›");
+   try{
+    double paid=EntryAssist.decimal(amount.getText().toString()),volume=EntryAssist.decimal(liters.getText().toString());FuelRecordValidation.requireFuel(paid,volume);
+    footerSummary.setText(a.won(paid)+" · "+EntryAssist.volume(volume)+" L"+(full.isChecked()?" · 가득 주유":""));
+   }catch(Exception invalid){footerSummary.setText("실제 결제 금액과 주유량을 확인해 주세요.");}
+  };
+  for(EditText field:new EditText[]{amount,liters,odo,date})field.addTextChangedListener(EntryAssist.watch(updateSummary));
+  full.setOnCheckedChangeListener((v,checked)->{
+   if(checked)extra.setVisibility(View.VISIBLE);odoConfirmed.setVisibility(checked?View.VISIBLE:View.GONE);if(!checked)odoConfirmed.setChecked(false);persistDraft.run();updateSummary.run();
+  });
+  updateSummary.run();
   a.gap(body,12);
   final long[] lastSaveClick={0};
   a.action(body,"저장",true,()->a.attempt(()->{
