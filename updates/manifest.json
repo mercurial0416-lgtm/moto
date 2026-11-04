@@ -6,6 +6,6 @@
   "sizeBytes": 47415542,
   "sha256": "3331ba897e2843b1b5dfe2dd324a9d060e1d876b2f29fdef20afad45e8054dae",
   "certificateSha256": "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b",
-  "apkUrl": "https://github.com/mercurial0416-lgtm/moto/releases/download/moto-hub-v575-offline/MOTO-HUB.apk",
+  "apkUrl": "https://github.com/mercurial0416-lgtm/moto/releases/download/moto-hub-v575/MOTO-HUB.apk",
   "notes": "고정 서명 MOTO HUB 업데이트. 기존 데이터가 유지되며 Android 설치 승인이 필요합니다."
 }
