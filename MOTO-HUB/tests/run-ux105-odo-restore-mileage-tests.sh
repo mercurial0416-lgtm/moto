@@ -36,10 +36,11 @@ assert 'rebuildGpsEstimateAsync()' in zip_restore
 assert 'static synchronized int rebuild(Context c)' in gps
 batch=gps.split('static synchronized int rebuild(Context c)',1)[1].split('static synchronized boolean resetAfterFullRestore(',1)[0]
 assert batch.count('prefs.getString("ledger","{}")') == 1
-assert batch.count('prefs.edit().putString("ledger",ledger.toString()).commit()') == 1
-assert 'ledger.has(track.getName())' in batch
+assert batch.count('prefs.edit().putString("ledger",snapshot).commit()') == 1
+assert 'previous.optJSONObject(track.getName())' in batch
+assert 'ledger.has(oldKeys.next())' in batch
 assert 'RideMileageIntegrity.validCompleted(track)' in batch
 assert 'RideBikeBinding.readStrict(track)' in batch
-assert 'RideInsights.analyze(track)' in batch
+assert 'RideDistanceCache.read(track)' in batch
 print("PASS UX105 source wiring: OBD interlock, rebaseline, restore isolation, batched GPS mileage")
 PY

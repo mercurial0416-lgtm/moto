@@ -16,9 +16,11 @@ final class RideDistanceCache {
  static final long MAX_ANALYSIS_BYTES=TrackFile.MAX_BYTES;
  private static final int MAX_ENTRIES=4096;
  static final class Summary {
+  final int points;
   final double distanceKm;
   final long durationMillis,movingMillis;
-  Summary(double distanceKm,long durationMillis,long movingMillis){
+  Summary(int points,double distanceKm,long durationMillis,long movingMillis){
+   this.points=points;
    this.distanceKm=distanceKm;this.durationMillis=durationMillis;
    this.movingMillis=movingMillis;
   }
@@ -68,7 +70,7 @@ final class RideDistanceCache {
   if(!parsed.equals(after)||!RideMileageIntegrity.validCompleted(track)||
      track.length()!=size||track.lastModified()!=modified)
    throw new IOException("GPS 분석 중 원본 파일이 변경됨");
-  Summary value=new Summary(details.distanceKm,details.durationMillis,details.movingMillis);
+  Summary value=new Summary(details.points,details.distanceKm,details.durationMillis,details.movingMillis);
   synchronized(CACHE){
    CACHE.put(path,new CacheEntry(size,modified,after,value));
    analyses++;

@@ -3,7 +3,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import org.json.JSONObject;
 import java.io.File;
-/** Independently accumulates only verified completed, bike-bound GPS rides since v567. */
+/** Derived distance for the current completed, bike-bound GPS collection; never an odometer. */
 final class RideMileageEstimate {
  private static final String PREF="gps_distance_estimate_v567";
  private RideMileageEstimate(){}
@@ -23,47 +23,56 @@ final class RideMileageEstimate {
    return p.edit().putString("ledger",ledger.toString()).commit();
   }catch(Exception ignored){return false;}
  }
- /** Reconstruct totals from restored/completed source tracks, never from an unverified GPS path.
-  * Runs only on a worker thread; old tracks with no bike binding stay unassigned. */
- /** One cheap file enumeration and one ledger read/write per launch, rather than
-  * re-parsing a growing JSON ledger for every historical GPS track.
-  * Existing verified entries stay stable; only previously unseen completed
-  * bike-bound originals are measured. */
+ /** Reconcile a complete derived snapshot on a worker. Membership, bike bindings
+  * and GPS bytes may change after merge/undo, trash/restore or reassignment.
+  * Read preferences once and commit once; never publish a partial rebuild.
+  * Distance cache hits still verify SHA-256, including same-size/mtime replacements.
+  * Return changed entries (including removals), so callers refresh for every edit.
+  */
  static synchronized int rebuild(Context c)throws java.io.IOException {
   SharedPreferences prefs=c.getSharedPreferences(PREF,Context.MODE_PRIVATE);
-  JSONObject ledger;
-  try{ledger=new JSONObject(prefs.getString("ledger","{}"));}
+  JSONObject previous;
+  try{previous=new JSONObject(prefs.getString("ledger","{}"));}
   catch(Exception e){throw new java.io.IOException("GPS 누적 통계 파일을 읽을 수 없습니다.",e);}
-  int added=0;
+  JSONObject ledger=new JSONObject();
+  int changed=0;
   for(File track:TrackFile.tracks(c.getFilesDir())){
-   if(ledger.has(track.getName())||!RideMileageIntegrity.validCompleted(track))continue;
-   String bike;
-   try{bike=RideBikeBinding.readStrict(track);}
-   catch(java.io.IOException invalid){continue;}
+   if(!RideMileageIntegrity.validCompleted(track))continue;
+   String bike=RideBikeBinding.readStrict(track);
    if(!RideBikeBinding.valid(bike))continue;
    try{
-    RideInsights.Result measured=RideInsights.analyze(track);
-    if(measured.points<=0||!Double.isFinite(measured.distanceKm)||
-       measured.distanceKm<0||measured.distanceKm>500)continue;
+    RideDistanceCache.Summary measured=RideDistanceCache.read(track);
+    if(measured.points<=0||!Double.isFinite(measured.distanceKm)||measured.distanceKm<0||measured.distanceKm>500)continue;
+    if(!bike.equals(RideBikeBinding.readStrict(track)))
+     throw new java.io.IOException("GPS 바이크 연결이 확인 중 변경됐습니다.");
     JSONObject entry=new JSONObject().put("bike",bike).put("km",measured.distanceKm);
     ledger.put(track.getName(),entry);
-    if(ledger.toString().length()>250_000){
-     ledger.remove(track.getName());
-     break; // Preserve old ledger; never truncate verified mileage.
-    }
-    added++;
-   }catch(Exception ignored){/* Preserve invalid original tracks without counting. */}
+    JSONObject old=previous.optJSONObject(track.getName());
+    if(old==null||!bike.equals(old.optString("bike"))||
+       Double.compare(old.optDouble("km",Double.NaN),measured.distanceKm)!=0)changed++;
+   }catch(Exception invalid){
+    throw new java.io.IOException("GPS 원본 확인 실패 · 이전 추정 합계를 유지했습니다.",invalid);
+   }
   }
-  if(added>0&&!prefs.edit().putString("ledger",ledger.toString()).commit())
-   throw new java.io.IOException("GPS 누적거리 갱신을 저장할 수 없습니다. GPS 원본은 유지했습니다.");
-  return added;
+  java.util.Iterator<String> oldKeys=previous.keys();
+  while(oldKeys.hasNext())if(!ledger.has(oldKeys.next()))changed++;
+  if(changed>0){
+   String snapshot=ledger.toString();
+   if(snapshot.length()>250_000)
+    throw new java.io.IOException("GPS 추정 통계 용량 초과 · 이전 합계와 원본을 유지했습니다.");
+   if(!prefs.edit().putString("ledger",snapshot).commit())
+    throw new java.io.IOException("GPS 누적거리 갱신을 저장할 수 없습니다. GPS 원본은 유지했습니다.");
+  }
+  return changed;
  }
  /** Full ZIP restore replaces the track collection; the derived old ledger
   * must not show distance from deleted or replaced rides. Rebuild after commit. */
  static synchronized boolean resetAfterFullRestore(Context c){
   return c.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().remove("ledger").commit();
  }
- static synchronized double total(Context c,String bikeId){
+ // SharedPreferences publishes one atomic snapshot. Do not acquire the writer
+ // monitor here: the dashboard must remain usable during a full GPS scan/hash.
+ static double total(Context c,String bikeId){
   if(!RideBikeBinding.valid(bikeId))return 0;
   try{
    JSONObject ledger=new JSONObject(c.getSharedPreferences(PREF,Context.MODE_PRIVATE).getString("ledger","{}"));

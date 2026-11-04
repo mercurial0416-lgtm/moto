@@ -970,7 +970,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
           if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active))
            throw new IOException("주행이 끝난 뒤 변경해 주세요.");
           RideSessionBikeBinding.write(getFilesDir(),track,chosenBikeId,appliedNames);
-          runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){close();openRideInsights(track);}});
+          runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){close();rebuildGpsEstimateAsync();openRideInsights(track);}});
          }catch(IOException ex){
           runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("바이크 연결 실패: "+ex.getMessage());});
          }
@@ -1010,7 +1010,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
        if(liveLedger!=null&&liveLedger.has(track.getName())){error("누적거리에 반영한 통합본은 취소할 수 없어요. 중복 계산을 방지합니다.");return;}
        new Thread(()->{
        try{RideTrackMerge.undo(getFilesDir(),track);
-        runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){close();render();toast("통합 취소 · 원본 2건 복원, 통합본 보관");}});
+        runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){close();render();rebuildGpsEstimateAsync();toast("통합 취소 · 원본 2건 복원, 통합본 보관");}});
        }catch(Exception e){runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("통합 취소 실패: "+e.getMessage());});}
       },"moto-unmerge").start();}).show());
      gap(p,16);

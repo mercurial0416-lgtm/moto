@@ -591,7 +591,7 @@ final class RideUi {
       try{
        if(RideService.running||RideService.autoArmed)throw new IOException("주행 중에는 통합할 수 없습니다.");
        RideTrackMerge.Result result=RideTrackMerge.merge(a.getFilesDir(),left,right);
-       a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){a.render();a.toast("통합 완료 · "+result.points+"개 GPS 좌표 · 원본 보존");}});
+       a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){a.render();a.rebuildGpsEstimateAsync();a.toast("통합 완료 · "+result.points+"개 GPS 좌표 · 원본 보존");}});
       }catch(Exception ex){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("라이딩 통합 실패: "+ex.getMessage());});}
      },"moto-ride-merge").start()).show();
    }).setNegativeButton("취소",null).show();

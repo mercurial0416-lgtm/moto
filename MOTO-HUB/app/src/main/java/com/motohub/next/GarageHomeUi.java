@@ -493,7 +493,7 @@ final class GarageHomeUi {
   sep.topMargin=a.dp(9);sep.bottomMargin=a.dp(12);surfaceCard.addView(separator,sep);
   double gps=RideMileageEstimate.total(a,b.optString("id"));
   String estimate=Double.isFinite(gps)?String.format(java.util.Locale.KOREA,"%,.1f km",gps):"확인 불가";
-  TextView gpsNote=a.text("GPS 추정 "+estimate+" · 계기판과 별도",13,soft,false);
+  TextView gpsNote=a.text("저장된 GPS 추정 "+estimate+" · 계기판과 별도",13,soft,false);
   gpsNote.setMaxLines(3);surfaceCard.addView(gpsNote);
   if(OdometerAutoSyncInbox.enabled(a,b.optString("id"))){
    TextView odoNote=a.text(OdometerAutoSyncInbox.display(a,b.optString("id")),12,soft,false);

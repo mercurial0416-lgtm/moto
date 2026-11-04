@@ -125,7 +125,7 @@ final class RideStorageManager {
         File leftover=new File(new File(a.getFilesDir(),"rides-trash"),restored.getName());
         a.toast(leftover.exists()?
          "GPS 복원 완료 · 빈 복구함 폴더는 다음 실행 때 정리됩니다.":
-         "GPS 원본 복원 완료 · 기존 기록에서 확인할 수 있어요");a.render();
+         "GPS 원본 복원 완료 · 기존 기록에서 확인할 수 있어요");a.render();a.rebuildGpsEstimateAsync();
        }});
       }catch(Exception error){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("복원 실패: "+error.getMessage());});}
      },"moto-gps-trash-restore").start()).show();
@@ -184,7 +184,7 @@ final class RideStorageManager {
     }
     RideTrash.move(a.getFilesDir(),track);
     RideCompletionInbox.remove(a,track.getName());
-    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){if(afterSuccess!=null)afterSuccess.run();a.toast("GPS 원본을 복구함으로 옮겼습니다.");a.render();}});
+    a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed()){if(afterSuccess!=null)afterSuccess.run();a.toast("GPS 원본을 복구함으로 옮겼습니다.");a.render();a.rebuildGpsEstimateAsync();}});
    }catch(Exception error){
     a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 보관 취소: "+error.getMessage());});
    }finally{if(held)RestoreRideGate.end();}
