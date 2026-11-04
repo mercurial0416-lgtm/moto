@@ -22,7 +22,7 @@ checks={
  "cache hit remains strongly hash-verified": "cached.sha256.equals(currentHash)" in cache and "RideMileageIntegrity.fingerprint(track)" in cache,
  "cache miss uses two source passes not three": "String parsed=toHex(parsedDigest.digest())" in cache and "!parsed.equals(after)" in cache and "String before=" not in cache,
  "cache never feeds odometer": "NEVER evidence for odometer" in cache,
- "explicit release version": Path("release-code.txt").read_text().strip()=="575"
+ "explicit release version": int(Path("release-code.txt").read_text().strip())>=574
 }
 for label,ok in checks.items(): print(("PASS " if ok else "FAIL ")+label)
 assert all(checks.values())

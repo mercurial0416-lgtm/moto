@@ -32,7 +32,7 @@ assert 'UndoLastSave.available(a)' in home and 'void showQuickTools(' in home
 assert 'FuelNearDuplicate.near(' in quick and 'lastSaveClick' in quick
 assert 'DailyMaintenanceJob.clearReminderState(a)' in service
 assert 'parkedInfo(' in parking and 'parkingAccuracyM' in parking
-assert 'moto-hub-v"+versionCode+"/"' in updater
+assert 'asset.equals(tag+"/MOTO-HUB.apk")' in updater and 'asset.equals(tag+"-offline/MOTO-HUB.apk")' in updater
 assert '-PmotoReleaseCode="$CODE"' in ci and "versionCode='$CODE'" in ci
 print("PASS UX80 purchase adjustments, saved-ride identity, undo, warnings, simplified home and OTA consistency")
 PY

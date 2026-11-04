@@ -19,7 +19,7 @@ checks={
  "GPS safe rollover preserves original UUID": 'rotateRideSection()' in service and 'activeRideSession' in service and 'TrackCompletion.mark(previous,segmentPoints)' in service,
  "GPS rollover retains last boundary fix": "lastGood.getLatitude()" in service and "nextOutput.getFD().sync()" in service,
  "GPS counts match per-section markers": "TrackCompletion.mark(track,segmentPoints)" in service and "count++;segmentPoints++;" in service,
- "GPS uses existing backuppable track naming": 'activeRideSession+".track"' in service and "\.track" in group,
+ "GPS uses existing backuppable track naming": 'activeRideSession+".track"' in service and r"\.track" in group,
  "GPS session aggregation is view-only": 'RideSegmentGroup.collapse' in timeline and "RideSegmentGroup.id(ride)" in stats,
  "timeline avoids repeated total sort during progress": 'MotoTimeline.newest(merged,120)' in timeline and 'inspected%1024==0' in timeline and 'RideSegmentGroup.collapse(merged)' in timeline,
  "timeline group detail selects a safe original track": 'RideSegmentGroup.members' in timeline and 'RideMileageIntegrity.validCompleted(track)' in timeline,
