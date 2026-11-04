@@ -25,7 +25,7 @@ test(design.count("static TextView figure(") == 1,
      "one reusable figure type style")
 test("MotoDesign.figure(a,values[i],24,light)" in garage,
      "odometer must use numeric figure style")
-test("MotoDesign.figure(a,a.won(" in garage,
+test('MotoDesign.figure(a,planned?"일정 보기  ›":a.won(' in garage,
      "recent maintenance expenses must use numeric figure style")
 test("MotoDesign.figure(a,values[i],i==0?19:18,light)" in garage,
      "monthly expense and efficiency must use numeric style")

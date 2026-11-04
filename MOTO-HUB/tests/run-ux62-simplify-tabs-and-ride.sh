@@ -15,7 +15,7 @@ assert 'ride_checks' not in main and '오늘의 점검 상태' not in main
 assert 'void ride(){' in main and 'new RideUi(this).render();' in main
 assert 'void savedRoutes(){' in main and 'edit("routes",null)' in main
 assert 'final String[] tabs={"홈","라이딩","차고","더보기"};' in main
-assert 'String[] labels={"홈","라이딩","정비","설정"};' in design
+assert 'String[] labels={"홈","라이딩","정비·주유","설정"};' in design
 assert 'final int[] icons={0,3,2,4};' in design
 assert 'case"매물":listings()' not in main and 'case"차고":garage()' in main
 assert 'a.action(p,"보관된 옛 매물 데이터"' in settings and 'a.items("listings")' in settings

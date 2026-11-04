@@ -75,7 +75,7 @@ check('setPositiveButton("저장하고 종료"' in rideui and
       "confirmed GPS stop and verified save must remain available")
 check('changeHeroPhoto(bike,owned)' in home and 'switchBike(direction)' in home,
       "photo editing or multi-bike switch implementation lost")
-check('String[] labels={"홈","라이딩","정비","설정"}' in design,
+check('String[] labels={"홈","라이딩","정비·주유","설정"}' in design,
       "navigation labels inconsistent")
 check('setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"))' in design,
       "navigation accessibility label missing")

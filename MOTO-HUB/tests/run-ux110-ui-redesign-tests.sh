@@ -37,7 +37,7 @@ for text,bg in (
 
 # Primary navigation still reaches the ORIGINAL tab identifiers.
 needs(main,'final String[] tabs={"홈","라이딩","차고","더보기"}')
-needs(design,'String[] labels={"홈","라이딩","정비","설정"}','a.navigate(destination)')
+needs(design,'String[] labels={"홈","라이딩","정비·주유","설정"}','a.navigate(destination)')
 needs(home,'compactVehicleHeader(bike)','homeShortcutTile(key)','라이딩 시작','requestStart(true)','editHomeShortcuts()')
 needs(ride,'라이딩 기록','rideTools.setOnClickListener','RideStatsUi.open(a)',
       'chooseRideReport()','a.pickGpx()','if(focus&&RideService.running)return')
