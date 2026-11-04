@@ -16,7 +16,7 @@ maint=(root/"MaintenanceAlertWindow.java").read_text()
 assert "Intent.FLAG_ACTIVITY_SINGLE_TOP" in widget and "new Intent(context,MainActivity.class)" in widget, "Every configured shortcut must reuse MainActivity"
 assert "launch(context,id,1,first)" in widget and "launch(context,id,2,second)" in widget
 assert "onAppWidgetOptionsChanged" in widget, "Resized widgets must be rebound"
-assert "onUpdate(context,manager,new int[]{id})" in widget
+assert "manager.updateAppWidget(id,build(context,id,compact(options)))" in widget
 assert "validOdo=Double.isFinite(odometer)" in maint
 assert "safeKm=validOdo&&Double.isFinite(rawKm)&&rawKm>=0" in maint
 assert "catch(java.time.DateTimeException invalidDate)" in maint

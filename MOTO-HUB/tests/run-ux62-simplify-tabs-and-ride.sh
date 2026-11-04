@@ -27,7 +27,7 @@ assert 'renderPreservingPosition()' in main
 assert 'rideStateSignature()!=lastRenderedRideState' in main and 'renderPreservingPosition();' in main
 assert 'target.scrollTo(0,restoreY)' in main
 assert 'if(java.util.Arrays.equals(ids,lastWidgetIds)&&navigator.equals(lastNavigationChoice)&&bike.equals(lastBikeLabel))return;' in widget
-assert 'manager.updateAppWidget(id,build(context))' in widget
+assert 'manager.updateAppWidget(id,build(context,compact(manager.getAppWidgetOptions(id))))' in widget
 assert 'void basicBackup(){' in settings and 'void advancedBackup(){' in settings
 assert '전체 ZIP 백업' in settings and 'a::importBundle' in settings
 assert '추가 도구 · 대용량 백업 · GPS' in settings and 'void backupMore(){' in settings and 'this::advancedBackup' in settings

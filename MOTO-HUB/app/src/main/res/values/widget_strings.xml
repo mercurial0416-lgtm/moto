@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="widget_choose_nav_short">내비 ›</string>
+  <string name="widget_brand">MOTO HUB</string>
+  <string name="widget_home_description">MOTO HUB 홈 열기</string>
+  <string name="widget_choose_nav">내비 설정  ›</string>
+  <string name="widget_choose_nav_description">기본 내비 선택 변경</string>
+  <string name="widget_ride">출발 + 내비</string>
+  <string name="widget_ride_description">동의 후 주행 기록 및 선택한 내비 실행</string>
+  <string name="widget_nav">내비만</string>
+  <string name="widget_nav_description">GPS 기록을 자동 시작하지 않고 내비만 실행</string>
+  <string name="widget_ride_short">출발</string>
+  <string name="widget_nav_short">내비</string>
+  <string name="widget_quick_ride_description">동의 후 주행 기록 시작 및 내비 실행</string>
+  <string name="widget_quick_nav_description">기본 내비만 실행</string>
+</resources>

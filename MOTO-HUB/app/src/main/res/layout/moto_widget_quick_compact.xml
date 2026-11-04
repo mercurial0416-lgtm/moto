@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_vertical" android:padding="2dp" android:background="@android:color/transparent">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="52dp" android:orientation="horizontal" android:padding="2dp" android:background="@drawable/widget_background">
+    <TextView android:id="@+id/quick_ride" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/widget_primary" android:gravity="center" android:text="@string/widget_ride_short" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/widget_on_primary" android:includeFontPadding="false" android:maxLines="1" android:contentDescription="@string/widget_quick_ride_description" />
+    <TextView android:id="@+id/quick_nav" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="6dp" android:background="@drawable/widget_secondary" android:gravity="center" android:text="@string/widget_nav_short" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/widget_text" android:includeFontPadding="false" android:maxLines="1" android:contentDescription="@string/widget_quick_nav_description" />
+  </LinearLayout>
+</LinearLayout>

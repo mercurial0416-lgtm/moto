@@ -9,7 +9,7 @@ res=Path("app/src/main/res")
 src=Path("app/src/main/java/com/motohub/next")
 layout=ET.parse(res/"layout/moto_widget.xml").getroot()
 quick=ET.parse(res/"layout/moto_widget_quick.xml").getroot()
-for root,limit in ((layout,72),(quick,47)):
+for root,limit in ((layout,120),(quick,72)):
  assert root.attrib[a+"background"]=="@android:color/transparent", "Oversized black widget background"
  assert root.attrib[a+"gravity"]=="center_vertical", "Content must not stick at top"
  cards=[x for x in root if x.attrib.get(a+"background")=="@drawable/widget_background"]
@@ -18,7 +18,7 @@ for root,limit in ((layout,72),(quick,47)):
 assert "android" not in list(layout.attrib) or True
 for node in quick.iter():
  if node.attrib.get(a+"id") in ("@+id/quick_ride","@+id/quick_nav"):
-  assert node.attrib[a+"layout_height"]=="37dp"
+  assert node.attrib[a+"layout_height"]=="match_parent"
 normalIDs={n.attrib.get(a+"id") for n in layout.iter()}
 assert {"@+id/widget_home","@+id/widget_ride","@+id/widget_nav","@+id/widget_nav_choice"}<=normalIDs
 assert len([n for n in layout.iter() if "widget_bike" in n.attrib.get(a+"id","")])==0

@@ -8,6 +8,19 @@
 - 정적 검사 UX38 26개·UX39 22개 통과. 디자인 수치를 고정한 UX14/UX106 검사만 새 팔레트·곡률·타이포그래피에 맞추고 기존 동작/데이터/동의 검사는 유지.
 - 두 번째 묶음인 위젯·아이콘 재설계와 전체 통합 검증은 아래 최신 결과에 따름. 프리뷰는 테스트 데이터로 생성한 네이티브 렌더이며 실기기 검증을 대체하지 않음.
 
+## UI 전면 개편 — 위젯·아이콘 및 최종 검증
+
+- 첫 묶음 앱 UI 커밋: `9baf0d0`. 두 번째 묶음은 크기 대응형 대시보드 위젯(4×2)·작은 바로가기(2×1), 주행/내비/주유 벡터 아이콘, M/바이크 모노그램 앱 아이콘·알림 아이콘과 Android 13+ 테마 아이콘 레이어.
+- 위젯은 호스트에 맞는 제한된 높이의 카드로 표시. 축소 시 조밀한 배치로 바꾸며 작은 바로가기는 가로 폭도 반영. 1.3배 이상 글씨에서는 장식 아이콘 대신 짧은 문구를 표시하고 전체 접근성 설명·동작은 유지.
+- 큰 글씨 잘림을 실제 RemoteViews 렌더링 테스트로 먼저 재현: `redesign-widget-large-font-before.log`의 `출발 + 내비 is too tall`. 최소 폭에서 2배 글씨의 작은 위젯 잘림도 추가 수정. 최종 1.3/1.5/2배 글씨의 최소 크기 테스트 통과.
+- `RedesignWidgetTest` 7개: 라이트/다크 명암 대비, 48dp 이상 터치 높이, 크기 변경, 텍스트 잘림, 주행 동의/내비 실행 분리, 사용자 선택/위젯별 PendingIntent 보존, DB 비접근, 네이티브 단색 아이콘 검사.
+- 최종 `assembleDebug`, `lintDebug`, `testDebugUnitTest`: BUILD SUCCESSFUL. 89 suites 총 278개: 통과 275 / 건너뜀 3 / 실패·오류 0. Lint 오류 0 / 경고 80(기준 93). 위젯 XML 문자열 리소스 통합과 불필요한 레이아웃/중복 drawable 속성 정리 포함.
+- 기존 `tests/run-*.sh` 176개 모두 PASS, 별도 UI 정적 조건 48개 PASS, 자동화 정책 검사 5개 PASS. 예전 디자인 수치·직접 호출 문자열을 고정한 검사만 새 구성으로 갱신하고 데이터/동의/백업/서명 관련 검사는 보존.
+- 검증 로그: `/workspace/setup-results/redesign-verified-android.log`, `redesign-final-regressions.log`, `redesign-final-regression-status.tsv`, `redesign-widget-final.log`. 초기 실패 로그는 별도 보존; 최종 통과와 구분.
+- 디버그 APK Android v2 서명 검증 성공. SHA256 `92b266dcb960011278b0f1703f8c0eced3b34dc31b597cdab96c20f5d577fa61`. package `com.motohub.next`, versionCode 518, Android Debug 인증서. 기존 공식 서명/v575 설치본 업데이트용이 아니며 설치본 삭제를 안내하지 않음.
+- 새 화면·위젯·아이콘 프리뷰와 테스트 APK는 별도 `artifacts/redesign-<소스 SHA>` 브랜치로 전달. 소스 작업 브랜치에는 APK/PNG 미추가. 공식 배포·업데이트 매니페스트·서명 키·기록 형식·GPS 원본 변경 없음.
+- 실기기 런처 크기 변경·테마 아이콘·TalkBack·GPS/백그라운드·실제 설치 업데이트는 미검증. 매시간 실행 예약은 여전히 미등록이며 자동 반복을 약속하지 않음.
+
 ## 최신 실행 정책
 
 - 사용자 최신 지시: 실행당 근거 있는 개선 두 묶음 이상, 반복 간격 1시간. 아래의 과거 305분 기록보다 이 지시가 우선한다.

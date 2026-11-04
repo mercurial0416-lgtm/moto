@@ -9,9 +9,9 @@ src=Path("app/src/main/java/com/motohub/next")
 andns="{http://schemas.android.com/apk/res/android}"
 normal=ET.parse(res/"xml/moto_widget_info.xml").getroot()
 quick=ET.parse(res/"xml/moto_widget_quick_info.xml").getroot()
-assert int(normal.attrib[andns+"minHeight"].removesuffix("dp"))<=80
+assert int(normal.attrib[andns+"minHeight"].removesuffix("dp"))<=132
 assert int(normal.attrib[andns+"minWidth"].removesuffix("dp"))<=225
-assert int(quick.attrib[andns+"minHeight"].removesuffix("dp"))<=50
+assert int(quick.attrib[andns+"minHeight"].removesuffix("dp"))<=64
 assert int(quick.attrib[andns+"minWidth"].removesuffix("dp"))<=110
 widget=ET.parse(res/"layout/moto_widget.xml").getroot()
 quickLayout=ET.parse(res/"layout/moto_widget_quick.xml").getroot()
@@ -22,8 +22,10 @@ receivers={x.attrib[andns+"name"] for x in manifest.iter("receiver")}
 assert ".MotoWidgetProvider" in receivers
 assert ".MotoQuickWidgetProvider" in receivers
 foreground=ET.parse(res/"drawable/ic_launcher_foreground.xml").getroot()
-colors=" ".join(x.attrib.get(andns+"fillColor","") for x in foreground)
-assert "#FF762B" in colors and "#FF8E35" in colors
+colors=" ".join(x.attrib.get(andns+"fillColor","")+x.attrib.get(andns+"strokeColor","") for x in foreground)
+assert "#91F0C9" in colors
+assert (res/"mipmap-anydpi-v33/ic_launcher.xml").is_file()
+assert normal.attrib[andns+"targetCellHeight"]=="2"
 assert "class MotoQuickWidgetProvider" in (src/"MotoQuickWidgetProvider.java").read_text()
 quickSrc=(src/"MotoQuickWidgetProvider.java").read_text()
 assert "EXTRA_ONE_TAP_RIDE,true" in quickSrc
@@ -40,5 +42,5 @@ assert "isRequestPinAppWidgetSupported()" in pin
 assert "requestPinAppWidget(" in pin
 assert 'a.action(p,"홈 화면 위젯"' in (src/"HubScreens.java").read_text()
 assert "if(focused)return 5000;" in (src/"RideScreenRefreshPolicy.java").read_text()
-print("PASS UX59 icon, adaptive widget 2x1/4x1, immutable shortcuts, nav, focus, pinning, privacy")
+print("PASS UX59 icon, adaptive widget 2x1/4x2, immutable shortcuts, nav, focus, pinning, privacy")
 PY

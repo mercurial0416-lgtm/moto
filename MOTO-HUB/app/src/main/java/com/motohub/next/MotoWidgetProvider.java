@@ -23,16 +23,34 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
  private static String lastBikeLabel=null;
  private static int[] lastWidgetIds=null;
  @Override public void onUpdate(Context context,AppWidgetManager manager,int[] ids){
-  for(int id:ids)manager.updateAppWidget(id,build(context));
+  for(int id:ids)manager.updateAppWidget(id,build(context,compact(manager.getAppWidgetOptions(id))));
  }
  @Override public void onAppWidgetOptionsChanged(Context context,AppWidgetManager manager,int id,android.os.Bundle options){
   super.onAppWidgetOptionsChanged(context,manager,id,options);
-  manager.updateAppWidget(id,build(context));
+  manager.updateAppWidget(id,build(context,compact(options)));
  }
- static RemoteViews build(Context context){
-  RemoteViews v=new RemoteViews(context.getPackageName(),R.layout.moto_widget);
-  v.setTextViewText(R.id.widget_home,WidgetBikeSnapshot.label(context));
-  v.setTextViewText(R.id.widget_nav_choice,"내비 · "+NavigationApps.preferred(context).label+"  ›");
+ static boolean compact(android.os.Bundle options){
+  int height=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,0);
+  return height>0&&height<124;
+ }
+ static RemoteViews build(Context context){return build(context,false);}
+ static RemoteViews build(Context context,boolean compact){
+  RemoteViews v=compact?new RemoteViews(context.getPackageName(),R.layout.moto_widget_compact):new RemoteViews(context.getPackageName(),R.layout.moto_widget);
+  String bike=WidgetBikeSnapshot.label(context);
+  boolean largeText=context.getResources().getConfiguration().fontScale>=1.3f;
+  v.setTextViewText(R.id.widget_home,bike);
+  v.setContentDescription(R.id.widget_home,bike+" · MOTO HUB 홈 열기");
+  String navigator=NavigationApps.preferred(context).label;
+  v.setTextViewText(R.id.widget_nav_choice,largeText?context.getString(R.string.widget_choose_nav_short):"내비 · "+navigator+"  ›");
+  v.setContentDescription(R.id.widget_nav_choice,"현재 "+navigator+" · 기본 내비 선택 변경");
+  // A two-cell launcher row has a fixed height. Give enlarged text the space
+  // normally used by decorative icons; spoken labels keep the full action.
+  if(largeText){
+   v.setTextViewText(R.id.widget_ride,context.getString(R.string.widget_ride_short));
+   v.setTextViewText(R.id.widget_nav,context.getString(R.string.widget_nav_short));
+  }
+  v.setTextViewCompoundDrawables(R.id.widget_ride,largeText?0:R.drawable.ic_widget_ride_primary,0,0,0);
+  v.setTextViewCompoundDrawables(R.id.widget_nav,largeText?0:R.drawable.ic_widget_nav_secondary,0,0,0);
   v.setOnClickPendingIntent(R.id.widget_home,pending(context,51,"HOME",EXTRA_TAB,"홈"));
   v.setOnClickPendingIntent(R.id.widget_nav_choice,pending(context,52,"CHOOSE_NAV",EXTRA_SELECT_NAV,true));
   v.setOnClickPendingIntent(R.id.widget_ride,pending(context,53,"RIDE_WITH_NAV",EXTRA_ONE_TAP_RIDE,true));
@@ -57,7 +75,7 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
   if(java.util.Arrays.equals(ids,lastWidgetIds)&&navigator.equals(lastNavigationChoice)&&bike.equals(lastBikeLabel))return;
   // Widgets contain shortcuts and navigator name only. GPS fixes and fuel/ride
   // database writes must not trigger repeated expensive launcher RemoteViews.
-  if(ids.length>0)for(int id:ids)manager.updateAppWidget(id,build(context));
+  if(ids.length>0)for(int id:ids)manager.updateAppWidget(id,build(context,compact(manager.getAppWidgetOptions(id))));
   lastWidgetIds=ids.clone();
   lastNavigationChoice=navigator;
   lastBikeLabel=bike;

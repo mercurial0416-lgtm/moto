@@ -565,7 +565,7 @@ final class HubScreens {
   a.action(p,"홈 버튼 표시 · 순서 편집",false,()->new GarageHomeUi(a).editHomeShortcuts());
   a.action(p,"홈 화면 위젯",false,()->new AlertDialog.Builder(a)
    .setTitle("홈 화면 위젯")
-   .setItems(new String[]{"작은 위젯 추가 (2×1)","기본 위젯 추가 (4×1)","위젯 버튼 변경"},(d,index)->{
+   .setItems(new String[]{"작은 위젯 추가 (2×1)","대시보드 위젯 추가 (4×2)","위젯 버튼 변경"},(d,index)->{
     if(index==2)QuickWidgetChoices.configure(a);else MotoWidgetPin.request(a,index==0);
    }).setNegativeButton("닫기",null).show());
   a.action(p,"주차 위치",false,()->{
