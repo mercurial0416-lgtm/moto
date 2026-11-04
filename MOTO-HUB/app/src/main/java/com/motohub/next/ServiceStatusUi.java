@@ -15,46 +15,52 @@ final class ServiceStatusUi {
  void render(LinearLayout target){
   JSONObject bike=a.bike();if(bike==null||GarageBikeStatus.sold(bike.optString("soldDate")))return;
   List<JSONObject> entries=new ArrayList<>();
-  for(JSONObject service:LatestServiceByType.latest(a.items("services"),bike.optString("id")).values()){
-   if(service.optDouble("nextKm")>0||!service.optString("nextDate").isEmpty())entries.add(service);
-  }
-  entries.sort((x,y)->Integer.compare(MaintenancePlanner.order(status(x,bike)),MaintenancePlanner.order(status(y,bike))));
+  Map<String,JSONObject> latest=LatestServiceByType.latest(a.items("services"),bike.optString("id"));
+  for(JSONObject service:latest.values())if(service.optDouble("nextKm")>0||!service.optString("nextDate").isEmpty())entries.add(service);
+  entries.sort(Comparator.comparingInt((JSONObject item)->MaintenancePlanner.order(status(item,bike)))
+   .thenComparing(item->item.optString("nextDate").isEmpty()?"9999-12-31":item.optString("nextDate"))
+   .thenComparingDouble(item->item.optDouble("nextKm")>0?item.optDouble("nextKm"):Double.POSITIVE_INFINITY));
   LinearLayout heading=new LinearLayout(a);heading.setGravity(Gravity.CENTER_VERTICAL);boolean narrow=a.getResources().getConfiguration().fontScale>=1.35f||a.getResources().getConfiguration().screenWidthDp<360;if(narrow)heading.setOrientation(LinearLayout.VERTICAL);
-  heading.addView(a.text("내 정비주기",18,a.fg,true),narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
-  Button odo=a.button("계기판 갱신",false,()->updateOdo(bike));odo.setTextSize(12);
-  odo.setMinHeight(a.dp(48));heading.addView(odo);target.addView(heading);
-  a.gap(target,9);
-  a.action(target,"여러 정비 항목 한 번에 완료",false,a::batchServiceEntry);
-  java.util.Map<String,JSONObject> serviceMap=LatestServiceByType.latest(a.items("services"),bike.optString("id"));
-  JSONObject engineOil=serviceMap.get("엔진오일"),oilFilter=serviceMap.get("오일필터");
-  if(engineOil!=null&&oilFilter!=null&&(engineOil.optDouble("nextKm")>0||!engineOil.optString("nextDate").isEmpty())
-     &&(oilFilter.optDouble("nextKm")>0||!oilFilter.optString("nextDate").isEmpty())){
-   a.action(target,"엔진오일 + 오일필터 함께 완료",false,()->completeOilPair(bike,engineOil,oilFilter));
-  }
+  heading.addView(a.text("내 정비주기",20,a.fg,true),narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
+  Button odo=a.button("계기판 갱신",false,()->updateOdo(bike));odo.setTextSize(13);odo.setMinHeight(a.dp(48));heading.addView(odo);target.addView(heading);a.gap(target,10);
+  int overdue=0,soon=0;
+  for(JSONObject item:entries){if(status(item,bike)==MaintenancePlanner.Status.OVERDUE)overdue++;else if(status(item,bike)==MaintenancePlanner.Status.SOON)soon++;}
+  TextView summary=a.text("점검 필요 "+overdue+"  ·  곧 정비 "+soon+"  ·  전체 "+entries.size()+"개",14,a.fg,true);summary.setTag("maintenance-status-summary");summary.setPadding(a.dp(14),a.dp(13),a.dp(14),a.dp(13));summary.setBackground(a.shape(a.highlight,0,16));target.addView(summary);a.gap(target,12);
   if(entries.isEmpty()){
-   TextView blank=a.text("등록된 정비주기가 없어요. 엔진오일·체인 등 필요한 항목부터 등록하세요.",13,a.muted,false);
-   blank.setPadding(a.dp(17),a.dp(15),a.dp(17),a.dp(15));blank.setBackground(a.shape(a.panel,a.line,17));target.addView(blank);
-   a.action(target,"정비주기 등록",false,()->new QuickEntryUi(a).maintenance());return;
+   a.label(target,"등록된 정비주기가 없어요. 필요한 항목부터 추가해 보세요.",15,a.muted,false);
+   a.action(target,"정비주기 등록",true,()->new QuickEntryUi(a).maintenance());return;
   }
-  int shown=0;
-  for(JSONObject item:entries){
-   if(shown++>=8)break;
-   MaintenancePlanner.Status status=status(item,bike);
-   LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);if(narrow)row.setOrientation(LinearLayout.VERTICAL);row.setPadding(a.dp(15),a.dp(13),a.dp(11),a.dp(13));row.setBackground(a.shape(a.panel,a.line,17));
-   LinearLayout info=a.col();
-   String state=status==MaintenancePlanner.Status.OVERDUE?"점검 필요":status==MaintenancePlanner.Status.SOON?"곧 정비":"정비 예정";
-   int tone=status==MaintenancePlanner.Status.OVERDUE?0xFFE28370:status==MaintenancePlanner.Status.SOON?a.accent:a.fg;
-   info.addView(a.text(item.optString("type")+" · "+state,15,tone,true));
-   String detail=MaintenanceNoticeText.detail(item.optString("nextDate"),item.optDouble("nextKm"),a.today(),bike.optDouble("odo"));
-   TextView sub=a.text(detail.isEmpty()?"다음 주기 설정됨":detail,12,a.muted,false);
-   LinearLayout.LayoutParams sl=new LinearLayout.LayoutParams(-1,-2);sl.topMargin=a.dp(5);info.addView(sub,sl);
-   row.addView(info,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
-   Button complete=a.button("완료",false,()->complete(item));complete.setMinHeight(a.dp(44));
-   row.addView(complete,narrow?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(-2,-2));
-   LinearLayout.LayoutParams cardLp=new LinearLayout.LayoutParams(-1,-2);cardLp.bottomMargin=a.dp(8);target.addView(row,cardLp);
-  }
-  a.gap(target,9);
-  a.label(target,"정비 알림은 저장된 계기판과 예정일을 기준으로 계산합니다. GPS 거리만으로 계기판을 자동 변경하지 않습니다.",12,a.muted,false);
+  a.action(target,"정비주기 추가",false,()->new QuickEntryUi(a).maintenance());
+  LinearLayout cards=a.col();target.addView(cards);final int[] shown={0};
+  Button more=a.button("",false,()->{});more.setTag("maintenance-more");
+  Runnable nextPage=()->{
+   int end=Math.min(entries.size(),shown[0]+8);
+   while(shown[0]<end)cards.addView(scheduleCard(entries.get(shown[0]++),bike));
+   more.setVisibility(shown[0]<entries.size()?View.VISIBLE:View.GONE);more.setText("정비 "+(entries.size()-shown[0])+"개 더 보기");
+  };
+  more.setOnClickListener(v->nextPage.run());target.addView(more);nextPage.run();
+  a.gap(target,12);
+  a.action(target,"여러 정비 항목 한 번에 완료",false,a::batchServiceEntry);
+  JSONObject engineOil=latest.get("엔진오일"),oilFilter=latest.get("오일필터");
+  if(engineOil!=null&&oilFilter!=null&&(engineOil.optDouble("nextKm")>0||!engineOil.optString("nextDate").isEmpty())
+     &&(oilFilter.optDouble("nextKm")>0||!oilFilter.optString("nextDate").isEmpty()))
+   a.action(target,"엔진오일 + 오일필터 함께 완료",false,()->completeOilPair(bike,engineOil,oilFilter));
+  a.label(target,"정비 알림은 저장된 계기판과 예정일 기준입니다. GPS 거리로 계기판을 자동 변경하지 않습니다.",12,a.muted,false);
+ }
+ View scheduleCard(JSONObject item,JSONObject bike){
+  MaintenancePlanner.Status state=status(item,bike);boolean overdue=state==MaintenancePlanner.Status.OVERDUE;
+  String caption=overdue?"점검 필요":state==MaintenancePlanner.Status.SOON?"곧 정비":state==MaintenancePlanner.Status.NONE?"일정 확인":"정비 예정";
+  int tone=overdue?(a.dark?0xFFFFB4A9:0xFF9B2C2C):a.accent;
+  LinearLayout card=a.col();card.setTag("maintenance-cycle:"+item.optString("id"));card.setPadding(a.dp(17),a.dp(16),a.dp(17),a.dp(14));card.setBackground(a.shape(a.panel,a.line,20));
+  card.addView(a.text(item.optString("type"),18,a.fg,true));a.gap(card,7);card.addView(a.text(caption,13,tone,true));a.gap(card,7);
+  double next=item.optDouble("nextKm"),current=bike.optDouble("odo");String day=item.optString("nextDate");
+  String remaining=MaintenanceNoticeText.detail(day,next,a.today(),current);
+  if(Double.isFinite(next)&&next>0&&Double.isFinite(current))remaining=a.num(Math.abs(next-current))+" km "+(next<=current?"초과":"남음");
+  TextView distance=a.text(remaining.isEmpty()?"예정 정보 확인":remaining,24,a.fg,true);card.addView(distance);a.gap(card,5);
+  String goal=(next>0?"목표 "+a.num(next)+" km":"날짜 기준 정비")+(!day.isEmpty()?" · "+MaintenanceNoticeText.detail(day,0,a.today(),current):"");
+  card.addView(a.text(goal,13,a.muted,false));a.gap(card,12);
+  a.pair(card,"완료",()->complete(item),"주기 조정",()->new QuickEntryUi(a).maintenance(item.optString("type")));
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=a.dp(10);card.setLayoutParams(lp);return card;
  }
  MaintenancePlanner.Status status(JSONObject item,JSONObject bike){
   return MaintenanceAlertWindow.status(item,a.today(),bike.optDouble("odo"));

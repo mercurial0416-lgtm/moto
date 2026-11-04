@@ -17,7 +17,7 @@ final class QuickEntryUi {
  private EditText number(LinearLayout body,String label,String initial,String hint){
   a.label(body,label,14,a.fg,true);
   EditText field=new EditText(a);field.setSingleLine(true);
-  field.setTextColor(a.fg);field.setHintTextColor(a.muted);field.setTextSize(19);
+  field.setTextColor(a.fg);field.setHintTextColor(a.muted);field.setTextSize(24);
   field.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
   field.setImeOptions(EditorInfo.IME_ACTION_NEXT);
   field.setBackground(a.shape(a.panel,a.line,17));
@@ -30,9 +30,9 @@ final class QuickEntryUi {
  private double numeric(EditText input,String title,boolean required)throws Exception{
   String raw=input.getText().toString().replace(",","").trim();
   if(raw.isEmpty()&&!required)return 0;
-  if(raw.isEmpty())throw new IllegalArgumentException(title+"을(를) 입력해 주세요.");
+  if(raw.isEmpty()){input.setError(title+"을(를) 입력해 주세요.");input.requestFocus();throw new IllegalArgumentException(title+"을(를) 입력해 주세요.");}
   try{double n=Double.parseDouble(raw);if(!Double.isFinite(n)||n<0)throw new NumberFormatException();return n;}
-  catch(NumberFormatException ex){throw new IllegalArgumentException(title+"에 올바른 숫자를 입력해 주세요.");}
+  catch(NumberFormatException ex){input.setError("올바른 숫자를 입력해 주세요.");input.requestFocus();throw new IllegalArgumentException(title+"에 올바른 숫자를 입력해 주세요.");}
  }
  private Spinner options(LinearLayout body,String title,String[] items){
   a.label(body,title,14,a.fg,true);
@@ -322,20 +322,13 @@ final class QuickEntryUi {
   double liters=recent.optDouble("liters",0);
   return Double.isFinite(liters)&&liters>0&&liters<1000?liters:0;
  }
- void maintenance(){
+ void maintenance(){maintenance(null);}
+ void maintenance(String selectedType){
   JSONObject bike=a.bike();if(bike==null||a.readOnly){a.toast("기록 가능한 바이크를 먼저 등록해 주세요.");return;}
   LinearLayout body=a.page("정비주기 등록");
   a.label(body,bike.optString("name")+" · 기준 주행거리 "+a.num(bike.optDouble("odo"))+" km",13,a.muted,false);a.gap(body,13);
   String[] items={"엔진오일","오일필터","체인","타이어","브레이크 패드","냉각수","배터리","기타 직접 입력"};
   Spinner service=options(body,"정비 항목",items);
-  for(JSONObject previousService:a.items("services")){
-   if(!bike.optString("id").equals(previousService.optString("vehicleId")))continue;
-   int match=java.util.Arrays.asList(items).indexOf(previousService.optString("type"));
-   if(match>=0&&match<items.length-1){
-    Button recent=a.button("이 바이크 최근 정비 항목 · "+items[match]+" 선택",false,()->service.setSelection(match));
-    body.addView(recent);break;
-   }
-  }
   EditText customType=new EditText(a);customType.setSingleLine(true);customType.setHint("정비 항목 이름");
   customType.setTextColor(a.fg);customType.setHintTextColor(a.muted);
   customType.setPadding(a.dp(14),a.dp(12),a.dp(14),a.dp(12));customType.setBackground(a.shape(a.panel,a.line,17));
@@ -346,12 +339,26 @@ final class QuickEntryUi {
    }
    public void onNothingSelected(android.widget.AdapterView<?> parent){}
   });
+  JSONObject mostRecent=null;
+  for(JSONObject previous:a.items("services")){
+   if(!bike.optString("id").equals(previous.optString("vehicleId"))||previous.optString("type").trim().isEmpty())continue;
+   if(mostRecent==null||!RecentRecordReuse.isNewer(mostRecent.optString("date"),mostRecent.optDouble("mileage"),previous.optString("date"),previous.optDouble("mileage")))mostRecent=previous;
+  }
+  if(mostRecent!=null){
+   final String recentType=mostRecent.optString("type");
+   Button recent=a.button("이 바이크 최근 정비 항목 · "+recentType+" 선택",false,()->{
+    int index=java.util.Arrays.asList(items).indexOf(recentType);service.setSelection(index>=0?index:items.length-1);
+    if(index<0){customType.setText(recentType);customType.setVisibility(View.VISIBLE);}
+   });body.addView(recent);
+  }
   String[] distance={"거리 주기 설정 안 함","+500km","+1,000km","+3,000km","+5,000km","+10,000km","직접 입력"};
   int[] intervals={0,500,1000,3000,5000,10000,-1};
   Spinner distanceChoice=options(body,"몇 km 뒤에 정비할까요?",distance);
+  EntryAssist.distanceChips(a,body,distanceChoice);
   String[] periods={"날짜 주기 설정 안 함","1개월 뒤","3개월 뒤","6개월 뒤","12개월 뒤","날짜 직접 선택"};
   int[] months={0,1,3,6,12,-1};
   Spinner dateChoice=options(body,"또는 몇 개월 뒤에 정비할까요?",periods);
+  TextView duePreview=EntryAssist.preview(a,body,"maintenance-due-preview");
   LinearLayout alertOptions=a.col();alertOptions.setVisibility(View.GONE);
   Spinner kmAlert=options(alertOptions,"거리 알림 시점",
    new String[]{"100km 전","300km 전","500km 전"});
@@ -410,16 +417,37 @@ final class QuickEntryUi {
    a.toast("이전 주기만 적용했어요. 저장 전 계기판과 예정일을 확인하세요.");
   }));
   reuse.setMinHeight(a.dp(48));body.addView(reuse);
+  Runnable updatePreview=()->{
+   int kmInterval=intervals[distanceChoice.getSelectedItemPosition()],monthInterval=months[dateChoice.getSelectedItemPosition()];
+   if(kmInterval==0&&monthInterval==0){duePreview.setText("거리 또는 날짜 주기를 선택하면\n다음 정비 목표를 미리 보여드려요.");return;}
+   try{
+    double current=EntryAssist.decimal(mileage.getText().toString());
+    double due=kmInterval<0?EntryAssist.decimal(nextKm.getText().toString()):QuickRecordDraft.nextOdometer(current,kmInterval);
+    String day=monthInterval<0?nextDate.getText().toString().trim():QuickRecordDraft.dueAfterMonths(a.today(),monthInterval);
+    // Use the same record validator as Save. This creates no persisted record.
+    QuickRecordDraft.maintenance(bike.optString("id"),"미리보기",a.today(),current,due,day,Math.max(0,kmInterval),Math.max(0,monthInterval));
+    String target=(due>0?a.num(due)+" km":"")+(due>0&&!day.isEmpty()?" 또는 ":"")+day;
+    duePreview.setText("다음 정비 목표\n"+target+"\n"+MaintenanceNoticeText.detail(day,due,a.today(),current));
+   }catch(Exception invalid){duePreview.setText("현재 계기판과 직접 지정 값을 확인해 주세요.");}
+  };
+  for(EditText field:new EditText[]{mileage,nextKm,nextDate})field.addTextChangedListener(EntryAssist.watch(updatePreview));
   // A custom interval must reveal its required input immediately; no second hidden tap.
   android.widget.AdapterView.OnItemSelectedListener revealCustom=new android.widget.AdapterView.OnItemSelectedListener(){
    @Override public void onItemSelected(android.widget.AdapterView<?> parent,View view,int position,long id){
     if(distanceChoice.getSelectedItemPosition()==intervals.length-1
       ||dateChoice.getSelectedItemPosition()==months.length-1)advanced.setVisibility(View.VISIBLE);
+    updatePreview.run();
    }
    @Override public void onNothingSelected(android.widget.AdapterView<?> parent){}
   };
   distanceChoice.setOnItemSelectedListener(revealCustom);
   dateChoice.setOnItemSelectedListener(revealCustom);
+  if(selectedType!=null){
+   int index=java.util.Arrays.asList(items).indexOf(selectedType);
+   if(index<0){service.setSelection(items.length-1);customType.setText(selectedType);customType.setVisibility(View.VISIBLE);}else service.setSelection(index);
+   reuse.performClick();
+  }
+  updatePreview.run();
   a.gap(body,12);a.label(body,"알림은 입력한 계기판과 날짜를 기준으로 계산합니다. 정비 주기는 제조사 매뉴얼을 확인하세요.",13,a.muted,false);
   a.action(body,"저장",true,()->a.attempt(()->{
    int kmInterval=intervals[distanceChoice.getSelectedItemPosition()];
