@@ -8,11 +8,14 @@ category=(base/'RideSessionCategory.java').read_text()
 main=(base/'MainActivity.java').read_text()
 assert 'static void write(File filesDir,File selected,String category)' in category
 assert 'RideSegmentGroup.members(filesDir,selected.getName())' in category
+assert 'requireEntireSessionComplete(filesDir,session,members.size())' in category
+assert category.count('requireEntireSessionComplete(filesDir,session,members.size())')>=2
+assert 'static synchronized void write(File filesDir,File selected,String category,Runnable afterEachWrite)' in category
 assert 'originals.get(member)' in category and 'restoreSidecar(member,originals.get(member))' in category
 assert 'Files.isSymbolicLink(sidecar.toPath())' in category
 assert 'RideSessionCategory.write(getFilesDir(),track,categories[which])' in main
 assert '"moto-ride-category").start()' in main
 assert main.count('RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active)')>=4
 assert 'RideCategory.write(track,categories[which])' not in main
-print('PASS UX126 whole-session tags, rollback, symlink safety, non-blocking UI, active-session guard')
+print('PASS UX126 / v580 complete-session-only tags, late section rollback, symlink safety, non-blocking UI')
 PY

@@ -67,6 +67,57 @@ public final class Ux126RideSessionCategoryTest {
    assertEquals(RideCategory.AUTO,RideCategory.read(b));
   }finally{cleanup(base);}
  }
+ @Test public void completedSegmentCannotIgnoreUnfinishedSibling()throws Exception{
+  File base=Files.createTempDirectory("moto-580-unfinished-sibling").toFile();
+  try{
+   File rides=TrackFile.directory(base);
+   String session=UUID.randomUUID().toString();
+   long now=System.currentTimeMillis()-90_000;
+   File first=create(rides,now,session);
+   File second=create(rides,now+4000,session);
+   RideCategory.write(first,RideCategory.DAILY);
+   File live=new File(rides,(now+8000)+"-"+session+".track");
+   Files.write(live.toPath(),TrackFile.point(37.1,127.1,3,now+8000).getBytes(StandardCharsets.UTF_8));
+   try{
+    RideSessionCategory.write(base,first,RideCategory.WINDING);
+    fail("previously completed file must not hide an unfinished sibling");
+   }catch(IOException expected){assertTrue(expected.getMessage().contains("미완료"));}
+   assertEquals(RideCategory.DAILY,RideCategory.read(first));
+   assertEquals(RideCategory.AUTO,RideCategory.read(second));
+   assertFalse(new File(live+".category").exists());
+   TrackCompletion.mark(live,1);
+   RideSessionCategory.write(base,second,RideCategory.WINDING);
+   assertEquals(RideCategory.WINDING,RideCategory.read(first));
+   assertEquals(RideCategory.WINDING,RideCategory.read(second));
+   assertEquals(RideCategory.WINDING,RideCategory.read(live));
+  }finally{cleanup(base);}
+ }
+ @Test public void newlyCreatedUnfinishedSectionDuringTransactionRollsBack()throws Exception{
+  File base=Files.createTempDirectory("moto-580-new-sibling").toFile();
+  try{
+   File rides=TrackFile.directory(base);
+   String session=UUID.randomUUID().toString();
+   long now=System.currentTimeMillis()-90_000;
+   File a=create(rides,now,session);
+   File b=create(rides,now+4000,session);
+   RideCategory.write(a,RideCategory.COMMUTE);
+   byte[] original=Files.readAllBytes(new File(a+".category").toPath());
+   File arriving=new File(rides,(now+8000)+"-"+session+".track");
+   AtomicInteger counter=new AtomicInteger();
+   try{
+    RideSessionCategory.write(base,a,RideCategory.TOUR,()->{
+     if(counter.incrementAndGet()==1)
+      try{Files.write(arriving.toPath(),
+       TrackFile.point(37,127,3,now+8000).getBytes(StandardCharsets.UTF_8));}
+      catch(IOException e){throw new IllegalStateException(e);}
+    });
+    fail("newly created unfinished sibling must invalidate entire write");
+   }catch(IOException expected){assertTrue(expected.getMessage().contains("되돌립니다"));}
+   assertArrayEquals(original,Files.readAllBytes(new File(a+".category").toPath()));
+   assertFalse(new File(b+".category").exists());
+   assertFalse(new File(arriving+".category").exists());
+  }finally{cleanup(base);}
+ }
  @Test public void incompleteRideNeverGetsSessionWrite()throws Exception{
   File base=Files.createTempDirectory("moto-category-incomplete").toFile();
   try{

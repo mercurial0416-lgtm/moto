@@ -15,7 +15,7 @@ final class RideSessionCategory {
   write(filesDir,selected,category,()->{});
  }
  /** Failure injection is only for local regression testing the rollback. */
- static void write(File filesDir,File selected,String category,Runnable afterEachWrite)throws IOException {
+ static synchronized void write(File filesDir,File selected,String category,Runnable afterEachWrite)throws IOException {
   if(!RideCategory.valid(category)||filesDir==null||selected==null||afterEachWrite==null)
    throw new IOException("라이딩 분류 요청이 올바르지 않습니다.");
   File rides=TrackFile.directory(filesDir).getCanonicalFile();
@@ -25,6 +25,10 @@ final class RideSessionCategory {
   java.util.List<File> members=RideSegmentGroup.members(filesDir,selected.getName());
   if(members.isEmpty()||!members.contains(selected))
    throw new IOException("라이딩의 GPS 구간을 확인할 수 없습니다.");
+  // members() deliberately returns only complete segments. Do not silently
+  // ignore an unfinished sibling sharing the same recording UUID.
+  String session=RideSegmentGroup.id(selected);
+  requireEntireSessionComplete(filesDir,session,members.size());
   // Snapshot every target before writing the first one.
   java.util.Map<File,byte[]> originals=new java.util.LinkedHashMap<>();
   for(File member:members){
@@ -48,6 +52,9 @@ final class RideSessionCategory {
     RideCategory.write(member,category);
     afterEachWrite.run();
    }
+   // A section created or made incomplete during the transaction must fail
+   // the whole update; the catch below restores every prior category byte.
+   requireEntireSessionComplete(filesDir,session,members.size());
   }catch(Exception cause){
    IOException failure=new IOException("라이딩 전체 분류 저장 실패 · 이전 분류로 되돌립니다.",cause);
    java.util.Collections.reverse(attempted);
@@ -57,6 +64,21 @@ final class RideSessionCategory {
    }
    throw failure;
   }
+ }
+ /** Fail closed if any section is missing a clean completion marker, including
+  * newly added live segments. No GPS bytes are read, copied or modified.
+  */
+ private static void requireEntireSessionComplete(File filesDir,String session,int expected)throws IOException{
+  if(session.isEmpty()||expected<=0)throw new IOException("라이딩 세션 정보가 올바르지 않습니다.");
+  int count=0;
+  for(File member:TrackFile.tracks(filesDir)){
+   if(!session.equals(RideSegmentGroup.id(member)))continue;
+   count++;
+   if(!RideMileageIntegrity.validCompleted(member))
+    throw new IOException("같은 라이딩에 미완료·통합된 GPS 구간이 있어 분류를 중단했습니다.");
+  }
+  if(count!=expected)
+   throw new IOException("라이딩 GPS 구간 수가 변경됐습니다. 원본 저장 후 다시 시도해 주세요.");
  }
  private static void restoreSidecar(File track,byte[] oldBytes)throws IOException{
   File sidecar=new File(track.getPath()+".category");
