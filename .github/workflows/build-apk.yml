@@ -56,14 +56,14 @@ jobs:
         working-directory: MOTO-HUB
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug :app:assembleRelease :app:lintDebug :app:testDebugUnitTest -PmotoReleaseCode=582 --no-daemon
+          ./gradlew :app:assembleDebug :app:assembleRelease :app:lintDebug :app:testDebugUnitTest -PmotoReleaseCode=583 --no-daemon
           mkdir -p app/build/outputs/sign-tools
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" app/build/outputs/sign-tools/
       - name: APK signature and checksum
         working-directory: MOTO-HUB
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/signature.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionCode='582'" > app/build/outputs/apk/debug/version-check.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionCode='583'" > app/build/outputs/apk/debug/version-check.txt
           sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/SHA256.txt
       - name: Upload APK and reports
         if: always()

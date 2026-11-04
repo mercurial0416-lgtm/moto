@@ -52,6 +52,9 @@ public final class CommercialUiTest {
     assertNotNull(change);assertTrue(change.isClickable());assertTrue(((TextView)change).getMinHeight()>=a.dp(48));
     TextView ride=Ux106NativeUiTest.text(a.root,"라이딩 시작");assertNotNull(ride);
     assertEquals(MotoDesign.onAccent(a.dark),ride.getCurrentTextColor());
+    assertNull(Ux106NativeUiTest.text(a.root,"내 기록 · 코스 · 기타 도구  ›"));
+    assertNull(Ux106NativeUiTest.text(a.root,"유지비 요약 보기  ›"));
+    assertNull(Ux106NativeUiTest.text(a.root,"최근 라이딩 저장 요약  ›"));
     capture(a,"home-"+theme,393,852);
    }
    android.content.res.Configuration config=new android.content.res.Configuration(a.getResources().getConfiguration());
@@ -62,6 +65,16 @@ public final class CommercialUiTest {
    assertTrue(((android.widget.LinearLayout)amount.getParent()).getOrientation()==android.widget.LinearLayout.VERTICAL);
    a.navigate("차고");capture(a,"garage-large-text",320,852);
    a.navigate("더보기");capture(a,"settings-large-text",320,852);
+   String unchanged=a.db.toString();
+   new HubScreens(a).advancedSettings();
+   View tools=a.dialog.getWindow().getDecorView();
+   assertNotNull(Ux106NativeUiTest.text(tools,"홈 화면 위젯"));
+   assertNotNull(Ux106NativeUiTest.text(tools,"주차 위치"));
+   assertNotNull(Ux106NativeUiTest.text(tools,"유지비 통계"));
+   assertNull(Ux106NativeUiTest.text(tools,"선택한 내비 실행"));
+   assertNull(Ux106NativeUiTest.text(tools,"바이크별 통합 활동"));
+   assertNull(Ux106NativeUiTest.text(tools,"바이크 판매용 정비 이력 PDF"));
+   assertEquals(unchanged,a.db.toString());a.close();
   }finally{a.finish();}
  }
  static void capture(MainActivity a,String name,int widthDp,int heightDp)throws Exception{

@@ -44,7 +44,7 @@ assert 'RestoreRideGate.beginExport(' in main and 'RestoreRideGate.endExport()' 
 
 # Core actions are accessible: navigation/GPX, manual route entry, ride stats.
 assert 'void showHomeTools(JSONObject bike)' in home and 'a.savedRoutes()' in home and 'new MotoTimelineUi(a).open()' in home
-assert 'new MotoTimelineUi(a).open()' in hub and 'a.exportOwnershipPdf(b.optString("id"))' in hub
+assert 'this::searchAllRecords' in hub and 'a.exportOwnershipPdf(b.optString("id"))' in hub
 assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
 assert 'NavigationApps.openPreferred(a)' in ride and 'NavigationApps.choose(a)' in ride
 assert 'Button routeButton=a.button("내 코스"' in ride

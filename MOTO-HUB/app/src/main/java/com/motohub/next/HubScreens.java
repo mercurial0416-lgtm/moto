@@ -434,13 +434,11 @@ final class HubScreens {
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
   a.action(p,"바이크 정보 수정",true,()->a.edit("vehicles",b));
   a.label(p,"차량 라이프로그",15,a.fg,true);
-  a.action(p,"라이딩 · 주유 · 정비 통합 타임라인",false,()->new MotoTimelineUi(a).open());
   a.action(p,"판매·정비 이력 PDF · 직접 저장",false,()->a.exportOwnershipPdf(b.optString("id")));
   a.action(p,"튜닝·부품 비용 등록",false,()->{
    a.toast("비용 종류에서 '튜닝' 또는 '부품'을 선택해 주세요.");
    a.edit("expenses",null);
   });
-  a.action(p,"보호장비 보관함 · 모든 바이크 공통",false,this::legacyGearManager);
 
   a.action(p,sold?"판매 처리 취소 (기록 유지)":"판매 처리 (기록 보존)",false,()->new AlertDialog.Builder(a)
    .setTitle(sold?"판매 처리를 취소할까요?":"판매한 바이크로 보관할까요?")
@@ -547,7 +545,7 @@ final class HubScreens {
 
   // The data structures for gear/trade-in and diagnostic reports stay untouched.
   // Hidden extras can be opened in version-tap developer settings without cluttering normal UI.
-  line("고급 도구","위젯 · 통계 · 내보내기","열기",this::advancedSettings);
+  line("고급 도구","홈 편집 · 위젯 · 주차 · 유지비","열기",this::advancedSettings);
   a.section("MOTO HUB");
   // Deliberately hidden until the user taps the version label seven times.
   TextView version=a.text("MOTO HUB " + BuildConfig.VERSION_NAME + " · 기기별 독립 저장 · 계정 불필요",16,a.muted,false);
@@ -565,19 +563,23 @@ final class HubScreens {
   LinearLayout p=a.page("고급 설정 · 문제 해결");
   a.label(p,"가끔 사용하는 기능을 모았어요. 기존 데이터와 알림 설정은 그대로 유지됩니다.",14,a.muted,false);
   a.action(p,"홈 버튼 표시 · 순서 편집",false,()->new GarageHomeUi(a).editHomeShortcuts());
-  a.action(p,"작은 위젯 버튼 선택",false,()->QuickWidgetChoices.configure(a));
-  a.action(p,"초소형 위젯 추가 (2×1)",false,()->MotoWidgetPin.request(a,true));
-  a.action(p,"기본 위젯 추가 (4×1)",false,()->MotoWidgetPin.request(a,false));
-  a.action(p,"선택한 내비 실행",false,()->NavigationApps.openPreferred(a));
-  a.action(p,"업데이트 데이터 검사",false,this::updateRecoveryReport);
+  a.action(p,"홈 화면 위젯",false,()->new AlertDialog.Builder(a)
+   .setTitle("홈 화면 위젯")
+   .setItems(new String[]{"작은 위젯 추가 (2×1)","기본 위젯 추가 (4×1)","위젯 버튼 변경"},(d,index)->{
+    if(index==2)QuickWidgetChoices.configure(a);else MotoWidgetPin.request(a,index==0);
+   }).setNegativeButton("닫기",null).show());
+  a.action(p,"주차 위치",false,()->{
+   JSONObject bike=a.bike();
+   if(bike==null){a.toast("바이크를 먼저 등록해 주세요.");return;}
+   new ParkingSpotUi(a).show(bike);
+  });
   // 앱 진단은 설정 첫 화면의 한 항목에서 바로 열 수 있습니다.
   a.action(p,"유지비 통계",false,this::costDashboard);
-  a.action(p,"바이크별 통합 활동",false,()->new MotoTimelineUi(a).open());
-  a.action(p,"바이크 판매용 정비 이력 PDF",false,()->{
-   JSONObject selected=a.bike();
-   if(selected==null){a.toast("바이크를 먼저 선택해 주세요.");return;}
-   a.exportOwnershipPdf(selected.optString("id"));
-  });
+  a.show();
+ }
+ void updateDiagnostics(){
+  LinearLayout p=a.page("업데이트 문제 해결");
+  a.action(p,"업데이트 데이터 검사",false,this::updateRecoveryReport);
   String signer=SigningIdentity.current(a);
   a.action(p,"설치 인증서 SHA-256 복사",false,()->{
    if(signer.isEmpty()){a.toast("서명 정보를 확인하지 못했습니다.");return;}
@@ -636,8 +638,8 @@ final class HubScreens {
    android.net.Uri.parse("package:"+a.getPackageName()))));
   a.action(p,"OBD 동글 연결·지원 센서 확인",false,()->DeveloperObdScreen.launchQuick(a));
   a.action(p,"데이터 연결 검사 · 주유·정비",false,()->a.auditGarageSoon(true));
-  a.action(p,"업데이트 기록 비교 결과",false,this::updateRecoveryReport);
   a.action(p,"외부 전체 ZIP 백업 만들기",false,a::exportBundle);
+  a.action(p,"업데이트 문제 해결",false,this::updateDiagnostics);
   a.show();
   final android.app.Dialog opened=a.dialog;
   new Thread(()->{

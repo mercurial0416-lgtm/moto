@@ -132,7 +132,7 @@ final class GarageHomeUi {
   // Real existing activity, not placeholder dashboard metrics.
   recent(bike);a.gap(a.content,16);
   // Secondary features behind one menu: no wall of competing home actions.
-  homeLink(a.content,"내 기록 · 코스 · 기타 도구",()->showHomeTools(bike));
+
 
   interruptedRideShortcut();
   if(UndoLastSave.available(a)){
@@ -142,20 +142,7 @@ final class GarageHomeUi {
    undo.setOnClickListener(v->UndoLastSave.undo(a));
    a.content.addView(undo);
   }
-  if(!RideCompletionInbox.entries(a).isEmpty()){
-   a.gap(a.content,6);
-   homeLink(a.content,"최근 라이딩 저장 요약",a::showRideCompletionHistory);
-  }
-  boolean extra=a.getSharedPreferences("garage_home",0).getBoolean("extra_cards",false);
-  a.gap(a.content,8);
-  TextView more=a.text(extra?"유지비 요약 접기  ⌃":"유지비 요약 보기  ›",13,a.muted,true);
-  more.setGravity(Gravity.CENTER_VERTICAL);more.setMinHeight(a.dp(48));
-  more.setOnClickListener(v->{
-   a.getSharedPreferences("garage_home",0).edit().putBoolean("extra_cards",!extra).apply();
-   a.renderPreservingPosition();
-  });
-  a.content.addView(more);
-  if(extra){a.gap(a.content,12);insights(bike);}
+
  }
  /** Fuelio-like compact vehicle picker. The original photo and bike-switch actions are retained. */
  void compactVehicleHeader(JSONObject bike){
@@ -742,7 +729,7 @@ final class GarageHomeUi {
   a.content.addView(box);a.gap(a.content,16);
  }
  void recent(JSONObject b){
-  sectionTitle("최근 기록","전체 보기  ›",()->new MotoTimelineUi(a).open());
+  sectionTitle("최근 기록","전체 보기  ›",()->new HubScreens(a).searchAllRecords());
   List<JSONObject> records=new HubScreens(a).records("전체",b);
   LinearLayout list=a.col();list.setBackground(a.shape(surface,stroke,16));
   a.content.addView(list);

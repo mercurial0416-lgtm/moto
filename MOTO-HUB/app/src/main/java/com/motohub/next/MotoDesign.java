@@ -123,7 +123,8 @@ final class MotoDesign {
    FrameLayout.LayoutParams iconParams=new FrameLayout.LayoutParams(a.dp(21),a.dp(21),Gravity.CENTER);
    pill.addView(graphic,iconParams);
    cell.addView(pill,new LinearLayout.LayoutParams(a.dp(57),a.dp(31)));
-   TextView name=a.text(labels[i],13,selected?a.accent:a.muted,selected);
+   String visibleLabel=i==2&&a.getResources().getConfiguration().fontScale>=1.3f?"정비\n주유":labels[i];
+   TextView name=a.text(visibleLabel,13,selected?a.accent:a.muted,selected);
    name.setGravity(Gravity.CENTER);
    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
    lp.topMargin=a.dp(3);cell.addView(name,lp);
