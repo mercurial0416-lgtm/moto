@@ -59,6 +59,20 @@ final class RideBikeBindingTest {
    rejection(()->BackupBundle.export("{\"version\":3}",base,new ByteArrayOutputStream()),"corrupt association blocks backup");
    rejection(()->RideBikeBinding.readStrict(a),"corrupt association blocks ODO application");
    rejection(()->RideTrackMerge.merge(base,a,b),"corrupt bike association blocks merge");
+   // Even a valid external UUID must not become evidence for ODO or merging.
+   File marker=new File(a.getPath()+".bike");
+   File external=new File(base,"external-bike-id");
+   Files.write(external.toPath(),duke.getBytes(StandardCharsets.US_ASCII));
+   Files.delete(marker.toPath());
+   Files.createSymbolicLink(marker.toPath(),external.toPath());
+   check(RideBikeBinding.read(a).isEmpty(),"display does not follow linked association");
+   rejection(()->RideBikeBinding.readStrict(a),"linked valid UUID blocks ODO application");
+   rejection(()->RideTrackMerge.merge(base,a,b),"linked association blocks merge");
+   check(duke.equals(new String(Files.readAllBytes(external.toPath()),StandardCharsets.US_ASCII)),"external target unchanged");
+   Files.delete(external.toPath());
+   rejection(()->RideBikeBinding.readStrict(a),"dangling link is corruption, not legacy unbound track");
+   Files.delete(marker.toPath());
+   check(RideBikeBinding.readStrict(a).isEmpty(),"truly absent legacy association remains supported");
    // Reject a tampered backup before its data writer is ever invoked.
    ByteArrayOutputStream tampered=new ByteArrayOutputStream();
    try(ZipOutputStream zip=new ZipOutputStream(tampered)){

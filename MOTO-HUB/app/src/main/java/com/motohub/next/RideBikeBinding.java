@@ -5,6 +5,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
@@ -19,7 +20,7 @@ final class RideBikeBinding {
  static String read(File track){
   if(track==null)return "";
   File marker=new File(track.getPath()+".bike");
-  if(!marker.isFile()||marker.length()>64)return "";
+  if(!Files.isRegularFile(marker.toPath(),LinkOption.NOFOLLOW_LINKS)||marker.length()>64)return "";
   try{
    String id=new String(Files.readAllBytes(marker.toPath()),StandardCharsets.US_ASCII);
    return valid(id)?id:"";
@@ -29,8 +30,9 @@ final class RideBikeBinding {
  static String readStrict(File track)throws IOException{
   if(track==null)throw new IOException("라이딩 파일을 찾지 못했어요.");
   File marker=new File(track.getPath()+".bike");
-  if(!marker.exists())return ""; // Older tracks have no binding; remain unassigned.
-  if(!marker.isFile()||marker.length()>64)throw new IOException("바이크 연결 정보가 손상됐어요. 백업을 확인해 주세요.");
+  if(Files.isSymbolicLink(marker.toPath()))throw new IOException("안전하지 않은 바이크 연결 경로입니다.");
+  if(!Files.exists(marker.toPath(),LinkOption.NOFOLLOW_LINKS))return ""; // Older tracks have no binding; remain unassigned.
+  if(!Files.isRegularFile(marker.toPath(),LinkOption.NOFOLLOW_LINKS)||marker.length()>64)throw new IOException("바이크 연결 정보가 손상됐어요. 백업을 확인해 주세요.");
   String id=new String(Files.readAllBytes(marker.toPath()),StandardCharsets.US_ASCII);
   if(!valid(id))throw new IOException("잘못된 바이크 연결 정보입니다. 주행거리 반영을 중단했어요.");
   return id;
