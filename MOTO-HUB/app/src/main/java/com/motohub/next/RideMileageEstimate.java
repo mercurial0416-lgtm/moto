@@ -20,6 +20,9 @@ final class RideMileageEstimate {
    JSONObject entry=new JSONObject().put("bike",bikeId).put("km",distanceKm);
    ledger.put(key,entry);
    if(ledger.toString().length()>250_000)return false;
+   // A track may move to the recovery bin or change bikes while storage was
+   // opening. Never add a stale/removed source after that intervening edit.
+   if(!RideMileageIntegrity.validCompleted(track)||!bikeId.equals(RideBikeBinding.readStrict(track)))return false;
    return p.edit().putString("ledger",ledger.toString()).commit();
   }catch(Exception ignored){return false;}
  }

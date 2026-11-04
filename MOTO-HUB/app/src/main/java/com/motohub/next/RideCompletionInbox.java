@@ -58,7 +58,9 @@ final class RideCompletionInbox {
   return found&&prefs(c).edit().putString(KEY,arr.toString()).commit();
  }
  /** Called only after GPS .done commit; one entry per track, at most ten recent items. */
- static synchronized void record(Context context,File track){
+ // GPS analysis and the independent mileage writer may take time. Never hold
+ // the inbox monitor while they run: UI summary reads/acknowledgements use it.
+ static void record(Context context,File track){
   if(context==null||track==null||!RideMileageIntegrity.validCompleted(track))return;
   try{
    RideInsights.Result result=RideInsights.analyze(track);
@@ -68,21 +70,28 @@ final class RideCompletionInbox {
     "저장된 GPS 좌표 %d개\n분석 이동거리 %.2f km\nGPS 첫·마지막 수신 간격 %d분\n관측 이동 %d분\nGPS 상태: %s\nGPS 수신 공백: %d회 · 관측 구간 %d분\n\nGPS 수신 공백은 이동거리에 합산하지 않았으며 실제 계기판과 차이가 날 수 있습니다.",
     result.points,result.distanceKm,result.durationMillis/60000,
     result.movingMillis/60000,result.gpsQuality(),result.gpsGaps,result.gpsObservedMillis/60000);
-   SharedPreferences p=prefs(context);
-   JSONArray current=read(context),next=new JSONArray();
-   // Do not post another popup for an already recorded track.
-   for(int i=0;i<current.length();i++)
-    if(id.equals(current.optJSONObject(i)==null?"":current.optJSONObject(i).optString("id")))return;
    JSONObject row=new JSONObject();
    String boundBike=RideBikeBinding.readStrict(track);
-   // GPS is a separate, explicitly approximate ledger; never rewrite dashboard ODO.
-   RideMileageEstimate.record(context,track,boundBike,result.distanceKm);
    row.put("id",id).put("summary",recap).put("seen",false)
     .put("bikeId",boundBike)
     .put("time",System.currentTimeMillis());
-   next.put(row);
-   for(int i=0;i<current.length()&&next.length()<LIMIT;i++)next.put(current.getJSONObject(i));
-   if(p.edit().putString(KEY,next.toString()).commit())RideSavedNotification.post(context);
+   if(append(context,track,row,boundBike))RideSavedNotification.post(context);
+   // Publish the recap first: a long estimate rebuild must not delay it.
+   // GPS is a separate, explicitly approximate ledger; never rewrite dashboard ODO.
+   RideMileageEstimate.record(context,track,boundBike,result.distanceKm);
   }catch(Exception ignored){/* Leave original completed GPS and .done untouched. */}
+ }
+ /** Publish from the latest inbox snapshot, preserving concurrent seen/remove
+  * operations and duplicate suppression. Only bounded metadata IO belongs here.
+  */
+ private static synchronized boolean append(Context context,File track,JSONObject row,String boundBike)throws Exception{
+  if(!RideMileageIntegrity.validCompleted(track)||!boundBike.equals(RideBikeBinding.readStrict(track)))return false;
+  String id=track.getName();
+  JSONArray current=read(context),next=new JSONArray();
+  for(int i=0;i<current.length();i++)
+   if(id.equals(current.optJSONObject(i)==null?"":current.optJSONObject(i).optString("id")))return false;
+  next.put(row);
+  for(int i=0;i<current.length()&&next.length()<LIMIT;i++)next.put(current.getJSONObject(i));
+  return prefs(context).edit().putString(KEY,next.toString()).commit();
  }
 }
