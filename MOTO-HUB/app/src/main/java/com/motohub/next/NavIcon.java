@@ -6,7 +6,12 @@ final class NavIcon extends View {
  public NavIcon(Context c){this(c,0,Color.BLACK);}
  NavIcon(Context c,int kind,int color){super(c);this.kind=kind;this.color=color;setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);}
  protected void onDraw(Canvas c){super.onDraw(c);c.save();c.scale(getWidth()/24f,getHeight()/24f);p.setColor(color);p.setStrokeWidth(1.85f);p.setStyle(Paint.Style.STROKE);p.setStrokeJoin(Paint.Join.ROUND);p.setStrokeCap(Paint.Cap.ROUND);
- switch(kind){case 0:Path h=path;h.reset();h.moveTo(3,10);h.lineTo(12,3);h.lineTo(21,10);h.moveTo(5,9);h.lineTo(5,21);h.lineTo(19,21);h.lineTo(19,9);h.moveTo(10,21);h.lineTo(10,14);h.lineTo(14,14);h.lineTo(14,21);c.drawPath(h,p);break;
+ switch(kind){
+ case 6:
+  c.drawCircle(5,17,3,p);c.drawCircle(19,17,3,p);
+  Path brand=path;brand.reset();brand.moveTo(3,14);brand.lineTo(8,5);brand.lineTo(12,10);
+  brand.lineTo(16,5);brand.lineTo(21,14);brand.moveTo(8,12);brand.lineTo(16,12);c.drawPath(brand,p);break;
+ case 0:Path h=path;h.reset();h.moveTo(3,10);h.lineTo(12,3);h.lineTo(21,10);h.moveTo(5,9);h.lineTo(5,21);h.lineTo(19,21);h.lineTo(19,9);h.moveTo(10,21);h.lineTo(10,14);h.lineTo(14,14);h.lineTo(14,21);c.drawPath(h,p);break;
  case 1: // Listings: price tag rather than a shopping bag.
   Path tag=path;tag.reset();tag.moveTo(3,5);tag.lineTo(13,5);tag.lineTo(21,13);
   tag.lineTo(13,21);tag.lineTo(3,11);tag.close();

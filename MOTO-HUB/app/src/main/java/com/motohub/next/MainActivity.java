@@ -507,7 +507,7 @@ public class MainActivity extends Activity {
  void label(LinearLayout p,String s,int size,int color,boolean bold){TextView t=text(s,size,color,bold);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(t,lp);}
  void gap(LinearLayout p,int n){p.addView(new Space(this),new LinearLayout.LayoutParams(1,dp(n)));}
  void divider(LinearLayout p){View v=new View(this);v.setBackgroundColor(line);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(1));lp.topMargin=dp(12);lp.bottomMargin=dp(12);p.addView(v,lp);}
- Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(primary?16:14);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(primary?54:48));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?MotoDesign.onAccent(dark):fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,primary?16:13);b.setPadding(dp(16),dp(10),dp(16),dp(10));b.setOnClickListener(v->r.run());return b;}
+ Button button(String s,boolean primary,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(primary?16:15);b.setTypeface(MotoDesign.medium());b.setMinHeight(dp(primary?56:50));b.setMinimumWidth(0);b.setElevation(0);b.setStateListAnimator(null);b.setTextColor(primary?MotoDesign.onAccent(dark):fg);MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,primary?18:16);b.setPadding(dp(16),dp(13),dp(16),dp(13));b.setOnClickListener(v->r.run());return b;}
  void action(LinearLayout p,String s,boolean primary,Runnable r){if(p==formBody&&s.equals("저장")&&formFooter!=null)p=formFooter;LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(8);p.addView(button(s,primary,r),lp);}
  void pair(LinearLayout p,String a,Runnable ra,String b,Runnable rb){
   LinearLayout row=new LinearLayout(this);
@@ -523,8 +523,8 @@ public class MainActivity extends Activity {
  void heading(String t,String sub){gap(content,8);if(!t.equals(MotoDesign.heading(tab))){TextView title=text(t,22,fg,true);title.setTypeface(MotoDesign.display());content.addView(title);gap(content,6);}if(sub!=null&&!sub.isEmpty())label(content,sub,13,muted,false);gap(content,13);}
  void section(String s){
   gap(content,14);
-  TextView heading=text(s,15,fg,true);
-  heading.setLetterSpacing(.012f);
+  TextView heading=text(s,16,fg,true);
+  heading.setLetterSpacing(0);
   LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
   lp.bottomMargin=dp(11);
   content.addView(heading,lp);
@@ -784,6 +784,7 @@ public class MainActivity extends Activity {
    QuickWidgetChoices.refresh(this);
   }
   String theme=settings().optString("theme","light");dark=theme.equals("dark")||(theme.equals("system")&&(getResources().getConfiguration().uiMode&Configuration.UI_MODE_NIGHT_MASK)==Configuration.UI_MODE_NIGHT_YES);
+  setTheme(dark?R.style.AppTheme_Dark:R.style.AppTheme_Light);
   int[] palette=MotoDesign.colors(dark);bg=palette[0];fg=palette[1];muted=palette[2];line=palette[3];accent=palette[4];panel=palette[5];highlight=palette[6];
 getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(panel);
  getWindow().getDecorView().setSystemUiVisibility(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
@@ -799,7 +800,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    TextView offline=text("오프라인 · 주유·정비·GPS 기록은 기기에 저장됩니다",12,muted,false);
    offline.setPadding(dp(20),dp(7),dp(20),dp(7));root.addView(offline);
   }
-  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);content=col();content.setPadding(dp(18),dp(14),dp(18),dp(28));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+  ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);content=col();content.setPadding(dp(18),dp(14),dp(18),dp(24));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   // Tab-level quick actions belong in their screens; do not repeat them above navigation.
   MotoDesign.addNavigation(this,root);
   // Render immediately. Avoid fading the full screen on every tab selection or live GPS refresh.

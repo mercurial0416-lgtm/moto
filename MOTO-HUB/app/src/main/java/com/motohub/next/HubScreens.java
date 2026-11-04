@@ -69,14 +69,14 @@ final class HubScreens {
   line(target,title,detail,value,click,null,false);
  }
  void line(LinearLayout target,String title,String detail,String value,Runnable click,Runnable favorite,boolean starred){
-  // Settings uses concise cards, while dense searchable ledger rows retain
-  // separators. Data sources, click actions and navigation are unchanged.
+  // Shared cards keep settings and searchable records visually consistent.
+  // Data sources, click actions and navigation are unchanged.
   boolean settingCard=target==a.content&&"더보기".equals(a.tab);
   LinearLayout block=a.col();
-  block.setPadding(a.dp(settingCard?16:7),a.dp(settingCard?12:15),
-                   a.dp(settingCard?16:7),a.dp(settingCard?12:15));
+  block.setPadding(a.dp(16),a.dp(settingCard?12:15),
+                   a.dp(16),a.dp(settingCard?12:15));
   block.setMinimumHeight(a.dp(settingCard?66:70));
-  if(settingCard)block.setBackground(a.shape(a.panel,a.line,16));
+  block.setBackground(a.shape(a.panel,a.line,20));
   LinearLayout head=new LinearLayout(a);head.setGravity(Gravity.CENTER_VERTICAL);
   if(settingCard){
    int iconKind=title.contains("내비")||title.contains("위치")?3:
@@ -116,16 +116,12 @@ final class HubScreens {
   }
   if(click!=null){
    block.setFocusable(true);block.setClickable(true);
-   MotoDesign.ripple(a,block,settingCard?a.panel:a.bg,0,settingCard?11:10);
+   MotoDesign.ripple(a,block,a.panel,a.line,20);
    block.setOnClickListener(v->click.run());
    block.setContentDescription(title+", "+detail+", "+value);
   }
   target.addView(block);
-  if(settingCard)a.gap(target,7);
-  else{
-   View rule=new View(a);rule.setBackgroundColor(a.line);
-   target.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
-  }
+  a.gap(target,8);
  }
  void bikePicker(){JSONObject b=a.bike();if(b==null)return;Button picker=a.button(b.optString("name")+"  ▾",false,this::chooseBike);picker.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);a.content.addView(picker,new LinearLayout.LayoutParams(-1,-2));a.gap(a.content,12);}
  void chooseBike(){List<JSONObject> list=a.items("vehicles");list.sort((x,y)->Integer.compare(GarageBikeStatus.rank(x.optString("soldDate")),GarageBikeStatus.rank(y.optString("soldDate"))));String[] options=new String[list.size()+1];for(int i=0;i<list.size();i++)options[i]=GarageBikeStatus.label(list.get(i).optString("name"),list.get(i).optString("soldDate"));options[list.size()]="＋ 바이크 추가";new AlertDialog.Builder(a).setTitle("내 바이크").setItems(options,(d,n)->{if(n==list.size()){a.edit("vehicles",null);return;}a.selected=list.get(n).optString("id");a.getSharedPreferences("garage_ui",0).edit().putString("selected_bike",a.selected).apply();a.render();}).show();}
@@ -358,7 +354,7 @@ final class HubScreens {
    a.action(a.content,"↶ 방금 저장한 기록 취소 · 2분",false,()->UndoLastSave.undo(a));
   }
   a.section("기록 추가");
-  LinearLayout actions=a.col();actions.setPadding(0,0,0,0);
+  LinearLayout actions=a.col();actions.setPadding(a.dp(16),a.dp(16),a.dp(16),a.dp(16));actions.setBackground(a.shape(a.panel,a.line,24));
   a.pair(actions,"간편 주유",()->new QuickEntryUi(a).fuel(),"정비주기 설정",()->new QuickEntryUi(a).maintenance());
   LinearLayout details=a.col();details.setVisibility(View.GONE);
   a.action(details,"정비 완료 내역 상세 입력",false,()->a.edit("services",null));

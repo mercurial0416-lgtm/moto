@@ -146,47 +146,37 @@ final class GarageHomeUi {
  }
  /** Fuelio-like compact vehicle picker. The original photo and bike-switch actions are retained. */
  void compactVehicleHeader(JSONObject bike){
-  LinearLayout row=new LinearLayout(a);
-  row.setGravity(Gravity.CENTER_VERTICAL);
-  row.setPadding(a.dp(12),a.dp(11),a.dp(12),a.dp(11));
-  MotoDesign.ripple(a,row,surface,stroke,17);
-  FrameLayout thumb=new FrameLayout(a);
-  thumb.setBackground(a.shape(a.highlight,0,12));thumb.setClipToOutline(true);
-  ImageView photo=new ImageView(a);photo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-  thumb.addView(photo,new FrameLayout.LayoutParams(-1,-1));
-  TextView credit=a.text("",10,soft,false);
-  boolean owned=loadBikePhoto(photo,bike,credit);
+  LinearLayout card=a.col();card.setPadding(a.dp(20),a.dp(12),a.dp(20),a.dp(20));
+  android.graphics.drawable.GradientDrawable backdrop=new android.graphics.drawable.GradientDrawable(
+   android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{0xFF0D2C22,0xFF234C39});
+  backdrop.setCornerRadius(a.dp(26));card.setBackground(backdrop);
+  LinearLayout top=new LinearLayout(a);top.setGravity(Gravity.CENTER_VERTICAL);
+  TextView caption=a.text("나의 바이크",12,0xFFB8D6C3,true);top.addView(caption,new LinearLayout.LayoutParams(0,-2,1));
+  TextView switcher=a.text("변경  ›",13,0xFF91F0C9,true);switcher.setGravity(Gravity.CENTER);
+  switcher.setMinHeight(a.dp(48));switcher.setMinWidth(a.dp(60));
+  switcher.setContentDescription("바이크 선택 또는 추가");switcher.setClickable(true);switcher.setFocusable(true);
+  switcher.setOnClickListener(v->new HubScreens(a).chooseBike());top.addView(switcher);card.addView(top);
+  LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
+  LinearLayout identity=a.col();identity.setPadding(0,0,a.dp(10),0);
+  TextView name=a.text(bike.optString("name","내 바이크"),26,0xFFF3FAF3,true);name.setTypeface(MotoDesign.display());
+  name.setMaxLines(3);identity.addView(name);
+  TextView sub=a.text((bike.optInt("year")>0?bike.optInt("year")+"년식":"모델 정보")+" · "+condition(bike),13,0xFFC0D8C9,false);
+  LinearLayout.LayoutParams subLp=new LinearLayout.LayoutParams(-1,-2);subLp.topMargin=a.dp(9);identity.addView(sub,subLp);
+  identity.setClickable(true);identity.setFocusable(true);identity.setContentDescription("바이크 선택 또는 추가");
+  identity.setOnClickListener(v->new HubScreens(a).chooseBike());row.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
+  FrameLayout thumb=new FrameLayout(a);thumb.setBackground(a.shape(0xFF355D46,0,20));thumb.setClipToOutline(true);
+  ImageView photo=new ImageView(a);photo.setScaleType(ImageView.ScaleType.FIT_CENTER);thumb.addView(photo,new FrameLayout.LayoutParams(-1,-1));
+  TextView credit=a.text("",10,0xFFC0D8C9,false);boolean owned=loadBikePhoto(photo,bike,credit);
   if(!owned){
    JSONObject known=MotorcycleCatalog.search(a,bike.optString("name"));
    String brand=bike.optString("catalogBrand",known==null?"":known.optString("brand"));
    String model=bike.optString("catalogModel",known==null?"":known.optString("model"));
-   if(!brand.isEmpty()&&!model.isEmpty())
-    MotorcyclePhoto.show(a,photo,credit,brand,model,bike.optInt("year"),bike.optString("id"));
+   if(!brand.isEmpty()&&!model.isEmpty())MotorcyclePhoto.show(a,photo,credit,brand,model,bike.optInt("year"),bike.optString("id"));
   }
-  thumb.setClickable(true);thumb.setFocusable(true);
-  thumb.setContentDescription("바이크 사진 변경");
+  thumb.setClickable(true);thumb.setFocusable(true);thumb.setContentDescription("바이크 사진 변경");
   thumb.setOnClickListener(v->changeHeroPhoto(bike,owned));
-  row.addView(thumb,new LinearLayout.LayoutParams(a.dp(78),a.dp(70)));
-  LinearLayout identity=a.col();
-  identity.setPadding(a.dp(12),0,0,0);
-  TextView name=a.text(bike.optString("name","내 바이크"),19,light,true);
-  name.setMaxLines(2);name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-  identity.addView(name);
-  TextView sub=a.text((bike.optInt("year")>0?bike.optInt("year")+"년식":"모델 정보")+" · "+
-    condition(bike),12,soft,false);
-  LinearLayout.LayoutParams subLp=new LinearLayout.LayoutParams(-1,-2);
-  subLp.topMargin=a.dp(5);identity.addView(sub,subLp);
-  row.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
-  TextView switcher=a.text("변경",13,a.accent,true);
-  switcher.setContentDescription("바이크 선택 또는 추가");
-  switcher.setGravity(Gravity.CENTER);
-  row.addView(switcher,new LinearLayout.LayoutParams(a.dp(48),a.dp(48)));
-  identity.setClickable(true);identity.setFocusable(true);
-  identity.setContentDescription("바이크 선택 또는 추가");
-  identity.setOnClickListener(v->new HubScreens(a).chooseBike());
-  switcher.setClickable(true);switcher.setFocusable(true);
-  switcher.setOnClickListener(v->new HubScreens(a).chooseBike());
-  a.content.addView(row);
+  int photoWidth=a.getResources().getConfiguration().fontScale>=1.5f?76:104;
+  row.addView(thumb,new LinearLayout.LayoutParams(a.dp(photoWidth),a.dp(88)));card.addView(row);a.content.addView(card);
  }
  /** One icon-and-label destination per common action; never a wall of full-width buttons. */
  LinearLayout homeShortcutTile(String key){
@@ -194,10 +184,10 @@ final class GarageHomeUi {
   final String label=nav?"내비게이션":fuel?"주유 기록":"정비 관리";
   final int glyph=nav?3:fuel?5:2;
   LinearLayout tile=a.col();tile.setGravity(Gravity.CENTER);
-  tile.setPadding(a.dp(6),a.dp(11),a.dp(6),a.dp(10));tile.setMinimumHeight(a.dp(91));
-  MotoDesign.ripple(a,tile,surface,stroke,14);
+  tile.setPadding(a.dp(8),a.dp(16),a.dp(8),a.dp(10));tile.setMinimumHeight(a.dp(91));
+  MotoDesign.ripple(a,tile,surface,stroke,22);
   NavIcon icon=new NavIcon(a,glyph,a.accent);
-  LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(a.dp(25),a.dp(25));
+  LinearLayout.LayoutParams iconLp=new LinearLayout.LayoutParams(a.dp(34),a.dp(34));
   iconLp.bottomMargin=a.dp(9);tile.addView(icon,iconLp);
   TextView text=a.text(label,14,light,true);text.setGravity(Gravity.CENTER);
   text.setMaxLines(2);tile.addView(text);
@@ -261,8 +251,8 @@ final class GarageHomeUi {
   LinearLayout blank=a.col();blank.setGravity(Gravity.CENTER);blank.setPadding(a.dp(24),a.dp(45),a.dp(24),a.dp(44));blank.setBackground(a.shape(surface,stroke,16));
   TextView intro=a.text("내 차고",12,orange,true);intro.setLetterSpacing(.16f);blank.addView(intro);
   TextView big=a.text("첫 바이크 등록",24,light,true);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=a.dp(15);big.setGravity(Gravity.CENTER);blank.addView(big,bp);
-  TextView hint=a.text("바이크를 등록하면 주행거리와 정비 기록을 볼 수 있어.",14,soft,false);hint.setGravity(Gravity.CENTER);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=a.dp(12);blank.addView(hint,hp);
-  Button add=a.button("바이크 등록",true,()->a.edit("vehicles",null));add.setTextColor(a.dark?0xFF18191B:Color.WHITE);LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,a.dp(54));ap.topMargin=a.dp(24);blank.addView(add,ap);a.content.addView(blank);
+  TextView hint=a.text("바이크를 등록하고 라이딩과 정비 기록을 시작하세요.",14,soft,false);hint.setGravity(Gravity.CENTER);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=a.dp(12);blank.addView(hint,hp);
+  Button add=a.button("바이크 등록",true,()->a.edit("vehicles",null));add.setTextColor(MotoDesign.onAccent(a.dark));LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=a.dp(24);blank.addView(add,ap);a.content.addView(blank);
  }
 
  void addHero(JSONObject bike){
@@ -440,7 +430,7 @@ final class GarageHomeUi {
   String[] names={"계기판 누적거리","다음 정비"};
   LinearLayout surfaceCard=a.col();
   surfaceCard.setPadding(a.dp(16),a.dp(15),a.dp(16),a.dp(13));
-  surfaceCard.setBackground(a.shape(surface,stroke,19));
+  surfaceCard.setBackground(a.shape(surface,stroke,24));
   LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
   boolean narrow=a.getResources().getConfiguration().fontScale>=1.35f||
     a.getResources().getConfiguration().screenWidthDp<360;
@@ -450,9 +440,9 @@ final class GarageHomeUi {
    LinearLayout group=a.col();group.setGravity(Gravity.CENTER_VERTICAL);
    group.setPadding(a.dp(7),a.dp(8),a.dp(7),a.dp(8));group.setMinimumHeight(a.dp(73));
    group.addView(a.text(names[i]+"  ›",13,soft,false));
-   TextView value=i==0?MotoDesign.figure(a,values[i],24,light):a.text(values[i],18,light,true);
+   TextView value=i==0?MotoDesign.figure(a,values[i],30,light):a.text(values[i],18,light,true);
    value.setMaxLines(2);
-   value.setAutoSizeTextTypeUniformWithConfiguration(14,i==0?24:18,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+   value.setAutoSizeTextTypeUniformWithConfiguration(16,i==0?30:18,1,android.util.TypedValue.COMPLEX_UNIT_SP);
    LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(-1,-2);
    vp.topMargin=a.dp(7);group.addView(value,vp);
    group.setClickable(true);group.setFocusable(true);

@@ -18,21 +18,21 @@ import android.widget.Spinner;
  */
 final class MotoDesign {
  private MotoDesign(){}
- // Quiet system-like surfaces: one accent, no decorative brand gradients.
- static final int DARK_BACKGROUND=0xFF101318;
- static final int DARK_SURFACE=0xFF1D2229;
- static final int DARK_STROKE=0xFF303944;
- static final int DARK_TEXT=0xFFF3F5F8;
- static final int DARK_MUTED=0xFFA6B0BD;
- static final int DARK_ACCENT=0xFFFFA25A;
- static final int DARK_TINT=0xFF36291F;
- static final int LIGHT_BACKGROUND=0xFFF7F8FA;
+ // Shared forest/mint palette for native screens and readable controls.
+ static final int DARK_BACKGROUND=0xFF0B1713;
+ static final int DARK_SURFACE=0xFF142820;
+ static final int DARK_STROKE=0xFF30483D;
+ static final int DARK_TEXT=0xFFF0F7F0;
+ static final int DARK_MUTED=0xFFB0C5B8;
+ static final int DARK_ACCENT=0xFF75E1BB;
+ static final int DARK_TINT=0xFF233F32;
+ static final int LIGHT_BACKGROUND=0xFFF3F5EF;
  static final int LIGHT_SURFACE=0xFFFFFFFF;
- static final int LIGHT_STROKE=0xFFE5E9EF;
- static final int LIGHT_TEXT=0xFF202733;
- static final int LIGHT_MUTED=0xFF667381;
- static final int LIGHT_ACCENT=0xFF9C4E1E;
- static final int LIGHT_TINT=0xFFF9EEE6;
+ static final int LIGHT_STROKE=0xFFDCE4DA;
+ static final int LIGHT_TEXT=0xFF14271E;
+ static final int LIGHT_MUTED=0xFF53675A;
+ static final int LIGHT_ACCENT=0xFF006B50;
+ static final int LIGHT_TINT=0xFFE1F0E5;
  static int[] colors(boolean dark){
   return dark?new int[]{DARK_BACKGROUND,DARK_TEXT,DARK_MUTED,DARK_STROKE,DARK_ACCENT,DARK_SURFACE,DARK_TINT}:
    new int[]{LIGHT_BACKGROUND,LIGHT_TEXT,LIGHT_MUTED,LIGHT_STROKE,LIGHT_ACCENT,LIGHT_SURFACE,LIGHT_TINT};
@@ -64,12 +64,19 @@ final class MotoDesign {
  static void addHeader(MainActivity a,LinearLayout root){
   LinearLayout bar=new LinearLayout(a);
   bar.setGravity(Gravity.CENTER_VERTICAL);
-  bar.setPadding(a.dp(20),a.dp(12),a.dp(16),a.dp(10));
+  bar.setPadding(a.dp(20),a.dp(16),a.dp(20),a.dp(8));
   bar.setMinimumHeight(a.dp(62));
-  TextView heading=a.text(heading(a.tab),23,a.fg,true);
+  FrameLayout mark=new FrameLayout(a);mark.setBackground(a.shape(a.highlight,0,15));
+  NavIcon brand=new NavIcon(a,6,a.accent);
+  mark.addView(brand,new FrameLayout.LayoutParams(a.dp(27),a.dp(27),Gravity.CENTER));
+  LinearLayout.LayoutParams markLp=new LinearLayout.LayoutParams(a.dp(46),a.dp(46));markLp.rightMargin=a.dp(12);
+  bar.addView(mark,markLp);
+  LinearLayout titles=a.col();
+  TextView brandName=a.text("MOTO HUB",10,a.muted,true);brandName.setLetterSpacing(.14f);titles.addView(brandName);
+  TextView heading=a.text(heading(a.tab),25,a.fg,true);
   heading.setTypeface(display());
   heading.setLetterSpacing(-.018f);
-  bar.addView(heading,new LinearLayout.LayoutParams(0,-2,1));
+  titles.addView(heading);bar.addView(titles,new LinearLayout.LayoutParams(0,-2,1));
   if("홈".equals(a.tab)){
    TextView notice=headerAction(a,"알림");
    notice.setContentDescription("정비 알림 열기");
@@ -104,12 +111,13 @@ final class MotoDesign {
   layout.bottomMargin=a.dp(bottomMarginDp);parent.addView(shell,layout);
  }
  static void addNavigation(MainActivity a,LinearLayout root){
-  View rule=new View(a);rule.setBackgroundColor(a.line);
+  View rule=new View(a);rule.setBackgroundColor(Color.TRANSPARENT);
   root.addView(rule,new LinearLayout.LayoutParams(-1,a.dp(1)));
   LinearLayout bar=new LinearLayout(a);
   bar.setBaselineAligned(false);
-  bar.setPadding(a.dp(12),a.dp(5),a.dp(12),a.dp(5));
-  bar.setBackgroundColor(a.panel);
+  bar.setPadding(a.dp(8),a.dp(7),a.dp(8),a.dp(7));
+  bar.setBackground(a.shape(a.panel,a.line,26));
+  bar.setElevation(a.dp(2));
   String[] labels={"홈","라이딩","정비·주유","설정"};
   final int[] icons={0,3,2,4};
   for(int i=0;i<a.tabs.length;i++){
@@ -127,7 +135,7 @@ final class MotoDesign {
    // The destination heading and spoken label retain the full meaning. Keep
    // the visual tab short enough for narrow screens and enlarged system text.
    String visibleLabel=i==2?"기록":labels[i];
-   TextView name=a.text(visibleLabel,13,selected?a.accent:a.muted,selected);
+   TextView name=a.text(visibleLabel,12,selected?a.accent:a.muted,selected);
    name.setGravity(Gravity.CENTER);
    name.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
    graphic.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
@@ -139,6 +147,7 @@ final class MotoDesign {
    cell.setOnClickListener(v->{if(!destination.equals(a.tab))a.navigate(destination);});
    bar.addView(cell,new LinearLayout.LayoutParams(0,-1,1));
   }
-  root.addView(bar);
+  LinearLayout.LayoutParams navLp=new LinearLayout.LayoutParams(-1,-2);
+  navLp.setMargins(a.dp(12),a.dp(3),a.dp(12),a.dp(8));root.addView(bar,navLp);
  }
 }

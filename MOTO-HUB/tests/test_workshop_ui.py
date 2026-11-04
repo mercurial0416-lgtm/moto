@@ -60,7 +60,8 @@ check("showHomeTools(bike)" not in render and "this::costDashboard" in hub,
 check(render.index("compactVehicleHeader(bike)") < render.index("stats(bike)") <
       render.index("HomeShortcutOrder.parse(") < render.index("recent(bike)"),
       "vehicle, status, shortcuts and latest activity should have clear hierarchy")
-check('row.addView(thumb,new LinearLayout.LayoutParams(a.dp(78),a.dp(70)))' in home,
+check('fontScale>=1.5f?76:104' in home and
+      'row.addView(thumb,new LinearLayout.LayoutParams(a.dp(photoWidth),a.dp(88)))' in home,
       "vehicle thumbnail should not monopolize the viewport")
 check('void homeShortcutTile' not in home and 'LinearLayout homeShortcutTile(String key)' in home,
       "compact icon shortcut builder missing")

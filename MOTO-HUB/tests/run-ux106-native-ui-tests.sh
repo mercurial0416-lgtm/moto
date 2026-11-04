@@ -11,7 +11,7 @@ screen=(root/'HubScreens.java').read_text()
 main=(root/'MainActivity.java').read_text()
 
 # No URL or remote dependency in the new native presentation.
-assert 'TextView heading=a.text(heading(a.tab),23,a.fg,true)' in design
+assert 'TextView heading=a.text(heading(a.tab),25,a.fg,true)' in design
 assert 'FrameLayout pill=new FrameLayout(a)' in design
 assert any('pill.setBackground(a.shape(selected?a.highlight:a.panel,0,'+str(r)+'))' in design for r in (14,16))
 assert ('cell.setMinimumHeight(a.dp(62))' in design or 'cell.setMinimumHeight(a.dp(59))' in design)
@@ -26,8 +26,8 @@ assert 'fontScale>=1.45f' in render and 'screenWidthDp<320' in render
 assert 'if(!"ride".equals(key)&&shortcut(key))visible.add(key);' in render
 assert 'LinearLayout homeShortcutTile(String key)' in home
 assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
-assert 'surfaceCard.setBackground(a.shape(surface,stroke,19))' in home
-assert 'MotoDesign.figure(a,values[i],24,light)' in home
+assert 'surfaceCard.setBackground(a.shape(surface,stroke,24))' in home
+assert 'MotoDesign.figure(a,values[i],30,light)' in home
 assert 'group.setOnClickListener(v->a.navigate("차고"))' in home
 assert 'new ServiceStatusUi(a).updateOdo(b)' in home
 assert 'a.readOnly||RideService.running||RideService.autoArmed' in home
@@ -48,9 +48,9 @@ assert 'NavigationApps.openPreferred(a)' in ride and 'NavigationApps.choose(a)' 
 assert 'RideScreenRefreshPolicy.interval(' in ride
 
 assert 'settingCard=target==a.content&&"더보기".equals(a.tab)' in screen
-assert 'MotoDesign.ripple(a,block,settingCard?a.panel:a.bg' in screen
+assert 'MotoDesign.ripple(a,block,a.panel,a.line' in screen
 assert 'block.setOnClickListener(v->click.run())' in screen
-assert 'MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,primary?16:13)' in main
+assert 'MotoDesign.ripple(this,b,primary?accent:panel,primary?0:line,primary?18:16)' in main
 
 # Explicitly preserve no unapproved ECU changes and all local persistence APIs.
 assert 'Sharing.start(' not in ride and 'Sharing.start(' not in home
