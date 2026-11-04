@@ -71,6 +71,7 @@ public class MainActivity extends Activity {
   boolean crashedRestoreRecovered=false,crashedRestoreNeedsHelp=false;
   try{
    crashedRestoreRecovered=RestoreArchive.CrashJournal.recoverAll(getFilesDir(),bytes->atomic(disk,bytes))>0;
+   if(RideMetadataJournal.recoverPending(getFilesDir())>0)crashedRestoreRecovered=true;
    // Recover any interrupted GPS trash move before a new ride or backup sees partial files.
    if(RideTrash.recoverInterrupted(getFilesDir())>0)crashedRestoreRecovered=true;
   }catch(Exception e){readOnly=true;crashedRestoreNeedsHelp=true;}
@@ -93,9 +94,9 @@ public class MainActivity extends Activity {
   DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
   if(state==null)receiveSharedListing(getIntent());
-  if(crashedRestoreNeedsHelp)error("미완료 백업 복원의 원본 사본을 안전하게 되돌리지 못했어요. 추가 저장을 차단하고 복구용 파일을 보존했습니다. 앱을 삭제하지 말고 백업 상태를 확인해 주세요.");
+  if(crashedRestoreNeedsHelp)error("중단된 복원 또는 라이딩 변경을 안전하게 복구하지 못했어요. 추가 저장을 차단하고 복구용 파일을 보존했습니다. 앱을 삭제하지 말고 백업 상태를 확인해 주세요.");
   else if(readOnly)error("저장 파일을 읽지 못해 원본을 보존하고 새 저장을 차단했습니다. 더보기에서 백업을 복원해 주세요.");
-  else if(crashedRestoreRecovered)toast("중단됐던 백업 복원을 이전 기록으로 안전하게 되돌렸어요.");
+  else if(crashedRestoreRecovered)toast("중단됐던 복원·라이딩 변경을 이전 상태로 안전하게 되돌렸어요.");
   if(state==null){
    // Main Store has already been parsed; audit the old restore point off the UI thread.
    final boolean loaded=!readOnly;
@@ -961,6 +962,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
        .setMessage("로컬 라이딩 기록에만 연결하며 계기판 주행거리는 변경하지 않습니다.")
        .setItems(names,(dialog,which)->{
         if(readOnly){error("데이터 보호 상태에서는 바이크 연결을 변경할 수 없어요.");return;}
+        if(!RestoreRideGate.beginFormWrite()){error("저장·백업·복원 중입니다. 끝난 뒤 다시 시도해 주세요.");return;}
         final String chosenBikeId=vehicles.get(which).optString("id");
         final Set<String> appliedNames=new HashSet<>();
         JSONObject ledger=settings().optJSONObject("appliedRides");
@@ -974,6 +976,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          }catch(IOException ex){
           runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("바이크 연결 실패: "+ex.getMessage());});
          }
+         finally{RestoreRideGate.endFormWrite();}
         },"moto-ride-bike-binding").start();
        }).setNegativeButton("취소",null).show();
      });
@@ -985,6 +988,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
        .setSingleChoiceItems(categories,Math.max(0,checked),(dialog,which)->{
         dialog.dismiss();
         if(readOnly){error("데이터 보호 상태에서는 분류를 수정할 수 없어요.");return;}
+        if(!RestoreRideGate.beginFormWrite()){error("저장·백업·복원 중입니다. 끝난 뒤 다시 시도해 주세요.");return;}
         new Thread(()->{
          try{
           if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active))
@@ -994,6 +998,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          }catch(IOException ex){
           runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("분류 저장 실패: "+ex.getMessage());});
          }
+         finally{RestoreRideGate.endFormWrite();}
         },"moto-ride-category").start();
        }).setNegativeButton("취소",null).show();
      });

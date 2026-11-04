@@ -111,6 +111,7 @@ public final class BackupBundle {
   if(!Arrays.asList("FULL","GPS","MEDIA").contains(part))throw new IOException("알 수 없는 백업 분할");
   boolean gps=!"MEDIA".equals(part),media=!"GPS".equals(part);
   if(internal==null||!regularDirectory(internal))throw new IOException("앱 백업 폴더를 확인하지 못했어요.");
+  BackupFormat.requireSettledRideEdits(internal);
   if(gps)requireDirectoryIfPresent(new File(internal,"rides"));
   byte[] data=json.getBytes(StandardCharsets.UTF_8);if(data.length>8_000_000)throw new IOException("JSON 데이터가 8MB를 넘었어요.");
   long total=data.length;int count=0;

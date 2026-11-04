@@ -46,6 +46,7 @@ final class RideSessionBikeBinding {
    }
    originals.put(part,before);
   }
+  RideMetadataJournal journal=RideMetadataJournal.begin(filesDir,originals,".bike");
   List<File> attempted=new ArrayList<>();
   try{
    for(File part:originals.keySet()){
@@ -54,6 +55,7 @@ final class RideSessionBikeBinding {
     afterEachWrite.run();
    }
    requireComplete(filesDir,session,members.size(),alreadyApplied);
+   journal.finish();
   }catch(Exception reason){
    IOException failure=new IOException("라이딩 전체 바이크 연결 실패 · 이전 연결을 복원합니다.",reason);
    Collections.reverse(attempted);
@@ -61,6 +63,7 @@ final class RideSessionBikeBinding {
     try{restore(part,originals.get(part));}
     catch(IOException rollback){failure.addSuppressed(rollback);}
    }
+   if(failure.getSuppressed().length==0)try{journal.finish();}catch(IOException unresolved){failure.addSuppressed(unresolved);}
    throw failure;
   }
  }

@@ -70,6 +70,7 @@ final class BatchArchiveExport {
   return now;
  }
  static Plan plan(File root)throws IOException{
+  BackupFormat.requireSettledRideEdits(root);
   safeDir(root);
   File rides=new File(root,"rides");safeDir(rides);
   File[] candidates=listIfPresent(rides,(d,n)->n.matches(BackupFormat.TRACK));

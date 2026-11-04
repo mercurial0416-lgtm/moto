@@ -1,8 +1,21 @@
 package com.motohub.next;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.attribute.BasicFileAttributes;
+
 /** Shared ZIP limits between exporter, readback validator and restorer. */
 final class BackupFormat {
  private BackupFormat() {}
+ /** Never certify a mixed set of sidecars while an edit still needs replay. */
+ static void requireSettledRideEdits(File root)throws IOException{
+  try{Files.readAttributes(new File(root,"ride-metadata-journal").toPath(),BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);}
+  catch(NoSuchFileException absent){return;}
+  throw new IOException("중단된 라이딩 변경을 복구한 뒤 백업해 주세요. 앱을 다시 열어 확인할 수 있어요.");
+ }
  static final long MAX_TOTAL_BYTES=250_000_000L;
  static final long MAX_JSON_BYTES=8_000_000L;
  static final long MAX_TRACK_BYTES=25_000_000L;

@@ -45,6 +45,7 @@ final class RideSessionCategory {
    }
    originals.put(member,prior);
   }
+  RideMetadataJournal journal=RideMetadataJournal.begin(filesDir,originals,".category");
   java.util.List<File> attempted=new java.util.ArrayList<>();
   try{
    for(File member:originals.keySet()){
@@ -55,6 +56,7 @@ final class RideSessionCategory {
    // A section created or made incomplete during the transaction must fail
    // the whole update; the catch below restores every prior category byte.
    requireEntireSessionComplete(filesDir,session,members.size());
+   journal.finish();
   }catch(Exception cause){
    IOException failure=new IOException("라이딩 전체 분류 저장 실패 · 이전 분류로 되돌립니다.",cause);
    java.util.Collections.reverse(attempted);
@@ -62,6 +64,7 @@ final class RideSessionCategory {
     try{restoreSidecar(member,originals.get(member));}
     catch(IOException rollback){failure.addSuppressed(rollback);}
    }
+   if(failure.getSuppressed().length==0)try{journal.finish();}catch(IOException unresolved){failure.addSuppressed(unresolved);}
    throw failure;
   }
  }
