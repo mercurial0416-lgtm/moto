@@ -19,7 +19,7 @@ checks={
  "original 60-day comparison retains moving time": "add(File file,long now,RideDistanceCache.Summary ride)" in types and "movingMillis" in types,
  "monthly GPS chart no 5MB exclusion": "ride.length()>5_000_000" not in stats and "ride.length()>TrackFile.MAX_BYTES" in stats,
  "monthly chart distinguishes exclusion reasons": all(x in stats for x in ("data.invalidCompleted","data.oversize","data.unreadable","data.invalidMetrics")),
- "monthly chart preserves cost division exclusion gate": "RideCostPerKm.caption(selected,sixMonthExpense,data.totalKm,data.scanned+data.excluded)" in stats,
+ "monthly chart preserves cost division exclusion gate": "RideCostPerKm.caption(selected,sixMonthExpense,data.totalKm,data.excluded)" in stats and "data.scanned++" in stats,
  "time zone is not fixed to Korea for timeline": 'ZoneId.of("Asia/Seoul")' not in timeline and 'ZoneId.systemDefault()' in timeline,
  "timeline snapshots zone once per screen": "localZone=java.time.ZoneId.systemDefault()" in timeline_ui and "MotoTimeline.ledger(snapshot,bikeId,localZone)" in timeline_ui and "MotoTimeline.ride(track,snapshot,bikeId,localZone)" in timeline_ui,
  "cache SHA-256 prevents matching-size matching-mtime rewrite": "RideMileageIntegrity.fingerprint(track)" in cache and "cached.sha256.equals(currentHash)" in cache and "!parsed.equals(after)" in cache,
