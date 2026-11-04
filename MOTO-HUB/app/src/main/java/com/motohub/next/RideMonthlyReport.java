@@ -2,9 +2,18 @@ package com.motohub.next;
 import java.io.File;
 /** Pure local analytics. Uses file creation epoch, never relies on system-modifiable mtime. */
 final class RideMonthlyReport {
- static final class Totals {int count;double km;long minutes;}
+ static final class Totals {
+  int count;double km;long minutes;
+  private long durationMs;
+  void add(double distance,long elapsedMs){
+   km+=distance;durationMs+=elapsedMs;
+   // Round once after aggregating all GPS segments, not once per split file.
+   minutes=durationMs/60_000L;
+  }
+ }
  final Totals current=new Totals(),previous=new Totals();int skipped;
- private final java.util.Set<String> countedNow=new java.util.HashSet<>(),countedBefore=new java.util.HashSet<>();
+ /** One logical ride belongs to its earliest observed 30-day bucket. */
+ private final java.util.Map<String,Boolean> earliestBucket=new java.util.HashMap<>();
  /** Standalone session-key parser: legacy pure-Java reports compile without Android JSON. */
  static String sessionKey(File track){
   if(track==null)return "";
@@ -22,10 +31,18 @@ final class RideMonthlyReport {
  static boolean recent(File track,long now,int days){long stamp=timestamp(track);return stamp>0&&stamp<=now&&now-stamp<(long)days*24*3600*1000;}
  void add(File track,long now,double distance,long duration){
   if(!recent(track,now,60)||!Double.isFinite(distance)||distance<0||distance>1000||duration<0)return;
-  Totals target=recent(track,now,30)?current:previous;
+  boolean inCurrent=recent(track,now,30);
+  Totals target=inCurrent?current:previous;
   String session=sessionKey(track);
-  java.util.Set<String> seen=target==current?countedNow:countedBefore;
-  if(session.isEmpty()||seen.add(session))target.count++;
-  target.km+=distance;target.minutes+=duration/60000;
+  if(session.isEmpty())target.count++;
+  else {
+   Boolean earlier=earliestBucket.putIfAbsent(session,inCurrent);
+   if(earlier==null)target.count++;
+   else if(earlier && !inCurrent){
+    // A session spanning the 30-day boundary must never count twice.
+    current.count--;previous.count++;earliestBucket.put(session,false);
+   }
+  }
+  target.add(distance,duration);
  }
 }

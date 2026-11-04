@@ -13,7 +13,9 @@ final class RideStatsSeries {
  int excluded=0, scanned=0;
  int invalidCompleted=0,oversize=0,unreadable=0,invalidMetrics=0;
  double totalKm=0;
- private final java.util.Set<String> countedSessions=new java.util.HashSet<>();
+ private final long[] durationMs=new long[6];
+ /** The first chronological segment owns the ride count even if files arrive newest-first. */
+ private final java.util.Map<String,Integer> earliestMonth=new java.util.HashMap<>();
  RideStatsSeries(YearMonth anchor){this(anchor,ZoneId.systemDefault());}
  RideStatsSeries(YearMonth anchor,ZoneId zone){
   if(anchor==null||zone==null)throw new IllegalArgumentException("기준 월 또는 시간대 없음");
@@ -34,8 +36,18 @@ final class RideStatsSeries {
   long index=ChronoUnit.MONTHS.between(anchor.minusMonths(5),month);
   if(index<0||index>=6)return false;
   int i=(int)index;
-  if(session==null||session.isEmpty()||countedSessions.add(session))count[i]++;
-  km[i]+=distanceKm;minutes[i]+=elapsedMs/60000;totalKm+=distanceKm;return true;
+  if(session==null||session.isEmpty())count[i]++;
+  else {
+   Integer recorded=earliestMonth.putIfAbsent(session,i);
+   if(recorded==null)count[i]++;
+   else if(i<recorded){
+    count[recorded]--;count[i]++;earliestMonth.put(session,i);
+   }
+  }
+  km[i]+=distanceKm;
+  durationMs[i]+=elapsedMs;
+  minutes[i]=durationMs[i]/60_000L;
+  totalKm+=distanceKm;return true;
  }
  /** Inclusive start of the six displayed local calendar months, including DST boundaries. */
  long earliestStartMs(){
@@ -46,7 +58,10 @@ final class RideStatsSeries {
  boolean inDisplayedPeriod(long startMs,long nowMs){
   return startMs>=earliestStartMs()&&startMs<=nowMs&&startMs>0;
  }
- long totalMinutes(){long sum=0;for(long value:minutes)sum+=value;return sum;}
+ long totalMinutes(){
+  long totalMs=0;for(long ms:durationMs)totalMs+=ms;
+  return totalMs/60_000L;
+ }
  int rides(){int sum=0;for(int countValue:count)sum+=countValue;return sum;}
  double maxKm(){double result=0;for(double d:km)result=Math.max(result,d);return result;}
 }
