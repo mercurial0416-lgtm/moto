@@ -709,7 +709,7 @@ final class RideUi {
     for(File track:RideHistorySort.order(TrackFile.tracks(a.getFilesDir()),RideHistorySort.NEWEST)){
      if(request!=REPORT_GENERATION.get()||a.isFinishing()||a.isDestroyed())return;
      if(!RideMonthlyReport.recent(track,now,60))continue;
-     if(RideService.running&&track.getName().equals(RideService.active))continue;
+     if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active))continue;
      if(RideTrackMerge.mergedSource(track)||RideTrackMerge.archived(track))continue;
      try{if(!RideReportScope.include(track,bikeScope))continue;}
      catch(IOException invalidBinding){report.skipped++;continue;}

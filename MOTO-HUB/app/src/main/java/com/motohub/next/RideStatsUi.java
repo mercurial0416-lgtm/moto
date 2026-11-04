@@ -56,7 +56,7 @@ final class RideStatsUi {
     long now=System.currentTimeMillis();int inspected=0;
     for(File ride:RideHistorySort.order(TrackFile.tracks(a.getFilesDir()),RideHistorySort.NEWEST)){
      if(generation!=STATS_GENERATION.get())return;
-     if(RideService.running&&ride.getName().equals(RideService.active))continue;
+     if(RideActiveSessionPolicy.exclude(ride.getName(),RideService.running,RideService.active))continue;
      if(RideTrackMerge.mergedSource(ride)||RideTrackMerge.archived(ride))continue;
      Long t=RideHistoryLabel.startTime(ride);
      if(t==null||!data.inDisplayedPeriod(t,now))continue;
@@ -75,6 +75,7 @@ final class RideStatsUi {
      // Analyze all matching tracks, not only the newest 180. The entire scan is
      // on the dedicated worker; progress is posted in bounded batches.
      inspected++;
+     data.scanned++;
      if(inspected%40==0){
       final int progress=inspected;
       a.runOnUiThread(()->{
@@ -103,9 +104,9 @@ final class RideStatsUi {
     totals.setText(String.format(Locale.KOREA,
      "6개월 %d회 · %.1f km  |  월 평균 %.1f km",
      data.rides(),data.totalKm,data.totalKm/6));
-    costEstimate.setText(RideCostPerKm.caption(selected,sixMonthExpense,data.totalKm,data.scanned+data.excluded));
+    costEstimate.setText(RideCostPerKm.caption(selected,sixMonthExpense,data.totalKm,data.excluded));
     foot.setText("바이크 "+(selected.isEmpty()?"전체":a.bikeName(selected))+
-      " · GPS 제외 "+data.excluded+"건 (완료 상태 "+data.invalidCompleted+
+      " · GPS 분석 대상 "+data.scanned+"건 · GPS 제외 "+data.excluded+"건 (완료 상태 "+data.invalidCompleted+
       " · 크기·빈 파일 "+data.oversize+" · 읽기 오류 "+data.unreadable+
       " · 거리·시간 기준 "+data.invalidMetrics+")"+
       (unpaidExcluded>0?" · 미지출·미래 비용 "+unpaidExcluded+"건 제외":"")+

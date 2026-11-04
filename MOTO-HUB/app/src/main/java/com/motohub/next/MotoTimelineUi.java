@@ -117,7 +117,7 @@ final class MotoTimelineUi {
     for(File track:RideHistorySort.order(TrackFile.tracks(a.getFilesDir()),RideHistorySort.NEWEST)){
      if(++inspected%64==0&&(a.isFinishing()||a.isDestroyed()||
         a.dialog!=opened||!opened.isShowing()))return;
-     if(RideService.running&&track.getName().equals(RideService.active))continue;
+     if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active))continue;
      try{
       MotoTimeline.Event e=MotoTimeline.ride(track,snapshot,bikeId,localZone);
       if(e!=null)merged.add(e);
