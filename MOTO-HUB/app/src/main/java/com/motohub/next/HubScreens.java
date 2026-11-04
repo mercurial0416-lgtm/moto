@@ -69,6 +69,7 @@ final class HubScreens {
   line(target,title,detail,value,click,null,false);
  }
  void line(LinearLayout target,String title,String detail,String value,Runnable click,Runnable favorite,boolean starred){
+  if("차고".equals(a.tab)&&target==a.content&&favorite==null){timelineRow(target,title,detail,value,click);return;}
   // Shared cards keep settings and searchable records visually consistent.
   // Data sources, click actions and navigation are unchanged.
   boolean settingCard=target==a.content&&"더보기".equals(a.tab);
@@ -122,6 +123,16 @@ final class HubScreens {
   }
   target.addView(block);
   a.gap(target,8);
+ }
+ void timelineRow(LinearLayout host,String title,String detail,String value,Runnable click){
+  LinearLayout row=new LinearLayout(a);row.setTag("ledger-timeline-entry");row.setPadding(0,a.dp(12),0,a.dp(12));row.setMinimumHeight(a.dp(84));
+  String date=detail!=null&&detail.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}.*")?detail.substring(5,10).replace('-','.') : "기록";
+  LinearLayout axis=a.col();axis.setGravity(Gravity.CENTER_HORIZONTAL);axis.addView(a.text(date,12,a.muted,true));a.gap(axis,10);
+  NavIcon icon=new NavIcon(a,title.contains("주유")?5:2,a.accent);axis.addView(icon,new LinearLayout.LayoutParams(a.dp(22),a.dp(22)));row.addView(axis,new LinearLayout.LayoutParams(a.dp(52),-2));
+  LinearLayout body=a.col();body.setPadding(a.dp(16),a.dp(14),a.dp(16),a.dp(14));body.setBackground(a.shape(a.panel,a.line,18));body.addView(a.text(title,17,a.fg,true));a.gap(body,6);
+  body.addView(a.text(detail==null?"":detail,12,a.muted,false));a.gap(body,9);body.addView(MotoDesign.figure(a,value==null?"":value,19,a.fg));row.addView(body,new LinearLayout.LayoutParams(0,-2,1));
+  if(click!=null){row.setClickable(true);row.setFocusable(true);row.setContentDescription(title+", "+detail+", "+value);row.setOnClickListener(v->click.run());}
+  host.addView(row);
  }
  void bikePicker(){JSONObject b=a.bike();if(b==null)return;Button picker=a.button(b.optString("name")+"  ▾",false,this::chooseBike);picker.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);a.content.addView(picker,new LinearLayout.LayoutParams(-1,-2));a.gap(a.content,12);}
  void chooseBike(){List<JSONObject> list=a.items("vehicles");list.sort((x,y)->Integer.compare(GarageBikeStatus.rank(x.optString("soldDate")),GarageBikeStatus.rank(y.optString("soldDate"))));String[] options=new String[list.size()+1];for(int i=0;i<list.size();i++)options[i]=GarageBikeStatus.label(list.get(i).optString("name"),list.get(i).optString("soldDate"));options[list.size()]="＋ 바이크 추가";new AlertDialog.Builder(a).setTitle("내 바이크").setItems(options,(d,n)->{if(n==list.size()){a.edit("vehicles",null);return;}a.selected=list.get(n).optString("id");a.getSharedPreferences("garage_ui",0).edit().putString("selected_bike",a.selected).apply();a.render();}).show();}
@@ -347,13 +358,38 @@ final class HubScreens {
   dialog.show();redraw.run();
  }
  void records(){
-  a.gap(a.content,4);
+  a.content.setTag("ledger-workspace");
+  ExperienceUi.title(a,"정비 · 주유","지출부터 정비 일정까지, 나의 바이크 장부");
   if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}
   bikePicker();
   if(UndoLastSave.available(a)){
    a.action(a.content,"↶ 방금 저장한 기록 취소 · 2분",false,()->UndoLastSave.undo(a));
   }
-  a.section("기록 추가");
+  ExperienceUi.spending(a,a.bike(),false);
+  ExperienceUi.section(a,"나의 기록","전체 기록 검색  ›",this::searchAllRecords);
+  ExperienceUi.dock(a,a.button("기록 추가  +",true,this::recordEntryTools));
+  ExperienceUi.switcher(a,"타임라인","정비 일정",!a.ledgerSchedulePage,()->{a.ledgerSchedulePage=false;a.render();},()->{a.ledgerSchedulePage=true;a.render();});
+  if(a.ledgerSchedulePage){new ServiceStatusUi(a).render(a.content);return;}
+  tabs(new String[]{"전체","주유","정비","기타"},a.garageMode,v->{a.garageMode=v;a.recordPageOffset=0;a.render();});
+  List<JSONObject> list=records(a.garageMode,a.bike());
+  a.label(a.content,"기록 "+list.size()+"건"+(a.garageMode.equals("전체")?"":" · "+a.garageMode),13,a.muted,false);
+  if(list.isEmpty())a.note("표시할 기록이 없어요. 위의 빠른 기록을 눌러 추가하세요.");
+  String last="";
+  for(int i=ListPageLimit.start(list.size(),a.recordPageOffset);i<ListPageLimit.end(list.size(),a.recordPageOffset);i++){
+   JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";
+   if(!month.equals(last)){a.section(month);last=month;}
+   boolean receipt=a.receiptCount(x.optString("id"))>0;
+   final String collection=visibleLedgerCollections.getOrDefault(x,"services");
+   line(x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km"+(receipt?" · 영수증":""),
+    a.won(x.optDouble("expenses".equals(collection)?"amount":"cost")),
+    ()->a.edit(collection,x));
+  }
+  if(ListPageLimit.canPrevious(list.size(),a.recordPageOffset))a.action(a.content,"◀ 최근 기록",false,()->{a.recordPageOffset=ListPageLimit.previous(list.size(),a.recordPageOffset);a.render();});
+  if(ListPageLimit.canNext(list.size(),a.recordPageOffset))a.action(a.content,"이전 기록 ▶ · "+ListPageLimit.end(list.size(),a.recordPageOffset)+"/"+list.size(),false,()->{a.recordPageOffset=ListPageLimit.next(list.size(),a.recordPageOffset);a.render();});
+ }
+ void recordEntryTools(){
+  LinearLayout p=a.page("새 기록");
+  a.label(p,"무엇을 기록할까요?",22,a.fg,true);
   LinearLayout actions=a.col();actions.setPadding(a.dp(16),a.dp(16),a.dp(16),a.dp(16));actions.setBackground(a.shape(a.panel,a.line,24));
   a.pair(actions,"간편 주유",()->new QuickEntryUi(a).fuel(),"정비주기 설정",()->new QuickEntryUi(a).maintenance());
   LinearLayout details=a.col();details.setVisibility(View.GONE);
@@ -371,8 +407,15 @@ final class HubScreens {
   reveal.setContentDescription("추가 비용·영수증·일괄 정비 입력 도구 펼치기");
   actions.addView(reveal);actions.addView(details);
   a.action(actions,"전체 기록 검색 · 주유 / 정비 / 비용 / GPS",false,this::searchAllRecords);
-  a.content.addView(actions);a.gap(a.content,16);
-  a.section("정비 상태");new ServiceStatusUi(a).render(a.content);a.gap(a.content,15);
+  p.addView(actions);a.gap(p,16);
+  a.action(p,"주유 · 정비 분석",false,this::recordInsights);
+  a.show();
+ }
+ void recordInsights(){
+  LinearLayout p=a.page("바이크 관리 리포트");
+  if(a.bike()==null){a.close();return;}
+  ExperienceUi.spending(a,p,a.bike(),true);
+  a.label(p,"정비 상태",20,a.fg,true);new ServiceStatusUi(a).render(p);a.gap(p,15);
   String bikeId=a.bike().optString("id");
   JSONObject lastFuel=null;
   for(JSONObject record:a.items("expenses"))if(bikeId.equals(record.optString("vehicleId"))&&"주유".equals(record.optString("type"))){
@@ -386,7 +429,7 @@ final class HubScreens {
    TextView fuelValue=MotoDesign.figure(a,a.won(lastFuel.optDouble("amount"))+"  ·  "+a.num(lastFuel.optDouble("liters"))+" L",20,a.fg);summary.addView(fuelValue);a.gap(summary,8);
    double price=lastFuel.optDouble("amount")/lastFuel.optDouble("liters");
    if(Double.isFinite(price))a.label(summary,"리터당 약 "+a.won(Math.round(price))+" · 실제 영수증 기준",12,a.muted,false);
-   a.content.addView(summary);a.gap(a.content,10);
+   p.addView(summary);a.gap(p,10);
   }
   FuelStats fuelStats=FuelStats.forBike(a.items("expenses"),bikeId);
   if(fuelStats.fills>0){
@@ -396,24 +439,9 @@ final class HubScreens {
     a.label(insight,"만땅 간격 추정 연비 약 "+String.format(java.util.Locale.KOREA,"%.1f",fuelStats.kmPerLiter)+" km/L · "+fuelStats.fullIntervals+"구간",13,a.muted,false);
    else a.label(insight,"만땅 기록 두 번 이상이면 구간별 예상 연비를 표시해요.",12,a.muted,false);
    a.label(insight,"직접 입력한 주유값만 계산 · 계기판과 실제 주유량을 확인하세요.",12,a.muted,false);
-   a.content.addView(insight);a.gap(a.content,10);
+   p.addView(insight);a.gap(p,10);
   }
-  tabs(new String[]{"전체","주유","정비","기타"},a.garageMode,v->{a.garageMode=v;a.recordPageOffset=0;a.render();});
-  List<JSONObject> list=records(a.garageMode,a.bike());
-  a.label(a.content,"기록 "+list.size()+"건"+(a.garageMode.equals("전체")?"":" · "+a.garageMode),13,a.muted,false);
-  if(list.isEmpty())a.note("표시할 기록이 없어요. 위의 빠른 기록을 눌러 추가하세요.");
-  String last="";
-  for(int i=ListPageLimit.start(list.size(),a.recordPageOffset);i<ListPageLimit.end(list.size(),a.recordPageOffset);i++){
-   JSONObject x=list.get(i);String month=x.optString("date");month=month.length()>=7?month.substring(0,7):"날짜 없음";
-   if(!month.equals(last)){a.section(month);last=month;}
-   boolean receipt=a.receiptCount(x.optString("id"))>0;
-   final String collection=visibleLedgerCollections.getOrDefault(x,"services");
-   line(x.optString("type"),x.optString("date")+" · "+a.num(x.optDouble("mileage"))+" km"+(receipt?" · 영수증":""),
-    a.won(x.optDouble("expenses".equals(collection)?"amount":"cost")),
-    ()->a.edit(collection,x));
-  }
-  if(ListPageLimit.canPrevious(list.size(),a.recordPageOffset))a.action(a.content,"◀ 최근 기록",false,()->{a.recordPageOffset=ListPageLimit.previous(list.size(),a.recordPageOffset);a.render();});
-  if(ListPageLimit.canNext(list.size(),a.recordPageOffset))a.action(a.content,"이전 기록 ▶ · "+ListPageLimit.end(list.size(),a.recordPageOffset)+"/"+list.size(),false,()->{a.recordPageOffset=ListPageLimit.next(list.size(),a.recordPageOffset);a.render();});
+  a.show();
  }
  void tabs(String[] values,String current,MainActivity.Choice select){
   HorizontalScrollView sc=new HorizontalScrollView(a);sc.setHorizontalScrollBarEnabled(false);
@@ -490,7 +518,30 @@ final class HubScreens {
   a.label(page,"휴대폰 현지 시간대("+localZone+") 기준의 6개월 지출입니다. 직접 입력한 주유·보험·부품·정비 기록이며 실제 영수증과 대조하세요.",12,a.muted,false);
   a.show();
  }
- void settings(){a.section("데이터 보호");line("백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해","열기",this::basicBackup);
+ void settings(){
+  a.content.setTag("owner-hub");
+  ExperienceUi.title(a,"설정","나의 바이크와 앱을 관리하는 곳");
+  if(a.settingsDetailPage){a.action(a.content,"← 관리 허브로",false,()->{a.settingsDetailPage=false;a.render();});settingsDetails();return;}
+  LinearLayout identity=a.col();identity.setPadding(a.dp(22),a.dp(20),a.dp(22),a.dp(20));identity.setBackground(a.shape(a.highlight,0,24));
+  identity.addView(a.text("나의 모토허브",25,a.fg,true));a.gap(identity,7);
+  identity.addView(a.text("바이크 "+a.items("vehicles").size()+"대  ·  주유·정비 "+(a.items("expenses").size()+a.items("services").size())+"건",14,a.muted,false));
+  a.content.addView(identity);a.gap(a.content,20);
+  ExperienceUi.pair(a,a.content,
+   ExperienceUi.tile(a,"바이크 관리","내 바이크 정보와 보관 기록",6,this::manageBike),
+   ExperienceUi.tile(a,"홈 화면 위젯","출발과 기록을 홈 화면에서",0,this::widgetPicker));
+  ExperienceUi.pair(a,a.content,
+   ExperienceUi.tile(a,"백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해",2,this::basicBackup),
+   ExperienceUi.tile(a,"유지비 통계","바이크별 6개월 지출 보기",5,this::costDashboard));
+  ExperienceUi.section(a,"앱 환경","전체 설정  ›",()->{a.settingsDetailPage=true;a.render();});
+  line("화면 테마",a.dark?"어두운 화면":"밝은 화면","변경",()->a.choose("화면 테마",new String[]{"system","light","dark"},v->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("theme",v);a.write(next);a.render();})));
+  line("앱 진단 · OBD 연결","연결 상태와 저장 기록 점검","열기",this::selfCheck);
+  line("앱 업데이트","현재 "+BuildConfig.VERSION_CODE+" · 업데이트와 서명 확인","열기",()->new AppUpdater(a).show());
+  if(Sharing.enabled)a.action(a.content,"위치 공유 중지",true,()->new AlertDialog.Builder(a).setTitle("위치 공유를 중지할까요?").setNegativeButton("취소",null).setPositiveButton("즉시 중지",(d,w)->{Sharing.stop();a.render();}).show());
+  a.gap(a.content,16);a.label(a.content,"MOTO HUB · "+BuildConfig.VERSION_NAME,12,a.muted,false);
+  a.label(a.content,"앱을 삭제하기 전 전체 ZIP 백업을 보관하세요.",12,a.muted,false);
+ }
+ void widgetPicker(){new AlertDialog.Builder(a).setTitle("홈 화면 위젯").setItems(new String[]{"작은 위젯 추가 (2×1)","대시보드 위젯 추가 (4×2)","위젯 버튼 변경"},(d,index)->{if(index==2)QuickWidgetChoices.configure(a);else MotoWidgetPin.request(a,index==0);}).setNegativeButton("닫기",null).show();}
+ void settingsDetails(){a.section("데이터 보호");line("백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해","열기",this::basicBackup);
  // Keep ZIP freshness visible as one small line, not another large settings card.
  final TextView backupState=a.text("백업 확인 중…",12,a.muted,false);
  backupState.setSingleLine(true);backupState.setEllipsize(android.text.TextUtils.TruncateAt.END);

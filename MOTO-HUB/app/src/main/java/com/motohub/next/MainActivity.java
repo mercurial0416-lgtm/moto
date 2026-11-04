@@ -19,6 +19,7 @@ import java.util.*;
 
 /** Native recovery of the prior P0 implementation. No WebView or network SDK. */
 public class MainActivity extends Activity {
+ boolean settingsDetailPage=false,ledgerSchedulePage=false;
  JSONObject db;AtomicFile disk;LinearLayout root,content,formFooter;Dialog dialog;LinearLayout formBody;
  String tab="홈",selected="",query="",filter="전체",sort="최신순";
  String pendingTrack="",pendingOwnershipReportBike="",pendingRidePhotoTrack="";
@@ -692,7 +693,7 @@ public class MainActivity extends Activity {
    }).show();
  }
  void hideKeyboard(){android.view.inputmethod.InputMethodManager imm=getSystemService(android.view.inputmethod.InputMethodManager.class);View focus=getCurrentFocus();if(focus!=null){imm.hideSoftInputFromWindow(focus.getWindowToken(),0);focus.clearFocus();}}
- void navigate(String destination){if("매물".equals(destination))destination="홈";hideKeyboard();if(destination.equals("더보기")&&!tab.equals("더보기"))previousTab=tab;tab=destination;render();}
+ void navigate(String destination){if("매물".equals(destination))destination="홈";hideKeyboard();if(destination.equals("더보기")&&!tab.equals("더보기")){previousTab=tab;settingsDetailPage=false;}tab=destination;render();}
  void selectRideHistoryFilter(String value){
   String normalized=RideHistoryFilter.normalize(value);
   // Only a local display preference: never part of backup, GPS or cloud sharing.
@@ -796,10 +797,6 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    TextView live=text("●  내 위치 공유 중",14,accent,true);sharingBar.addView(live,new LinearLayout.LayoutParams(0,-2,1));
    Button stop=button("공유 중지",false,()->{Sharing.stop();toast("위치 공유를 중지했어요.");render();});stop.setTextSize(13);stop.setMinHeight(dp(40));stop.setBackground(shape(highlight,0,12));sharingBar.addView(stop);root.addView(sharingBar);
   }
-  if(!OfflineStatus.hasInternet(this)){
-   TextView offline=text("오프라인 · 주유·정비·GPS 기록은 기기에 저장됩니다",12,muted,false);
-   offline.setPadding(dp(20),dp(7),dp(20),dp(7));root.addView(offline);
-  }
   ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);content=col();content.setPadding(dp(18),dp(14),dp(18),dp(24));scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
   // Tab-level quick actions belong in their screens; do not repeat them above navigation.
   MotoDesign.addNavigation(this,root);
@@ -822,6 +819,10 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    content.addView(draftCard);gap(content,10);
   }
   switch(tab){case"홈":home();break;case"라이딩":ride();break;case"차고":garage();break;case"지도":more();break;default:more();}
+  if(!OfflineStatus.hasInternet(this)){
+   TextView offline=text("오프라인 · 주유·정비·GPS 기록은 기기에 저장됩니다",12,muted,false);
+   offline.setPadding(0,dp(20),0,dp(7));content.addView(offline);
+  }
   if("라이딩".equals(tab))lastRenderedRideState=rideStateSignature();
  }
  String dueText(JSONObject s){return(s.optDouble("nextKm")>0?num(s.optDouble("nextKm"))+" km":"")+(!s.optString("nextDate").isEmpty()?" · "+s.optString("nextDate"):"");}
@@ -1503,7 +1504,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   });
  }
  void renderCatalogPhoto(ImageView photo,TextView label,String brand,String model,int year){
-  photo.setImageResource(BikeVisual.superCub(model)?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
+  photo.setImageResource(BikeVisual.superCub(model)?R.drawable.garage_super_cub:R.drawable.garage_bike_outline);
   label.setOnClickListener(null);label.setText(BikeVisual.superCub(model)?"슈퍼커브 참고 일러스트 · 실제 연식 사진 검색 중":"실제 연식에 맞는 사진 검색 중…");
   MotorcyclePhoto.show(this,photo,label,brand,model,year,null);
  }
@@ -1708,7 +1709,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   ImageView catalogPreview=null;TextView catalogStatus=null;
   if(key.equals("vehicles")||key.equals("listings")){
    label(p,"브랜드 → 모델 → 연식  ·  선택해서 자동 입력",16,fg,true);
-   ImageView preview=new ImageView(this);preview.setBackground(shape(panel,line,16));preview.setScaleType(ImageView.ScaleType.CENTER_CROP);preview.setImageResource(R.drawable.garage_model_placeholder);
+   ImageView preview=new ImageView(this);preview.setBackground(shape(panel,line,16));preview.setScaleType(ImageView.ScaleType.CENTER_CROP);preview.setImageResource(R.drawable.garage_bike_outline);
    LinearLayout.LayoutParams pl=new LinearLayout.LayoutParams(-1,dp(155));pl.bottomMargin=dp(6);p.addView(preview,pl);
    TextView status=text("연식·모델 사진은 확인된 후보만 표시 · 직접 사진은 차고에서 변경",12,muted,false);p.addView(status);
    catalogPreview=preview;catalogStatus=status;
@@ -2809,7 +2810,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   new RideUi(this).start();
   render();
  }
- void back(){if(dialog!=null&&dialog.isShowing()){close();return;}if(tab.equals("더보기")){tab=previousTab;render();}else if(!tab.equals("홈")){tab="홈";render();}else finish();}
+ void back(){if(dialog!=null&&dialog.isShowing()){close();return;}if(tab.equals("더보기")&&settingsDetailPage){settingsDetailPage=false;render();return;}if(tab.equals("더보기")){tab=previousTab;render();}else if(!tab.equals("홈")){tab="홈";render();}else finish();}
 
  @Override protected void onDestroy(){odoSyncHandler.removeCallbacks(odoSyncTick);if(isFinishing())BackupPickerTransfer.cancelAll();if(developerObd!=null){developerObd.stop();developerObd=null;}super.onDestroy();}
  @Override protected void onPause(){odoSyncHandler.removeCallbacks(odoSyncTick);flushQuickFuelDraft();persistDraft();super.onPause();}

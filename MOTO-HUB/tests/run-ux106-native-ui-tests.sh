@@ -11,7 +11,8 @@ screen=(root/'HubScreens.java').read_text()
 main=(root/'MainActivity.java').read_text()
 
 # No URL or remote dependency in the new native presentation.
-assert 'TextView heading=a.text(heading(a.tab),25,a.fg,true)' in design
+assert 'TextView wordmark=a.text("MOTO HUB",14,a.fg,true)' in design
+assert 'ExperienceUi.title(a,"내 차고"' in home and 'ExperienceUi.title(a,"라이딩"' in ride
 assert 'FrameLayout pill=new FrameLayout(a)' in design
 assert any('pill.setBackground(a.shape(selected?a.highlight:a.panel,0,'+str(r)+'))' in design for r in (14,16))
 assert ('cell.setMinimumHeight(a.dp(62))' in design or 'cell.setMinimumHeight(a.dp(59))' in design)
@@ -19,21 +20,21 @@ assert 'if(!destination.equals(a.tab))a.navigate(destination)' in design
 assert 'setContentDescription(labels[i]+(selected?", 현재 탭":" 탭 열기"))' in design
 
 render=home.split(' void render(){',1)[1].split(' /** Scan local GPS metadata',1)[0]
-for marker in ('compactVehicleHeader(bike)', 'stats(bike)', 'HomeShortcutOrder.parse(',
+for marker in ('garageShowcase(bike)', 'vehicleStatus(bike)', 'HomeShortcutOrder.parse(',
                'homeShortcutTile(key)', 'if(shortcut("ride")||RideService.running||RideService.autoArmed){', 'recent(bike)'):
  assert marker in render, marker
-assert 'fontScale>=1.45f' in render and 'screenWidthDp<320' in render
-assert 'if(!"ride".equals(key)&&shortcut(key))visible.add(key);' in render
+assert 'ExperienceUi.stacked(a)' in render
+assert 'if(!"ride".equals(key)&&shortcut(key))' in render
 assert 'LinearLayout homeShortcutTile(String key)' in home
 assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home
-assert 'surfaceCard.setBackground(a.shape(surface,stroke,24))' in home
-assert 'MotoDesign.figure(a,values[i],30,light)' in home
-assert 'group.setOnClickListener(v->a.navigate("차고"))' in home
-assert 'new ServiceStatusUi(a).updateOdo(b)' in home
+assert 'stage.setTag("vehicle-stage")' in home
+assert 'MotoDesign.figure(a,a.num(bike.optDouble("odo")),34,light)' in home
+assert 'a.ledgerSchedulePage=true;a.navigate("차고")' in home
+assert 'new ServiceStatusUi(a).updateOdo(bike)' in home
 assert 'a.readOnly||RideService.running||RideService.autoArmed' in home
-assert 'GarageBikeStatus.sold(b.optString("soldDate"))' in home
-assert 'RideMileageEstimate.total(a,b.optString("id"))' in home
-assert 'OdometerAutoSyncInbox.display(a,b.optString("id"))' in home
+assert 'GarageBikeStatus.sold(bike.optString("soldDate"))' in home
+assert 'RideMileageEstimate.total(a,bike.optString("id"))' in home
+assert 'OdometerAutoSyncInbox.display(a,bike.optString("id"))' in home
 assert 'int photoHeight=displayWidth<a.dp(390)?190:211' in home
 assert 'new FrameLayout.LayoutParams(a.dp(48),a.dp(54)' in home
 

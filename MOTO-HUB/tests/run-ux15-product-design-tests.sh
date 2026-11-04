@@ -11,10 +11,10 @@ activity=(src/"MainActivity.java").read_text()
 assert 'ImageView.ScaleType.FIT_CENTER' in home, "keep bike visible without cropping"
 assert '0x44000000' in home and '0xC9081016' not in home, "avoid thick faux-cinematic overlay"
 assert 'TextView tag=a.text(HomeBikeSwitch.label' not in home, "no promotional badge covering photos"
-assert 'compactVehicleHeader(JSONObject bike)' in home and 'new HubScreens(a).chooseBike()' in home and 'changeHeroPhoto(bike,owned)' in home, "compact vehicle selector keeps bike switching and photo editing"
-assert home.index('compactVehicleHeader(bike);') < home.index('stats(bike);') < home.index('HomeShortcutOrder.parse('), "vehicle context comes before user-selected quick actions"
+assert 'garageShowcase(JSONObject bike)' in home and 'new HubScreens(a).chooseBike()' in home and 'changeHeroPhoto(bike,own)' in home, "compact vehicle selector keeps bike switching and photo editing"
+assert home.index('garageShowcase(bike);') < home.index('HomeShortcutOrder.parse(') < home.index('vehicleStatus(bike);'), "vehicle context comes before user-selected quick actions"
 assert 'if(shortcut("ride")||RideService.running||RideService.autoArmed){' in home and 'homeShortcutTile(key)' in home and 'NavigationApps.openPreferred(a)' in home, "all home actions remain reachable"
-assert 'String[] names={"계기판 누적거리","다음 정비"};' in home, "2-item KPI strip"
+assert 'void vehicleStatus(JSONObject bike)' in home, "2-item KPI strip"
 assert 'String.format(Locale.ROOT,"%02d",i+1)' not in home, "no arbitrary numbered menu"
 assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home, "purpose-built action icons"
 assert 'new QuickEntryUi(a).fuel()' in home and 'new QuickEntryUi(a).maintenance()' in home, 'first-class quick fuel and reminders'

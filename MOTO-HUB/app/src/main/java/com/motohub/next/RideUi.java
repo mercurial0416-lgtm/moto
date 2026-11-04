@@ -54,12 +54,20 @@ final class RideUi {
   a.root.postDelayed(()->{if(!a.isFinishing()&&!a.isDestroyed())a.showPendingRideSummary();},1300);
  }
  void render(){
+  a.content.setTag("ride-workspace");
+  ExperienceUi.title(a,"라이딩","주행에 집중하고, 경로는 기록으로 남기세요.");
+  String workspace=a.getSharedPreferences("ride_display",0).getString("workspace","ride");
+  ExperienceUi.switcher(a,"주행하기","라이딩 기록",!"history".equals(workspace),()->switchWorkspace("ride"),()->switchWorkspace("history"));
+  if("history".equals(workspace)){renderHistoryWorkspace();return;}
   final boolean saving=RideService.saving();
   final boolean focus=RideService.running&&a.getSharedPreferences("ride_display",0).getBoolean("focus",false);
-  LinearLayout hero=a.col();hero.setPadding(a.dp(20),a.dp(22),a.dp(20),a.dp(20));hero.setBackground(a.shape(a.panel,a.line,26));
-  TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?(a.dark?0xFFFFA79C:0xFFAA3833):a.accent,true);hero.addView(eyebrow);
-  TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?"라이딩 진행 중":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",30,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
-  TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?RideService.count+"개 위치 기록 · 화면을 꺼도 GPS 기록 유지":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
+  LinearLayout hero=a.col();hero.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(16));
+  ExperienceUi.RideConsole console=new ExperienceUi.RideConsole(a,RideService.running);
+  hero.addView(console.view,new LinearLayout.LayoutParams(-1,a.dp(250)));
+  if(focus)console.view.setVisibility(View.GONE);
+  TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"기록 대기",13,RideService.running?(a.dark?0xFFFFA79C:0xFFAA3833):a.accent,true);eyebrow.setGravity(Gravity.CENTER);hero.addView(eyebrow);
+  TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?"라이딩 진행 중":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",22,a.fg,true);title.setTypeface(MotoDesign.display());title.setGravity(Gravity.CENTER);LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
+  TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?RideService.count+"개 위치 기록 · 화면을 꺼도 GPS 기록 유지":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setGravity(Gravity.CENTER);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
   // No redundant pre-ride checklist. Explicit permission/consent handling stays
   // inside requestStart/start; foreground GPS never starts silently.
   if(RideService.running){
@@ -72,8 +80,8 @@ final class RideUi {
    boolean narrowMetrics=a.getResources().getConfiguration().fontScale>=1.3f||
      a.getResources().getConfiguration().screenWidthDp<360;
    if(narrowMetrics)live.setOrientation(LinearLayout.VERTICAL);
-   TextView[] values=new TextView[3];String[] names={"주행거리","경과시간","실시간 속도"};
-   for(int i=0;i<3;i++){
+   TextView[] values=new TextView[3];values[2]=console.speed;String[] names={"주행거리","경과시간"};
+   for(int i=0;i<2;i++){
     LinearLayout box=a.col();box.setPadding(a.dp(9),a.dp(12),a.dp(9),a.dp(12));box.setBackground(a.shape(a.highlight,0,16));
     values[i]=a.text("—",focus?32:24,a.fg,true);values[i].setGravity(Gravity.CENTER);
     values[i].setAutoSizeTextTypeUniformWithConfiguration(14,focus?32:24,1,android.util.TypedValue.COMPLEX_UNIT_SP);
@@ -164,7 +172,7 @@ final class RideUi {
   start.setMinHeight(a.dp(60));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);
   start.setContentDescription(RideService.running?"현재 GPS 기록을 저장 후 종료":
     RideService.autoArmed?"OBD 자동 출발 감지만 중지":"GPS 기록 시작, 사용자 동의 필요");
-  hero.addView(start);
+  ExperienceUi.dock(a,start);
   if(RideService.autoArmed&&RideService.running){
    a.gap(hero,8);
    Button disarm=a.button("OBD만 중지 · GPS 기록은 계속",false,()->{
@@ -229,17 +237,16 @@ final class RideUi {
    }).setNegativeButton("취소",null).show());
   a.content.addView(rideTools);
   if(focus&&RideService.running)return; // Hide data entry only after nav selection is shown.
-  // GPS, navigation, and recent tracks are the three primary responsibilities.
-  a.gap(a.content,9);
-  a.label(a.content,"라이딩 기록",19,a.fg,true);
-  // Render controls immediately and read track/sidecar metadata on one background worker.
-  // A new render invalidates the previous snapshot; no GPS file is modified here.
-  LinearLayout historyPanel=a.col();
-  historyPanel.addView(a.text("라이딩 기록 확인 중…",13,a.muted,false));
-  a.content.addView(historyPanel);
-  loadHistoryAsync(historyPanel,a.content);
-  a.gap(a.content,12);
+  a.gap(a.content,10);
   a.label(a.content,"GPS 기록은 이 기기에 저장됩니다. 주행 중 화면 조작은 피하세요.",12,a.muted,false);
+ }
+ void switchWorkspace(String workspace){a.getSharedPreferences("ride_display",0).edit().putString("workspace",workspace).apply();a.render();}
+ void renderHistoryWorkspace(){
+  a.content.setTag("ride-history-workspace");
+  a.label(a.content,"라이딩 기록",19,a.fg,true);
+  LinearLayout historyPanel=a.col();historyPanel.addView(a.text("라이딩 기록 확인 중…",13,a.muted,false));a.content.addView(historyPanel);
+  loadHistoryAsync(historyPanel,a.content);
+  if(RideService.running)ExperienceUi.dock(a,a.button("현재 라이딩으로 돌아가기",true,()->switchWorkspace("ride")));
  }
  /** Snapshot all filesystem metadata off the Android UI thread. Stale screen loads are discarded. */
  void loadHistoryAsync(LinearLayout historyPanel,LinearLayout requestedContent){

@@ -96,8 +96,10 @@ public final class AccessibleNavigationTest {
    String id="11111111-2222-4333-8444-555555555555";
    a.arr("vehicles").put(new JSONObject().put("id",id).put("name","Test bike").put("odo",100));a.selected=id;
    a.navigate("차고");String before=a.db.toString();
-   TextView reveal=Ux106NativeUiTest.text(a.root,"상세 입력·영수증 도구 보기");
-   View details=(View)Ux106NativeUiTest.text(a.root,"정비 완료 내역 상세 입력").getParent();
+   Ux106NativeUiTest.text(a.root,"기록 추가  +").performClick();
+   View tools=a.dialog.getWindow().getDecorView();
+   TextView reveal=Ux106NativeUiTest.text(tools,"상세 입력·영수증 도구 보기");
+   View details=(View)Ux106NativeUiTest.text(tools,"정비 완료 내역 상세 입력").getParent();
    assertEquals(View.GONE,details.getVisibility());
    reveal.performClick();assertEquals(View.VISIBLE,details.getVisibility());
    assertEquals("상세 입력·영수증 도구 닫기",reveal.getText().toString());

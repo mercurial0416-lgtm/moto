@@ -64,19 +64,10 @@ final class MotoDesign {
  static void addHeader(MainActivity a,LinearLayout root){
   LinearLayout bar=new LinearLayout(a);
   bar.setGravity(Gravity.CENTER_VERTICAL);
-  bar.setPadding(a.dp(20),a.dp(16),a.dp(20),a.dp(8));
-  bar.setMinimumHeight(a.dp(62));
-  FrameLayout mark=new FrameLayout(a);mark.setBackground(a.shape(a.highlight,0,15));
-  NavIcon brand=new NavIcon(a,6,a.accent);
-  mark.addView(brand,new FrameLayout.LayoutParams(a.dp(27),a.dp(27),Gravity.CENTER));
-  LinearLayout.LayoutParams markLp=new LinearLayout.LayoutParams(a.dp(46),a.dp(46));markLp.rightMargin=a.dp(12);
-  bar.addView(mark,markLp);
-  LinearLayout titles=a.col();
-  TextView brandName=a.text("MOTO HUB",10,a.muted,true);brandName.setLetterSpacing(.14f);titles.addView(brandName);
-  TextView heading=a.text(heading(a.tab),25,a.fg,true);
-  heading.setTypeface(display());
-  heading.setLetterSpacing(-.018f);
-  titles.addView(heading);bar.addView(titles,new LinearLayout.LayoutParams(0,-2,1));
+  bar.setPadding(a.dp(20),a.dp(4),a.dp(20),a.dp(4));
+  bar.setMinimumHeight(a.dp(54));
+  NavIcon brand=new NavIcon(a,6,a.accent);LinearLayout.LayoutParams brandLp=new LinearLayout.LayoutParams(a.dp(25),a.dp(25));brandLp.rightMargin=a.dp(9);bar.addView(brand,brandLp);
+  TextView wordmark=a.text("MOTO HUB",14,a.fg,true);wordmark.setLetterSpacing(.1f);bar.addView(wordmark,new LinearLayout.LayoutParams(0,-2,1));
   if("홈".equals(a.tab)){
    TextView notice=headerAction(a,"알림");
    notice.setContentDescription("정비 알림 열기");

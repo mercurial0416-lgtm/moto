@@ -81,102 +81,47 @@ final class GarageHomeUi {
  void render(){
   JSONObject bike=a.bike();
   if(bike==null){emptyGarage();return;}
-  compactVehicleHeader(bike);
+  a.content.setTag("garage-dashboard");
+  ExperienceUi.title(a,"내 차고",a.today().replace('-','.')+"  ·  나의 바이크 라이프");
+  garageShowcase(bike);
   a.gap(a.content,14);
-  if(shortcut("ride")||RideService.running||RideService.autoArmed){
-   rideAction();a.gap(a.content,16);
-  }
-  maintenanceAttention(bike);
-  stats(bike);
-  a.gap(a.content,18);
-
-  // Three restrained, tappable shortcuts. Existing visibility and ordering preferences survive.
+  LinearLayout utilities=new LinearLayout(a);utilities.setTag("garage-utility-rail");
+  boolean stacked=ExperienceUi.stacked(a);if(stacked)utilities.setOrientation(LinearLayout.VERTICAL);
   String[] ordered=HomeShortcutOrder.parse(a.getSharedPreferences("home_shortcuts",0).getString("order",""));
-  java.util.List<String> visible=new java.util.ArrayList<>();
-  for(String key:ordered)if(!"ride".equals(key)&&shortcut(key))visible.add(key);
-  if(!visible.isEmpty()){
-   LinearLayout header=new LinearLayout(a);
-   header.setGravity(Gravity.CENTER_VERTICAL);
-   TextView label=a.text("바로가기",16,light,true);
-   header.addView(label,new LinearLayout.LayoutParams(0,-2,1));
-   TextView edit=a.text("편집",13,soft,true);
-   edit.setPadding(a.dp(12),a.dp(12),a.dp(4),a.dp(12));
-   edit.setMinHeight(a.dp(48));
-   edit.setMinWidth(a.dp(48));edit.setGravity(Gravity.CENTER);edit.setFocusable(true);
-   edit.setOnClickListener(v->editHomeShortcuts());
-   edit.setContentDescription("홈 바로가기 표시 및 순서 편집");
-   header.addView(edit);
-   a.content.addView(header);a.gap(a.content,5);
-   LinearLayout shortcuts=new LinearLayout(a);
-   boolean stacked=a.getResources().getConfiguration().fontScale>=1.45f||
-     a.getResources().getConfiguration().screenWidthDp<320;
-   if(stacked)shortcuts.setOrientation(LinearLayout.VERTICAL);
-   for(int i=0;i<visible.size();i++){
-    String key=visible.get(i);
-    LinearLayout tile=homeShortcutTile(key);
-    LinearLayout.LayoutParams lp=stacked?new LinearLayout.LayoutParams(-1,-2):
-      new LinearLayout.LayoutParams(0,-2,1);
-    if(i>0){if(stacked)lp.topMargin=a.dp(8);else lp.leftMargin=a.dp(8);}
-    shortcuts.addView(tile,lp);
-   }
-   a.content.addView(shortcuts);
-   a.gap(a.content,18);
-  }else{
-   TextView edit=a.text("바로가기 설정  ›",13,a.accent,true);
-   edit.setMinHeight(a.dp(48));
-   edit.setMinWidth(a.dp(48));edit.setGravity(Gravity.CENTER);edit.setFocusable(true);edit.setGravity(Gravity.CENTER_VERTICAL);
-   edit.setOnClickListener(v->editHomeShortcuts());
-   a.content.addView(edit);a.gap(a.content,12);
+  for(String key:ordered)if(!"ride".equals(key)&&shortcut(key)){
+   LinearLayout tile=homeShortcutTile(key);LinearLayout.LayoutParams lp=stacked?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-1,1);lp.setMargins(a.dp(3),a.dp(3),a.dp(3),a.dp(3));utilities.addView(tile,lp);
   }
-
-  // Real existing activity, not placeholder dashboard metrics.
+  a.content.addView(utilities);a.gap(a.content,16);
+  maintenanceAttention(bike);
+  ExperienceUi.spending(a,bike,false);
+  ExperienceUi.section(a,"바이크 상태","바이크 관리  ›",()->new HubScreens(a).manageBike());
+  vehicleStatus(bike);a.gap(a.content,18);
   recent(bike);a.gap(a.content,16);
-  // Secondary features behind one menu: no wall of competing home actions.
-
-
   interruptedRideShortcut();
-  if(UndoLastSave.available(a)){
-   a.gap(a.content,8);
-   TextView undo=a.text("마지막 저장 취소 · 2분",13,a.muted,true);
-   undo.setMinHeight(a.dp(48));undo.setGravity(Gravity.CENTER_VERTICAL);
-   undo.setOnClickListener(v->UndoLastSave.undo(a));
-   a.content.addView(undo);
-  }
-
+  ExperienceUi.section(a,"나만의 차고","바로가기 편집  ›",this::editHomeShortcuts);
+  if(UndoLastSave.available(a))a.action(a.content,"마지막 저장 취소 · 2분",false,()->UndoLastSave.undo(a));
+  if(shortcut("ride")||RideService.running||RideService.autoArmed){rideAction();}
  }
- /** Fuelio-like compact vehicle picker. The original photo and bike-switch actions are retained. */
- void compactVehicleHeader(JSONObject bike){
-  LinearLayout card=a.col();card.setPadding(a.dp(20),a.dp(12),a.dp(20),a.dp(20));
-  android.graphics.drawable.GradientDrawable backdrop=new android.graphics.drawable.GradientDrawable(
-   android.graphics.drawable.GradientDrawable.Orientation.TL_BR,new int[]{0xFF0D2C22,0xFF234C39});
-  backdrop.setCornerRadius(a.dp(26));card.setBackground(backdrop);
-  LinearLayout top=new LinearLayout(a);top.setGravity(Gravity.CENTER_VERTICAL);
-  TextView caption=a.text("나의 바이크",12,0xFFB8D6C3,true);top.addView(caption,new LinearLayout.LayoutParams(0,-2,1));
-  TextView switcher=a.text("변경  ›",13,0xFF91F0C9,true);switcher.setGravity(Gravity.CENTER);
-  switcher.setMinHeight(a.dp(48));switcher.setMinWidth(a.dp(60));
-  switcher.setContentDescription("바이크 선택 또는 추가");switcher.setClickable(true);switcher.setFocusable(true);
-  switcher.setOnClickListener(v->new HubScreens(a).chooseBike());top.addView(switcher);card.addView(top);
-  LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
-  LinearLayout identity=a.col();identity.setPadding(0,0,a.dp(10),0);
-  TextView name=a.text(bike.optString("name","내 바이크"),26,0xFFF3FAF3,true);name.setTypeface(MotoDesign.display());
-  name.setMaxLines(3);identity.addView(name);
-  TextView sub=a.text((bike.optInt("year")>0?bike.optInt("year")+"년식":"모델 정보")+" · "+condition(bike),13,0xFFC0D8C9,false);
-  LinearLayout.LayoutParams subLp=new LinearLayout.LayoutParams(-1,-2);subLp.topMargin=a.dp(9);identity.addView(sub,subLp);
-  identity.setClickable(true);identity.setFocusable(true);identity.setContentDescription("바이크 선택 또는 추가");
-  identity.setOnClickListener(v->new HubScreens(a).chooseBike());row.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
-  FrameLayout thumb=new FrameLayout(a);thumb.setBackground(a.shape(0xFF355D46,0,20));thumb.setClipToOutline(true);
-  ImageView photo=new ImageView(a);photo.setScaleType(ImageView.ScaleType.FIT_CENTER);thumb.addView(photo,new FrameLayout.LayoutParams(-1,-1));
-  TextView credit=a.text("",10,0xFFC0D8C9,false);boolean owned=loadBikePhoto(photo,bike,credit);
-  if(!owned){
-   JSONObject known=MotorcycleCatalog.search(a,bike.optString("name"));
-   String brand=bike.optString("catalogBrand",known==null?"":known.optString("brand"));
-   String model=bike.optString("catalogModel",known==null?"":known.optString("model"));
-   if(!brand.isEmpty()&&!model.isEmpty())MotorcyclePhoto.show(a,photo,credit,brand,model,bike.optInt("year"),bike.optString("id"));
-  }
-  thumb.setClickable(true);thumb.setFocusable(true);thumb.setContentDescription("바이크 사진 변경");
-  thumb.setOnClickListener(v->changeHeroPhoto(bike,owned));
-  int photoWidth=a.getResources().getConfiguration().fontScale>=1.5f?76:104;
-  row.addView(thumb,new LinearLayout.LayoutParams(a.dp(photoWidth),a.dp(88)));card.addView(row);a.content.addView(card);
+ /** A full-width vehicle stage combines identity, photo and mileage, rather than a small list row. */
+ void garageShowcase(JSONObject bike){
+  LinearLayout stage=a.col();stage.setTag("vehicle-stage");stage.setBackground(a.shape(surface,stroke,26));stage.setClipToOutline(true);
+  LinearLayout identity=a.col();identity.setPadding(a.dp(20),a.dp(18),a.dp(20),0);
+  LinearLayout bar=new LinearLayout(a);bar.setGravity(Gravity.CENTER_VERTICAL);
+  TextView type=a.text("MY MOTORCYCLE",10,soft,true);type.setLetterSpacing(.16f);bar.addView(type,new LinearLayout.LayoutParams(0,-2,1));
+  TextView change=a.text("선택  ▾",13,orange,true);change.setGravity(Gravity.CENTER);change.setMinHeight(a.dp(48));change.setMinWidth(a.dp(64));change.setContentDescription("바이크 선택 또는 추가");change.setClickable(true);change.setFocusable(true);change.setOnClickListener(v->new HubScreens(a).chooseBike());bar.addView(change);identity.addView(bar);
+  TextView name=a.text(bike.optString("name","내 바이크"),28,light,true);identity.addView(name);stage.addView(identity);
+  FrameLayout photoArea=new FrameLayout(a);photoArea.setBackgroundColor(0xFF0D2C22);ImageView image=new ImageView(a);image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+  TextView credit=a.text("",10,0xFFF0F7F0,false);boolean own=loadBikePhoto(image,bike,credit);photoArea.addView(image,new FrameLayout.LayoutParams(-1,-1));
+  credit.setText(own?"내 바이크 사진":"기본 일러스트 · 사진을 등록해 보세요");credit.setMaxLines(2);credit.setPadding(a.dp(8),a.dp(4),a.dp(8),a.dp(4));credit.setBackground(a.shape(0xB30B1713,0,6));FrameLayout.LayoutParams creditLp=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.END);creditLp.setMargins(a.dp(12),0,a.dp(12),a.dp(8));photoArea.addView(credit,creditLp);
+  if(!own){JSONObject known=MotorcycleCatalog.search(a,bike.optString("name"));String brand=bike.optString("catalogBrand",known==null?"":known.optString("brand"));String model=bike.optString("catalogModel",known==null?"":known.optString("model"));if(!brand.isEmpty()&&!model.isEmpty())MotorcyclePhoto.show(a,image,credit,brand,model,bike.optInt("year"),bike.optString("id"));}
+  photoArea.setContentDescription("바이크 사진 변경");photoArea.setClickable(true);photoArea.setFocusable(true);photoArea.setOnClickListener(v->changeHeroPhoto(bike,own));
+  stage.addView(photoArea,new LinearLayout.LayoutParams(-1,a.dp(170)));
+  LinearLayout footer=new LinearLayout(a);boolean stacked=ExperienceUi.stacked(a);if(stacked)footer.setOrientation(LinearLayout.VERTICAL);footer.setGravity(Gravity.CENTER_VERTICAL);footer.setPadding(a.dp(20),a.dp(12),a.dp(20),a.dp(20));
+  TextView mileage=MotoDesign.figure(a,a.num(bike.optDouble("odo")),34,light);mileage.setMaxLines(1);mileage.setAutoSizeTextTypeUniformWithConfiguration(16,34,1,android.util.TypedValue.COMPLEX_UNIT_SP);footer.addView(mileage,stacked?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
+  TextView unit=a.text("km  ·  계기판",12,soft,false);footer.addView(unit);stage.addView(footer);
+  footer.setMinimumHeight(a.dp(72));footer.setClickable(true);footer.setFocusable(true);footer.setContentDescription("계기판 누적거리 "+a.num(bike.optDouble("odo"))+" km · 직접 갱신");
+  footer.setOnClickListener(v->{if(a.readOnly||RideService.running||RideService.autoArmed||GarageBikeStatus.sold(bike.optString("soldDate"))){a.toast("주행·자동 감지를 종료하고 운행 중인 바이크를 선택한 뒤 계기판을 갱신해 주세요.");return;}new ServiceStatusUi(a).updateOdo(bike);});
+  a.content.addView(stage);
  }
  /** One icon-and-label destination per common action; never a wall of full-width buttons. */
  LinearLayout homeShortcutTile(String key){
@@ -248,11 +193,13 @@ final class GarageHomeUi {
   });
  }
  void emptyGarage(){
-  LinearLayout blank=a.col();blank.setGravity(Gravity.CENTER);blank.setPadding(a.dp(24),a.dp(45),a.dp(24),a.dp(44));blank.setBackground(a.shape(surface,stroke,16));
-  TextView intro=a.text("내 차고",12,orange,true);intro.setLetterSpacing(.16f);blank.addView(intro);
-  TextView big=a.text("첫 바이크 등록",24,light,true);LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-1,-2);bp.topMargin=a.dp(15);big.setGravity(Gravity.CENTER);blank.addView(big,bp);
-  TextView hint=a.text("바이크를 등록하고 라이딩과 정비 기록을 시작하세요.",14,soft,false);hint.setGravity(Gravity.CENTER);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.topMargin=a.dp(12);blank.addView(hint,hp);
-  Button add=a.button("바이크 등록",true,()->a.edit("vehicles",null));add.setTextColor(MotoDesign.onAccent(a.dark));LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(-1,-2);ap.topMargin=a.dp(24);blank.addView(add,ap);a.content.addView(blank);
+  ExperienceUi.title(a,"내 차고","바이크와 함께 쌓아가는 나의 기록");
+  LinearLayout welcome=a.col();welcome.setPadding(a.dp(24),a.dp(22),a.dp(24),a.dp(24));welcome.setBackground(a.shape(surface,stroke,26));
+  welcome.addView(a.text("나만의 차고를\n만들어 보세요",32,light,true));
+  ImageView visual=new ImageView(a);visual.setImageResource(R.drawable.garage_bike_outline);visual.setScaleType(ImageView.ScaleType.FIT_CENTER);welcome.addView(visual,new LinearLayout.LayoutParams(-1,a.dp(190)));
+  welcome.addView(a.text("주행거리, 주유비, 정비 일정을 한곳에.\n첫 바이크를 등록하면 시작됩니다.",15,soft,false));a.content.addView(welcome);a.gap(a.content,14);
+  a.action(a.content,"백업에서 내 기록 가져오기",false,()->new HubScreens(a).basicBackup());
+  ExperienceUi.dock(a,a.button("첫 바이크 등록",true,()->a.edit("vehicles",null)));
  }
 
  void addHero(JSONObject bike){
@@ -365,7 +312,7 @@ final class GarageHomeUi {
  boolean loadBikePhoto(ImageView iv,JSONObject bike,TextView credit){
   File custom=a.garagePhotoFile(bike.optString("id"));
   boolean cub=BikeVisual.superCub(bike.optString("name"));
-  iv.setImageResource(cub?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
+  iv.setImageResource(cub?R.drawable.garage_super_cub:R.drawable.garage_bike_outline);
   if(custom==null||!custom.isFile())return false;
   // A user photo takes priority even while it is decoding asynchronously.
   // Binding this request to one image and bike stops rapid switching from showing a stale photo.
@@ -389,7 +336,7 @@ final class GarageHomeUi {
     if(!brand.isEmpty()&&!model.isEmpty()){
      MotorcyclePhoto.showFallback(a,iv,credit,brand,model,bike.optInt("year"),bikeId);
     }else{
-     iv.setImageResource(cub?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
+     iv.setImageResource(cub?R.drawable.garage_super_cub:R.drawable.garage_bike_outline);
      credit.setText("내 사진 손상 · 사진 변경에서 다시 선택");
     }
    });
@@ -424,73 +371,14 @@ final class GarageHomeUi {
   }
  }catch(Exception ignored){}return count;
  }
- /** Clear hierarchy: verified dashboard ODO, next service, separate GPS estimate. */
- void stats(JSONObject b){
-  String[] values={a.num(b.optDouble("odo"))+" km",nextService(b)};
-  String[] names={"계기판 누적거리","다음 정비"};
-  LinearLayout surfaceCard=a.col();
-  surfaceCard.setPadding(a.dp(16),a.dp(15),a.dp(16),a.dp(13));
-  surfaceCard.setBackground(a.shape(surface,stroke,24));
-  LinearLayout row=new LinearLayout(a);row.setGravity(Gravity.CENTER_VERTICAL);
-  boolean narrow=a.getResources().getConfiguration().fontScale>=1.35f||
-    a.getResources().getConfiguration().screenWidthDp<360;
-  if(narrow)row.setOrientation(LinearLayout.VERTICAL);
-  for(int i=0;i<2;i++){
-   final int index=i;
-   LinearLayout group=a.col();group.setGravity(Gravity.CENTER_VERTICAL);
-   group.setPadding(a.dp(7),a.dp(8),a.dp(7),a.dp(8));group.setMinimumHeight(a.dp(73));
-   group.addView(a.text(names[i]+"  ›",13,soft,false));
-   TextView value=i==0?MotoDesign.figure(a,values[i],30,light):a.text(values[i],18,light,true);
-   value.setMaxLines(2);
-   value.setAutoSizeTextTypeUniformWithConfiguration(16,i==0?30:18,1,android.util.TypedValue.COMPLEX_UNIT_SP);
-   LinearLayout.LayoutParams vp=new LinearLayout.LayoutParams(-1,-2);
-   vp.topMargin=a.dp(7);group.addView(value,vp);
-   group.setClickable(true);group.setFocusable(true);
-   if(index==0){
-    group.setContentDescription("계기판 누적거리 "+values[i]+" · 직접 갱신");
-    group.setOnClickListener(v->{
-     if(a.readOnly||RideService.running||RideService.autoArmed||
-        GarageBikeStatus.sold(b.optString("soldDate"))){
-      a.toast("주행·자동 감지를 종료하고 운행 중인 바이크를 선택한 뒤 계기판을 갱신해 주세요.");
-      return;
-     }
-     new ServiceStatusUi(a).updateOdo(b);
-    });
-   }else{
-    group.setContentDescription("다음 정비 "+values[i]+" · 정비 관리");
-    group.setOnClickListener(v->a.navigate("차고"));
-   }
-   MotoDesign.ripple(a,group,surface,0,12);
-   if(narrow){
-    row.addView(group,new LinearLayout.LayoutParams(-1,-2));
-    if(i==0){
-     View separator=new View(a);separator.setBackgroundColor(stroke);
-     LinearLayout.LayoutParams sep=new LinearLayout.LayoutParams(-1,a.dp(1));
-     sep.setMargins(0,a.dp(6),0,a.dp(6));row.addView(separator,sep);
-    }
-   }else{
-    row.addView(group,new LinearLayout.LayoutParams(0,-2,1));
-    if(i==0){
-     View separator=new View(a);separator.setBackgroundColor(stroke);
-     LinearLayout.LayoutParams sep=new LinearLayout.LayoutParams(a.dp(1),a.dp(48));
-     sep.setMargins(a.dp(8),0,a.dp(8),0);row.addView(separator,sep);
-    }
-   }
-  }
-  surfaceCard.addView(row);
-  View separator=new View(a);separator.setBackgroundColor(stroke);
-  LinearLayout.LayoutParams sep=new LinearLayout.LayoutParams(-1,a.dp(1));
-  sep.topMargin=a.dp(9);sep.bottomMargin=a.dp(12);surfaceCard.addView(separator,sep);
-  double gps=RideMileageEstimate.total(a,b.optString("id"));
-  String estimate=Double.isFinite(gps)?String.format(java.util.Locale.KOREA,"%,.1f km",gps):"확인 불가";
-  TextView gpsNote=a.text("저장된 GPS 추정 "+estimate+" · 계기판과 별도",13,soft,false);
-  gpsNote.setMaxLines(3);surfaceCard.addView(gpsNote);
-  if(OdometerAutoSyncInbox.enabled(a,b.optString("id"))){
-   TextView odoNote=a.text(OdometerAutoSyncInbox.display(a,b.optString("id")),12,soft,false);
-   LinearLayout.LayoutParams op=new LinearLayout.LayoutParams(-1,-2);op.topMargin=a.dp(8);
-   surfaceCard.addView(odoNote,op);
-  }
-  a.content.addView(surfaceCard);
+ void vehicleStatus(JSONObject bike){
+  LinearLayout panel=a.col();panel.setPadding(a.dp(18),a.dp(16),a.dp(18),a.dp(16));panel.setBackground(a.shape(surface,stroke,22));
+  panel.addView(a.text("다음 정비",12,soft,false));a.gap(panel,6);panel.addView(a.text(nextService(bike),22,light,true));
+  panel.setMinimumHeight(a.dp(80));panel.setClickable(true);panel.setFocusable(true);panel.setContentDescription("다음 정비 "+nextService(bike)+" · 정비 관리");panel.setOnClickListener(v->{a.ledgerSchedulePage=true;a.navigate("차고");});
+  a.content.addView(panel);a.gap(a.content,8);
+  double gps=RideMileageEstimate.total(a,bike.optString("id"));
+  a.label(a.content,"저장된 GPS 추정 "+(Double.isFinite(gps)?String.format(Locale.KOREA,"%,.1f km",gps):"확인 불가")+" · 계기판과 별도",12,soft,false);
+  if(OdometerAutoSyncInbox.enabled(a,bike.optString("id")))a.label(a.content,OdometerAutoSyncInbox.display(a,bike.optString("id")),12,soft,false);
  }
  /** Single prominent trip action. All consent and GPS state controls remain in RideUi. */
  void rideAction(){
@@ -503,7 +391,7 @@ final class GarageHomeUi {
   button.setMinHeight(a.dp(60));
   button.setContentDescription(running?"현재 GPS 라이딩 화면 열기":armed?
     "OBD 자동 출발 감지 화면 열기":"위치 접근 동의 후 GPS 라이딩 및 기본 내비 시작");
-  a.content.addView(button);
+  ExperienceUi.dock(a,button);
  }
  void quickNavigation(){
   NavigationChoice preferred=NavigationApps.preferred(a);

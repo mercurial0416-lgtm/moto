@@ -23,7 +23,7 @@ test('setFontFeatureSettings("tnum")' in design,
      "numeric values must use tabular digit widths")
 test(design.count("static TextView figure(") == 1,
      "one reusable figure type style")
-test("MotoDesign.figure(a,values[i],30,light)" in garage,
+test('MotoDesign.figure(a,a.num(bike.optDouble("odo")),34,light)' in garage,
      "odometer must use numeric figure style")
 test('MotoDesign.figure(a,planned?"일정 보기  ›":a.won(' in garage,
      "recent maintenance expenses must use numeric figure style")
@@ -41,9 +41,9 @@ test('void listings(){' not in records,
      "retired listing UI stays out of active screens")
 test('void listings(){' not in records,
      "retired listing UI stays out of active screens")
-test('value.setMaxLines(2)' in garage and 'value.setAutoSizeTextTypeUniformWithConfiguration(16,i==0?30:18,1,' in garage,
+test('mileage.setMaxLines(1)' in garage and 'mileage.setAutoSizeTextTypeUniformWithConfiguration(16,34,1,' in garage,
      "odometer/maintenance values should have room for large text")
-test('vp.topMargin=a.dp(7);group.addView(value,vp)' in garage,
+test('footer.setMinimumHeight(a.dp(72))' in garage,
      "metrics cannot use a hardcoded one-line height")
 test('void listings(){' not in records,
      "retired listing UI stays out of active screens")
@@ -64,6 +64,6 @@ test('new RideUi(a).requestStart(true)' in garage and
      'setPositiveButton("저장하고 종료"' in rideui and
      'RideService.STOP' in rideui and '".done"' in rideui,
      "ride start consent, stop confirmation and verified finish still wired")
-test('switchBike(direction)' in garage and 'changeHeroPhoto(bike,owned)' in garage,
+test('switchBike(direction)' in garage and 'changeHeroPhoto(bike,own)' in garage,
      "photo editing and multi-bike switching still wired")
 print(f"PASS UX39 typography / graphics / actions: {checks} checks")

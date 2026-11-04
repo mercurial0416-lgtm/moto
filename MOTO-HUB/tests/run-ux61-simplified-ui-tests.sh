@@ -7,7 +7,7 @@ p=Path("app/src/main/java/com/motohub/next")
 settings=(p/"HubScreens.java").read_text()
 ride=(p/"RideUi.java").read_text()
 main=(p/"MainActivity.java").read_text()
-assert 'void settings(){a.section("데이터 보호")' in settings
+assert 'void settingsDetails(){a.section("데이터 보호")' in settings
 assert 'line("앱 업데이트"' in settings
 assert settings.index('line("앱 업데이트"')<settings.index('a.section("라이딩 설정")')
 assert 'line("기변 계산기"' not in settings

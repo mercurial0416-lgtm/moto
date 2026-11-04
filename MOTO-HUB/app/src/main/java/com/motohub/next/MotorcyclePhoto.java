@@ -157,7 +157,7 @@ final class MotorcyclePhoto {
   long requestToken=PhotoRequestGuard.begin(target);
   credit.setOnClickListener(null); // Never leave a previous model's source link active.
   // A reused preview must not keep displaying the previous motorcycle during lookup/failure.
-  target.setImageResource(BikeVisual.superCub(model)?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);
+  target.setImageResource(BikeVisual.superCub(model)?R.drawable.garage_super_cub:R.drawable.garage_bike_outline);
   if(brand.isEmpty()||model.isEmpty()) {credit.setText(garageMode?"모델 정보 확인 필요 · 탭해서 사진 직접 등록":"모델 정보를 선택하면 사진을 검색해요");if(garageMode)credit.setOnClickListener(v->a.chooseGaragePhoto());return;}
   if(garageMode&&!skipInvalidLocal){
    File manual=a.garagePhotoFile(garageBikeId);

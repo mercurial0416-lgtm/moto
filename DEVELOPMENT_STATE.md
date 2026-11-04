@@ -1,25 +1,18 @@
 # MOTO HUB 개발 상태
 
-## UI 전면 개편 — 앱 화면 묶음
+## 최신 UI 작업 — 화면 구조 및 사용자 흐름 재설계
 
-- 사용자 요청에 따라 홈·라이딩·정비/주유·설정의 네이티브 UI를 재구성. 녹색/민트와 아이보리 공통 팔레트, 브랜드 헤더, 바이크 히어로, 큰 계기판 수치, 카드형 목록과 하단 내비게이션 적용.
-- 라이트/다크 설정을 Android 네이티브 대화상자에도 반영. 바이크 사진/선택, 기존 네 개 목적지, 주유/정비 입력, GPS 시작/저장 동의와 데이터 API는 보존.
-- `DashboardDesignTest` 2개 및 기존 Commercial/Native/AccessibleNavigation UI 테스트 통과. 320/393dp, 라이트/다크, 1.5배 글씨로 네 화면을 네이티브 렌더링하고 전환 전후 DB 동일성을 검사. 기존 내비게이션 검사는 2배 글씨까지 포함.
-- 정적 검사 UX38 26개·UX39 22개 통과. 디자인 수치를 고정한 UX14/UX106 검사만 새 팔레트·곡률·타이포그래피에 맞추고 기존 동작/데이터/동의 검사는 유지.
-- 두 번째 묶음인 위젯·아이콘 재설계와 전체 통합 검증은 아래 최신 결과에 따름. 프리뷰는 테스트 데이터로 생성한 네이티브 렌더이며 실기기 검증을 대체하지 않음.
-
-## UI 전면 개편 — 위젯·아이콘 및 최종 검증
-
-- 첫 묶음 앱 UI 커밋: `9baf0d0`. 두 번째 묶음은 크기 대응형 대시보드 위젯(4×2)·작은 바로가기(2×1), 주행/내비/주유 벡터 아이콘, M/바이크 모노그램 앱 아이콘·알림 아이콘과 Android 13+ 테마 아이콘 레이어.
-- 위젯은 호스트에 맞는 제한된 높이의 카드로 표시. 축소 시 조밀한 배치로 바꾸며 작은 바로가기는 가로 폭도 반영. 1.3배 이상 글씨에서는 장식 아이콘 대신 짧은 문구를 표시하고 전체 접근성 설명·동작은 유지.
-- 큰 글씨 잘림을 실제 RemoteViews 렌더링 테스트로 먼저 재현: `redesign-widget-large-font-before.log`의 `출발 + 내비 is too tall`. 최소 폭에서 2배 글씨의 작은 위젯 잘림도 추가 수정. 최종 1.3/1.5/2배 글씨의 최소 크기 테스트 통과.
-- `RedesignWidgetTest` 7개: 라이트/다크 명암 대비, 48dp 이상 터치 높이, 크기 변경, 텍스트 잘림, 주행 동의/내비 실행 분리, 사용자 선택/위젯별 PendingIntent 보존, DB 비접근, 네이티브 단색 아이콘 검사.
-- 최종 `assembleDebug`, `lintDebug`, `testDebugUnitTest`: BUILD SUCCESSFUL. 89 suites 총 278개: 통과 275 / 건너뜀 3 / 실패·오류 0. Lint 오류 0 / 경고 80(기준 93). 위젯 XML 문자열 리소스 통합과 불필요한 레이아웃/중복 drawable 속성 정리 포함.
-- 기존 `tests/run-*.sh` 176개 모두 PASS, 별도 UI 정적 조건 48개 PASS, 자동화 정책 검사 5개 PASS. 예전 디자인 수치·직접 호출 문자열을 고정한 검사만 새 구성으로 갱신하고 데이터/동의/백업/서명 관련 검사는 보존.
-- 검증 로그: `/workspace/setup-results/redesign-verified-android.log`, `redesign-final-regressions.log`, `redesign-final-regression-status.tsv`, `redesign-widget-final.log`. 초기 실패 로그는 별도 보존; 최종 통과와 구분.
-- 디버그 APK Android v2 서명 검증 성공. SHA256 `92b266dcb960011278b0f1703f8c0eced3b34dc31b597cdab96c20f5d577fa61`. package `com.motohub.next`, versionCode 518, Android Debug 인증서. 기존 공식 서명/v575 설치본 업데이트용이 아니며 설치본 삭제를 안내하지 않음.
-- 새 화면·위젯·아이콘 프리뷰와 테스트 APK는 별도 `artifacts/redesign-<소스 SHA>` 브랜치로 전달. 소스 작업 브랜치에는 APK/PNG 미추가. 공식 배포·업데이트 매니페스트·서명 키·기록 형식·GPS 원본 변경 없음.
-- 실기기 런처 크기 변경·테마 아이콘·TalkBack·GPS/백그라운드·실제 설치 업데이트는 미검증. 매시간 실행 예약은 여전히 미등록이며 자동 반복을 약속하지 않음.
+- 사용자 추가 지시: 기존 구성에 색만 바꾸지 말고 전면 재개편. 첫 시안 커밋 `9baf0d0`/`1589164` 이후 아래 구조로 교체. 이전 시안 APK는 전달하지 않음.
+- 홈: 작은 차량 행과 KPI 묶음을 제거하고 전체 폭 바이크 전시·사진·계기판 거리, 빠른 실행, 실제 월 지출 요약, 다음 정비와 최근 기록으로 재구성. 라이딩 버튼은 스크롤 밖 고정. 빈 차고도 새 등록/백업 진입 화면으로 교체.
+- 라이딩: 원형 계기판 + 고정 GPS 시작/저장 종료, 주행 화면/기록 보관함 전환. GPS 수신 전 숫자를 꾸미지 않고 미수신 표시. 주행 집중 모드, 동의, GPS 저장 검증, OBD만 해제, 내비만 실행은 보존.
+- 기록: 날짜 축 타임라인/정비 일정 전환, 고정 기록 추가 버튼, 별도 입력 화면과 분석 화면. 지출 요약과 6개월 그래프는 기존 RecordMonthlySummary의 미래/예정 제외 규칙을 사용.
+- 설정: 바이크·위젯·백업·유지비 2열 관리 허브와 전체 설정 진입/뒤로가기. 위치 공유 중일 때 즉시 중지 동작을 기본 허브에도 표시. 네 개 목적지와 기존 데이터/백업/동의/업데이트 API는 유지.
+- 사진 선택·비동기 로딩·모델 사진 출처를 보존하고 기본 일러스트만 벡터로 교체. 개인 사진을 덮어쓰거나 모델 예시를 실제 사진으로 표시하지 않음.
+- 새 구조 검사 `ExperienceStructureTest` 6개: 전체 폭 사진과 고정 버튼, 2배 글씨 계기판, 주행/기록 전환, 기록/일정/입력 분리, 주행 종료 확인과 집중 모드, 관리 허브와 뒤로가기. Commercial/Dashboard/AccessibleNavigation/기존 폼 테스트 포함해 통합 검증.
+- 최종 Android build/lint/unit: BUILD SUCCESSFUL. 90 suites 총 284개 = 통과 281 / 건너뜀 3 / 실패·오류 0. Lint 오류 0 / 경고 85. 실기기 검증과 구분.
+- 회귀 스크립트 최초 174 PASS/2 과거 UI 소스 문자열 검사 FAIL. ODO의 변수명 `b→bike`, 상세 설정 함수 분리를 반영해 두 검사 재실행 PASS. 최종 각 176개 최신 결과 PASS. 데이터·ODO·GPS 동의 검사는 유지. 별도 UI 정적 조건 48개 PASS.
+- 로그: `/workspace/setup-results/restructure-verified-android.log`, `restructure-regressions.log`, `restructure-ux104-rerun.log`, `restructure-ux61-rerun.log`, `restructure-verified-regression-status.tsv`. 처음 실패 결과와 최종 통과 결과를 별도 보존.
+- 스크린샷은 테스트 데이터의 Android 네이티브 렌더. 실제 단말 런처·TalkBack·GPS·백그라운드·설치 업데이트는 미검증. 정식 배포와 업데이트 매니페스트는 변경하지 않음.
 
 ## 최신 실행 정책
 

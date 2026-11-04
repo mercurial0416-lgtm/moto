@@ -7,7 +7,7 @@ from pathlib import Path
 s=Path('app/src/main/java/com/motohub/next/MotorcyclePhoto.java').read_text()
 checks={
  'new photo request invalidates old request': 'PhotoRequestGuard.begin(target)' in s,
- 'preview resets previous bike image': 'target.setImageResource(BikeVisual.superCub(model)?R.drawable.garage_super_cub:R.drawable.garage_model_placeholder);' in s,
+ 'preview resets previous bike image': 'target.setImageResource(BikeVisual.superCub(model)?R.drawable.garage_super_cub:R.drawable.garage_bike_outline);' in s,
  'cached image decoded separately from metadata': 'android.graphics.Bitmap cached=decodeLocalSampled(file,1200);' in s and 'PhotoDecodeScale.sampleSize(' in s and 'PHOTO_DISK.execute' in s,
  'metadata parsing has its own fallback': 'if(attribution.isFile())try{meta=new JSONObject(readSmall(attribution));}catch(Exception ignored){}' in s,
  'valid cached photo assigned from guarded UI callback': s.index('if(attribution.isFile())try{meta=') < s.index('target.setImageBitmap(loaded);',s.index('if(attribution.isFile())try{meta=')) < s.index('boolean accepted=PhotoLookupQueue.submit'),

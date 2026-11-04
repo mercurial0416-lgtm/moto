@@ -50,19 +50,18 @@ for name, background, foreground in [
 # Modern layout regression: keep the same actions, not the old 211dp hero/card stack.
 render = home[home.index(" void render(){"):home.index(" /** Scan local GPS metadata")]
 for marker in [
-    "compactVehicleHeader(bike)", "stats(bike)", "HomeShortcutOrder.parse(",
+    "garageShowcase(bike)", "vehicleStatus(bike)", "HomeShortcutOrder.parse(",
     "rideAction()", "homeShortcutTile(key)", "recent(bike)",
     "interruptedRideShortcut()"
 ]:
     check(marker in render, "missing modern home action " + marker)
 check("showHomeTools(bike)" not in render and "this::costDashboard" in hub,
       "home has no duplicate tools menu; cost analysis stays in advanced tools")
-check(render.index("compactVehicleHeader(bike)") < render.index("stats(bike)") <
-      render.index("HomeShortcutOrder.parse(") < render.index("recent(bike)"),
+check(render.index("garageShowcase(bike)") < render.index("HomeShortcutOrder.parse(") <
+      render.index("vehicleStatus(bike)") < render.index("recent(bike)"),
       "vehicle, status, shortcuts and latest activity should have clear hierarchy")
-check('fontScale>=1.5f?76:104' in home and
-      'row.addView(thumb,new LinearLayout.LayoutParams(a.dp(photoWidth),a.dp(88)))' in home,
-      "vehicle thumbnail should not monopolize the viewport")
+check('stage.addView(photoArea,new LinearLayout.LayoutParams(-1,a.dp(170)))' in home,
+      "vehicle stage keeps a bounded photograph area")
 check('void homeShortcutTile' not in home and 'LinearLayout homeShortcutTile(String key)' in home,
       "compact icon shortcut builder missing")
 check('new QuickEntryUi(a).fuel()' in home and
@@ -74,7 +73,7 @@ check('new RideUi(a).requestStart(true)' in home,
 check('setPositiveButton("저장하고 종료"' in rideui and
       'void finishWithSummary()' in rideui and 'RideService.STOP' in rideui,
       "confirmed GPS stop and verified save must remain available")
-check('changeHeroPhoto(bike,owned)' in home and 'switchBike(direction)' in home,
+check('changeHeroPhoto(bike,own)' in home and 'switchBike(direction)' in home,
       "photo editing or multi-bike switch implementation lost")
 check('String[] labels={"홈","라이딩","정비·주유","설정"}' in design,
       "navigation labels inconsistent")

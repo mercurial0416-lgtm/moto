@@ -131,7 +131,7 @@ final class MotorcyclePhotoGallery {
   row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(a.dp(10),a.dp(10),a.dp(10),a.dp(10));
   row.setBackground(a.shape(a.panel,a.line,12));
   ImageView image=new ImageView(a);image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-  image.setImageResource(R.drawable.garage_model_placeholder);
+  image.setImageResource(R.drawable.garage_bike_outline);
   row.addView(image,new LinearLayout.LayoutParams(a.dp(110),a.dp(84)));
   LinearLayout details=a.col();details.setPadding(a.dp(12),0,0,0);
   TextView name=a.text(choice.optString("label","모델 사진"),13,a.fg,true);name.setMaxLines(2);details.addView(name);
