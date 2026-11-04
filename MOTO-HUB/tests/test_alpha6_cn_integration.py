@@ -13,7 +13,7 @@ checks={
  'bounded reconnection preserved': 'ObdConnectionPolicy.shouldRetry' in monitor,
  'ODO automatic polling only with verified ECU capability and explicit opt-in': 'listener.allowOdometer()' in monitor and 'odoSupported&&listener.allowOdometer()' in monitor and 'OdoAutoSyncPolicy.consistent(a,b)' in monitor and 'ObdReadOnlyProtocol.query("01A6")' in monitor,
  'no ECU writes': 'ObdReadOnlyProtocol.query("010D")' in monitor and 'ATSH' not in monitor and 'CLEAR' not in monitor,
- 'durable recovery marker': 'markerOut.getFD().sync()' in recovery and 'if(marker.isFile())marker.delete();' in recovery and 'Files.move(originalCopy,track.toPath()' in recovery,
+ 'durable recovery marker': 'markerOut.getFD().sync()' in recovery and 'markerCreated=true;' in recovery and 'if(markerCreated&&marker.isFile())marker.delete();' in recovery and 'Files.move(originalCopy,track.toPath()' in recovery,
  'opt-in privacy': 'Sharing.stop(); // Automatic local rides' in service,
  'never boot auto record': 'startForegroundService' not in source('BootRideReminder.java'),
  'KakaoNavi separate': 'KakaoNaviLaunch.open(activity)' in screen,

@@ -13,7 +13,7 @@ final class TrackRecovery {
  }
  static Result recover(File track)throws Exception {return recover(track,()->{});}
  /** Package-private fault hook exercises rollback after replacement but before marking completion. */
- static Result recover(File track,Runnable beforeMark)throws Exception {
+ static synchronized Result recover(File track,Runnable beforeMark)throws Exception {
   if(track==null||!track.isFile()||!track.getName().matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"))
    throw new IOException("올바른 GPS 기록 파일을 선택해 주세요.");
   if(track.length()>TrackFile.MAX_BYTES)throw new IOException("경로 파일 크기 초과");
@@ -30,7 +30,7 @@ final class TrackRecovery {
   if(complete==0)throw new IOException("복구 가능한 완성된 좌표가 없습니다.");
   long dropped=length-complete;
   Path temporary=null,originalCopy=null;
-  boolean replaced=false,committed=false;
+  boolean replaced=false,committed=false,markerCreated=false;
   try{
    if(dropped>0){
     Path parent=track.getParentFile().toPath();
@@ -59,6 +59,7 @@ final class TrackRecovery {
    }
    beforeMark.run();
    if(!marker.createNewFile())throw new IOException("복구 완료 표시를 저장하지 못했습니다.");
+   markerCreated=true;
    try(FileOutputStream markerOut=new FileOutputStream(marker,true)){
     markerOut.getFD().sync();
    }
@@ -66,7 +67,7 @@ final class TrackRecovery {
    return new Result(points,dropped);
   }catch(Exception failure){
    if(!committed){
-    if(marker.isFile())marker.delete();
+    if(markerCreated&&marker.isFile())marker.delete();
     if(replaced&&originalCopy!=null){
      try{
       Files.move(originalCopy,track.toPath(),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);

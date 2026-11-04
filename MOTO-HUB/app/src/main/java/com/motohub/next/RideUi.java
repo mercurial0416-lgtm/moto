@@ -597,6 +597,29 @@ final class RideUi {
    }).setNegativeButton("취소",null).show();
   }).setNegativeButton("취소",null).show();
  }
+ /** Recovery mutates the original GPS file: reserve it against exports, restores,
+  * form writes and new/live rides, and honor the existing protection state. */
+ void recoverInterrupted(File f){
+  if(a.readOnly){a.error("원본 보호 상태에서는 GPS 기록을 변경할 수 없어요.");return;}
+  new Thread(()->{
+   try{
+    if(!RestoreRideGate.begin(RideService.running||RideService.saving(),RideService.autoArmed))
+     throw new IOException("라이딩·저장·백업·복원 중에는 GPS를 복구할 수 없어요.");
+    TrackRecovery.Result result;
+    try{
+     if(a.readOnly)throw new IOException("원본 보호 상태에서는 GPS 기록을 변경할 수 없어요.");
+     if(f==null||!TrackFile.directory(a.getFilesDir()).getCanonicalFile().equals(f.getCanonicalFile().getParentFile()))
+      throw new IOException("앱에 저장된 GPS 원본만 복구할 수 있어요.");
+     result=TrackRecovery.recover(f);
+    }finally{RestoreRideGate.end();}
+    a.runOnUiThread(()->{
+     if(a.isFinishing()||a.isDestroyed())return;
+     a.toast("복구 완료 · "+result.points+"개 좌표 · 제거 "+result.discardedBytes+"바이트");
+     a.render();a.rebuildGpsEstimateAsync();a.openRideInsights(f);
+    });
+   }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 복구 실패: "+e.getMessage());});}
+  },"MOTO-ride-recovery").start();
+ }
  void showHistoryResults(LinearLayout results,List<HistoryEntry> entries,int total,String selected,TextView summary){
   results.removeAllViews();
   int count=0;
@@ -639,11 +662,7 @@ final class RideUi {
        .setMessage("강제 종료나 GPS 오류로 중단된 기록이야. 정상 저장된 좌표만 보존하고, 쓰다 만 마지막 행이 있다면 제거해. 원본을 교체하므로 먼저 전체 ZIP 백업을 권장해.")
        .setNegativeButton("취소",null)
        .setNeutralButton("복구 없이 분석",(d,w)->a.openRideInsights(f))
-       .setPositiveButton("복구",(d,w)->new Thread(()->{
-        try{TrackRecovery.Result result=TrackRecovery.recover(f);
-         a.runOnUiThread(()->{if(a.isFinishing()||a.isDestroyed())return;a.toast("복구 완료 · "+result.points+"개 좌표 · 제거 "+result.discardedBytes+"바이트");a.render();a.openRideInsights(f);});
-        }catch(Exception e){a.runOnUiThread(()->{if(!a.isFinishing()&&!a.isDestroyed())a.error("GPS 복구 실패: "+e.getMessage());});}
-       },"MOTO-ride-recovery").start()).show();
+       .setPositiveButton("복구",(d,w)->recoverInterrupted(f)).show();
       return;
      }
      a.openRideInsights(f);
