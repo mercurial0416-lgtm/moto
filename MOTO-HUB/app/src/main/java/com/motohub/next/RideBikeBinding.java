@@ -37,11 +37,14 @@ final class RideBikeBinding {
  }
  static void write(File track,String id)throws IOException{
   if(!valid(id))throw new IOException("올바른 바이크 식별자가 아닙니다.");
-  if(track==null||!track.isFile()||!track.getName().matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track")||
+  if(track==null||!track.isFile()||Files.isSymbolicLink(track.toPath())||
+    !track.getName().matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track")||
     !"rides".equals(track.getCanonicalFile().getParentFile().getName()))
    throw new IOException("저장된 라이딩 기록만 연결할 수 있어요.");
   File marker=new File(track.getPath()+".bike");
   File temp=new File(marker.getPath()+".writing");
+  if(Files.isSymbolicLink(marker.toPath())||Files.isSymbolicLink(temp.toPath()))
+   throw new IOException("안전하지 않은 바이크 연결 경로입니다.");
   try{
    try(FileOutputStream output=new FileOutputStream(temp)){
     output.write(id.getBytes(StandardCharsets.US_ASCII));output.getFD().sync();

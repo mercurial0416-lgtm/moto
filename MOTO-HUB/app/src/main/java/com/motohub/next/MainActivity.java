@@ -949,11 +949,23 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       for(int i=0;i<vehicles.size();i++)names[i]=vehicles.get(i).optString("name")+" · "+vehicles.get(i).optInt("year")+"년식";
       new AlertDialog.Builder(this).setTitle("이 라이딩을 기록한 바이크")
        .setMessage("로컬 라이딩 기록에만 연결하며 계기판 주행거리는 변경하지 않습니다.")
-       .setItems(names,(dialog,which)->attempt(()->{
-        if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active))throw new IOException("주행이 끝난 뒤 변경해 주세요.");
-        RideBikeBinding.write(track,vehicles.get(which).optString("id"));
-        close();openRideInsights(track);
-       })).setNegativeButton("취소",null).show();
+       .setItems(names,(dialog,which)->{
+        if(readOnly){error("데이터 보호 상태에서는 바이크 연결을 변경할 수 없어요.");return;}
+        final String chosenBikeId=vehicles.get(which).optString("id");
+        final Set<String> appliedNames=new HashSet<>();
+        JSONObject ledger=settings().optJSONObject("appliedRides");
+        if(ledger!=null){Iterator<String> keys=ledger.keys();while(keys.hasNext())appliedNames.add(keys.next());}
+        new Thread(()->{
+         try{
+          if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active))
+           throw new IOException("주행이 끝난 뒤 변경해 주세요.");
+          RideSessionBikeBinding.write(getFilesDir(),track,chosenBikeId,appliedNames);
+          runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){close();openRideInsights(track);}});
+         }catch(IOException ex){
+          runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("바이크 연결 실패: "+ex.getMessage());});
+         }
+        },"moto-ride-bike-binding").start();
+       }).setNegativeButton("취소",null).show();
      });
      label(p,"라이딩 유형: "+RideCategory.label(track,info)+(RideCategory.AUTO.equals(RideCategory.read(track))?" · 자동 추천":" · 직접 선택"),15,accent,true);
      action(p,"라이딩 유형 변경 (출퇴근·와인딩·장거리)",false,()->{

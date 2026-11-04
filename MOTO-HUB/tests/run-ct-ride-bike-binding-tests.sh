@@ -18,6 +18,8 @@ checks={
  'ride start stores local binding': 'RideBikeBinding.write(track,pendingBikeId)' in r,
  'history shows bike label': '연결된 바이크:' in a,
  'applied ODO verifies bike association': 'latestRideBike=RideBikeBinding.readStrict(track)' in a,
+ 'manual bike edit updates whole GPS session': 'RideSessionBikeBinding.write(getFilesDir(),track,chosenBikeId,appliedNames)' in a,
+ 'manual bike edit checks all applied ride IDs': 'while(keys.hasNext())appliedNames.add(keys.next());' in a,
  'ride quarantine retains association for restore': 'RideStorageManager.confirm(this,track,()->close())' in a and '".bike"' in (root/'RideTrash.java').read_text() and 'RideTrash.move(a.getFilesDir(),track)' in (root/'RideStorageManager.java').read_text(),
 }
 for title,passed in checks.items():
