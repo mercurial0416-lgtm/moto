@@ -49,7 +49,7 @@ public final class CommercialUiTest {
    for(String theme:new String[]{"light","dark"}){
     a.settings().put("theme",theme);a.tab="홈";a.render();
     View change=Ux106NativeUiTest.desc(a.root,"기본 내비게이션 앱 변경");
-    assertNotNull(change);assertTrue(change.isClickable());assertTrue(change.getMinimumHeight()>=a.dp(48));
+    assertNotNull(change);assertTrue(change.isClickable());assertTrue(((TextView)change).getMinHeight()>=a.dp(48));
     TextView ride=Ux106NativeUiTest.text(a.root,"라이딩 시작");assertNotNull(ride);
     assertEquals(MotoDesign.onAccent(a.dark),ride.getCurrentTextColor());
     capture(a,"home-"+theme,393,852);
