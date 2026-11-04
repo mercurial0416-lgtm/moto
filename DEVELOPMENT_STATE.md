@@ -14,6 +14,15 @@
 - 로그: `/workspace/setup-results/restructure-verified-android.log`, `restructure-regressions.log`, `restructure-ux104-rerun.log`, `restructure-ux61-rerun.log`, `restructure-verified-regression-status.tsv`. 처음 실패 결과와 최종 통과 결과를 별도 보존.
 - 스크린샷은 테스트 데이터의 Android 네이티브 렌더. 실제 단말 런처·TalkBack·GPS·백그라운드·설치 업데이트는 미검증. 정식 배포와 업데이트 매니페스트는 변경하지 않음.
 
+## 최신 위젯 구조 및 검토용 APK
+
+- 앱 구조 묶음 `05fc8b6`에 이어 위젯을 별도 묶음으로 재구성. 4×2 대시보드는 차량/내비 정보를 왼쪽, 큰 출발/내비 실행을 오른쪽에 배치. 2×2 바로가기 패드는 사용자 선택 두 동작을 세로로 배치.
+- 기존 크기로 줄인 인스턴스에는 2×1 가로 배치 제공. 기본 패드 120dp/대시보드 140dp, 카드 외부는 투명. 모든 표시 동작 48dp 이상, 1.3/1.5/2배 글씨, 라이트/다크 대비, 위젯별 동작/동의 구분, DB 비접근 검사 7개 통과.
+- 앱·알림·테마 아이콘은 새 M/바이크 벡터 계열 유지. 위젯 선택/홈 추가 안내도 실제 2×2/4×2 크기로 맞춤.
+- 위 앱 구조와 위젯을 합친 최종 검증: Android 284개 중 281 통과/3 건너뜀/실패·오류 0, Lint 오류 0/경고 85, 기존 회귀 176개 최신 결과 PASS. APK의 v2 서명 검증 성공.
+- 검토용 APK SHA256 `60d4fa54a6e1ef06a9b55f3b7fe80cc0b9810d1c8d44f591e060b347fd3bd437`. package `com.motohub.next`, debug versionCode 518, Android Debug 인증서. 기존 정식 v575 앱을 덮어쓰는 업데이트용이 아니며 기존 앱 삭제 금지.
+- 네이티브 프리뷰와 APK는 소스와 분리한 `artifacts/redesign-<최종 소스 SHA>` 브랜치로 전달. 원격 전달 후 불변 커밋 다운로드 링크의 전체 파일 SHA256을 재확인한다. 공식 APK 배포/업데이트 매니페스트/고정 서명은 변경하지 않음.
+
 ## 최신 실행 정책
 
 - 사용자 최신 지시: 실행당 근거 있는 개선 두 묶음 이상, 반복 간격 1시간. 아래의 과거 305분 기록보다 이 지시가 우선한다.

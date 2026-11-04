@@ -44,16 +44,16 @@ public final class RedesignWidgetTest {
    RuntimeEnvironment.setQualifiers("ko-rKR-w393dp-h852dp-"+mode+"-xhdpi");
    assertTrue(CommercialUiTest.contrast(c.getColor(R.color.widget_text),c.getColor(R.color.widget_surface))>=4.5);
    assertTrue(CommercialUiTest.contrast(c.getColor(R.color.widget_on_primary),c.getColor(R.color.widget_primary))>=4.5);
-   View full=MotoWidgetProvider.build(c).apply(c,new FrameLayout(c));capture(c,full,"widget-full-"+mode,340,132);
+   View full=MotoWidgetProvider.build(c).apply(c,new FrameLayout(c));capture(c,full,"widget-full-"+mode,340,140);
    for(int id:new int[]{R.id.widget_home,R.id.widget_nav_choice,R.id.widget_ride,R.id.widget_nav}){
     View button=full.findViewById(id);assertNotNull(button);assertTrue(button.isClickable());assertTrue(button.getHeight()>=px(c,48));
    }
    View compact=MotoWidgetProvider.build(c,true).apply(c,new FrameLayout(c));capture(c,compact,"widget-compact-"+mode,300,72);
    assertTrue(compact.findViewById(R.id.widget_ride).getHeight()>=px(c,48));
-   View quick=MotoQuickWidgetProvider.build(c,71,false).apply(c,new FrameLayout(c));capture(c,quick,"widget-quick-"+mode,160,76);
+   View quick=MotoQuickWidgetProvider.build(c,71,false).apply(c,new FrameLayout(c));capture(c,quick,"widget-quick-"+mode,160,120);
    View small=MotoQuickWidgetProvider.build(c,71,true).apply(c,new FrameLayout(c));capture(c,small,"widget-quick-small-"+mode,140,56);
    for(int id:new int[]{R.id.quick_ride,R.id.quick_nav}){
-    TextView button=quick.findViewById(id);assertNotNull(button.getCompoundDrawables()[1]);assertTrue(button.isClickable());assertTrue(button.getHeight()>=px(c,48));
+    TextView button=quick.findViewById(id);assertNotNull(button.getCompoundDrawables()[0]);assertTrue(button.isClickable());assertTrue(button.getHeight()>=px(c,48));
     assertTrue(((TextView)small.findViewById(id)).getHeight()>=px(c,48));
    }
   }
@@ -67,10 +67,10 @@ public final class RedesignWidgetTest {
  }
  @Test public void resizingSelectsCompactLayoutWithoutChangingActions(){
   Bundle shortSize=new Bundle();shortSize.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,72);assertTrue(MotoWidgetProvider.compact(shortSize));
-  shortSize.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,140);assertFalse(MotoWidgetProvider.compact(shortSize));
+  shortSize.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,160);assertFalse(MotoWidgetProvider.compact(shortSize));
   assertFalse(MotoWidgetProvider.compact(new Bundle()));
-  Bundle quickSize=new Bundle();quickSize.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,110);quickSize.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,80);
-  assertTrue(MotoQuickWidgetProvider.compact(quickSize));quickSize.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,140);assertFalse(MotoQuickWidgetProvider.compact(quickSize));
+  Bundle quickSize=new Bundle();quickSize.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,110);quickSize.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,140);
+  assertFalse(MotoQuickWidgetProvider.compact(quickSize));quickSize.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,140);assertFalse(MotoQuickWidgetProvider.compact(quickSize));
   quickSize.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,56);assertTrue(MotoQuickWidgetProvider.compact(quickSize));
  }
  @Test public void largeWidgetTextFitsAtMinimumSizesWithoutTruncation()throws Exception{
@@ -80,10 +80,10 @@ public final class RedesignWidgetTest {
    c.getResources().updateConfiguration(config,c.getResources().getDisplayMetrics());
    for(boolean compact:new boolean[]{false,true}){
     View full=MotoWidgetProvider.build(c,compact).apply(c,new FrameLayout(c));
-    capture(c,full,"widget-large-font-"+scale+"-"+compact,220,compact?72:124);
+    capture(c,full,"widget-large-font-"+scale+"-"+compact,220,compact?72:140);
     for(int id:new int[]{R.id.widget_ride,R.id.widget_nav})assertTextFits((TextView)full.findViewById(id));
     View quick=MotoQuickWidgetProvider.build(c,71,compact).apply(c,new FrameLayout(c));
-    capture(c,quick,"widget-quick-large-font-"+scale+"-"+compact,compact?110:140,compact?56:76);
+    capture(c,quick,"widget-quick-large-font-"+scale+"-"+compact,110,compact?56:120);
     for(int id:new int[]{R.id.quick_ride,R.id.quick_nav})assertTextFits((TextView)quick.findViewById(id));
    }
   }

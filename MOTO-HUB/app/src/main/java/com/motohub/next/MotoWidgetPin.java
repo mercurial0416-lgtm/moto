@@ -14,7 +14,7 @@ final class MotoWidgetPin {
   }
   Class<?> provider=quick?MotoQuickWidgetProvider.class:MotoWidgetProvider.class;
   boolean requested=widgets.requestPinAppWidget(new ComponentName(a,provider),null,null);
-  a.toast(requested?(quick?"바로가기 2×1":"대시보드 4×2")+" 위젯 추가 요청을 보냈어요. 홈 화면에서 승인해 주세요.":
+  a.toast(requested?(quick?"바로가기 패드 2×2":"대시보드 4×2")+" 위젯 추가 요청을 보냈어요. 홈 화면에서 승인해 주세요.":
    "홈 화면에 위젯 추가 요청을 보낼 수 없어요. 홈 화면 위젯 목록에서 추가해 주세요.");
  }
 }

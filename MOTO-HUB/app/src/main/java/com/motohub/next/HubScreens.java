@@ -540,7 +540,7 @@ final class HubScreens {
   a.gap(a.content,16);a.label(a.content,"MOTO HUB · "+BuildConfig.VERSION_NAME,12,a.muted,false);
   a.label(a.content,"앱을 삭제하기 전 전체 ZIP 백업을 보관하세요.",12,a.muted,false);
  }
- void widgetPicker(){new AlertDialog.Builder(a).setTitle("홈 화면 위젯").setItems(new String[]{"작은 위젯 추가 (2×1)","대시보드 위젯 추가 (4×2)","위젯 버튼 변경"},(d,index)->{if(index==2)QuickWidgetChoices.configure(a);else MotoWidgetPin.request(a,index==0);}).setNegativeButton("닫기",null).show();}
+ void widgetPicker(){new AlertDialog.Builder(a).setTitle("홈 화면 위젯").setItems(new String[]{"바로가기 패드 추가 (2×2 · 축소 가능)","대시보드 위젯 추가 (4×2)","위젯 버튼 변경"},(d,index)->{if(index==2)QuickWidgetChoices.configure(a);else MotoWidgetPin.request(a,index==0);}).setNegativeButton("닫기",null).show();}
  void settingsDetails(){a.section("데이터 보호");line("백업 · 복원","라이딩 원본·사진·정비 기록을 보관하고 복원해","열기",this::basicBackup);
  // Keep ZIP freshness visible as one small line, not another large settings card.
  final TextView backupState=a.text("백업 확인 중…",12,a.muted,false);
@@ -616,7 +616,7 @@ final class HubScreens {
   a.action(p,"홈 버튼 표시 · 순서 편집",false,()->new GarageHomeUi(a).editHomeShortcuts());
   a.action(p,"홈 화면 위젯",false,()->new AlertDialog.Builder(a)
    .setTitle("홈 화면 위젯")
-   .setItems(new String[]{"작은 위젯 추가 (2×1)","대시보드 위젯 추가 (4×2)","위젯 버튼 변경"},(d,index)->{
+   .setItems(new String[]{"바로가기 패드 추가 (2×2 · 축소 가능)","대시보드 위젯 추가 (4×2)","위젯 버튼 변경"},(d,index)->{
     if(index==2)QuickWidgetChoices.configure(a);else MotoWidgetPin.request(a,index==0);
    }).setNegativeButton("닫기",null).show());
   a.action(p,"주차 위치",false,()->{

@@ -31,7 +31,7 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
  }
  static boolean compact(android.os.Bundle options){
   int height=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,0);
-  return height>0&&height<124;
+  return height>0&&height<140;
  }
  static RemoteViews build(Context context){return build(context,false);}
  static RemoteViews build(Context context,boolean compact){
@@ -49,7 +49,7 @@ public final class MotoWidgetProvider extends AppWidgetProvider {
    v.setTextViewText(R.id.widget_ride,context.getString(R.string.widget_ride_short));
    v.setTextViewText(R.id.widget_nav,context.getString(R.string.widget_nav_short));
   }
-  v.setTextViewCompoundDrawables(R.id.widget_ride,largeText?0:R.drawable.ic_widget_ride_primary,0,0,0);
+  v.setTextViewCompoundDrawables(R.id.widget_ride,!largeText&&compact?R.drawable.ic_widget_ride_primary:0,!largeText&&!compact?R.drawable.ic_widget_ride_primary:0,0,0);
   v.setTextViewCompoundDrawables(R.id.widget_nav,largeText?0:R.drawable.ic_widget_nav_secondary,0,0,0);
   v.setOnClickPendingIntent(R.id.widget_home,pending(context,51,"HOME",EXTRA_TAB,"홈"));
   v.setOnClickPendingIntent(R.id.widget_nav_choice,pending(context,52,"CHOOSE_NAV",EXTRA_SELECT_NAV,true));

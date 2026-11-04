@@ -7,7 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.widget.RemoteViews;
 
-/** Minimal 2x1 widget with user-selected launch actions, no private ride or location status. */
+/** Configurable 2x2 action pad with a compact 2x1 fallback and no ride/location status. */
 public final class MotoQuickWidgetProvider extends AppWidgetProvider {
  @Override public void onAppWidgetOptionsChanged(Context context,AppWidgetManager manager,int id,android.os.Bundle options){
   super.onAppWidgetOptionsChanged(context,manager,id,options);
@@ -15,8 +15,7 @@ public final class MotoQuickWidgetProvider extends AppWidgetProvider {
  }
  static boolean compact(android.os.Bundle options){
   int height=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,0);
-  int width=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,0);
-  return (height>0&&height<76)||(width>0&&width<140);
+  return (height>0&&height<120);
  }
  private static PendingIntent launch(Context context,int widgetId,int slot,String action){
   Intent open=new Intent(context,MainActivity.class)
@@ -44,9 +43,9 @@ public final class MotoQuickWidgetProvider extends AppWidgetProvider {
    String bike=WidgetBikeSnapshot.label(context);
    boolean largeText=context.getResources().getConfiguration().fontScale>=1.3f;
    views.setTextViewText(R.id.quick_ride,visualLabel(first));
-   views.setTextViewCompoundDrawables(R.id.quick_ride,0,largeText?0:icon(first,true),0,0);
+   views.setTextViewCompoundDrawables(R.id.quick_ride,!largeText&&!compact?icon(first,true):0,!largeText&&compact?icon(first,true):0,0,0);
    views.setTextViewText(R.id.quick_nav,visualLabel(second));
-   views.setTextViewCompoundDrawables(R.id.quick_nav,0,largeText?0:icon(second,false),0,0);
+   views.setTextViewCompoundDrawables(R.id.quick_nav,!largeText&&!compact?icon(second,false):0,!largeText&&compact?icon(second,false):0,0,0);
    views.setContentDescription(R.id.quick_ride,bike+" · "+QuickWidgetChoices.label(first)+" 바로가기");
    views.setContentDescription(R.id.quick_nav,bike+" · "+QuickWidgetChoices.label(second)+" 바로가기");
    views.setOnClickPendingIntent(R.id.quick_ride,launch(context,id,1,first));
