@@ -1,0 +1,12 @@
+[Unit]
+Description=Run MOTO HUB development every hour in Asia/Seoul
+
+[Timer]
+OnCalendar=*-*-* *:27:37 Asia/Seoul
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=false
+Unit=moto-hourly.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=MOTO HUB hourly validated development attempt
+
+[Service]
+Type=oneshot
+WorkingDirectory=/workspace/moto
+ExecStart=/usr/bin/python3 /workspace/moto/automation/dispatch.py /bin/bash /workspace/moto/automation/run-development.sh
+TimeoutStartSec=infinity

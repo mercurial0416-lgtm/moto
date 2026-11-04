@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One anchored 305-minute attempt per slot, invoked by an external minute timer.
+"""One anchored hourly attempt per slot, invoked by an external minute timer.
 No daemon is installed by this file. State must be on persistent local storage.
 """
 import argparse
@@ -12,7 +12,7 @@ import time
 from zoneinfo import ZoneInfo
 
 ANCHOR = int(datetime.fromisoformat('2026-11-05T00:27:37+09:00').timestamp())
-INTERVAL = 305 * 60
+INTERVAL = 60 * 60
 
 def slot_at(now):
     return (now - ANCHOR) // INTERVAL if now >= ANCHOR else -1
@@ -33,10 +33,14 @@ def dispatch(state_dir, runner, now=None, dry_run=False):
             return 0  # A prior execution still owns the workspace.
         state = state_dir / 'state.json'
         previous = json.loads(state.read_text()) if state.exists() else {}
-        if slot < 0 or slot <= previous.get('slot', -1):
+        # Compare attempt timestamps, so switching the old 305-minute schedule
+        # to hourly cannot reuse an incompatible persisted slot number.
+        last_attempt = previous.get('attempted_at')
+        previous_slot = slot_at(last_attempt) if isinstance(last_attempt, int) else previous.get('slot', -1)
+        if slot < 0 or slot <= previous_slot:
             return 0
         # Record the attempt before launching: crashes/quota failures cannot loop.
-        record = {'slot': slot, 'attempted_at': now, 'status': 'attempted'}
+        record = {'slot': slot, 'attempted_at': now, 'status': 'attempted', 'interval_seconds': INTERVAL}
         temp = state_dir / 'state.tmp'
         temp.write_text(json.dumps(record))
         temp.replace(state)

@@ -21,6 +21,20 @@ class DispatcherTest(unittest.TestCase):
             self.assertEqual(dispatch(root, command, now=ANCHOR+10*INTERVAL), 7)
             self.assertEqual(json.loads((Path(root)/'state.json').read_text())['slot'], 10)
 
+    def test_interval_is_one_hour(self):
+        self.assertEqual(INTERVAL, 3600)
+        self.assertEqual(slot_at(ANCHOR+3599), 0)
+        self.assertEqual(slot_at(ANCHOR+3600), 1)
+
+    def test_legacy_305_minute_state_uses_attempt_time_without_duplicate(self):
+        with tempfile.TemporaryDirectory() as root:
+            state=Path(root)/'state.json'
+            state.write_text(json.dumps({'slot': 1, 'attempted_at': ANCHOR+305*60, 'status': 'finished'}))
+            command=[sys.executable, '-c', 'raise SystemExit(7)']
+            self.assertEqual(dispatch(root, command, now=ANCHOR+310*60), 0)
+            self.assertEqual(dispatch(root, command, now=ANCHOR+360*60), 7)
+            self.assertEqual(json.loads(state.read_text())['interval_seconds'], 3600)
+
     def test_overlap_is_skipped_without_advancing_state(self):
         with tempfile.TemporaryDirectory() as root:
             with (Path(root)/'lock').open('a') as lock:
