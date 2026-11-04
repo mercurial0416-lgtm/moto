@@ -37,6 +37,7 @@ final class MotoDesign {
   return dark?new int[]{DARK_BACKGROUND,DARK_TEXT,DARK_MUTED,DARK_STROKE,DARK_ACCENT,DARK_SURFACE,DARK_TINT}:
    new int[]{LIGHT_BACKGROUND,LIGHT_TEXT,LIGHT_MUTED,LIGHT_STROKE,LIGHT_ACCENT,LIGHT_SURFACE,LIGHT_TINT};
  }
+ static int onAccent(boolean dark){return dark?DARK_BACKGROUND:Color.WHITE;}
  static Typeface medium(){return Typeface.create("sans-serif-medium",Typeface.NORMAL);}
  static Typeface display(){return Typeface.create("sans-serif",Typeface.BOLD);}
  /** Stable-width digits keep odometers, prices and service amounts easy to scan. */
@@ -81,7 +82,7 @@ final class MotoDesign {
   TextView view=a.text(label,13,a.fg,true);
   view.setGravity(Gravity.CENTER);
   view.setMinWidth(a.dp(48));
-  view.setMinHeight(a.dp(44));
+  view.setMinHeight(a.dp(48));
   view.setPadding(a.dp(10),0,a.dp(10),0);
   ripple(a,view,a.panel,a.line,12);
   view.setClickable(true);view.setFocusable(true);
@@ -99,7 +100,7 @@ final class MotoDesign {
   chevron.setGravity(Gravity.CENTER);
   FrameLayout.LayoutParams icon=new FrameLayout.LayoutParams(a.dp(25),a.dp(35),Gravity.RIGHT|Gravity.CENTER_VERTICAL);
   icon.rightMargin=a.dp(10);shell.addView(chevron,icon);
-  LinearLayout.LayoutParams layout=new LinearLayout.LayoutParams(-1,a.dp(56));
+  LinearLayout.LayoutParams layout=new LinearLayout.LayoutParams(-1,a.dp(Math.max(56,Math.round(40+20*a.getResources().getConfiguration().fontScale))));
   layout.bottomMargin=a.dp(bottomMarginDp);parent.addView(shell,layout);
  }
  static void addNavigation(MainActivity a,LinearLayout root){
@@ -108,7 +109,7 @@ final class MotoDesign {
   LinearLayout bar=new LinearLayout(a);
   bar.setPadding(a.dp(12),a.dp(5),a.dp(12),a.dp(5));
   bar.setBackgroundColor(a.panel);
-  String[] labels={"홈","라이딩","정비","설정"};
+  String[] labels={"홈","라이딩","정비·주유","설정"};
   final int[] icons={0,3,2,4};
   for(int i=0;i<a.tabs.length;i++){
    final String destination=a.tabs[i];
@@ -122,7 +123,7 @@ final class MotoDesign {
    FrameLayout.LayoutParams iconParams=new FrameLayout.LayoutParams(a.dp(21),a.dp(21),Gravity.CENTER);
    pill.addView(graphic,iconParams);
    cell.addView(pill,new LinearLayout.LayoutParams(a.dp(57),a.dp(31)));
-   TextView name=a.text(labels[i],12,selected?a.accent:a.muted,selected);
+   TextView name=a.text(labels[i],13,selected?a.accent:a.muted,selected);
    name.setGravity(Gravity.CENTER);
    LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
    lp.topMargin=a.dp(3);cell.addView(name,lp);

@@ -47,7 +47,7 @@ public final class Ux106NativeUiTest {
   assertNotNull("active task title must be visible without decorative brand overline",
    text(activity.root,"내 차고"));
   assertNotNull(desc(activity.root,"홈, 현재 탭"));
-  for(String label:new String[]{"라이딩","정비","설정"}){
+  for(String label:new String[]{"라이딩","정비·주유","설정"}){
    View item=desc(activity.root,label+" 탭 열기");
    assertNotNull(label+" bottom tab",item);
    assertTrue(label+" is clickable",item.isClickable());
