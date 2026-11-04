@@ -883,7 +883,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  }
  void editRideNote(File track){
   if(readOnly){toast("데이터 보호 상태에서는 메모를 수정할 수 없어요.");return;}
-  if(RideService.running&&track.getName().equals(RideService.active)){
+  if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active)){
    toast("진행 중인 GPS 기록은 종료 후 수정해 주세요.");return;
   }
   LinearLayout body=page("라이딩 제목·메모");
@@ -906,7 +906,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   show();
  }
  void openRideInsights(File track){
-  if(RideService.running&&track.getName().equals(RideService.active)){toast("기록 종료 후 확인해 주세요.");return;}
+  if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active)){toast("기록 종료 후 확인해 주세요.");return;}
   toast("주행 기록을 분석하고 있어요.");
   new Thread(()->{
    try{
@@ -950,7 +950,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       new AlertDialog.Builder(this).setTitle("이 라이딩을 기록한 바이크")
        .setMessage("로컬 라이딩 기록에만 연결하며 계기판 주행거리는 변경하지 않습니다.")
        .setItems(names,(dialog,which)->attempt(()->{
-        if(RideService.running&&track.getName().equals(RideService.active))throw new IOException("주행이 끝난 뒤 변경해 주세요.");
+        if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active))throw new IOException("주행이 끝난 뒤 변경해 주세요.");
         RideBikeBinding.write(track,vehicles.get(which).optString("id"));
         close();openRideInsights(track);
        })).setNegativeButton("취소",null).show();
@@ -962,8 +962,17 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       new AlertDialog.Builder(this).setTitle("라이딩 유형 지정 · 내 기기에만 저장")
        .setSingleChoiceItems(categories,Math.max(0,checked),(dialog,which)->{
         dialog.dismiss();
-        try{RideCategory.write(track,categories[which]);close();openRideInsights(track);}
-        catch(IOException ex){error("분류 저장 실패: "+ex.getMessage());}
+        if(readOnly){error("데이터 보호 상태에서는 분류를 수정할 수 없어요.");return;}
+        new Thread(()->{
+         try{
+          if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active))
+           throw new IOException("주행이 끝난 후 유형을 변경해 주세요.");
+          RideCategory.writeSession(getFilesDir(),track,categories[which]);
+          runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){close();openRideInsights(track);}});
+         }catch(IOException ex){
+          runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("분류 저장 실패: "+ex.getMessage());});
+         }
+        },"moto-ride-category").start();
        }).setNegativeButton("취소",null).show();
      });
      if(RideTrackMerge.archived(track))label(p,"통합 취소로 보관된 경로 · 월간 통계에서 제외",13,muted,false);
