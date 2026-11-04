@@ -34,11 +34,11 @@ public final class Ux126RideSessionCategoryTest {
    File other=create(rides,now+8000,UUID.randomUUID().toString());
    RideCategory.write(other,RideCategory.TOUR);
    assertEquals(2,RideSegmentGroup.members(base,a.getName()).size());
-   RideCategory.writeSession(base,b,RideCategory.COMMUTE);
+   RideSessionCategory.write(base,b,RideCategory.COMMUTE);
    assertEquals(RideCategory.COMMUTE,RideCategory.read(a));
    assertEquals(RideCategory.COMMUTE,RideCategory.read(b));
    assertEquals(RideCategory.TOUR,RideCategory.read(other));
-   RideCategory.writeSession(base,a,RideCategory.AUTO);
+   RideSessionCategory.write(base,a,RideCategory.AUTO);
    assertEquals(RideCategory.AUTO,RideCategory.read(a));
    assertEquals(RideCategory.AUTO,RideCategory.read(b));
    assertFalse(new File(a+".category").exists());
@@ -56,7 +56,7 @@ public final class Ux126RideSessionCategoryTest {
    byte[] old=Files.readAllBytes(new File(a+".category").toPath());
    AtomicInteger count=new AtomicInteger();
    try{
-    RideCategory.writeSession(base,a,RideCategory.WINDING,()->{
+    RideSessionCategory.write(base,a,RideCategory.WINDING,()->{
      if(count.incrementAndGet()==1)throw new IllegalStateException("simulated IO failure after first commit");
     });
     fail("must roll back partial session writes");
@@ -76,7 +76,7 @@ public final class Ux126RideSessionCategoryTest {
    File complete=create(rides,now,session);
    File incomplete=new File(rides,(now+4000)+"-"+session+".track");
    Files.write(incomplete.toPath(),TrackFile.point(37,127,3,now+4000).getBytes(StandardCharsets.UTF_8));
-   try{RideCategory.writeSession(base,incomplete,RideCategory.COMMUTE);fail("incomplete must fail");}
+   try{RideSessionCategory.write(base,incomplete,RideCategory.COMMUTE);fail("incomplete must fail");}
    catch(IOException expected){}
    assertEquals(RideCategory.AUTO,RideCategory.read(complete));
   }finally{cleanup(base);}

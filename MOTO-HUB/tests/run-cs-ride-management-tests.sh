@@ -15,7 +15,7 @@ activity=(source/'MainActivity.java').read_text()
 checks={
  'ride merge action implemented':'void chooseMerge()' in ride,
  'merge undo action in insights':'RideTrackMerge.undo(getFilesDir(),track)' in activity,
- 'category selector attached to insights':'RideCategory.write(track,categories[which])' in activity,
+ 'category selector attached to insights':'RideSessionCategory.write(getFilesDir(),track,categories[which])' in activity,
  'stats exclude archived merge':'RideTrackMerge.archived(track))continue' in ride,
  'existing GPS records still opened':'a.openRideInsights(f)' in ride,
  'privacy of rides in history':'GPS 기록은 이 기기에 저장됩니다' in ride,

@@ -967,7 +967,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          try{
           if(RideActiveSessionPolicy.exclude(track.getName(),RideService.running,RideService.active))
            throw new IOException("주행이 끝난 후 유형을 변경해 주세요.");
-          RideCategory.writeSession(getFilesDir(),track,categories[which]);
+          RideSessionCategory.write(getFilesDir(),track,categories[which]);
           runOnUiThread(()->{if(!isFinishing()&&!isDestroyed()){close();openRideInsights(track);}});
          }catch(IOException ex){
           runOnUiThread(()->{if(!isFinishing()&&!isDestroyed())error("분류 저장 실패: "+ex.getMessage());});
