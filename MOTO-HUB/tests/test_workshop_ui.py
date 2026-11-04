@@ -51,12 +51,12 @@ for name, background, foreground in [
 render = home[home.index(" void render(){"):home.index(" /** Scan local GPS metadata")]
 for marker in [
     "compactVehicleHeader(bike)", "stats(bike)", "HomeShortcutOrder.parse(",
-    "rideAction()", "homeShortcutTile(key)", "recent(bike)", "insights(bike)",
-    "interruptedRideShortcut()", "showHomeTools(bike)"
+    "rideAction()", "homeShortcutTile(key)", "recent(bike)",
+    "interruptedRideShortcut()"
 ]:
     check(marker in render, "missing modern home action " + marker)
-check("void showQuickTools(JSONObject bike)" in home and "void showHomeTools(JSONObject bike)" in home,
-      "secondary garage tools must remain reachable via the compact tools menu")
+check("showHomeTools(bike)" not in render and "this::costDashboard" in hub,
+      "home has no duplicate tools menu; cost analysis stays in advanced tools")
 check(render.index("compactVehicleHeader(bike)") < render.index("stats(bike)") <
       render.index("HomeShortcutOrder.parse(") < render.index("recent(bike)"),
       "vehicle, status, shortcuts and latest activity should have clear hierarchy")

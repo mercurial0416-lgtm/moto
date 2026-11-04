@@ -29,7 +29,7 @@ assert 'tracks=' in footprint and 'trackBytes=' in footprint and 'garagePhotoByt
 assert 'ObdSignalAge.label(RideService.obdLastSampleElapsed' in obd
 assert 'ObdTelemetryFreshness.connectionLabel' in obd
 assert 'Store.find(next,"services",old.optString("id"))==null' in maintenance
-assert 'recent(bike)' in home and 'if(extra){a.gap(a.content,12);insights(bike);}' in home
+assert 'recent(bike)' in home and 'extra_cards' not in home
 assert 'void complete(JSONObject old)' in maintenance and 'ServiceCycle.completed(old,a.today(),current,spent)' in maintenance
 print("PASS UX69 durable GPS recap, conservative merge, install inventory, ECU age, maintenance safety and minimal home")
 PY

@@ -28,7 +28,7 @@ assert 'parkingLat' in parking and 'ACTION_VIEW' in parking
 assert 'QuickWidgetChoices.choice(context,0)' in widget
 assert 'EXTRA_FORM,"fuel_quick"' in widget
 assert 'new QuickEntryUi(this).fuel()' in main
-assert '작은 위젯 버튼 선택' in hub and 'QuickWidgetChoices.configure(a)' in hub
+assert '위젯 버튼 변경' in hub and 'QuickWidgetChoices.configure(a)' in hub
 assert 'static String normalize(' in choices and 'static void refresh(' in choices
 assert 'showConsumables(bike)' in home and 'LatestServiceByType.latest(' in home
 assert '-PmotoReleaseCode="$CODE"' in ci
