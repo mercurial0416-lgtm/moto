@@ -1,0 +1,58 @@
+name: Repair v575 canonical update URL without re-signing the APK
+on:
+  push:
+    branches: ['release/moto-hub-apk']
+    paths: ['.github/workflows/moto-v575-url-alias.yml']
+permissions:
+  contents: write
+concurrency:
+  group: moto-hub-v575-canonical-url
+  cancel-in-progress: false
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Verify the exact already-published original-certificate APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          REPO="$GITHUB_REPOSITORY"
+          CURRENT=$(gh api "repos/$REPO/contents/updates/manifest.json?ref=main" --jq .content | tr -d "\n" | base64 --decode | python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
+          if [ "$CURRENT" -ne 575 ]; then echo "Public version is not 575; skip alias to prevent a downgrade"; exit 0; fi
+          mkdir -p "$RUNNER_TEMP/moto-alias"
+          gh release download moto-hub-v575-offline --repo "$REPO" --pattern MOTO-HUB.apk --dir "$RUNNER_TEMP/moto-alias"
+          APK="$RUNNER_TEMP/moto-alias/MOTO-HUB.apk"
+          test "$(stat -c%s "$APK")" = "47415542"
+          echo "3331ba897e2843b1b5dfe2dd324a9d060e1d876b2f29fdef20afad45e8054dae  $APK" | sha256sum --check
+          SIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$SIGNER" verify --verbose "$APK"
+          CERT=$("$SIGNER" verify --print-certs "$APK" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 | tr -d ": " | tr "[:upper:]" "[:lower:]")
+          test "$CERT" = "212c5b39d0082ab4bed78f8da2b719819cd80a20bc116c84f8bdfabca507021b"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='com.motohub.next'" | grep -F "versionCode='575'"
+          if ! gh release view moto-hub-v575 --repo "$REPO" >/dev/null 2>&1; then
+            gh release create moto-hub-v575 "$APK#MOTO-HUB.apk" --repo "$REPO" --target b54025bb056dc9a0a790561d5190cfa319deb5a9 --title "MOTO HUB 575 - canonical update URL" --notes "The exact verified v575 APK, byte-for-byte identical to v575-offline. Fixes in-app URL compatibility."
+          fi
+          gh release view moto-hub-v575 --repo "$REPO" --json assets --jq ".assets[].name" | grep -Fx MOTO-HUB.apk
+          python3 - "$REPO" <<'PY'
+import base64,hashlib,json,os,subprocess,sys
+repo=sys.argv[1]
+def gh(*args): return subprocess.check_output(["gh","api",*args],text=True)
+info=json.loads(gh(f"repos/{repo}/contents/updates/manifest.json?ref=main"))
+manifest=json.loads(base64.b64decode(info["content"]))
+if manifest["versionCode"]!=575:
+ print("A newer version is published; preserving it");sys.exit(0)
+if manifest.get("sha256")!="3331ba897e2843b1b5dfe2dd324a9d060e1d876b2f29fdef20afad45e8054dae":
+ raise SystemExit("Manifest points to a different APK; refusing to change it")
+new_url=f"https://github.com/{repo}/releases/download/moto-hub-v575/MOTO-HUB.apk"
+if manifest["apkUrl"]==new_url:
+ print("Canonical URL already active");sys.exit(0)
+manifest["apkUrl"]=new_url
+payload=base64.b64encode((json.dumps(manifest,ensure_ascii=False,indent=2)+"\n").encode()).decode()
+subprocess.check_call(["gh","api","--method","PUT",f"repos/{repo}/contents/updates/manifest.json",
+ "-f","branch=main","-f",f"sha={info['sha']}","-f",f"content={payload}",
+ "-f","message=Fix v575 signed APK update URL without changing binary [skip ci]"])
+print("Repointed v575 in-app manifest to byte-identical canonical signed release")
+PY

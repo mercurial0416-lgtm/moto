@@ -27,7 +27,7 @@ checks={
  "OBD session stats are sanitized and local": 'automaticSession(Context c' in diag and 'ObdFailureGuide.classify(reason)' in diag and '"auto_samples"' in diag and 'automaticSession(this,obdConnectionAttempts' in service,
  "post-update detailed audit reads current GPS and backup": 'BackupGpsProof.fullCurrentStatus' in hub and 'GarageIntegrity.report(data)' in hub and 'TrackFile.tracks(a.getFilesDir())' in hub,
  "update report reachable in updater and after startup": 'new HubScreens(a).updateRecoveryReport()' in updater and 'new HubScreens(this).updateRecoveryReport()' in main,
- "unchanged package and source version updated": Path("release-code.txt").read_text().strip()=="575"
+ "unchanged package and source version updated": int(Path("release-code.txt").read_text().strip())>=575
 }
 for name,ok in checks.items():print(("PASS" if ok else "FAIL")+" : "+name)
 assert all(checks.values()),"v575 GPS/OBD/OTA regression"

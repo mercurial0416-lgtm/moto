@@ -112,7 +112,7 @@ jobs:
             tr -d '\n' | base64 --decode |
             python3 -c 'import json,sys; print(int(json.load(sys.stdin)["versionCode"]))')
           test "$RELEASE_CODE" -gt "$CURRENT" || { echo "::error::Manifest version advanced; refusing downgrade"; exit 1; }
-          TAG="moto-hub-apk-$RELEASE_CODE-$GITHUB_RUN_ID"
+          TAG="moto-hub-v$RELEASE_CODE"
           # A release artifact must be published and addressable before pointing any phone at it.
           gh release create "$TAG" "$APK#MOTO-HUB.apk" \
             --title "MOTO HUB $RELEASE_CODE · 앱 내 업데이트" \

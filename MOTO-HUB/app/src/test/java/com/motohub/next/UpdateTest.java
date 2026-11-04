@@ -10,6 +10,16 @@ public class UpdateTest {
  @Test public void wrongSignerBlocked()throws Exception{assertThrows(IOException.class,()->parse(metadata().put("certificateSha256","b".repeat(64))));}
  @Test public void invalidHashBlocked()throws Exception{assertThrows(IOException.class,()->parse(metadata().put("sha256","abc")));}
  @Test public void oversizedDownloadBlocked()throws Exception{assertThrows(IOException.class,()->parse(metadata().put("sizeBytes",200000001)));}
+ @Test public void officialReleaseUrlVariationsAccepted()throws Exception{
+  JSONObject m=metadata().put("versionCode",575);
+  for(String tag:new String[]{"moto-hub-v575","moto-hub-v575-offline","moto-hub-apk-575-41654118532"})
+   assertEquals(575,parse(m.put("apkUrl","https://github.com/mercurial0416-lgtm/moto/releases/download/"+tag+"/MOTO-HUB.apk")).versionCode);
+ }
+ @Test public void officialReleaseWrongVersionRejected()throws Exception{
+  JSONObject m=metadata().put("versionCode",575);
+  for(String tag:new String[]{"moto-hub-v576","moto-hub-v574-offline","moto-hub-apk-576-1234"})
+   assertThrows(IOException.class,()->parse(m.put("apkUrl","https://github.com/mercurial0416-lgtm/moto/releases/download/"+tag+"/MOTO-HUB.apk")));
+ }
  @Test public void invalidVersionBlocked()throws Exception{assertThrows(IOException.class,()->parse(metadata().put("versionCode",0)));}
  @Test public void responseLimitEnforced(){assertThrows(IOException.class,()->UpdateManifest.bounded(new ByteArrayInputStream(new byte[11]),10));}
  @Test public void sha256Format(){assertEquals("00ff10",AppUpdater.hex(new byte[]{0,(byte)255,16}));}
