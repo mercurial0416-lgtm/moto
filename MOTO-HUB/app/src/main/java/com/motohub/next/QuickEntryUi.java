@@ -149,7 +149,7 @@ final class QuickEntryUi {
   a.label(extra,"주유 날짜",14,a.fg,true);extra.addView(date,new LinearLayout.LayoutParams(-1,a.dp(52)));
   a.gap(extra,12);
   a.action(extra,"전체 주유·비용 편집 열기",false,()->a.edit("expenses",null));
-  Button toggle=a.button("주행거리·날짜 수정",false,()->{
+  Button toggle=a.button("추가 입력 · 날짜·거리·영수증",false,()->{
    if(full.isChecked()){extra.setVisibility(View.VISIBLE);return;}
    extra.setVisibility(extra.getVisibility()==View.GONE?View.VISIBLE:View.GONE);
   });
@@ -249,7 +249,7 @@ final class QuickEntryUi {
   });
   updateSummary.run();
   QuickFuelReceipt receipt=new QuickFuelReceipt(a,bikeId,a.dialog,amount,liters,unitPrice,date,calculator,fuelAuto);a.quickFuelReceipt=receipt;
-  Button fromReceipt=a.button("영수증 사진에서 금액·리터·단가 읽기",false,receipt::choose);body.addView(fromReceipt,1);
+  Button fromReceipt=a.button("영수증 사진에서 금액·리터·단가 읽기",false,receipt::choose);extra.addView(fromReceipt,0);
   a.gap(body,12);
   final long[] lastSaveClick={0};
   a.action(body,"저장",true,()->a.attempt(()->{
