@@ -13,7 +13,7 @@ checks={
  'zip_transaction_released': 'if(entered)RestoreRideGate.end();ready.close();' in main,
  'zip_json_final_guard': 'if(RideService.running||RideService.autoArmed)throw new IOException(RestoreRideGate.MESSAGE);' in main,
  'json_import_document_guard': ('}else if(request==42){\n   if(restoreIsBlocked()){explainRestoreBlocked();return;}' in main and '"moto-json-import-check").start()' in main),
- 'json_confirmation_guard': 'void confirmImport(JSONObject next){\n  if(restoreIsBlocked())' in main,
+ 'json_confirmation_guard': ('void confirmImport(JSONObject next){confirmImport(next,null);}' in main and 'void confirmImport(JSONObject next,String reviewedSnapshot){\n  if(restoreIsBlocked())' in main),
  'json_commit_transaction': ('void confirmImport(JSONObject next)' in main and 'RestoreRideGate.begin(RideService.running,RideService.autoArmed)' in main[main.index('void confirmImport(JSONObject next)'):]),
  'json_merge_transaction': ('void prepareJsonMerge(Uri uri)' in main and 'RestoreRideGate.begin(RideService.running,RideService.autoArmed)' in main[main.index('void prepareJsonMerge(Uri uri)'):main.index('void chooseQuickOdometerPhoto')]),
  'json_finally_unlock': ('finally{' in main[main.index('void confirmImport(JSONObject next)'):] and 'RestoreRideGate.end();' in main[main.index('void confirmImport(JSONObject next)'):main.index('@Override public void onBackPressed()')] and 'jsonImportRunning=false;' in main),

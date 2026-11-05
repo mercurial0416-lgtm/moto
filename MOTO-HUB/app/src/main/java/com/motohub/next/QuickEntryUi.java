@@ -248,6 +248,8 @@ final class QuickEntryUi {
    if(checked)extra.setVisibility(View.VISIBLE);odoConfirmed.setVisibility(checked?View.VISIBLE:View.GONE);if(!checked)odoConfirmed.setChecked(false);persistDraft.run();updateSummary.run();
   });
   updateSummary.run();
+  QuickFuelReceipt receipt=new QuickFuelReceipt(a,bikeId,a.dialog,amount,liters,unitPrice,date,calculator,fuelAuto);a.quickFuelReceipt=receipt;
+  Button fromReceipt=a.button("영수증 사진에서 금액·리터·단가 읽기",false,receipt::choose);body.addView(fromReceipt,1);
   a.gap(body,12);
   final long[] lastSaveClick={0};
   a.action(body,"저장",true,()->a.attempt(()->{

@@ -780,6 +780,7 @@ final class HubScreens {
       "\n바이크 영구 삭제는 현재 데이터와 일치하는 검증된 전체 ZIP이 있어야 가능합니다.");
    });
   });
+  a.action(p,"기기 이전 · 복구 지점 변경 내역",false,()->new RecoveryCenterUi(a).open());
   a.action(p,"전체 ZIP 백업",true,a::exportBundle);
   a.action(p,"GPS 백업 내용 정밀 검사 (SHA-256)",false,()->{
    if(RideService.running||RideService.autoArmed||RideService.saving()){

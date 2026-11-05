@@ -21,13 +21,21 @@
 | 기록 목록·검색·필터 | RideUi, HubScreens.records/searchAllRecords | 필요 |
 | 주행 상세·분석 | MainActivity.openRideInsights | 필요 |
 | 정비·소모품 | ServiceStatusUi, QuickEntryUi.maintenance, ComponentBookUi | 필요 |
-| 주유·영수증 | QuickEntryUi.fuel, ReceiptOcr, ReceiptTextParser | 필요 |
+| 주유·영수증 | QuickEntryUi.fuel, QuickFuelReceipt, ReceiptOcr, ReceiptTextParser | 필요 |
 | 주행 통계·유지비 | RideStatsUi, CostReportUi, HubScreens.legacySixMonthCosts | 필요 |
 | OBD2·장치 연결 | DeveloperObdScreen, ObdAutoSpeedMonitor | 필요 |
 | 친구·그룹·공유 | SocialUi, GroupUi, GroupMapActivity, Sharing | 필요 |
-| 사진 일지·공유 카드 | RidePhotoUi, RidePhotoJournal | 필요 |
-| 백업·복구·이전 | HubScreens.basicBackup/advancedBackup, BackupBundle | 필요 |
+| 사진 일지·여행기·수동 지점 | RidePhotoUi, RidePhotoJournal, TripJournalUi, TripNotes | 필요 |
+| 백업·복구·이전 | RecoveryCenterUi, HubScreens.basicBackup/advancedBackup, BackupBundle | 필요 |
 | 설정·업데이트·진단 | HubScreens.settings, AppUpdater | 필요 |
 | 전체 입력 폼·팝업 | MainActivity.page/edit, AlertDialog | 필요 |
 
 공통 외형 변경은 검증 가능한 자료 확보 후 이 표를 화면별 대응·검토 결과로 갱신한다. 패키지명·서명 설정·GPS/OBD·로컬 v3 데이터 형식과 기존 업데이트 경로는 유지한다.
+
+## 기능 확장 검증 결과 (BIFIX 외형 검증 아님)
+
+부품 장부·기간별 비용 비교·영수증 확인 입력·수동 지점 여행기·복구센터를 실제 코드에 추가했다. 기존 화면 API를 사용했으며 BIFIX 전용 토큰/레이아웃/에셋은 만들지 않았다. 데이터 스키마와 앱 패키지·서명 설정은 유지했다.
+
+Android 95 suites / 325개 중 통과 322·건너뜀 3·실패/오류 0. Lint 오류 0·경고 90. shell 회귀 176개 최신 결과 통과. 신규 기능 네이티브 렌더 4개 중 비용 비교와 여행기 이미지를 직접 열어 검토했다. 실기기 사진 OCR 인식·지도 선택 제스처·TalkBack·설치 업데이트는 미검증이다.
+
+실제 BIFIX 화면을 확보하면 이 표의 '필요'를 해당 출처·확인 가능한 레이아웃·적용 화면·렌더 비교 결과로 대체해야 한다. 정지 화면으로 전환/터치 동작을 확정하지 말고 실제 앱 관찰이나 영상이 있어야 구분해서 기록한다.

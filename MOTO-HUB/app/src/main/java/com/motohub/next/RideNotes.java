@@ -38,7 +38,9 @@ final class RideNotes {
   JSONObject all=settings.optJSONObject("rideNotes");
   if(all==null){all=new JSONObject();settings.put("rideNotes",all);}
   if(all.length()>10000&&!all.has(track.getName()))throw new IllegalArgumentException("메모 저장 개수를 초과했어요.");
-  if(title.trim().isEmpty()&&memo.trim().isEmpty())all.remove(track.getName());
-  else all.put(track.getName(),new JSONObject().put("title",title.trim()).put("memo",memo.trim()));
+  JSONObject old=all.optJSONObject(track.getName()),next=old==null?new JSONObject():new JSONObject(old.toString());
+  if(title.trim().isEmpty())next.remove("title");else next.put("title",title.trim());
+  if(memo.trim().isEmpty())next.remove("memo");else next.put("memo",memo.trim());
+  if(next.length()==0)all.remove(track.getName());else all.put(track.getName(),next);
  }
 }

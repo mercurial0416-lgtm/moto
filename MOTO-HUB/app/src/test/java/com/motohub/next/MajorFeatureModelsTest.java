@@ -40,4 +40,12 @@ public class MajorFeatureModelsTest {
  @Test public void expenseTotalsAreNotSilentlyCappedAtOneBillion()throws Exception{
   List<JSONObject> rows=Arrays.asList(record("one",bike,"보험","2026-05-01",10000,900000000),record("two",bike,"부품","2026-05-02",10100,900000000));CostPeriodReport.Bike report=CostPeriodReport.build(Arrays.asList(new JSONObject().put("id",bike).put("name","A")),Collections.emptyList(),rows,LocalDate.of(2026,5,1),LocalDate.of(2026,5,31),LocalDate.of(2026,5,31)).get(0);assertEquals(1800000000,report.total.doubleValue(),0);
  }
+ @Test public void backupDiffUsesIdentityAndCanonicalNestedContentWithoutMutation()throws Exception{
+  JSONObject before=base(),after=new JSONObject(before.toString());before.getJSONArray("services").put(record("old",bike,"오일","2026-01-01",1000,50000));after.getJSONArray("services").put(record("new",bike,"오일","2026-01-01",1000,50000));after.getJSONArray("vehicles").getJSONObject(0).put("odo",16000);String original=before.toString();Map<String,BackupChangeSet.Counts> diff=BackupChangeSet.compare(before,after);assertEquals(1,diff.get("services").added);assertEquals(1,diff.get("services").removed);assertEquals(1,diff.get("vehicles").changed);assertEquals(original,before.toString());assertTrue(BackupChangeSet.same(new JSONObject("{\"a\":1,\"b\":2}"),new JSONObject("{\"b\":2.0,\"a\":1.0}")));
+ }
+ @Test public void backupDiffAcceptsOldOptionalCollectionsAndRejectsInvalidSnapshots()throws Exception{
+  JSONObject old=base();old.remove("shops");old.remove("gear");Map<String,BackupChangeSet.Counts> diff=BackupChangeSet.compare(old,base());assertEquals(0,diff.get("gear").added);JSONObject invalid=base();invalid.getJSONArray("services").put(record("bad","missing-bike","x","2026-01-01",100,0));assertThrows(JSONException.class,()->BackupChangeSet.compare(old,invalid));
+ }
+ @Test public void receiptUnitPriceDoesNotBecomeThePaidTotal(){ReceiptTextParser.Result result=ReceiptTextParser.parse("판매단가 1,880원\\n주유량 12.5 L\\n총 결제 금액 23,500원\\n2026-05-01".replace("\\n","\n"));assertEquals("23500",result.amount);assertEquals("12.5",result.liters);assertEquals("1880",result.unitPrice);assertEquals("2026-05-01",result.date);}
+ @Test public void impossibleUnitPricesAndAbsentMoneyAreNotInvented(){ReceiptTextParser.Result result=ReceiptTextParser.parse("단가 9,999,999원 주유량 5.0L");assertEquals("",result.unitPrice);assertEquals("",result.amount);}
 }

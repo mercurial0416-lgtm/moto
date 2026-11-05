@@ -141,6 +141,15 @@ public final class RideMapActivity extends Activity {
   map=new MapView(this);map.setTileSource(TileSourceFactory.MAPNIK);map.setMultiTouchControls(true);
   // Saved routes stay available without automatically contacting any map tile server.
   map.setUseDataConnection(false);
+  if(getIntent().getBooleanExtra("choose_trip_stop",false)){
+   caption.setText("방문한 지점을 지도에서 길게 누르세요. 선택 후 이름과 메모를 직접 저장합니다.");
+   map.getOverlays().add(new org.osmdroid.views.overlay.MapEventsOverlay(new org.osmdroid.events.MapEventsReceiver(){
+    public boolean singleTapConfirmedHelper(GeoPoint p){return false;}
+    public boolean longPressHelper(GeoPoint p){new AlertDialog.Builder(RideMapActivity.this).setTitle("이 위치를 여행기에 기록할까요?").setNegativeButton("취소",null).setPositiveButton("이 위치 선택",(d,w)->{setResult(RESULT_OK,new android.content.Intent().putExtra("latitude",p.getLatitude()).putExtra("longitude",p.getLongitude()));finish();}).show();return true;}
+   }));
+  }
+  try{org.json.JSONArray notes=new org.json.JSONArray(getIntent().getStringExtra("trip_stops")==null?"[]":getIntent().getStringExtra("trip_stops"));for(int i=0;i<Math.min(notes.length(),TripNotes.MAX_STOPS);i++){org.json.JSONObject stop=notes.optJSONObject(i);if(stop==null||!stop.has("latitude")||!stop.has("longitude"))continue;double lat=stop.optDouble("latitude"),lon=stop.optDouble("longitude");if(!Double.isFinite(lat)||!Double.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)continue;Marker marker=new Marker(map);marker.setPosition(new GeoPoint(lat,lon));marker.setTitle("직접 등록 · "+stop.optString("name"));marker.setSnippet(stop.optString("memo"));map.getOverlays().add(marker);}}catch(org.json.JSONException invalid){/* Preserve the route even if optional journal metadata is damaged. */}
+
   Button cacheButton=new Button(this);cacheButton.setText("오프라인 지도 캐시 확인·정리");
   cacheButton.setOnClickListener(v->new Thread(()->{
    try{
