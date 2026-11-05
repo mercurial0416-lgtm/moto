@@ -52,4 +52,15 @@ public class MajorFeatureUiTest {
  @Test public void staleFeatureSaveAndReviewedRestoreCannotOverwriteNewRecords()throws Exception{
   String reviewed=a.db.toString();JSONObject next=new JSONObject(reviewed);next.getJSONObject("settings").put("test",1);a.settings().put("changed",true);a.commitFeatureRecordAsync(next,reviewed,"test",null);assertTrue(a.settings().getBoolean("changed"));assertFalse(RestoreRideGate.isFormWriting());JSONObject incoming=Store.empty();a.confirmImport(incoming,reviewed);ShadowAlertDialog.getLatestAlertDialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();assertEquals(1,a.arr("vehicles").length());assertFalse(RestoreRideGate.isRestoring());
  }
+ @Test public void defaultCostsKeepTheSummaryAndPeriodReviewIsReadOnly()throws Exception{
+  String before=a.db.toString();new HubScreens(a).costDashboard();
+  assertTrue(EntryUiFixture.contains(a.formBody,"KTM 390 DUKE"));assertNull(Ux106NativeUiTest.desc(a.formBody,"시작일"));
+  EntryUiFixture.capture(a,"cleanup-default-costs",393);
+  EntryUiFixture.text(a.formFooter,"기간 · 바이크별 비교").performClick();
+  await(()->EntryUiFixture.contains(a.formBody,"103,500원"));assertNull(Ux106NativeUiTest.desc(a.formBody,"시작일"));assertNull(Ux106NativeUiTest.desc(a.formBody,"차량 이름 필터"));
+  EntryUiFixture.text(a.formFooter,"기간 변경").performClick();Shadows.shadowOf(Looper.getMainLooper()).idle();AlertDialog picker=ShadowAlertDialog.getLatestAlertDialog();
+  EditText from=(EditText)Ux106NativeUiTest.desc(picker.getWindow().getDecorView(),"시작일"),to=(EditText)Ux106NativeUiTest.desc(picker.getWindow().getDecorView(),"종료일");
+  from.setText("2026-11-05");to.setText("2026-11-01");picker.getButton(AlertDialog.BUTTON_POSITIVE).performClick();assertTrue(picker.isShowing());assertNotNull(from.getError());assertEquals(before,a.db.toString());
+  from.setText("2025-01-01");to.setText("2025-01-31");picker.getButton(AlertDialog.BUTTON_POSITIVE).performClick();await(()->EntryUiFixture.contains(a.formBody,"이 기간에 등록된 지출이 없습니다."));assertFalse(picker.isShowing());assertEquals(before,a.db.toString());
+ }
 }
