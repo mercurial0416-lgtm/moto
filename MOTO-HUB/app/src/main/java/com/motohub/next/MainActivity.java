@@ -500,6 +500,19 @@ public class MainActivity extends Activity {
    });
   },"moto-form-save-atomic").start();
  }
+ void commitFeatureRecordAsync(JSONObject next,String before,String label,Runnable success){
+  if(next==null||before==null){error("저장할 기록을 확인하세요.");return;}
+  final String serialized=next.toString();
+  if(serialized==null){error("저장할 데이터 형식을 확인하세요.");return;}
+  if(readOnly||!before.equals(db.toString())||jsonImportRunning||observedJsonImportRevision!=jsonImportRevision||observedFormWriteRevision!=formWriteRevision||!RestoreRideGate.beginFormWrite()){error("기록이 변경됐거나 저장·복원 중입니다. 다시 열어 주세요.");return;}
+  toast("기록 저장 중…");
+  new Thread(()->{FeatureRecordWriter.Result result=null;String failure=null;
+   try{result=FeatureRecordWriter.persist(this,disk,before,serialized);}catch(Exception error){failure=error.getMessage();}
+   finally{if(result!=null)formWriteRevision++;RestoreRideGate.endFormWrite();}
+   final FeatureRecordWriter.Result saved=result;final String reason=failure;
+   runOnUiThread(()->{if(isFinishing()||isDestroyed())return;if(saved==null){error("저장 실패 · 이전 기록 유지: "+reason);return;}db=saved.data;observedFormWriteRevision=formWriteRevision;close();render();UndoLastSave.offer(this,before,db.toString(),label);if(success!=null)success.run();if(!saved.checkpoint)error("기록은 저장됐지만 자동 복구 지점 생성에 실패했습니다. 전체 ZIP도 보관하세요.");});
+  },"moto-feature-save").start();
+ }
  void atomic(AtomicFile file,byte[] bytes)throws Exception{FileOutputStream out=null;try{out=file.startWrite();out.write(bytes);file.finishWrite(out);}catch(Exception e){if(out!=null)file.failWrite(out);throw e;}}
  void saveItem(String key,JSONObject item)throws Exception{JSONObject next=new JSONObject(db.toString());Store.upsert(next,key,item);write(next);}
  GradientDrawable shape(int color,int stroke,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));if(stroke!=0)d.setStroke(dp(1),stroke);return d;}

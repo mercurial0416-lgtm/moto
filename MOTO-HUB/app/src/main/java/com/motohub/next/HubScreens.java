@@ -414,6 +414,7 @@ final class HubScreens {
   a.action(actions,"전체 기록 검색 · 주유 / 정비 / 비용 / GPS",false,this::searchAllRecords);
   p.addView(actions);a.gap(p,16);
   a.action(p,"주유 · 정비 분석",false,this::recordInsights);
+  a.action(p,"부품별 관리 장부",false,()->new ComponentBookUi(a).open());
   a.show();
  }
  void recordInsights(){
@@ -466,6 +467,7 @@ final class HubScreens {
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
   a.action(p,"바이크 정보 수정",true,()->a.edit("vehicles",b));
+  a.action(p,"부품별 관리 장부",false,()->new ComponentBookUi(a).open());
   a.label(p,"차량 라이프로그",15,a.fg,true);
   a.action(p,"판매·정비 이력 PDF · 직접 저장",false,()->a.exportOwnershipPdf(b.optString("id")));
   a.action(p,"튜닝·부품 비용 등록",false,()->{
@@ -481,7 +483,8 @@ final class HubScreens {
     if(record==null)throw new Exception("바이크가 삭제됐어요.");
     record.put("soldDate",sold?"":a.today());a.write(next);a.close();a.render();
    })).show());a.action(p,"대표 바이크로 설정",false,()->a.attempt(()->{JSONObject next=new JSONObject(a.db.toString());next.getJSONObject("settings").put("primary",b.getString("id"));a.write(next);a.selected="";a.getSharedPreferences("garage_ui",0).edit().remove("selected_bike").apply();a.close();a.render();}));a.action(p,"다른 바이크 추가",false,()->a.edit("vehicles",null));a.divider(p);a.action(p,"바이크와 관련 기록 삭제",false,()->{a.close();a.remove("vehicles",b);});a.show();}
- void costDashboard(){
+ void costDashboard(){new CostReportUi(a).open();}
+ void legacySixMonthCosts(){
   LinearLayout page=a.page("바이크별 유지비");
   java.util.List<JSONObject> bikes=a.items("vehicles");
   if(bikes.isEmpty()){a.label(page,"먼저 바이크를 등록해 주세요.",16,a.muted,false);a.show();return;}
