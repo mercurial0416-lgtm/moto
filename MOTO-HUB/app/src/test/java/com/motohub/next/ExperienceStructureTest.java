@@ -43,9 +43,11 @@ public final class ExperienceStructureTest {
    assertNotNull(Ux106NativeUiTest.text(a.root,"OBD만 중지 · GPS 기록은 계속"));
    Ux106NativeUiTest.text(a.root,"주행 집중 모드").performClick();assertEquals(View.GONE,tagged(a.root,"ride-instrument").getVisibility());
    Ux106NativeUiTest.text(tagged(a.root,"primary-action-dock"),"라이딩 저장 후 종료").performClick();
-   android.app.AlertDialog confirmation=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
-   assertNotNull(confirmation.getButton(android.app.AlertDialog.BUTTON_POSITIVE));assertTrue(RideService.running);
-   confirmation.getButton(android.app.AlertDialog.BUTTON_NEGATIVE).performClick();assertTrue(RideService.running);
+   android.app.Dialog confirmation=org.robolectric.shadows.ShadowDialog.getLatestDialog();
+   assertNotNull(confirmation);
+   View modal=confirmation.getWindow().getDecorView();
+   assertNotNull(Ux106NativeUiTest.text(modal,"저장하고 종료"));assertTrue(RideService.running);
+   Ux106NativeUiTest.text(modal,"취소").performClick();assertTrue(RideService.running);
   }finally{RideService.running=running;RideService.autoArmed=armed;}
  }
  @Test public void ledgerSeparatesTimelineSchedulingAndEntryTools(){
