@@ -885,11 +885,15 @@ final class RideUi {
      if(RideService.running){
       a.toast(RideService.gpsFresh()?"GPS 기록 시작됨 · 위치 수신 정상":
        "GPS 기록 시작됨 · 첫 위치 수신 대기");
+      if(a.hasWindowFocus()&&"라이딩".equals(a.tab))a.renderPreservingPosition();
       return;
      }
      if(android.os.SystemClock.elapsedRealtime()-started<12_000L)
       statusCheck.postDelayed(this,650);
-     else a.toast("GPS 기록 시작을 확인하지 못했어요. 라이딩 상태를 확인해 주세요.");
+     else {
+      a.toast("GPS 기록 시작을 확인하지 못했어요. 라이딩 상태를 확인해 주세요.");
+      if(a.hasWindowFocus()&&"라이딩".equals(a.tab))a.renderPreservingPosition();
+     }
     }},700);
    }
    a.root.postDelayed(()->{if(!a.isFinishing()&&!a.isDestroyed()&&a.hasWindowFocus())a.render();},800);
