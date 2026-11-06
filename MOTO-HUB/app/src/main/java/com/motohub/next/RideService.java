@@ -231,6 +231,7 @@ public final class RideService extends Service implements LocationListener {
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);gpsSyncScheduled=false;
   startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;liveMovingMillis=0;liveStationaryMillis=0;lastWidgetRefreshElapsed=0;gpsOnlyAfterObd=false;
   active=track.getName();running=true;notificationRate.reset();status="GPS 신호 대기";
+  RideCaptureHealth.started(this);
   if(gpsWriteHandler!=null){
    gpsWriteHandler.removeCallbacks(storageWatchdog);
    gpsWriteHandler.postDelayed(storageWatchdog,60_000L);
@@ -375,6 +376,7 @@ public final class RideService extends Service implements LocationListener {
   HandlerThread worker=gpsIoThread;
   if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
    boolean verified=closeTrack(true);
+   RideCaptureHealth.finished(getApplicationContext(),verified,count);
    if(verified)RideCompletionInbox.record(getApplicationContext(),savedTrack);
    // Reconcile previous sections in the derived GPS ledger, never the vehicle ODO.
    if(verified&&completedSegments>0)new Thread(()->{
@@ -403,6 +405,7 @@ public final class RideService extends Service implements LocationListener {
   HandlerThread worker=gpsIoThread;
   if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
    boolean verified=closeTrack(true);
+   RideCaptureHealth.finished(getApplicationContext(),verified,count);
    if(verified)RideCompletionInbox.record(getApplicationContext(),savedTrack);
    // Reconcile previous sections in the derived GPS ledger, never the vehicle ODO.
    if(verified&&completedSegments>0)new Thread(()->{
@@ -561,6 +564,7 @@ public final class RideService extends Service implements LocationListener {
     gpsWriteHandler.postDelayed(syncPendingGps,GpsSyncPolicy.MAX_DIRTY_MS);
    }
    lastTime=location.getTime();lastFixElapsed=SystemClock.elapsedRealtime();count++;segmentPoints++;
+   if(count==1)RideCaptureHealth.firstFix(this);
    if(lastGood!=null){long dt=location.getTime()-lastGood.getTime();float metres=location.distanceTo(lastGood);
     // Estimate only GPS-observed time; long gaps, poor accuracy and spikes
     // are not silently counted as either moving or stopped.
@@ -615,7 +619,10 @@ public final class RideService extends Service implements LocationListener {
   });
  }}
  @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p))handler.post(()->{if(!running)return;status="GPS 복귀 · 좌표 대기";notifySafely(status);});} @Override public void onStatusChanged(String p,int s,Bundle b){}
- void stopWith(String message,boolean completed){status=message;cleanup(completed);stopSelf();}
+ void stopWith(String message,boolean completed){
+  RideCaptureHealth.failedIfActive(this,message);
+  status=message;cleanup(completed);stopSelf();
+ }
  private synchronized boolean closeTrack(boolean completed){
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);
   gpsSyncScheduled=false;gpsSync.reset();
