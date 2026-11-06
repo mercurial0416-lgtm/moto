@@ -6,10 +6,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
+import org.robolectric.annotation.Config;
 import static org.junit.Assert.*;
 
 /** First ride must not report success without a real GPS coordinate. */
 @RunWith(RobolectricTestRunner.class)
+@Config(sdk=35)
 public final class RideCaptureHealthTest {
  Context context;
 
