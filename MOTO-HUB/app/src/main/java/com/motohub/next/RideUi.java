@@ -68,6 +68,18 @@ final class RideUi {
   TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"기록 대기",13,RideService.running?(a.dark?0xFFFFA79C:0xFFAA3833):a.accent,true);eyebrow.setGravity(Gravity.CENTER);hero.addView(eyebrow);
   TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?"라이딩 진행 중":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",22,a.fg,true);title.setTypeface(MotoDesign.display());title.setGravity(Gravity.CENTER);LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
   TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?RideService.count+"개 위치 기록 · 화면을 꺼도 GPS 기록 유지":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setGravity(Gravity.CENTER);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
+   String initialGps=recordingFeedback();
+   TextView gpsHealth=a.text(initialGps,13,RideService.running&&RideService.count==0?a.accent:a.muted,false);
+   gpsHealth.setPadding(a.dp(8),a.dp(4),a.dp(8),a.dp(8));
+   gpsHealth.setGravity(Gravity.CENTER);
+   gpsHealth.setVisibility(initialGps.isEmpty()?View.GONE:View.VISIBLE);
+   hero.addView(gpsHealth);
+   TextView gpsDiagnostics=a.text("GPS 상태·기록 진단  ›",13,a.accent,true);
+   gpsDiagnostics.setGravity(Gravity.CENTER);
+   gpsDiagnostics.setMinHeight(a.dp(48));
+   gpsDiagnostics.setClickable(true);gpsDiagnostics.setFocusable(true);
+   gpsDiagnostics.setOnClickListener(v->showGpsDiagnostics());
+   hero.addView(gpsDiagnostics);
   // No redundant pre-ride checklist. Explicit permission/consent handling stays
   // inside requestStart/start; foreground GPS never starts silently.
   if(RideService.running){
@@ -106,6 +118,10 @@ final class RideUi {
      return;
     }
     if(!RideService.running){a.renderPreservingPosition();return;}
+     String liveStatus=recordingFeedback();
+     gpsHealth.setText(liveStatus);
+     gpsHealth.setTextColor(RideService.count==0?a.accent:a.muted);
+     sub.setText(RideService.count+"개 위치 기록 · "+(RideService.gpsFresh()?"GPS 수신 정상":"GPS 신호 대기/확인 필요"));
     long seconds=Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.startedElapsed)/1000);
     // Gauge cards are invisible in navigation-first focus mode; GPS is still recorded.
     if(!focus){
@@ -237,10 +253,44 @@ final class RideUi {
   a.gap(a.content,10);
   a.label(a.content,"GPS 기록은 이 기기에 저장됩니다. 주행 중 화면 조작은 피하세요.",12,a.muted,false);
  }
- void switchWorkspace(String workspace){a.getSharedPreferences("ride_display",0).edit().putString("workspace",workspace).apply();a.render();}
+ String recordingFeedback(){
+   if(RideService.running){
+    if(RideService.count==0){
+     long elapsed=android.os.SystemClock.elapsedRealtime()-RideService.startedElapsed;
+     return elapsed>=20_000L?
+      "GPS 위치 0개 · 첫 신호 미수신. 실외에서 정확한 위치 권한을 확인해 주세요.":
+      "GPS 첫 위치 수신 대기 · 아직 저장된 경로 좌표가 없습니다.";
+    }
+    return RideService.gpsFresh()?
+     "GPS 좌표 "+RideService.count+"개 기록됨 · 현재 위치 신호 정상":
+     "좌표 "+RideService.count+"개 기록됨 · 현재 GPS 신호가 끊겼거나 지연 중입니다.";
+   }
+   return RideCaptureHealth.summary(a,false);
+  }
+  void showGpsDiagnostics(){
+   boolean precise=a.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;
+   LocationManager manager=a.getSystemService(LocationManager.class);
+   boolean enabled=manager!=null&&manager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+   boolean notice=Build.VERSION.SDK_INT<33||a.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED;
+   android.app.NotificationManager nm=a.getSystemService(android.app.NotificationManager.class);
+   boolean notifications=nm!=null&&nm.areNotificationsEnabled();
+   String result=RideCaptureHealth.summary(a,RideService.running);
+   String report="기록 서비스: "+(RideService.running?"실행 중":"중지됨")
+     +"\\nGPS 좌표: "+RideService.count+"개"
+     +"\\nGPS 수신: "+(RideService.gpsFresh()?"최근 신호 정상":"최근 유효 신호 없음")
+     +"\\n정확한 위치 권한: "+(precise?"허용":"미허용")
+     +"\\n기기 GPS: "+(enabled?"켜짐":"꺼짐")
+     +"\\n알림: "+(notice&&notifications?"허용":"차단")
+     +"\\n최근 처리 결과: "+(result.isEmpty()?"아직 기록 시도 없음":result)
+     +"\\n\\n좌표 0개 상태에서는 완료 주행 경로가 생성되지 않습니다. 첫 신호 확인 후 안전한 곳에서 기록을 테스트해 주세요.";
+   MotoDialog.info(a,"GPS 기록 진단",report);
+  }
+  void switchWorkspace(String workspace){a.getSharedPreferences("ride_display",0).edit().putString("workspace",workspace).apply();a.render();}
  void renderHistoryWorkspace(){
   a.content.setTag("ride-history-workspace");
   a.label(a.content,"라이딩 기록",19,a.fg,true);
+   String previous=RideCaptureHealth.summary(a,RideService.running);
+   if(!previous.isEmpty())a.label(a.content,"최근 GPS 결과 · "+previous,13,a.muted,false);
   LinearLayout historyPanel=a.col();historyPanel.addView(a.text("라이딩 기록 확인 중…",13,a.muted,false));a.content.addView(historyPanel);
   loadHistoryAsync(historyPanel,a.content);
   if(RideService.running)ExperienceUi.dock(a,a.button("현재 라이딩으로 돌아가기",true,()->switchWorkspace("ride")));
