@@ -276,13 +276,13 @@ final class RideUi {
    boolean notifications=nm!=null&&nm.areNotificationsEnabled();
    String result=RideCaptureHealth.summary(a,RideService.running);
    String report="기록 서비스: "+(RideService.running?"실행 중":"중지됨")
-     +"\\nGPS 좌표: "+RideService.count+"개"
-     +"\\nGPS 수신: "+(RideService.gpsFresh()?"최근 신호 정상":"최근 유효 신호 없음")
-     +"\\n정확한 위치 권한: "+(precise?"허용":"미허용")
-     +"\\n기기 GPS: "+(enabled?"켜짐":"꺼짐")
-     +"\\n알림: "+(notice&&notifications?"허용":"차단")
-     +"\\n최근 처리 결과: "+(result.isEmpty()?"아직 기록 시도 없음":result)
-     +"\\n\\n좌표 0개 상태에서는 완료 주행 경로가 생성되지 않습니다. 첫 신호 확인 후 안전한 곳에서 기록을 테스트해 주세요.";
+     +"\nGPS 좌표: "+RideService.count+"개"
+     +"\nGPS 수신: "+(RideService.gpsFresh()?"최근 신호 정상":"최근 유효 신호 없음")
+     +"\n정확한 위치 권한: "+(precise?"허용":"미허용")
+     +"\n기기 GPS: "+(enabled?"켜짐":"꺼짐")
+     +"\n알림: "+(notice&&notifications?"허용":"차단")
+     +"\n최근 처리 결과: "+(result.isEmpty()?"아직 기록 시도 없음":result)
+     +"\n\n좌표 0개 상태에서는 완료 주행 경로가 생성되지 않습니다. 첫 신호 확인 후 안전한 곳에서 기록을 테스트해 주세요.";
    MotoDialog.info(a,"GPS 기록 진단",report);
   }
   void switchWorkspace(String workspace){a.getSharedPreferences("ride_display",0).edit().putString("workspace",workspace).apply();a.render();}
