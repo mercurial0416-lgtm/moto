@@ -126,13 +126,12 @@ final class RideUi {
         RideService.lastMotionElapsed,RideService.gpsFresh(),
         RideService.liveDistanceKm,RideService.liveSpeedKmh,RideService.stopSuggestionShown)){
      RideService.stopSuggestionShown=true;
-     new AlertDialog.Builder(a).setTitle("라이딩을 종료할까요?")
-      .setMessage("약 12분 동안 움직임이 확인되지 않았어요. 신호대기나 휴식일 수도 있으므로 기록을 자동 종료하지 않습니다.")
-      .setNegativeButton("계속 기록",null)
-      .setPositiveButton("저장하고 종료",(d,w)->{
-       if(RideService.running)a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));
-       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
-      }).show();
+     MotoDialog.confirm(a,"라이딩을 종료할까요?",
+       "약 12분 동안 움직임이 확인되지 않았어요. 신호대기나 휴식일 수도 있으므로 기록을 자동 종료하지 않습니다.",
+       "저장하고 종료","계속 기록",()->{
+        if(RideService.running)a.startService(new Intent(a,RideService.class).setAction(RideService.STOP));
+        a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
+       },null);
     }
     hero.postDelayed(this,RideScreenRefreshPolicy.interval(RideService.gpsFresh(),RideService.liveSpeedKmh,focus));
    }};hero.post(refresh);
@@ -143,26 +142,24 @@ final class RideUi {
   Button start=a.button(RideService.running?"라이딩 저장 후 종료":
    RideService.autoArmed?"OBD 자동 감지 중지":"GPS 기록 시작",true,()->{
    if(RideService.running){
-    new AlertDialog.Builder(a)
-     .setTitle(RideService.autoArmed?"자동 라이딩 기록 종료":"라이딩 기록 종료")
-     .setMessage(RideService.autoArmed?
-      "현재 GPS 기록을 저장하고 OBD2 자동 출발 감지도 함께 종료합니다. 기록은 검증 후 완료됩니다.":
-      "GPS 경로를 저장·검증한 뒤 기록을 종료합니다.")
-     .setNegativeButton("취소",null)
-     .setPositiveButton("저장하고 종료",(d,w)->{
-      finishWithSummary();
-      a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
-     }).show();
+    MotoDialog.confirm(a,
+      RideService.autoArmed?"자동 라이딩 기록 종료":"라이딩 기록 종료",
+      RideService.autoArmed?
+       "현재 GPS 기록을 저장하고 OBD2 자동 출발 감지도 함께 종료합니다. 기록은 검증 후 완료됩니다.":
+       "GPS 경로를 저장·검증한 뒤 기록을 종료합니다.",
+      "저장하고 종료","취소",()->{
+       finishWithSummary();
+       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
+      },null);
     return;
    }
    if(RideService.autoArmed){
-    new AlertDialog.Builder(a).setTitle("OBD2 자동 출발 감지를 중지할까요?")
-     .setMessage("아직 시작하지 않은 GPS 기록은 없습니다. 감지를 중지하고 기존 주행 기록은 보존합니다.")
-     .setNegativeButton("취소",null)
-     .setPositiveButton("감지 중지",(d,w)->{
-      a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));
-      a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
-     }).show();
+    MotoDialog.confirm(a,"OBD2 자동 출발 감지를 중지할까요?",
+      "아직 시작하지 않은 GPS 기록은 없습니다. 감지를 중지하고 기존 주행 기록은 보존합니다.",
+      "감지 중지","취소",()->{
+       a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));
+       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
+      },null);
     return;
    }
    requestStart();
@@ -788,19 +785,18 @@ final class RideUi {
   final org.json.JSONObject selectedBike=a.bike();
   final String approvedBike=selectedBike==null?"":selectedBike.optString("id");
   final String displayBike=selectedBike==null?"바이크 미지정 (차고에서 선택 가능)":selectedBike.optString("name","바이크 이름 없음");
-  new AlertDialog.Builder(a).setTitle(openNavigatorAfterStart?"GPS 기록 + 내비 실행":"GPS 경로를 기록할까요?")
-   .setMessage("기록할 바이크: "+displayBike+"\n\n정확한 위치를 라이딩 중 이 휴대폰에 저장합니다. 화면이 꺼져도 지속 알림으로 기록하며, 서버나 친구에게 자동 전송하지 않습니다."+
-    (openNavigatorAfterStart?"\n\nGPS 기록이 실제 시작된 뒤 선택한 외부 내비를 실행합니다. OBD2는 자동 연결하지 않습니다.":""))
-   .setNegativeButton("취소",(d,w)->{a.launchNavigationAfterRide=false;a.approvedRideBikeId="";})
-   .setPositiveButton("이 바이크로 기록 시작",(d,w)->{
-    String liveBike=a.bike()==null?"":a.bike().optString("id");
-    if(!approvedBike.equals(liveBike)){
-     a.rideStartConsent.cancel();a.approvedRideBikeId="";a.launchNavigationAfterRide=false;
-     a.toast("바이크 선택이 변경됐어요. 다시 확인해 주세요.");return;
-    }
-    a.approvedRideBikeId=approvedBike;
-    a.launchNavigationAfterRide=openNavigatorAfterStart;a.rideStartConsent.approve();start();
-   }).show();
+  MotoDialog.rideStart(a,displayBike,openNavigatorAfterStart,()->{
+     String liveBike=a.bike()==null?"":a.bike().optString("id");
+     if(!approvedBike.equals(liveBike)){
+      a.rideStartConsent.cancel();a.approvedRideBikeId="";a.launchNavigationAfterRide=false;
+      a.toast("바이크 선택이 변경됐어요. 다시 확인해 주세요.");return;
+     }
+     a.approvedRideBikeId=approvedBike;
+     a.launchNavigationAfterRide=openNavigatorAfterStart;a.rideStartConsent.approve();start();
+    },()->{
+     a.rideStartConsent.cancel();
+     a.launchNavigationAfterRide=false;a.approvedRideBikeId="";
+    });
  }
  void start(){
   if(!a.rideStartConsent.pending()||!"라이딩".equals(a.tab))return;
