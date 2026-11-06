@@ -43,7 +43,7 @@ assert 'RideService.running?"라이딩 저장 후 종료"' in ride
 assert 'Button disarm=a.button("OBD만 중지 · GPS 기록은 계속"' in ride
 assert 'RideService.AUTO_DISARM' in ride and 'RideService.STOP' in ride
 assert 'finishWithSummary();' in ride
-assert 'setPositiveButton("저장하고 종료"' in ride
+assert 'MotoDialog.confirm(a' in ride and '"저장하고 종료","취소"' in ride
 assert 'narrowMetrics' in ride and 'navRow' in ride
 assert 'NavigationApps.openPreferred(a)' in ride and 'NavigationApps.choose(a)' in ride
 assert 'RideScreenRefreshPolicy.interval(' in ride

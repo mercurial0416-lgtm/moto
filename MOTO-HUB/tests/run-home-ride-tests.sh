@@ -11,8 +11,8 @@ activity=Path('app/src/main/java/com/motohub/next/MainActivity.java').read_text(
 checks={
  'home navigates to ride tab before consent': 'a.navigate("라이딩");' in home and 'new RideUi(a).requestStart(true);' in home,
  'ride start requires ride tab': 'if(!a.rideStartConsent.pending()||!"라이딩".equals(a.tab))return;' in ride,
- 'start consent still explicit and bike-fixed': 'setPositiveButton("이 바이크로 기록 시작"' in ride and 'if(!approvedBike.equals(liveBike))' in ride and 'putExtra(RideService.EXTRA_BIKE_ID,fixedBikeId)' in ride,
- 'home stop sends completed STOP command': 'if(!RideService.running&&!RideService.autoArmed)new RideUi(a).requestStart(true)' in home and 'setPositiveButton("저장하고 종료"' in ride and 'a.startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in ride,
+ 'start consent still explicit and bike-fixed': 'MotoDialog.rideStart(a,displayBike,openNavigatorAfterStart' in ride and 'if(!approvedBike.equals(liveBike))' in ride and 'putExtra(RideService.EXTRA_BIKE_ID,fixedBikeId)' in ride,
+ 'home stop sends completed STOP command': 'if(!RideService.running&&!RideService.autoArmed)new RideUi(a).requestStart(true)' in home and 'MotoDialog.confirm(a' in ride and '"저장하고 종료"' in ride and 'a.startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in ride,
  'ride tab stop sends completed STOP command': 'a.startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in ride,
  'no direct stopService for ride anywhere': all(not re.search(r'\.stopService\(\s*new Intent\([^;]*RideService\.class',p.read_text()) for p in Path('app/src/main/java').rglob('*.java')),
  'STOP is completed not interrupted': 'if(STOP.equals(action))' in service and 'finishUserRideAsync();return START_NOT_STICKY;' in service and 'boolean verified=closeTrack(true)' in service and 'if(AUTO_DISARM.equals(action))' in service,

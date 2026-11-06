@@ -10,7 +10,7 @@ assert 'boolean running=RideService.running,armed=RideService.autoArmed;' in hom
 assert 'if(!RideService.running&&!RideService.autoArmed)new RideUi(a).requestStart(true)' in home
 assert 'String label=running?' in home and '라이딩 진행 중 · 상태 보기' in home
 ride=(s/'RideUi.java').read_text()
-assert 'setPositiveButton("저장하고 종료"' in ride and 'void finishWithSummary()' in ride
+assert 'MotoDialog.confirm(a' in ride and '"저장하고 종료","취소"' in ride and 'void finishWithSummary()' in ride
 assert 'RideService.STOP' in ride
 assert 'setNeutralButton("다른 내비 실행"' in nav
 assert 'NavigationChoice.values()' in nav

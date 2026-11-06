@@ -41,7 +41,8 @@ assert 'FuelAnomalyPolicy.unusualAmount' in fuel
 assert 'MaintenanceDueOverrides.apply' in main and 'dueKms' in main and 'dueDates' in main
 assert 'GarageIntegrity.findings(checked)' in main and 'edit(found.collection,record)' in main
 assert 'approvedRideBikeId' in main and 'final String fixedBikeId=a.approvedRideBikeId;' in ride
-assert '기록할 바이크:' in ride and '이 바이크로 기록 시작' in ride
+assert 'MotoDialog.rideStart(a,displayBike,openNavigatorAfterStart' in ride
+assert '"기록할 바이크"' in s('MotoDialog.java') and '"이 바이크로 기록 시작"' in s('MotoDialog.java')
 assert 'apksigner' in Path('../.github/workflows/moto-fixed-signed.yml').read_text()
 publisher=Path('../.github/workflows/moto-publish-signed-on-version.yml').read_text()
 assert 'cp "$APK" "$RUNNER_TEMP/MOTO-HUB.apk"' in publisher

@@ -13,7 +13,7 @@ assert "BACKGROUND_UI_POLL_MS=10000L" in policy
 assert "if(!a.hasWindowFocus())" in ui
 assert "hero.postDelayed(this,RideScreenRefreshPolicy.BACKGROUND_UI_POLL_MS);" in ui
 assert ui.index("if(!a.hasWindowFocus())")<ui.index("RideStopSuggestion.shouldSuggest(")
-assert "new AlertDialog.Builder(a).setTitle(\"라이딩을 종료할까요?\")" in ui
+assert 'MotoDialog.confirm(a,"라이딩을 종료할까요?"' in ui
 assert 'a.renderPreservingPosition();return;' in ui
 assert "startForegroundService(new Intent(a,RideService.class)" in ui
 assert "output.getFD().sync()" in service
