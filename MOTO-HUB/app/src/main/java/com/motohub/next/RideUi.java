@@ -868,7 +868,13 @@ final class RideUi {
   final String fixedBikeId=a.approvedRideBikeId;
   a.approvedRideBikeId="";
   a.attempt(()->{
-   a.startForegroundService(new Intent(a,RideService.class).putExtra(RideService.EXTRA_BIKE_ID,fixedBikeId));
+   RideCaptureHealth.started(a);
+   try{
+    a.startForegroundService(new Intent(a,RideService.class).putExtra(RideService.EXTRA_BIKE_ID,fixedBikeId));
+   }catch(RuntimeException startFailure){
+    RideCaptureHealth.failedIfActive(a,startFailure.getMessage());
+    throw startFailure;
+   }
    boolean nav=a.launchNavigationAfterRide;a.launchNavigationAfterRide=false;
    a.toast("GPS 기록을 시작하는 중…");
    if(!nav){
