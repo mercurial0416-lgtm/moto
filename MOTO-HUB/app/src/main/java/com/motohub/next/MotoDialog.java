@@ -44,6 +44,13 @@ final class MotoDialog {
   show(a,title,null,null,facts,primaryLabel,secondaryLabel,onConfirm,onCancel);
  }
 
+ /** Read-only branded information sheet. No accidental primary action. */
+ static void info(MainActivity a,String title,String message){
+  List<String> facts=new ArrayList<>();
+  if(message!=null&&!message.trim().isEmpty())facts.add(message);
+  show(a,title,null,null,facts,"닫기",null,null,null);
+ }
+
  private static void show(MainActivity a,String title,String infoLabel,String infoValue,
                           List<String> facts,String primaryLabel,String secondaryLabel,
                           Runnable onConfirm,Runnable onCancel){
@@ -125,11 +132,13 @@ final class MotoDialog {
   primary.setOnClickListener(v->{dialog.dismiss();if(onConfirm!=null)onConfirm.run();});
   sheet.addView(primary,new LinearLayout.LayoutParams(-1,a.dp(54)));
 
-  TextView secondary=action(a,secondaryLabel,false);
-  secondary.setOnClickListener(v->{dialog.dismiss();if(onCancel!=null)onCancel.run();});
-  LinearLayout.LayoutParams secondaryLp=new LinearLayout.LayoutParams(-1,a.dp(48));
-  secondaryLp.topMargin=a.dp(8);
-  sheet.addView(secondary,secondaryLp);
+  if(secondaryLabel!=null&&!secondaryLabel.trim().isEmpty()){
+   TextView secondary=action(a,secondaryLabel,false);
+   secondary.setOnClickListener(v->{dialog.dismiss();if(onCancel!=null)onCancel.run();});
+   LinearLayout.LayoutParams secondaryLp=new LinearLayout.LayoutParams(-1,a.dp(48));
+   secondaryLp.topMargin=a.dp(8);
+   sheet.addView(secondary,secondaryLp);
+  }
 
   // Keep the action buttons visible even at enlarged font sizes.
   int maxScroll=(int)(a.getResources().getDisplayMetrics().heightPixels*0.52f);
