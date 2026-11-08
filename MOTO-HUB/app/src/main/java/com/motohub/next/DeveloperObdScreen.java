@@ -41,6 +41,7 @@ final class DeveloperObdScreen {
  private volatile boolean stopped=true;
  private volatile BluetoothSocket socket;
  private Thread worker;
+ private volatile long discoveryGeneration;
  DeveloperObdScreen(MainActivity activity){this.activity=activity;}
  /** A short, opt-in first-connection flow. Reuses the existing read-only SPP engine. */
  static void launchQuick(MainActivity a){
@@ -74,6 +75,8 @@ final class DeveloperObdScreen {
    if(RideService.running||RideService.autoArmed){setStatus("라이딩 중에는 별도 ECU 연결을 시작하지 않습니다.");return;}
    loadPaired();
   });
+  activity.action(p,"지원하는 전체 센서 탐색 · 실제 수신값 확인",false,()->loadPairedDiscovery(false));
+  activity.action(p,"선택한 센서만 다시 읽기",false,()->loadPairedDiscovery(true));
   activity.gap(p,12);
   activity.label(p,"3  지원 결과 확인",16,activity.fg,true);
   activity.label(p,"연결 결과·PID 지원 메모는 이 기기에만 저장되고, 실제 센서값을 확인하지 못했다면 지원 확정으로 보지 않습니다.",13,activity.muted,false);
@@ -103,6 +106,8 @@ final class DeveloperObdScreen {
   }
   activity.gap(p,12);
   activity.action(p,"페어링된 장치로 센서 연결 테스트",true,this::loadPaired);
+  activity.action(p,"ECU 전체 지원 센서 탐색 · 선별",false,()->loadPairedDiscovery(false));
+  activity.action(p,"선택한 센서만 재조회",false,()->loadPairedDiscovery(true));
   activity.action(p,"지난 ECU 지원 항목 · 연결 테스트 기록",false,()->{
    new AlertDialog.Builder(activity).setTitle("OBD2 로컬 점검 기록")
     .setMessage(ObdLocalDiagnosticLog.summary(activity))
@@ -318,14 +323,15 @@ final class DeveloperObdScreen {
   entry.show();
  }
  private boolean permissionGranted(){return Build.VERSION.SDK_INT<31||activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED;}
- void loadPaired(){loadPaired(false,false);}
- void loadPairedAuto(){loadPaired(true,false);}
- void loadPairedOdo(){loadPaired(false,true);}
+ void loadPaired(){loadPaired(false,false,false,false);}
+ void loadPairedAuto(){loadPaired(true,false,false,false);}
+ void loadPairedOdo(){loadPaired(false,true,false,false);}
+ void loadPairedDiscovery(boolean selectedOnly){loadPaired(false,false,true,selectedOnly);}
  private void openBluetoothSettings(){
   try{activity.startActivity(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS));}
   catch(Exception unavailable){setStatus("갤럭시 설정 → 연결 → Bluetooth에서 동글을 페어링해 주세요.");}
  }
- private void loadPaired(boolean automatic,boolean odo){
+ private void loadPaired(boolean automatic,boolean odo,boolean discovery,boolean selectedOnly){
   if(owner==null||!owner.isShowing())return;
   if(!permissionGranted()){
    activity.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},automatic?AUTO_CONNECT_PERMISSION_REQUEST:odo?ODO_CONNECT_PERMISSION_REQUEST:CONNECT_PERMISSION_REQUEST);
@@ -351,11 +357,108 @@ final class DeveloperObdScreen {
    String[] labels=new String[devices.size()];
    for(int i=0;i<devices.size();i++){String name=devices.get(i).getName();labels[i]=ObdFirstConnectionGuide.adapterLabel(name)+(name==null||name.trim().isEmpty()?"이름 없는 장치":name)+" · "+devices.get(i).getAddress();}
    new AlertDialog.Builder(activity).setTitle("OBD2 어댑터 선택")
-    .setItems(labels,(d,index)->{if(automatic)confirmAuto(devices.get(index));else if(odo)confirmOdo(devices.get(index));else confirmConnect(devices.get(index));})
+    .setItems(labels,(d,index)->{if(automatic)confirmAuto(devices.get(index));else if(odo)confirmOdo(devices.get(index));else if(discovery)confirmDiscovery(devices.get(index),selectedOnly);else confirmConnect(devices.get(index));})
     .setNegativeButton("취소",null).show();
   }catch(SecurityException e){setStatus("Bluetooth 연결 권한이 필요합니다.");}
  }
 
+
+ private void confirmDiscovery(BluetoothDevice device,boolean selectedOnly){
+  if(RideService.running||RideService.autoArmed||RideService.saving()||RestoreRideGate.isRestoring()){
+   setStatus("라이딩·복원 작업 중에는 별도 OBD 센서 탐색을 시작하지 않습니다.");return;
+  }
+  if(selectedOnly&&activity.getSharedPreferences("obd_discovery_selection",0).getString("selected","").isEmpty()){
+   setStatus("먼저 '전체 센서 탐색'에서 읽힌 센서를 선택해 주세요.");return;
+  }
+  new AlertDialog.Builder(activity)
+   .setTitle(selectedOnly?"선택한 OBD 센서 다시 읽기":"ECU 지원 PID 일괄 탐색")
+   .setMessage(selectedOnly
+    ?"선택했던 PID만 한 번씩 다시 읽습니다. 주행 중 실행하지 마세요."
+    :"ECU 지원 비트맵을 따라 표준 Mode 01 읽기 전용 PID만 한 번씩 조회합니다. 센서가 많으면 오래 걸릴 수 있습니다. 결과는 이 화면에서 선택할 수 있고, 총주행거리는 계기판과 대조 전까지 앱에 반영하지 않습니다.")
+   .setNegativeButton("취소",null)
+   .setPositiveButton("정차 상태에서 조회",(d,w)->startDiscovery(device,selectedOnly)).show();
+ }
+ private synchronized void startDiscovery(BluetoothDevice device,boolean selectedOnly){
+  stop();
+  if(worker!=null&&worker.isAlive()){setStatus("이전 OBD 연결을 종료 중입니다. 다시 시도해 주세요.");return;}
+  if(!permissionGranted()){setStatus("먼저 Bluetooth 연결 권한을 허용해 주세요.");return;}
+  long generation=++discoveryGeneration;
+  stopped=false;
+  setStatus(selectedOnly?"선택 센서 조회 연결 중…":"ECU 지원 목록 탐색 연결 중…");
+  worker=new Thread(()->runDiscovery(device,selectedOnly,generation),"moto-obd-readonly-discovery");
+  worker.setDaemon(true);worker.start();
+ }
+ private void runDiscovery(BluetoothDevice device,boolean selectedOnly,long generation){
+  try{
+   BluetoothSocket connected=device.createRfcommSocketToServiceRecord(SPP);
+   socket=connected;
+   if(stopped)return;
+   connected.connect();
+   if(stopped)return;
+   InputStream in=connected.getInputStream();
+   OutputStream out=connected.getOutputStream();
+   for(String setup:new String[]{"ATZ\r","ATE0\r","ATL0\r","ATS0\r","ATSP0\r"}){
+    request(in,out,setup,4000);
+    if(stopped)return;
+   }
+   ObdReadOnlyDiscovery.Request reader=(command,timeoutMs)->request(in,out,command,timeoutMs);
+   ObdReadOnlyDiscovery.Progress progress=(done,total,valid)->
+     setStatus("OBD 읽기 전용 탐색 "+done+"/"+total+" · 실제 응답 "+valid+"개\n중단하려면 이 창을 닫거나 '연결 끊기'를 누르세요.");
+   java.util.function.BooleanSupplier cancel=()->stopped||discoveryGeneration!=generation;
+   ObdReadOnlyDiscovery.Result result;
+   if(selectedOnly){
+    String saved=activity.getSharedPreferences("obd_discovery_selection",0).getString("selected","");
+    List<String> pids=new ArrayList<>();
+    for(String pid:saved.split(","))if(pid.matches("01[0-9A-F]{2}"))pids.add(pid);
+    if(pids.isEmpty()){setStatus("저장된 선택 PID가 없습니다. 먼저 전체 탐색을 실행하세요.");return;}
+    result=ObdReadOnlyDiscovery.selected(reader,pids,progress,cancel);
+   }else result=ObdReadOnlyDiscovery.all(reader,progress,cancel);
+   if(cancel.getAsBoolean())return;
+   activity.runOnUiThread(()->{
+    if(owner==null||!owner.isShowing()||activity.dialog!=owner||generation!=discoveryGeneration)return;
+    showDiscoveryResult(result,selectedOnly);
+   });
+  }catch(InterruptedException ignored){/* User cancelled the scan. */}
+  catch(Exception e){
+   if(!stopped&&generation==discoveryGeneration)
+    setStatus("OBD 센서 탐색 실패: "+e.getClass().getSimpleName()+
+      " · 시동 ON/동글 연결 확인. 기존 라이딩·누적거리 기록 변경 없음.");
+  }finally{closeSocket();stopped=true;}
+ }
+ private void showDiscoveryResult(ObdReadOnlyDiscovery.Result result,boolean selectedOnly){
+  List<ObdReadOnlyDiscovery.Reading> readings=result.readings;
+  setStatus("지원 표준 PID "+result.advertised+"개 탐색 · 실제 응답 "+readings.size()+
+   "개 · 무응답/오류 "+result.rejected+"개 · ECU 기록 변경 없음");
+  if(readings.isEmpty()){
+   new AlertDialog.Builder(activity).setTitle("실제 수신된 센서 없음")
+    .setMessage("표준 Mode 01 PID에서 유효한 수신값이 없습니다. 기존 센서 검사가 성공했다면 시동·연결 상태를 확인하고 다시 시도해 주세요.")
+    .setPositiveButton("확인",null).show();
+   return;
+  }
+  final String[] labels=new String[readings.size()];
+  final boolean[] checked=new boolean[readings.size()];
+  String previous=activity.getSharedPreferences("obd_discovery_selection",0).getString("selected","");
+  java.util.Set<String> selected=new java.util.HashSet<>();
+  for(String pid:previous.split(","))if(pid.matches("01[0-9A-F]{2}"))selected.add(pid);
+  for(int i=0;i<readings.size();i++){
+   ObdReadOnlyDiscovery.Reading reading=readings.get(i);
+   labels[i]=reading.label();
+   checked[i]=previous.isEmpty()||selected.contains(reading.pid);
+  }
+  new AlertDialog.Builder(activity)
+   .setTitle("실제 수신 "+readings.size()+"개 · 표시할 센서 선택")
+   .setMessage("값을 읽은 표준 PID만 표시합니다. 'HEX' 항목은 단위가 확인되지 않은 원시 응답이며 ECU 누적거리는 계기판 대조 전까지 앱에 반영되지 않습니다. 선택한 PID 번호만 기기에 저장합니다.")
+   .setMultiChoiceItems(labels,checked,(dialog,index,on)->checked[index]=on)
+   .setNegativeButton("저장 안 함",null)
+   .setPositiveButton("선택한 항목 저장",(dialog,which)->{
+    List<String> kept=new ArrayList<>();
+    for(int i=0;i<checked.length;i++)if(checked[i])kept.add(readings.get(i).pid);
+    activity.getSharedPreferences("obd_discovery_selection",0).edit()
+     .putString("selected",String.join(",",kept)).apply();
+    setStatus("실제 수신 "+readings.size()+"개 확인 · 선택 "+kept.size()+
+     "개 저장 (PID 번호만) · '선택한 센서만 다시 읽기'에서 재조회 가능");
+   }).show();
+ }
  private void confirmOdo(BluetoothDevice device){
   if(RideService.running||RideService.autoArmed){setStatus("주행 중에는 ODO 실험 조회를 사용할 수 없습니다.");return;}
   if(activity.readOnly){setStatus("저장 데이터 보호 상태에서는 ODO를 반영하지 않습니다.");return;}
@@ -573,7 +676,7 @@ final class DeveloperObdScreen {
  private void setStatus(String message){activity.runOnUiThread(()->{
   if(owner!=null&&owner.isShowing()&&activity.dialog==owner)status.setText(message);
  });}
- synchronized void stop(){stopped=true;closeSocket();for(int i=0;i<fields.length;i++)updateStopped(i);setStatus("연결 끊김");}
+ synchronized void stop(){stopped=true;discoveryGeneration++;closeSocket();for(int i=0;i<fields.length;i++)updateStopped(i);setStatus("연결 끊김");}
  private void updateStopped(int index){activity.runOnUiThread(()->{
   if(owner!=null&&owner.isShowing()&&activity.dialog==owner){
    fields[index].setVisibility(android.view.View.VISIBLE);
