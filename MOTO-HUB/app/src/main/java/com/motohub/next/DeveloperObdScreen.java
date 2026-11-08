@@ -471,7 +471,7 @@ final class DeveloperObdScreen {
   if(activity.bike()==null||GarageBikeStatus.sold(activity.bike().optString("soldDate"))){setStatus("먼저 운행 중인 바이크를 선택해 주세요.");return;}
   new AlertDialog.Builder(activity).setTitle("ODO 읽기 전용 추가 진단 · 실험")
    .setMessage("정차 상태에서 01A0 지원목록 → 01A6 직접 조회 → 읽기 전용 22 F4 A6을 차례로 확인합니다. CAN 11비트인 경우 ECU 주소 7E0으로도 재시도합니다. ECU 설정·고장코드·계기판은 변경하지 않습니다. 수신 km는 두 차례 일치하고 계기판과 직접 대조할 때만 앱에 반영할 수 있습니다. 듀크390 호환성은 아직 확인되지 않았습니다.")
-   .setNegativeButton("취소",null).setPositiveButton("정차 상태 · 조회 동의",(d,w)->startOdoProbe(device)).show();
+   .setNegativeButton("취소",null).setPositiveButton("조회 동의",(d,w)->startOdoProbe(device)).show();
  }
  private synchronized void startOdoProbe(BluetoothDevice device){
   stop();
