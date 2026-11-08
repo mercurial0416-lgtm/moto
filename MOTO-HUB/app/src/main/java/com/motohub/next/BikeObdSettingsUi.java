@@ -26,7 +26,8 @@ final class BikeObdSettingsUi {
 
  void open(String bikeId){
   if(!RideBikeBinding.valid(bikeId)){a.toast("바이크를 먼저 등록해 주세요.");return;}
-  org.json.JSONObject bike=Store.find(a.db,"vehicles",bikeId);
+  org.json.JSONObject bike=null;
+  for(org.json.JSONObject entry:a.items("vehicles"))if(bikeId.equals(entry.optString("id"))){bike=entry;break;}
   if(bike==null){a.toast("등록된 바이크를 찾을 수 없습니다.");return;}
   String name=bike.optString("name","내 바이크");
   String address=BikeObdPreferences.address(a,bikeId);
