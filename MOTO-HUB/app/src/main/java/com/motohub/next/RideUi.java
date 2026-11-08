@@ -454,7 +454,7 @@ final class RideUi {
   }
    // One state selector replaces six always-visible horizontal chips.
    String[] statusOptions=RideHistoryFilter.OPTIONS;
-   Button statusButton=a.button("상태 · "+selected+"  ("+counts.getOrDefault(selected,0)+")  ▾",false,()->
+   Button statusButton=a.button("상태 · "+selected+"  (GPS 구간 "+counts.getOrDefault(selected,0)+"개)  ▾",false,()->
     new AlertDialog.Builder(a).setTitle("라이딩 상태")
      .setSingleChoiceItems(statusOptions,Math.max(0,Arrays.asList(statusOptions).indexOf(selected)),
       (dialog,index)->{dialog.dismiss();a.selectRideHistoryFilter(statusOptions[index]);})
