@@ -432,7 +432,7 @@ public class MainActivity extends Activity {
   if(!RestoreRideGate.beginFormWrite())return;
   if(!odoApplying.compareAndSet(false,true)){RestoreRideGate.endFormWrite();return;}
   new Thread(()->{
-   boolean wrote=false,checkpoint=false,skip=false;String failure=null;JSONObject updated=null;
+   boolean wrote=false,checkpoint=false,skip=false,acknowledged=false;String failure=null;JSONObject updated=null;
    try{
     if(RideService.running||!OdometerAutoSyncInbox.enabled(this,bikeId))
      throw new java.io.IOException("자동 라이딩 또는 동기화 설정 변경 중");
@@ -451,7 +451,7 @@ public class MainActivity extends Activity {
      wrote=true;updated=original;
      try{checkpoint=LocalSafetyBackup.checkpoint(this,original);}catch(Exception ignored){}
     }
-    OdometerAutoSyncInbox.acknowledged(this,bikeId,offered);
+    acknowledged=OdometerAutoSyncInbox.acknowledged(this,bikeId,offered);
    }catch(Exception e){failure=e.getMessage();}
    finally{
     if(wrote)formWriteRevision++;
@@ -459,7 +459,7 @@ public class MainActivity extends Activity {
     odoApplying.set(false);
    }
    final JSONObject done=updated;final String why=failure;
-   final boolean saved=wrote,hadCheckpoint=checkpoint,ignored=skip;
+   final boolean saved=wrote,hadCheckpoint=checkpoint,ignored=skip,ackSaved=acknowledged;
    runOnUiThread(()->{
     if(isFinishing()||isDestroyed())return;
     if(saved&&done!=null){
@@ -471,7 +471,7 @@ public class MainActivity extends Activity {
     // Each completed write/ack is independently checked against the current
     // garage revision before applying another bike's verified ODO candidate.
     // Failed writes intentionally do NOT retry indefinitely in a hot loop.
-    if(saved||ignored)syncVerifiedOdoInbox();
+    if((saved||ignored)&&ackSaved)syncVerifiedOdoInbox();
    });
   },"moto-verified-obd-odo-commit").start();
  }
