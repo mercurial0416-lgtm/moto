@@ -47,7 +47,7 @@ final class BikeObdPreferences {
   LinkedHashSet<String> set=new LinkedHashSet<>();
   for(String pid:csv.split(",")){
    if(pid.matches("01[0-9A-F]{2}")&&!"01FF".equals(pid))set.add(pid);
-   if(set.size()>=160)break;
+   if(set.size()>=250)break;
   }
   return new ArrayList<>(set);
  }
@@ -58,7 +58,7 @@ final class BikeObdPreferences {
    if(pid==null||!pid.matches("01[0-9A-F]{2}")||"01FF".equals(pid))
     throw new IllegalArgumentException("허용되지 않은 PID입니다.");
    clean.add(pid);
-   if(clean.size()>160)throw new IllegalArgumentException("너무 많은 PID가 선택됐습니다.");
+   if(clean.size()>250)throw new IllegalArgumentException("너무 많은 PID가 선택됐습니다.");
   }
   prefs(context).edit().putString(key(bikeId,"selected"),String.join(",",clean)).apply();
  }
