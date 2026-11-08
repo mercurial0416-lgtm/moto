@@ -66,6 +66,14 @@ final class BikeObdSettingsUi {
    });
 
   a.gap(p,12);
+  a.label(p,"계기판 총주행거리(ODO) 연동",16,a.fg,true);
+  boolean odoEnabled=OdometerAutoSyncInbox.enabled(a,bikeId);
+  a.label(p,odoEnabled?OdometerAutoSyncInbox.display(a,bikeId):
+   "꺼짐 · ECU 표준 01A6 지원 여부는 실차 확인 필요",14,a.muted,false);
+  a.action(p,odoEnabled?"이 바이크 ECU 누적거리 자동 동기화 끄기":
+    "이 바이크 ECU 누적거리 자동 동기화 설정",false,()->confirmOdo(bikeId));
+  a.label(p,"GPS 경로와 이동거리는 항상 바이크별로 기록합니다. 실제 계기판 총주행거리 자동 갱신은 ECU가 01A6을 지원하고 최초 계기판 km를 확인한 경우에만 가능합니다. 지원하지 않으면 라이딩 기록에서 검증 후 직접 반영할 수 있습니다.",13,a.muted,false);
+  a.gap(p,12);
   a.label(p,"선택된 계기판 센서",16,a.fg,true);
   a.label(p,selected.isEmpty()?"아직 선별한 센서 없음 · 전체 탐색 후 선택":
    selected.size()+"개 저장 · "+preview(selected),14,a.muted,false);
@@ -101,6 +109,45 @@ final class BikeObdSettingsUi {
  }
 
 
+
+ private void confirmOdo(String bikeId){
+  if(a.readOnly||RideService.running||RideService.autoArmed||
+     RideService.saving()||RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()){
+   a.toast("라이딩·자동 감지·데이터 복원이 끝난 뒤 ODO 설정을 변경해 주세요.");return;
+  }
+  if(a.bike()==null||!bikeId.equals(a.bike().optString("id"))){
+   a.toast("현재 선택한 바이크를 다시 확인해 주세요.");return;
+  }
+  if(OdometerAutoSyncInbox.enabled(a,bikeId)){
+   new AlertDialog.Builder(a).setTitle("ECU 누적거리 자동 동기화 끄기")
+    .setMessage("이 바이크의 ECU ODO 자동 적용만 중지합니다. 기존 주행거리·GPS·정비 기록은 변경하지 않습니다.")
+    .setNegativeButton("취소",null)
+    .setPositiveButton("끄기",(dialog,which)->{
+     OdometerAutoSyncInbox.disable(a,bikeId);
+     open(bikeId);
+    }).show();
+   return;
+  }
+  double baseline=a.bike().optDouble("odo",Double.NaN);
+  if(!OdoAutoSyncPolicy.sane(baseline)){
+   a.toast("바이크 정보에 실제 계기판 총주행거리를 먼저 입력해 주세요.");return;
+  }
+  new AlertDialog.Builder(a).setTitle("이 바이크 ECU 총주행거리 동기화")
+   .setMessage("바이크: "+a.bikeName(bikeId)+
+    "\n차고 총주행거리: "+a.num(baseline)+" km\n\n"+
+    "지금 바이크의 실제 계기판 누적 km와 차고 값이 정확히 일치하는지 확인했나요?"+
+    "\n\nECU 표준 PID 01A6을 지원할 때만 두 번 독립 조회한 값을 비교하고, 최초 오차 및 급증 여부를 검증한 후 차고 km에 반영합니다. "+
+    "미지원이면 자동 갱신되지 않으며 GPS 추정거리와 ECU 실제 누적거리를 섞지 않습니다.")
+   .setNegativeButton("취소",null)
+   .setPositiveButton("계기판 일치 확인 · 켜기",(dialog,which)->{
+    if(RideService.running||RideService.autoArmed||a.bike()==null||
+       !bikeId.equals(a.bike().optString("id"))||
+       Double.compare(a.bike().optDouble("odo",Double.NaN),baseline)!=0)return;
+    if(!OdometerAutoSyncInbox.enable(a,bikeId,baseline))
+     a.toast("동기화 기준값 저장에 실패했습니다.");
+    open(bikeId);
+   }).show();
+ }
  private void beginAuto(String bikeId){
   if(a.readOnly||RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()||RideService.saving()){
    a.toast("데이터 보호·복원·저장이 끝난 뒤 실행해 주세요.");return;
