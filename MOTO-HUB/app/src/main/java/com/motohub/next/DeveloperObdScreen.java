@@ -197,7 +197,7 @@ final class DeveloperObdScreen {
     new AlertDialog.Builder(activity).setTitle("ODO 자동 동기화 끄기")
      .setMessage("기존 주행 기록과 차고 km는 그대로 유지합니다.")
      .setNegativeButton("취소",null).setPositiveButton("끄기",(d,w)->{
-       OdometerAutoSyncInbox.disable(activity);setStatus("ODO 자동 동기화 꺼짐 · 기록 유지");
+       OdometerAutoSyncInbox.disable(activity,id);setStatus("이 바이크 ODO 자동 동기화 꺼짐 · 기록 유지");
      }).show();return;
    }
    double baseline=chosen.optDouble("odo",Double.NaN);
