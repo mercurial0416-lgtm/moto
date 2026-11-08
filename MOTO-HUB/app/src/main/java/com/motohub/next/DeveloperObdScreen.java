@@ -31,7 +31,7 @@ final class DeveloperObdScreen {
  static final int CONNECT_PERMISSION_REQUEST=88;
  static final int AUTO_CONNECT_PERMISSION_REQUEST=89;
  static final int ODO_CONNECT_PERMISSION_REQUEST=90;
- private static final String PREFERRED_ADAPTER="obd_remembered_device";
+ // Per-bike adapter and PID selection are stored by BikeObdPreferences.
  static final UUID SPP=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
  private final MainActivity activity;
  private final String[] values=new String[ObdReadOnlyProtocol.SENSOR_PIDS.length];
@@ -61,6 +61,7 @@ final class DeveloperObdScreen {
   if(RideService.running||RideService.autoArmed||RideService.saving())return;
   LinearLayout p=activity.page("OBD 연결 · 3단계");
   activity.label(p,"1  준비",16,activity.fg,true);
+  activity.label(p,"대상: "+(activity.bike()==null?"바이크 미선택":activity.bike().optString("name"))+" · 동글/센서 설정은 바이크별 저장",14,activity.fg,true);
   activity.label(p,"바이크 정차 → 진단 케이블·동글 장착 → 시동 ON → 갤럭시 Bluetooth 페어링",13,activity.muted,false);
   activity.action(p,"Bluetooth 페어링 설정",false,this::openBluetoothSettings);
   activity.gap(p,12);
@@ -154,11 +155,11 @@ final class DeveloperObdScreen {
   });
   activity.label(p,"주차·배터리 주의: 일부 OBD 동글은 시동 OFF 후에도 전력을 사용할 수 있어요. 장기 주차 시 동글 분리 또는 대기전류 실측을 권장합니다. 시트 잠금장치와 배선이 눌리지 않는지도 확인하세요.",13,activity.muted,false);
   activity.label(p,"자동 감지를 켜는 동안 알림이 계속 표시됩니다. GPS 기록은 이 휴대폰에만 저장하고 친구·그룹 위치 공유는 시작하지 않습니다. 앱 종료/폰 재부팅 뒤 새로 자동 실행하지 않습니다. 같은 기록 세션 중에는 연결을 최대 8회 재시도합니다.",13,activity.muted,false);
-  String remembered=activity.getSharedPreferences("developer_experiments",0).getString(PREFERRED_ADAPTER,"");
+  String remembered=activity.bike()==null?"":BikeObdPreferences.address(activity,activity.bike().optString("id"));
   if(!remembered.isEmpty()){
    activity.action(p,"최근 OBD2 장치로 빠르게 연결",true,this::connectRememberedAuto);
    activity.action(p,"기억한 OBD2 장치 삭제",false,()->{
-    activity.getSharedPreferences("developer_experiments",0).edit().remove(PREFERRED_ADAPTER).apply();
+    if(activity.bike()!=null)BikeObdPreferences.clearDevice(activity,activity.bike().optString("id"));
     setStatus("기억한 장치를 삭제했습니다. 다음부터 다시 선택해 주세요.");
    });
   }
@@ -352,10 +353,11 @@ final class DeveloperObdScreen {
     return;
    }
    List<BluetoothDevice> devices=new ArrayList<>(bonded);
-   devices.sort(Comparator.comparingInt((BluetoothDevice device)->ObdFirstConnectionGuide.adapterPriority(device.getName()))
+   String bikeRegistered=activity.bike()==null?"":BikeObdPreferences.address(activity,activity.bike().optString("id"));
+   devices.sort(Comparator.comparingInt((BluetoothDevice device)->bikeRegistered.equalsIgnoreCase(device.getAddress())?-1:ObdFirstConnectionGuide.adapterPriority(device.getName()))
     .thenComparing(device->{String name=device.getName();return name==null?"":name.toLowerCase(java.util.Locale.ROOT);}));
    String[] labels=new String[devices.size()];
-   for(int i=0;i<devices.size();i++){String name=devices.get(i).getName();labels[i]=ObdFirstConnectionGuide.adapterLabel(name)+(name==null||name.trim().isEmpty()?"이름 없는 장치":name)+" · "+devices.get(i).getAddress();}
+   for(int i=0;i<devices.size();i++){String name=devices.get(i).getName();labels[i]=(bikeRegistered.equalsIgnoreCase(devices.get(i).getAddress())?"★ 등록된 동글 · ":"")+ObdFirstConnectionGuide.adapterLabel(name)+(name==null||name.trim().isEmpty()?"이름 없는 장치":name)+" · "+devices.get(i).getAddress();}
    new AlertDialog.Builder(activity).setTitle("OBD2 어댑터 선택")
     .setItems(labels,(d,index)->{if(automatic)confirmAuto(devices.get(index));else if(odo)confirmOdo(devices.get(index));else if(discovery)confirmDiscovery(devices.get(index),selectedOnly);else confirmConnect(devices.get(index));})
     .setNegativeButton("취소",null).show();
@@ -367,7 +369,9 @@ final class DeveloperObdScreen {
   if(RideService.running||RideService.autoArmed||RideService.saving()||RestoreRideGate.isRestoring()){
    setStatus("라이딩·복원 작업 중에는 별도 OBD 센서 탐색을 시작하지 않습니다.");return;
   }
-  if(selectedOnly&&activity.getSharedPreferences("obd_discovery_selection",0).getString("selected","").isEmpty()){
+  String currentBikeId=activity.bike()==null?"":activity.bike().optString("id");
+  if(!RideBikeBinding.valid(currentBikeId)){setStatus("먼저 바이크를 등록해 주세요.");return;}
+  if(selectedOnly&&BikeObdPreferences.selectedPids(activity,currentBikeId).isEmpty()){
    setStatus("먼저 '전체 센서 탐색'에서 읽힌 센서를 선택해 주세요.");return;
   }
   new AlertDialog.Builder(activity)
@@ -385,10 +389,11 @@ final class DeveloperObdScreen {
   long generation=++discoveryGeneration;
   stopped=false;
   setStatus(selectedOnly?"선택 센서 조회 연결 중…":"ECU 지원 목록 탐색 연결 중…");
-  worker=new Thread(()->runDiscovery(device,selectedOnly,generation),"moto-obd-readonly-discovery");
+  final String bikeId=activity.bike().optString("id");
+  worker=new Thread(()->runDiscovery(device,selectedOnly,generation,bikeId),"moto-obd-readonly-discovery");
   worker.setDaemon(true);worker.start();
  }
- private void runDiscovery(BluetoothDevice device,boolean selectedOnly,long generation){
+ private void runDiscovery(BluetoothDevice device,boolean selectedOnly,long generation,String bikeId){
   try{
    BluetoothSocket connected=device.createRfcommSocketToServiceRecord(SPP);
    socket=connected;
@@ -407,16 +412,15 @@ final class DeveloperObdScreen {
    java.util.function.BooleanSupplier cancel=()->stopped||discoveryGeneration!=generation;
    ObdReadOnlyDiscovery.Result result;
    if(selectedOnly){
-    String saved=activity.getSharedPreferences("obd_discovery_selection",0).getString("selected","");
-    List<String> pids=new ArrayList<>();
-    for(String pid:saved.split(","))if(pid.matches("01[0-9A-F]{2}"))pids.add(pid);
+    List<String> pids=BikeObdPreferences.selectedPids(activity,bikeId);
     if(pids.isEmpty()){setStatus("저장된 선택 PID가 없습니다. 먼저 전체 탐색을 실행하세요.");return;}
     result=ObdReadOnlyDiscovery.selected(reader,pids,progress,cancel);
    }else result=ObdReadOnlyDiscovery.all(reader,progress,cancel);
    if(cancel.getAsBoolean())return;
    activity.runOnUiThread(()->{
     if(owner==null||!owner.isShowing()||activity.dialog!=owner||generation!=discoveryGeneration)return;
-    showDiscoveryResult(result,selectedOnly);
+    if(activity.bike()==null||!bikeId.equals(activity.bike().optString("id"))){setStatus("대상 바이크가 바뀌어 결과 저장을 건너뛰었습니다.");return;}
+    showDiscoveryResult(result,selectedOnly,bikeId);
    });
   }catch(InterruptedException ignored){/* User cancelled the scan. */}
   catch(Exception e){
@@ -425,7 +429,7 @@ final class DeveloperObdScreen {
       " · 시동 ON/동글 연결 확인. 기존 라이딩·누적거리 기록 변경 없음.");
   }finally{closeSocket();stopped=true;}
  }
- private void showDiscoveryResult(ObdReadOnlyDiscovery.Result result,boolean selectedOnly){
+ private void showDiscoveryResult(ObdReadOnlyDiscovery.Result result,boolean selectedOnly,String bikeId){
   List<ObdReadOnlyDiscovery.Reading> readings=result.readings;
   setStatus("지원 표준 PID "+result.advertised+"개 탐색 · 실제 응답 "+readings.size()+
    "개 · 무응답/오류 "+result.rejected+"개 · ECU 기록 변경 없음");
@@ -437,13 +441,11 @@ final class DeveloperObdScreen {
   }
   final String[] labels=new String[readings.size()];
   final boolean[] checked=new boolean[readings.size()];
-  String previous=activity.getSharedPreferences("obd_discovery_selection",0).getString("selected","");
-  java.util.Set<String> selected=new java.util.HashSet<>();
-  for(String pid:previous.split(","))if(pid.matches("01[0-9A-F]{2}"))selected.add(pid);
+  java.util.Set<String> selected=new java.util.HashSet<>(BikeObdPreferences.selectedPids(activity,bikeId));
   for(int i=0;i<readings.size();i++){
    ObdReadOnlyDiscovery.Reading reading=readings.get(i);
    labels[i]=reading.label();
-   checked[i]=previous.isEmpty()||selected.contains(reading.pid);
+   checked[i]=selected.isEmpty()||selected.contains(reading.pid);
   }
   setStatus("실제 수신 "+readings.size()+"개 · 표시할 센서를 체크하세요. HEX=단위 미확인. ODO 자동 반영 없음.\n선택한 PID 번호만 저장합니다.");
   new AlertDialog.Builder(activity)
@@ -453,8 +455,8 @@ final class DeveloperObdScreen {
    .setPositiveButton("선택한 항목 저장",(dialog,which)->{
     List<String> kept=new ArrayList<>();
     for(int i=0;i<checked.length;i++)if(checked[i])kept.add(readings.get(i).pid);
-    activity.getSharedPreferences("obd_discovery_selection",0).edit()
-     .putString("selected",String.join(",",kept)).apply();
+    if(activity.bike()==null||!bikeId.equals(activity.bike().optString("id"))){setStatus("바이크가 바뀌어 선택을 저장하지 않았습니다.");return;}
+    BikeObdPreferences.setSelectedPids(activity,bikeId,kept);
     setStatus("실제 수신 "+readings.size()+"개 확인 · 선택 "+kept.size()+
      "개 저장 (PID 번호만) · '선택한 센서만 다시 읽기'에서 재조회 가능");
    }).show();
@@ -526,7 +528,7 @@ final class DeveloperObdScreen {
   if(!permissionGranted()){
    activity.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},AUTO_CONNECT_PERMISSION_REQUEST);return;
   }
-  String address=activity.getSharedPreferences("developer_experiments",0).getString(PREFERRED_ADAPTER,"");
+  String address=activity.bike()==null?"":BikeObdPreferences.address(activity,activity.bike().optString("id"));
   if(address.isEmpty()||!BluetoothAdapter.checkBluetoothAddress(address)){
    setStatus("기억한 OBD2 장치가 없습니다. 다시 선택해 주세요.");return;
   }
@@ -555,9 +557,9 @@ final class DeveloperObdScreen {
   final boolean[] remember={false};
   new AlertDialog.Builder(activity).setTitle("OBD2 자동 라이딩 기록을 켤까요?")
    .setMessage("이 장치가 연결된 동안 속도 7km/h 이상을 연속 3회 감지하면 GPS 경로를 이 휴대폰에 자동 저장합니다. 설정한 정차 시간 후 종료하며 다음 출발을 다시 감지합니다. 백그라운드 위치 사용과 지속 알림이 필요합니다. 그룹 공유는 켜지지 않습니다. 재연결에 최종 실패하면 진행 중인 GPS 주행은 유지되며 알림에서 직접 종료합니다. 원할 때 알림에서 중지하세요. 실험 기능이므로 실제 듀크 390 동작은 아직 검증되지 않았습니다.")
-   .setMultiChoiceItems(new String[]{"이 장치를 이 휴대폰에 기억하기 (다음 연결 선택만 생략)"},remember,(dialog,index,selected)->remember[index]=selected)
+   .setMultiChoiceItems(new String[]{"이 장치를 현재 바이크에 기억하기 (다음 선택 시 위에 표시)"},remember,(dialog,index,selected)->remember[index]=selected)
    .setNegativeButton("취소",null).setPositiveButton("동의하고 자동 감지 시작",(d,w)->{
-    if(remember[0])activity.getSharedPreferences("developer_experiments",0).edit().putString(PREFERRED_ADAPTER,device.getAddress()).apply();
+    if(remember[0]&&activity.bike()!=null)BikeObdPreferences.setDevice(activity,activity.bike().optString("id"),device.getAddress(),device.getName());
     stop();
     Intent start=new Intent(activity,RideService.class).setAction(RideService.AUTO_ARM).putExtra(RideService.EXTRA_DEVICE,device.getAddress())
      .putExtra(RideService.EXTRA_BIKE_ID,activity.bike()==null?"":activity.bike().optString("id"));
