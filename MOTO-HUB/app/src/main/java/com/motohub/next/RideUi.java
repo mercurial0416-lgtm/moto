@@ -693,18 +693,17 @@ final class RideUi {
  }
  void showHistoryResults(LinearLayout results,List<HistoryEntry> entries,int total,String selected,TextView summary){
   results.removeAllViews();
-  int count=0;
   final String[] terms=RideHistorySearch.terms(a.rideHistoryQuery);
-  // One pass counts all matches and collects only the visible page. This avoids
-  // scanning the same 10k-record history again every time the user types.
-  final List<HistoryEntry> page=new ArrayList<>(Math.min(entries.size(),Math.min(historyVisibleLimit,100)));
-  for(HistoryEntry entry:entries)if(RideHistorySearch.matchesIndex(entry.searchKey,terms)){
-   count++;
-   if(page.size()<historyVisibleLimit)page.add(entry);
-  }
-  String bikeLabel=RideHistoryBikeFilter.ALL.equals(a.rideHistoryBike)?"전체":
+  final List<HistoryEntry> matched=new ArrayList<>();
+  for(HistoryEntry entry:entries)if(RideHistorySearch.matchesIndex(entry.searchKey,terms))matched.add(entry);
+  final List<RideHistorySessionRows.Row<HistoryEntry>> rows=
+   RideHistorySessionRows.group(matched,entry->entry.groupKey);
+  final int count=rows.size();
+  final int shown=Math.min(count,historyVisibleLimit);
+  final String bikeLabel=RideHistoryBikeFilter.ALL.equals(a.rideHistoryBike)?"전체":
    RideHistoryBikeFilter.UNASSIGNED.equals(a.rideHistoryBike)?"미지정":a.bikeName(a.rideHistoryBike);
-  summary.setText("검색 "+count+"건 / 전체 "+total+"건 · 바이크 "+bikeLabel+" · "+a.rideHistoryPeriod+(count>historyVisibleLimit?" · 처음 "+historyVisibleLimit+"건 표시":""));
+  summary.setText("검색 라이딩 "+count+"회 · GPS 구간 "+matched.size()+"개 / 전체 파일 "+total+"개 · 바이크 "+bikeLabel+
+   " · "+a.rideHistoryPeriod+(count>historyVisibleLimit?" · 처음 "+historyVisibleLimit+"회 표시":""));
   if(count==0){
    String message=total==0?"아직 저장된 주행이 없어요. GPS를 시작하거나 GPX 파일을 가져와 주세요.":
     entries.isEmpty()?"선택한 바이크·상태·기간에 라이딩이 없어요. 필터를 바꿔 주세요.":
@@ -719,8 +718,40 @@ final class RideUi {
    }
    return;
   }
-  final int shown=page.size();
-  for(HistoryEntry entry:page){
+  for(int i=0;i<shown;i++){
+   RideHistorySessionRows.Row<HistoryEntry> row=rows.get(i);
+   if(!row.grouped()){
+    showHistoryEntry(results,row.segments.get(0),entries,total,selected,summary);
+    continue;
+   }
+   final HistoryEntry latest=row.segments.get(0);
+   final boolean expanded=expandedRideSessions.contains(row.key);
+   new HubScreens(a).line(results,
+    latest.date+" · 라이딩 1회",
+    "GPS "+row.segments.size()+"개 구간 · 원본 그대로 보존",
+    expanded?"구간 접기  ›":"구간 펼치기  ›",
+    ()->{
+     if(!expandedRideSessions.add(row.key))expandedRideSessions.remove(row.key);
+     showHistoryResults(results,entries,total,selected,summary);
+    },null,false);
+   if(expanded)for(HistoryEntry segment:row.segments)
+    showHistoryEntry(results,segment,entries,total,selected,summary);
+  }
+  final int remaining=RideHistoryPage.remaining(count,shown);
+  if(remaining>0){
+   a.gap(results,8);
+   Button more=a.button("라이딩 더 보기 · 남은 "+remaining+"회",false,()->{
+    historyVisibleLimit=RideHistoryPage.nextLimit(historyVisibleLimit);
+    showHistoryResults(results,entries,total,selected,summary);
+   });
+   more.setContentDescription("라이딩 기록 "+Math.min(RideHistoryPage.PAGE_SIZE,remaining)+"회 더 보기");
+   more.setMinHeight(a.dp(50));
+   results.addView(more);
+  }
+ }
+ private void showHistoryEntry(LinearLayout results,HistoryEntry entry,
+                               List<HistoryEntry> entries,int total,String selected,TextView summary){
+
    File f=entry.file;String date=entry.date,status=entry.status;
    boolean live=RideHistoryFilter.ACTIVE.equals(status);
    boolean interrupted=RideHistoryFilter.INTERRUPTED.equals(status);
@@ -744,18 +775,6 @@ final class RideUi {
       showHistoryResults(results,entries,total,selected,summary);
      });
     },starred);
-  }
-  final int remaining=RideHistoryPage.remaining(count,shown);
-  if(remaining>0){
-   a.gap(results,8);
-   Button more=a.button("라이딩 더 보기 · 남은 "+remaining+"건",false,()->{
-    historyVisibleLimit=RideHistoryPage.nextLimit(historyVisibleLimit);
-    showHistoryResults(results,entries,total,selected,summary);
-   });
-   more.setContentDescription("라이딩 기록 "+Math.min(RideHistoryPage.PAGE_SIZE,remaining)+"건 더 보기");
-   more.setMinHeight(a.dp(50));
-   results.addView(more);
-  }
  }
  RideReadiness.State readiness(){
   boolean fine=a.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;
