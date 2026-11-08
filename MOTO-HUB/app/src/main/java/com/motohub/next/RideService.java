@@ -18,6 +18,8 @@ public final class RideService extends Service implements LocationListener {
  static volatile long obdStationaryRemainingMs=-1;
  static String engineEstimate(){return ObdEngineState.label(obdRpm,obdRpmAt,SystemClock.elapsedRealtime());}
  static volatile boolean gpsOnlyAfterObd=false;
+ /** Bound once per ride; switching the garage never changes the GPS owner. */
+ static volatile String activeRideBikeId="";
  static volatile RideService instance;
  @Override public void onCreate(){super.onCreate();instance=this;
   // GPS disk sync and callbacks live off the UI looper, preserving location callback order.
@@ -86,7 +88,7 @@ public final class RideService extends Service implements LocationListener {
  }
  final RideNotificationRate notificationRate=new RideNotificationRate();
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
- String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();final ObdSpeedSanityPolicy speedSanity=new ObdSpeedSanityPolicy();LocationManager manager;FileOutputStream output;File track;
+ String pendingBikeId="",activeAutoAdapterAddress="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();final ObdSpeedSanityPolicy speedSanity=new ObdSpeedSanityPolicy();LocationManager manager;FileOutputStream output;File track;
  /** Original UUID is reused for sequential 25MB sections, so legacy ZIP formats still work. */
  String activeRideSession="";
  int segmentPoints=0,completedSegments=0;
@@ -115,7 +117,9 @@ public final class RideService extends Service implements LocationListener {
   }
  }};
  volatile boolean finishPending=false,autoFinishPending=false;
- final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
+ final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)
+   &&(!BikeObdPreferences.autoRideEnabled(RideService.this,pendingBikeId)
+       ||!BikeObdPreferences.address(RideService.this,pendingBikeId).equals(activeAutoAdapterAddress))){
     // Turning off developer experiments revokes OBD permission, not consent to a
     // separately running GPS ride. The GPS track must stay recoverable/active.
     ObdAutoSpeedMonitor monitor=obdMonitor;
@@ -184,10 +188,13 @@ public final class RideService extends Service implements LocationListener {
    if(AUTO_ARM.equals(action)){
     if(running||autoArmed)return START_NOT_STICKY;
     pendingBikeId=intent.getStringExtra(EXTRA_BIKE_ID);
+    if(!RideBikeBinding.valid(pendingBikeId))throw new SecurityException("등록된 바이크를 선택한 뒤 OBD 기록을 켜 주세요.");
+    activeRideBikeId=pendingBikeId;
     armAutomaticRide(intent.getStringExtra(EXTRA_DEVICE));return START_NOT_STICKY;
    }
    if(running||autoArmed)return START_NOT_STICKY;
    pendingBikeId=intent.getStringExtra(EXTRA_BIKE_ID);
+   activeRideBikeId=RideBikeBinding.valid(pendingBikeId)?pendingBikeId:"";
    try{
     prepareForeground(false);
     openRideTrack();
@@ -240,7 +247,11 @@ public final class RideService extends Service implements LocationListener {
  }
  private void armAutomaticRide(String address){
   try{
-   if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))throw new SecurityException("개발자 모드를 활성화해 주세요.");
+   boolean developerApproved=getSharedPreferences("developer_experiments",0).getBoolean("enabled",false);
+   boolean bikeApproved=BikeObdPreferences.autoRideEnabled(this,pendingBikeId)
+     &&address!=null&&address.equalsIgnoreCase(BikeObdPreferences.address(this,pendingBikeId));
+   if(!developerApproved&&!bikeApproved)
+    throw new SecurityException("바이크 설정에서 이 동글의 OBD 자동 라이딩을 먼저 동의해 주세요.");
    if(address==null||!BluetoothAdapter.checkBluetoothAddress(address))throw new IllegalArgumentException("OBD2 어댑터를 다시 선택해 주세요.");
    if(Build.VERSION.SDK_INT>=31&&checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("Bluetooth 연결 권한이 필요합니다.");
    BluetoothManager bluetooth=getSystemService(BluetoothManager.class);
@@ -249,6 +260,7 @@ public final class RideService extends Service implements LocationListener {
    BluetoothDevice paired=null;
    for(BluetoothDevice d:adapter.getBondedDevices())if(address.equals(d.getAddress())){paired=d;break;}
    if(paired==null)throw new SecurityException("이미 페어링된 OBD2 장치만 사용할 수 있습니다.");
+   activeAutoAdapterAddress=address.toUpperCase(java.util.Locale.ROOT);
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
@@ -647,7 +659,7 @@ public final class RideService extends Service implements LocationListener {
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(storageWatchdog);
   // Invalidate queued main-thread finalization callbacks after failures or process teardown.
   finishPending=false;autoFinishPending=false;
-  Sharing.stop();autoArmed=false;obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
+  Sharing.stop();autoArmed=false;activeRideBikeId="";activeAutoAdapterAddress="";obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
   obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;
