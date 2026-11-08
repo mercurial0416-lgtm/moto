@@ -25,6 +25,9 @@ assert 'OdometerAutoSyncInbox.disable(activity,id)' in developer
 assert 'RideService.running||jsonImportRunning' in main
 assert 'RestoreRideGate.beginFormWrite()' in main
 assert 'OdometerAutoSyncInbox.acknowledged(this,bikeId,offered)' in main
+assert 'if(saved||ignored)syncVerifiedOdoInbox();' in main, 'other bikes in the verified ODO inbox must eventually be processed'
+assert 'post(this::syncVerifiedOdoInbox)' in main, 'already-applied ODO must not block next bike or recursively block UI'
+assert 'if(!ignored&&why!=null)' in main, 'failed ODO writes must not enter a hot retry loop'
 assert 'atomic(disk,original.toString(2)' in main
 assert 'LocalSafetyBackup.checkpoint(this,original)' in main
 assert 'RideMileageEstimate.record(context,track,boundBike,result.distanceKm)' in inbox
