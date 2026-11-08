@@ -424,7 +424,10 @@ public class MainActivity extends Activity {
   if(bike==null)return;
   // The app never decreases a manually entered/verified odometer.
   if(offered<=bike.optDouble("odo",0)+0.05){
-   OdometerAutoSyncInbox.acknowledged(this,bikeId,offered);return;
+   OdometerAutoSyncInbox.acknowledged(this,bikeId,offered);
+   // Do not starve another bike's pending ECU mileage behind an already-applied value.
+   new android.os.Handler(android.os.Looper.getMainLooper()).post(this::syncVerifiedOdoInbox);
+   return;
   }
   if(!RestoreRideGate.beginFormWrite())return;
   if(!odoApplying.compareAndSet(false,true)){RestoreRideGate.endFormWrite();return;}
@@ -465,6 +468,10 @@ public class MainActivity extends Activity {
      toast("OBD 검증 누적거리 "+num(offered)+" km 자동 반영");
      if(!hadCheckpoint)error("ODO 변경은 저장됐지만 자동 복구 지점 생성에 실패했습니다. ZIP 백업을 보관하세요.");
     }else if(!ignored&&why!=null){toast("OBD ODO 반영 보류 · "+why);}
+    // Each completed write/ack is independently checked against the current
+    // garage revision before applying another bike's verified ODO candidate.
+    // Failed writes intentionally do NOT retry indefinitely in a hot loop.
+    if(saved||ignored)syncVerifiedOdoInbox();
    });
   },"moto-verified-obd-odo-commit").start();
  }
