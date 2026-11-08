@@ -21,6 +21,8 @@ final class ObdParkingIsolation {
 
  void onSpeed(int speedKmh,long now) {
   if(speedKmh<0||speedKmh>200||now<0)return;
+  // Only a fresh ECU speed response proves that the OBD link is live again.
+  parkingLossAt=-1;confirmedAtLoss=false;
   lastSpeed=speedKmh;
   lastSpeedAt=now;
   if(speedKmh<=PARKED_MAX_KMH){
@@ -47,8 +49,8 @@ final class ObdParkingIsolation {
   if(stationary)hold=true;
   return stationary;
  }
- /** Reconnect alone cannot prove motorcycle moved; only a fresh speed can release the GPS hold. */
- void onLinkConnected(){parkingLossAt=-1;confirmedAtLoss=false;}
+ /** Bluetooth RFCOMM alone is not a fresh ECU speed. Keep parking-loss deadline. */
+ void onLinkConnected(){} 
  boolean dueAfterLost(long now){
   return confirmedAtLoss&&parkingLossAt>=0&&now>=parkingLossAt
    &&now-parkingLossAt>=LOST_PARKED_GRACE_MS;
