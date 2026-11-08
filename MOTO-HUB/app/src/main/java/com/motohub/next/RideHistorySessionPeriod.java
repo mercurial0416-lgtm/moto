@@ -16,6 +16,9 @@ final class RideHistorySessionPeriod {
  static List<File> select(List<File> tracks,long now,String period){
   List<File> result=new ArrayList<>();
   if(tracks==null||tracks.isEmpty())return result;
+  if(RideHistoryPeriod.ALL.equals(RideHistoryPeriod.normalize(period))){
+   result.addAll(tracks);return result; // Unfiltered view never reads sidecars.
+  }
   Map<String,Long> first=new HashMap<>();
   Map<File,String> grouping=new HashMap<>();
   for(File track:tracks){
