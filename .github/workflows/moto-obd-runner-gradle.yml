@@ -1,0 +1,47 @@
+name: MOTO HUB OBD preview via runner Gradle
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/obd-readonly-pid-discovery-20261108]
+    paths:
+      - 'MOTO-HUB/**'
+      - '.github/workflows/moto-obd-runner-gradle.yml'
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Identify preinstalled Gradle
+        run: |
+          set -euo pipefail
+          command -v gradle
+          gradle --version
+      - name: Install Android SDK 36
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Build separate package with preinstalled Gradle
+        working-directory: MOTO-HUB
+        run: |
+          gradle :app:assembleObdPreview :app:testObdPreviewUnitTest -PmotoReleaseCode=587 --no-daemon --stacktrace
+      - name: Check signature and version
+        working-directory: MOTO-HUB
+        run: |
+          APK="app/build/outputs/apk/obdPreview/app-obdPreview.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='com.motohub.next.obdpreview' versionCode='587'"
+          sha256sum "$APK" > "app/build/outputs/apk/obdPreview/SHA256.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MOTO-HUB-OBD-PREVIEW-587-runner
+          path: |
+            MOTO-HUB/app/build/outputs/apk/obdPreview/app-obdPreview.apk
+            MOTO-HUB/app/build/outputs/apk/obdPreview/SHA256.txt
+          retention-days: 14
+          if-no-files-found: error
