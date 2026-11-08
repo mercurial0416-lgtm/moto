@@ -18,7 +18,7 @@ public class RideHistorySessionPeriodTest {
  private static final String BIKE_B="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
  private File track(long t,String session,String bike)throws Exception{
   File file=folder.newFile(t+"-"+session+".track");
-  if(bike!=null)Files.writeString(new File(file.getPath()+".bike").toPath(),bike,StandardCharsets.US_ASCII);
+  if(bike!=null)Files.write(new File(file.getPath()+".bike").toPath(),bike.getBytes(StandardCharsets.US_ASCII));
   return file;
  }
  @Test public void startTimeAcrossMidnightKeepsEverySectionInSamePeriod()throws Exception{
@@ -44,8 +44,8 @@ public class RideHistorySessionPeriodTest {
  @Test public void importedGpxUsesRecordedPointTimeInsteadOfFileName()throws Exception{
   long now=1_700_000_000_000L;
   File imported=track(now-36*3600_000L,OTHER,null);
-  Files.writeString(imported.toPath(),TrackFile.point(37.0,127.0,5,now-3600_000L),StandardCharsets.UTF_8);
-  Files.writeString(new File(imported.getPath()+".imported").toPath(),"imported",StandardCharsets.UTF_8);
+  Files.write(imported.toPath(),TrackFile.point(37.0,127.0,5,now-3600_000L).getBytes(StandardCharsets.UTF_8));
+  Files.write(new File(imported.getPath()+".imported").toPath(),"imported".getBytes(StandardCharsets.UTF_8));
   assertEquals(1,RideHistorySessionPeriod.select(Arrays.asList(imported),now,RideHistoryPeriod.DAY).size());
  }
 }
