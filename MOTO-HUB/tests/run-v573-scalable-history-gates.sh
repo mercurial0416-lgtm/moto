@@ -12,12 +12,12 @@ cache=read("RideDistanceCache.java")
 hub=read("HubScreens.java")
 main=read("MainActivity.java")
 cost=hub.split("void costDashboard(){",1)[1].split("void settings(){",1)[0]
-distance=ride.split('String distanceInfo="";',1)[1].split('List<HistoryEntry> entries=',1)[0]
+distance=ride.split('String distanceInfo="";',1)[1].split('File unapplied=null;',1)[0]
 checks={
  "timeline no 200-track cutoff": "if(inspected++>=200)break;" not in timeline and "for(File track:RideHistorySort.order" in timeline,
  "timeline incremental pages": "MotoTimeline.filtered(events,selected[0],visibleLimit[0])" in timeline and "활동 더 보기" in timeline and "visibleLimit[0]=40" in timeline,
  "timeline old damaged GPS warning retained": "invalid.setText(exclusions>0" in timeline,
- "full-distance search uses cache not 150/80MB gate": "RideDistanceCache.read(file)" in distance and "withinBudget" not in distance and "visible=matched" in distance,
+ "full-distance search uses cache not 150/80MB gate": "RideDistanceCache.read(entry.file)" in distance and "RideHistorySessionDistance.select(entries,entry->entry.groupKey" in distance and "withinBudget" not in distance,
  "distance search generation cancellation": "if(generation!=HISTORY_GENERATION.get())return;" in distance,
  "shared in-memory capped LRU": "MAX_ENTRIES=4096" in cache and "removeEldestEntry" in cache,
  "cache read-only no odometer": "NEVER evidence for odometer" in cache and "RideMileageIntegrity.validCompleted(track)" in cache,
