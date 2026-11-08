@@ -108,8 +108,8 @@ final class BikeObdSettingsUi {
     String name=list.get(i).getName();
     labels[i]=(name==null||name.trim().isEmpty()?"이름 없는 기기":name)+" · "+list.get(i).getAddress();
    }
+   a.toast("카르도 등이 보여도 실제 OBD2 동글만 선택해 주세요.");
    new AlertDialog.Builder(a).setTitle("이 바이크의 OBD2 장치 선택")
-    .setMessage("카르도 등 일반 Bluetooth 기기가 목록에 섞일 수 있어요. 실제 OBD 동글만 선택하세요.")
     .setItems(labels,(dialog,index)->{
      BluetoothDevice chosen=list.get(index);
      String address=chosen.getAddress();
