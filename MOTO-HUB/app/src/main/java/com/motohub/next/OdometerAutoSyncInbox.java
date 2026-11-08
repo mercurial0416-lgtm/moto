@@ -121,11 +121,13 @@ final class OdometerAutoSyncInbox {
   if(!enabled(c,bikeId))return Double.NaN;
   try{return Double.parseDouble(p(c).getString(k(bikeId,"pending"),"NaN"));}catch(Exception e){return Double.NaN;}
  }
- static synchronized void acknowledged(Context c,String bikeId,double applied){
-  if(!enabled(c,bikeId))return;
+ /** Return true only when a pending candidate is absent or its removal committed. */
+ static synchronized boolean acknowledged(Context c,String bikeId,double applied){
+  if(!enabled(c,bikeId))return false;
   double current=pending(c,bikeId);
-  if(OdoAutoSyncPolicy.sane(current)&&current<=applied+0.05)
-   p(c).edit().remove(k(bikeId,"pending")).commit();
+  if(!OdoAutoSyncPolicy.sane(current))return true;
+  if(current>applied+0.05)return false; // A newer ECU sample superseded this write.
+  return p(c).edit().remove(k(bikeId,"pending")).commit();
  }
  static synchronized String display(Context c,String bikeId){
   if(!enabled(c,bikeId))return "OBD 누적거리 동기화 꺼짐";
