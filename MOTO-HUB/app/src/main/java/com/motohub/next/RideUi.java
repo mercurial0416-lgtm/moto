@@ -349,6 +349,16 @@ final class RideUi {
     List<File> visible=RideHistorySort.order(RideHistoryFilter.select(bikeRides,selected,activeName,recording),sort);
     String distanceInfo="";
     Map<String,Integer> sessionCounts=RideSegmentGroup.counts(rides);
+    // Do not advertise a partly recorded/recovered session as one complete ride.
+    // All sibling metadata is checked on the history worker, never the UI thread.
+    Set<String> unsafeSessions=new HashSet<>();
+    for(File sibling:rides){
+     String session=RideSegmentGroup.id(sibling);
+     if(session.isEmpty())continue;
+     if(!RideHistoryFilter.COMPLETE.equals(RideHistoryFilter.status(sibling,activeName,recording))
+        ||!RideMileageIntegrity.validCompleted(sibling)
+        ||new File(sibling.getPath()+".imported").exists())unsafeSessions.add(session);
+    }
     List<HistoryEntry> entries=new ArrayList<>();
     for(File file:visible){
      if(generation!=HISTORY_GENERATION.get())return;
@@ -370,7 +380,8 @@ final class RideUi {
       try{
        String bikeBinding=RideBikeBinding.readStrict(file);
        String session=RideSegmentGroup.id(file);
-       if(!session.isEmpty())groupKey=session+"|"+bikeBinding+"|"+category;
+       if(!session.isEmpty()&&!unsafeSessions.contains(session))
+        groupKey=session+"|"+bikeBinding+"|"+category;
       }catch(IOException corrupted){/* Damaged bike binding never silently joins a ride. */}
      }
      entries.add(new HistoryEntry(file,label,status,savedMemo,groupKey));
