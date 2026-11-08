@@ -537,7 +537,7 @@ public final class RideService extends Service implements LocationListener {
     gpsOnlyAfterObd=true;
     status=gpsObdParkingHold?
       "OBD 종료 · 주차 후보, 휴대폰 도보 GPS 제외 · 알림에서 종료 확인":
-      "OBD 연결 종료 · 주행 중 신호 손실 가능 · GPS 기록 유지 · 알림에서 종료 가능";
+      "OBD 연결 종료 · 주행 중 신호 손실 가능 · GPS 단독 기록 유지 · 알림에서 종료 가능";
    }
    notifySafely(status);
   }else stopWith("OBD2 자동 감지 종료 · "+reason,false);
