@@ -183,7 +183,7 @@ final class DeveloperObdScreen {
    activity.startActivity(new Intent(activity,ObdDashboardActivity.class));
   });
   activity.action(p,"최근 라이딩 기록 확인",false,()->{stop();activity.close();activity.navigate("라이딩");});
-  activity.action(p,"실험 · ECU 표준 ODO(01A6) 1회 조회",false,this::loadPairedOdo);
+  activity.action(p,"실험 · ODO 직접 조회 (01A6 + UDS F4A6)",false,this::loadPairedOdo);
   activity.action(p,"계기판 누적 주행거리 수동 확인·반영",false,this::manualOdo);
   JSONObject configured=activity.bike();
   String configuredId=configured==null?"":configured.optString("id");
@@ -255,7 +255,7 @@ final class DeveloperObdScreen {
    dialog.show();
   });
   activity.label(p,OdometerAutoSyncInbox.display(activity,configuredId),12,activity.muted,false);
-  activity.label(p,"표준 01A6 ODO는 지원 차량에서만 조회됩니다. 듀크 390 지원은 미검증입니다. 조회 결과가 실제 계기판과 일치하는지 두 번 확인해야만 앱 주행거리를 변경합니다. GPS·정비 이력은 그대로 보존합니다.",13,activity.muted,false);
+  activity.label(p,"01A6·읽기 전용 UDS F4A6은 지원 ECU에서만 수신됩니다. 듀크390 미검증. 두 번 동일하게 수신하고 계기판을 대조한 후에만 수동 반영합니다. GPS·정비 기록 보존.",13,activity.muted,false);
   activity.action(p,"연결 끊기",false,this::stop);
   activity.show();owner=activity.dialog;
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
@@ -465,16 +465,33 @@ final class DeveloperObdScreen {
   if(RideService.running||RideService.autoArmed){setStatus("주행 중에는 ODO 실험 조회를 사용할 수 없습니다.");return;}
   if(activity.readOnly){setStatus("저장 데이터 보호 상태에서는 ODO를 반영하지 않습니다.");return;}
   if(activity.bike()==null||GarageBikeStatus.sold(activity.bike().optString("soldDate"))){setStatus("먼저 운행 중인 바이크를 선택해 주세요.");return;}
-  new AlertDialog.Builder(activity).setTitle("표준 ODO 조회 · 실험")
-   .setMessage("선택한 OBD2 장치에 지원 목록 01A0과 읽기 전용 01A6 요청만 전송합니다. 듀크 390 지원 여부는 확인되지 않았습니다. 측정값은 계기판과 대조하기 전 앱에 저장하지 않습니다. 주행 중에는 조작하지 마세요.")
-   .setNegativeButton("취소",null).setPositiveButton("조회 동의",(d,w)->startOdoProbe(device)).show();
+  new AlertDialog.Builder(activity).setTitle("ODO 읽기 전용 추가 진단 · 실험")
+   .setMessage("정차 상태에서 01A0 지원목록 → 01A6 직접 조회 → 읽기 전용 22 F4 A6을 차례로 확인합니다. CAN 11비트인 경우 ECU 주소 7E0으로도 재시도합니다. ECU 설정·고장코드·계기판은 변경하지 않습니다. 수신 km는 두 차례 일치하고 계기판과 직접 대조할 때만 앱에 반영할 수 있습니다. 듀크390 호환성은 아직 확인되지 않았습니다.")
+   .setNegativeButton("취소",null).setPositiveButton("정차 상태 · 조회 동의",(d,w)->startOdoProbe(device)).show();
  }
  private synchronized void startOdoProbe(BluetoothDevice device){
   stop();
   if(worker!=null&&worker.isAlive()){setStatus("기존 조회 연결을 종료 중입니다. 다시 시도해 주세요.");return;}
   if(!permissionGranted()){setStatus("Bluetooth 연결 권한이 필요합니다.");return;}
-  stopped=false;setStatus("표준 ODO PID 지원 확인 중…");
+  stopped=false;setStatus("표준 01A6 → 읽기 전용 22 F4 A6 확인 중…");
   worker=new Thread(()->runOdoProbe(device),"moto-obd-odo-probe");worker.setDaemon(true);worker.start();
+ }
+ /** Timeouts do not prove non-support; display the read-only probe outcome. */
+ private String tryOdoRequest(InputStream in,OutputStream out,String command,long timeoutMs){
+  try{return request(in,out,command,timeoutMs);}
+  catch(Exception e){return stopped?"중지됨":"응답 실패 ("+e.getClass().getSimpleName()+")";}
+ }
+ /** Two distinct, identical reads required before showing an ODO candidate. */
+ private void checkSecondOdoReply(InputStream in,OutputStream out,String cmd,double first,boolean uds,String source){
+  String secondRaw=tryOdoRequest(in,out,cmd,3000);
+  double second=uds?ObdOdometer.parseUdsKm(secondRaw):ObdOdometer.parseKm(secondRaw);
+  if(!Double.isFinite(second)||Double.compare(first,second)!=0){
+   setStatus(source+" · 2회 응답 검증 실패 · 첫 값 "+
+    String.format(java.util.Locale.KOREA,"%.1f",first)+
+    " km · 재조회 "+ObdOdometer.responseSummary(secondRaw)+" · 기록 변경 없음");
+   return;
+  }
+  if(!stopped)activity.runOnUiThread(()->confirmProbedOdo(first,source));
  }
  private void runOdoProbe(BluetoothDevice device){
   try{
@@ -485,19 +502,52 @@ final class DeveloperObdScreen {
    for(String setup:new String[]{"ATZ\r","ATE0\r","ATL0\r","ATS0\r","ATSP0\r"}){
     request(in,out,setup,4000);if(stopped)return;
    }
-   String bitmap=request(in,out,ObdReadOnlyProtocol.query("01A0"),3000);
+   // A functional 0100 helps the ELM adapter autodetect the vehicle protocol.
+   tryOdoRequest(in,out,ObdReadOnlyProtocol.query("0100"),2500);
+   String bitmap=tryOdoRequest(in,out,ObdReadOnlyProtocol.query("01A0"),2500);
    ObdPidCapabilities.Support support=ObdPidCapabilities.fromResponses(null,null,bitmap).forPid("01A6");
-   if(support!=ObdPidCapabilities.Support.YES){
-    setStatus(support==ObdPidCapabilities.Support.NO?"이 ECU는 표준 ODO PID 01A6을 지원하지 않습니다.":"ODO 지원 목록을 확인할 수 없습니다. 앱 기록은 변경되지 않았습니다.");return;
+   // Bitmap unavailable/NO is not treated as proof a direct reply is impossible.
+   String standard=tryOdoRequest(in,out,ObdOdometer.STANDARD_REQUEST,3000);
+   double km=ObdOdometer.parseKm(standard);
+   if(Double.isFinite(km)){
+    checkSecondOdoReply(in,out,ObdOdometer.STANDARD_REQUEST,km,false,"표준 OBD 01A6");return;
    }
-   String raw=request(in,out,ObdReadOnlyProtocol.query(ObdReadOnlyProtocol.ODOMETER_PID),3000);
-   double odo=ObdOdometer.parseKm(raw);
-   if(!Double.isFinite(odo)){setStatus("ODO 응답이 없거나 유효하지 않습니다. 기록 변경 없음.");return;}
-   if(!stopped)activity.runOnUiThread(()->confirmProbedOdo(odo));
+   if(stopped)return;
+   String uds=tryOdoRequest(in,out,ObdOdometer.UDS_REQUEST,3000);
+   km=ObdOdometer.parseUdsKm(uds);
+   if(Double.isFinite(km)){
+    checkSecondOdoReply(in,out,ObdOdometer.UDS_REQUEST,km,true,"UDS 22 F4 A6 · 기본 주소");return;
+   }
+   if(stopped)return;
+   // ATSH selects a tester request header on the ELM dongle, not an ECU setting.
+   // Restrict it to confirmed 11-bit CAN transport only.
+   String dpn=tryOdoRequest(in,out,"ATDPN\r",1500).trim().toUpperCase(java.util.Locale.ROOT);
+   String physical="시도하지 않음 (11비트 CAN 미확인)";
+   if(dpn.matches("A?[68]")){
+    String header=tryOdoRequest(in,out,"ATSH7E0\r",1500);
+    if(header.toUpperCase(java.util.Locale.ROOT).contains("OK")){
+     physical=tryOdoRequest(in,out,ObdOdometer.UDS_REQUEST,3000);
+     km=ObdOdometer.parseUdsKm(physical);
+     if(Double.isFinite(km)){
+      checkSecondOdoReply(in,out,ObdOdometer.UDS_REQUEST,km,true,"UDS 22 F4 A6 · ECU 7E0");return;
+     }
+     String physicalStandard=tryOdoRequest(in,out,ObdOdometer.STANDARD_REQUEST,3000);
+     km=ObdOdometer.parseKm(physicalStandard);
+     if(Double.isFinite(km)){
+      checkSecondOdoReply(in,out,ObdOdometer.STANDARD_REQUEST,km,false,"표준 01A6 · ECU 7E0");return;
+     }
+     physical+=" · 01A6: "+ObdOdometer.responseSummary(physicalStandard);
+    }else physical="헤더 변경 거부: "+ObdOdometer.responseSummary(header);
+   }
+   if(!stopped)setStatus("ODO 미수신 · 01A0 지원: "+support+
+    "\n01A6: "+ObdOdometer.responseSummary(standard)+
+    "\n22 F4 A6: "+ObdOdometer.responseSummary(uds)+
+    "\nECU 7E0: "+ObdOdometer.responseSummary(physical)+
+    "\n앱 km 변경 없음 · 원시 응답 화면을 캡처해 분석할 수 있습니다.");
   }catch(Exception e){if(!stopped)setStatus("ODO 조회 실패: "+e.getClass().getSimpleName()+" · 기록 변경 없음");}
   finally{closeSocket();stopped=true;}
  }
- private void confirmProbedOdo(double odo){
+ private void confirmProbedOdo(double odo,String source){
   if(owner==null||!owner.isShowing()||activity.dialog!=owner||RideService.running||RideService.autoArmed)return;
   JSONObject bike=activity.bike();
   if(bike==null||GarageBikeStatus.sold(bike.optString("soldDate"))||activity.readOnly)return;
@@ -505,7 +555,7 @@ final class DeveloperObdScreen {
   try{OdometerSyncPolicy.checkedManual(String.valueOf(odo),before);}
   catch(IllegalArgumentException ex){setStatus("ECU 값 "+odo+" km · "+ex.getMessage()+" · 반영하지 않음");return;}
   new AlertDialog.Builder(activity).setTitle("실험 ODO 수신 · 1차 확인")
-   .setMessage("ECU 표준 PID 01A6: "+activity.num(odo)+" km\n앱: "+activity.num(before)+" km\n이 값이 실제 KTM 계기판에 표시된 누적거리와 정확히 같은지 직접 확인했나요? 자동 변경되지 않습니다.")
+   .setMessage(source+" · 2회 동일한 ECU 응답: "+activity.num(odo)+" km\n앱: "+activity.num(before)+" km\n실제 KTM 계기판의 총주행거리와 일치하는지 직접 확인했나요? 자동 변경되지 않습니다.")
    .setNegativeButton("반영 안 함",null).setPositiveButton("계기판과 일치",(d,w)->{
     new AlertDialog.Builder(activity).setTitle("주행거리 변경 · 최종 확인")
      .setMessage("바이크 "+bike.optString("name")+"\n"+activity.num(before)+" → "+activity.num(odo)+" km\n확인한 ODO만 앱에 반영하고 기존 정비·주행 기록은 보존합니다.")
