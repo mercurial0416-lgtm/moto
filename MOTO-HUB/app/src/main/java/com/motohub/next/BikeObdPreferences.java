@@ -39,7 +39,8 @@ final class BikeObdPreferences {
    .putString(key(bikeId,"name"),safe).apply();
  }
  static void clearDevice(Context context,String bikeId){
-  prefs(context).edit().remove(key(bikeId,"mac")).remove(key(bikeId,"name")).apply();
+  prefs(context).edit().remove(key(bikeId,"mac")).remove(key(bikeId,"name"))
+   .remove(key(bikeId,"autoRide")).apply();
  }
  static List<String> selectedPids(Context context,String bikeId){
   if(!RideBikeBinding.valid(bikeId))return new ArrayList<>();
@@ -65,7 +66,19 @@ final class BikeObdPreferences {
  static void clearSelectedPids(Context context,String bikeId){
   prefs(context).edit().remove(key(bikeId,"selected")).apply();
  }
- static void clearBike(Context context,String bikeId){
-  clearDevice(context,bikeId);clearSelectedPids(context,bikeId);
+ /** Persistent opt-in flag. Never starts a background service by itself. */
+ static boolean autoRideEnabled(Context context,String bikeId){
+  return RideBikeBinding.valid(bikeId)&&prefs(context).getBoolean(key(bikeId,"autoRide"),false);
  }
+ static void setAutoRideEnabled(Context context,String bikeId,boolean enabled){
+  if(!RideBikeBinding.valid(bikeId))throw new IllegalArgumentException("등록된 바이크가 필요합니다.");
+  if(enabled&&address(context,bikeId).isEmpty())throw new IllegalStateException("먼저 이 바이크에 OBD 동글을 등록해 주세요.");
+  prefs(context).edit().putBoolean(key(bikeId,"autoRide"),enabled).apply();
+ }
+ static void clearBike(Context context,String bikeId){
+  if(!RideBikeBinding.valid(bikeId))return;
+  prefs(context).edit().remove(key(bikeId,"mac")).remove(key(bikeId,"name"))
+   .remove(key(bikeId,"selected")).remove(key(bikeId,"autoRide")).apply();
+ }
+
 }
