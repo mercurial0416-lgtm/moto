@@ -88,7 +88,18 @@ public final class RideService extends Service implements LocationListener {
  }
  final RideNotificationRate notificationRate=new RideNotificationRate();
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
- String pendingBikeId="",activeAutoAdapterAddress="";ObdAutoSpeedMonitor obdMonitor;final ObdRideAutoGate autoGate=new ObdRideAutoGate();final ObdSpeedSanityPolicy speedSanity=new ObdSpeedSanityPolicy();LocationManager manager;FileOutputStream output;File track;
+ String pendingBikeId="",activeAutoAdapterAddress="";ObdAutoSpeedMonitor obdMonitor;
+ final ObdParkingIsolation parkingIsolation=new ObdParkingIsolation();
+ /** The phone may walk after the motorcycle is parked. */
+ volatile boolean gpsObdParkingHold=false,gpsObdResumeSplit=false;
+ long gpsObdHoldStarted=-1;
+ final Runnable finishParkedObdLoss=new Runnable(){@Override public void run(){
+  if(!running||autoArmed||autoFinishPending||finishPending||!gpsObdParkingHold)return;
+  if(parkingIsolation.dueAfterLost(SystemClock.elapsedRealtime())){
+   status="주차 후 OBD 끊김 추정 · 휴대폰 도보 경로 제외 · GPS 저장 검증 중";
+   finishAutoTrack();
+  }
+ }};final ObdRideAutoGate autoGate=new ObdRideAutoGate();final ObdSpeedSanityPolicy speedSanity=new ObdSpeedSanityPolicy();LocationManager manager;FileOutputStream output;File track;
  /** Original UUID is reused for sequential 25MB sections, so legacy ZIP formats still work. */
  String activeRideSession="";
  int segmentPoints=0,completedSegments=0;
@@ -264,6 +275,7 @@ public final class RideService extends Service implements LocationListener {
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
+   parkingIsolation.reset();gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;obdFuelPercent=Double.NaN;obdFuelAt=0;
    obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=1;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
@@ -292,6 +304,16 @@ public final class RideService extends Service implements LocationListener {
        return;
       }
       obdSpeedKmh=kmh;obdSpeedSamples++;obdLastSampleElapsed=elapsed;
+       boolean heldBefore=gpsObdParkingHold;
+       parkingIsolation.onSpeed(kmh,elapsed);
+       synchronized(RideService.this){
+        gpsObdParkingHold=running&&parkingIsolation.holdGps();
+        if(gpsObdParkingHold&&!heldBefore)gpsObdHoldStarted=elapsed;
+        if(heldBefore&&!gpsObdParkingHold){
+         if(gpsObdHoldStarted>0&&elapsed-gpsObdHoldStarted>=15_000)gpsObdResumeSplit=true;
+         gpsObdHoldStarted=-1;
+        }
+       }
       if(obdSpeedSamples==1)ObdLocalDiagnosticLog.record(RideService.this,"SENSOR_OK");
       handleAutoSpeed(kmh);
     }});}
@@ -314,17 +336,26 @@ public final class RideService extends Service implements LocationListener {
      if(autoArmed&&obdMonitor==ref[0])obdAuxDiagnostics=summary;
     });}
     @Override public void connected(){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
+     parkingIsolation.onLinkConnected();
      obdLink="연결됨 · 차량 데이터 읽기 전용";MotoWidgetProvider.refresh(RideService.this);
       ObdLocalDiagnosticLog.record(RideService.this,"BT_OK");obdConnectionSuccesses++;
      if(!running)status="OBD2 연결됨 · 출발 대기";
     }});}
     @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
      obdLink="연결 재시도 "+attempt+"/"+max;obdConnectionAttempts++;MotoWidgetProvider.refresh(RideService.this);
+     boolean parkedBeforeLoss=running&&parkingIsolation.onLinkLoss(SystemClock.elapsedRealtime());
+     if(parkedBeforeLoss){
+      synchronized(RideService.this){
+       gpsObdParkingHold=true;
+       if(gpsObdHoldStarted<0)gpsObdHoldStarted=SystemClock.elapsedRealtime();
+      }
+     }
      obdReconnects=attempt;speedSanity.reset();ObdLocalDiagnosticLog.record(RideService.this,"RECONNECT");obdSpeedKmh=-1;obdLastSampleElapsed=0;
      obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;
      obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
      autoGate.connectionLost();obdStationaryRemainingMs=-1;liveSpeedKmh=0;
-     status="OBD2 신호 손실 · "+obdLink+(running?" · GPS 기록 유지":"");
+     status="OBD2 신호 손실 · "+obdLink+(running?
+       (gpsObdParkingHold?" · 주차 후보, 휴대폰 도보 GPS 제외":" · GPS 기록 유지"):"");
      notifySafely(status);
     }});}
     @Override public void disconnected(String reason){handler.post(()->{if(autoArmed&&obdMonitor==ref[0])onObdDisconnected(reason);});}
@@ -473,8 +504,18 @@ public final class RideService extends Service implements LocationListener {
    return;
   }
   if(running){
-   gpsOnlyAfterObd=true;
-   status="OBD2 연결 종료 · GPS 단독 기록 유지 · 알림에서 종료 가능";
+   if(gpsObdParkingHold&&parkingIsolation.remainingAfterLost(SystemClock.elapsedRealtime())>=0
+     &&!"사용자가 자동 감지를 중지했습니다.".equals(reason)){
+    long remaining=parkingIsolation.remainingAfterLost(SystemClock.elapsedRealtime());
+    status="주차 후 OBD 끊김 추정 · 도보 GPS 제외 · "+Math.max(0,(remaining+999)/1000)+"초 후 종료 판정";
+    handler.removeCallbacks(finishParkedObdLoss);
+    handler.postDelayed(finishParkedObdLoss,Math.max(1,remaining));
+   }else{
+    gpsOnlyAfterObd=true;
+    status=gpsObdParkingHold?
+      "OBD 종료 · 주차 후보, 휴대폰 도보 GPS 제외 · 알림에서 종료 확인":
+      "OBD 연결 종료 · 주행 중 신호 손실 가능 · GPS 기록 유지 · 알림에서 종료 가능";
+   }
    notifySafely(status);
   }else stopWith("OBD2 자동 감지 종료 · "+reason,false);
  }
