@@ -23,8 +23,16 @@ final class ObdOdometer {
   return parse(raw,"62F4A6");
  }
 
+ private static boolean invalidResponse(String raw) {
+  String upper=raw.toUpperCase(Locale.ROOT);
+  for(String error:new String[]{"NO DATA","UNABLE TO CONNECT","CAN ERROR",
+    "BUS ERROR","BUS INIT: ERROR","STOPPED","BUFFER FULL","DATA ERROR",
+    "ACT ALERT","UNSUPPORTED"})
+   if(upper.contains(error))return true;
+  return upper.indexOf('?')>=0;
+ }
  private static double parse(String raw,String marker) {
-  if(raw==null||raw.length()>4096||!ObdReadOnlyProtocol.replyError(raw).isEmpty())return Double.NaN;
+  if(raw==null||raw.length()>4096||invalidResponse(raw))return Double.NaN;
   Double first=null;
   for(String line:raw.toUpperCase(Locale.ROOT).split("[\r\n>]+")) {
    // Accept headers, CAN data length and optional zero padding, but never
