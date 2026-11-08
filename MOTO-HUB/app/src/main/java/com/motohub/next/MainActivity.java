@@ -424,9 +424,9 @@ public class MainActivity extends Activity {
   if(bike==null)return;
   // The app never decreases a manually entered/verified odometer.
   if(offered<=bike.optDouble("odo",0)+0.05){
-   OdometerAutoSyncInbox.acknowledged(this,bikeId,offered);
-   // Do not starve another bike's pending ECU mileage behind an already-applied value.
-   new android.os.Handler(android.os.Looper.getMainLooper()).post(this::syncVerifiedOdoInbox);
+   // Never recurse forever if storage refuses to acknowledge a pending value.
+   if(OdometerAutoSyncInbox.acknowledged(this,bikeId,offered))
+    new android.os.Handler(android.os.Looper.getMainLooper()).post(this::syncVerifiedOdoInbox);
    return;
   }
   if(!RestoreRideGate.beginFormWrite())return;
