@@ -585,7 +585,13 @@ public final class RideService extends Service implements LocationListener {
   * The same session UUID ties together legacy-compatible track files.
   * If rotation fails, the previous committed .done remains intact.
   */
- private synchronized void rotateRideSection()throws Exception{
+ private synchronized void rotateRideSection()throws Exception{rotateRideSection(true);}
+ /**
+  * Normal size-based rotation repeats one fix to preserve a continuous ride.
+  * OBD parked-resume rotation must NOT repeat it: the phone may have walked
+  * hundreds of metres and the old bike position is not a valid new origin.
+  */
+ private synchronized void rotateRideSection(boolean bridgeWithLastFix)throws Exception{
   if(output==null||track==null||segmentPoints<1||activeRideSession.isEmpty())
    throw new IOException("연속 GPS 구간 상태가 유효하지 않습니다.");
   GpsStorageSpacePolicy.require(getFilesDir());
@@ -600,9 +606,9 @@ public final class RideService extends Service implements LocationListener {
   try{
    nextOutput=new FileOutputStream(next);
    if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(next,pendingBikeId);
-   // Repeat exactly one boundary fix to include its next travel interval.
-   // The prior segment and next one have no duplicated distance interval.
-   if(lastGood!=null){
+   // Only storage-size rotation preserves the continuous boundary point.
+   // A parked OBD gap is a discontinuity; never manufacture its travelled distance.
+   if(bridgeWithLastFix&&lastGood!=null){
     byte[] boundary=TrackFile.point(lastGood.getLatitude(),lastGood.getLongitude(),
       lastGood.getAccuracy(),lastGood.getTime()).getBytes(StandardCharsets.UTF_8);
     nextOutput.write(boundary);nextOutput.flush();nextOutput.getFD().sync();
@@ -630,9 +636,9 @@ public final class RideService extends Service implements LocationListener {
   try{
    // Never bridge an OBD-stationary gap (or walking) as traveled motorcycle km.
    if(gpsObdResumeSplit){
-    gpsObdResumeSplit=false;
-    if(segmentPoints>0)rotateRideSection();
+    if(segmentPoints>0)rotateRideSection(false);
     lastGood=null;lastTime=0;
+    gpsObdResumeSplit=false;
    }
    byte[] point=TrackFile.point(location.getLatitude(),location.getLongitude(),
     location.getAccuracy(),location.getTime()).getBytes(StandardCharsets.UTF_8);
