@@ -35,7 +35,9 @@ final class BikeObdPreferences {
   if(!validAddress(address))throw new IllegalArgumentException("정상적인 Bluetooth 장치 주소가 아닙니다.");
   String safe=name==null||name.trim().isEmpty()?"OBD2 동글":name.trim();
   if(safe.length()>80)safe=safe.substring(0,80);
-  prefs(context).edit().putString(key(bikeId,"mac"),address.toUpperCase(Locale.ROOT))
+  SharedPreferences.Editor edit=prefs(context).edit();
+  if(!address.equalsIgnoreCase(address(context,bikeId)))edit.remove(key(bikeId,"autoRide"));
+  edit.putString(key(bikeId,"mac"),address.toUpperCase(Locale.ROOT))
    .putString(key(bikeId,"name"),safe).apply();
  }
  static void clearDevice(Context context,String bikeId){
