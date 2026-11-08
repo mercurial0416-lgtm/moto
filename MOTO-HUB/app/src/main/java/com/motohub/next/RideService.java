@@ -486,6 +486,12 @@ public final class RideService extends Service implements LocationListener {
   if(verified)DailyMaintenanceJob.checkSoon(this);
  }
  private void onObdDisconnected(String reason){
+  // A user explicitly choosing GPS-only recording overrides the parked-ECU pause.
+  // Start a fresh GPS segment so any intervening phone movement is not bridged.
+  if("사용자가 자동 감지를 중지했습니다.".equals(reason)){
+   synchronized(this){gpsObdParkingHold=false;gpsObdResumeSplit=true;gpsObdHoldStarted=-1;}
+   parkingIsolation.reset();
+  }
   // A permanent failure may arrive without a reconnect callback (no retry budget).
   // Check the last fresh, stationary ECU samples; never infer parking from phone GPS.
   if(running&&gpsObdParkingHold)
