@@ -26,6 +26,10 @@ jobs:
         working-directory: MOTO-HUB
         run: |
           chmod +x gradlew
+          # Official Gradle GitHub release redirect is returning HTTP 504.
+          # Use an independent mirror only with Gradle's official SHA-256 hard-pinned.
+          sed -i 's#https\\://downloads.gradle.org/distributions/gradle-8.11.1-bin.zip#https\\://mirrors.aliyun.com/gradle/distributions/v8.11.1/gradle-8.11.1-bin.zip#' gradle/wrapper/gradle-wrapper.properties
+          printf '%s\n' 'distributionSha256Sum=f397b287023acdba1e9f6fc5ea72d22dd63669d59ed4a289a29b1a76eee151c6' >> gradle/wrapper/gradle-wrapper.properties
           ./gradlew :app:assembleObdPreview :app:testObdPreviewUnitTest -PmotoReleaseCode=587 --no-daemon --stacktrace
       - name: Verify separate package and APK signature
         working-directory: MOTO-HUB
