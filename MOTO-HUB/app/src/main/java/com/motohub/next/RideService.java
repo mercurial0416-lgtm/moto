@@ -308,7 +308,7 @@ public final class RideService extends Service implements LocationListener {
        parkingIsolation.onSpeed(kmh,elapsed);
        synchronized(RideService.this){
         gpsObdParkingHold=running&&parkingIsolation.holdGps();
-        if(gpsObdParkingHold&&!heldBefore)gpsObdHoldStarted=elapsed;
+        if(gpsObdParkingHold&&!heldBefore){gpsObdHoldStarted=elapsed;liveSpeedKmh=0;}
         if(heldBefore&&!gpsObdParkingHold){
          if(gpsObdHoldStarted>0&&elapsed-gpsObdHoldStarted>=15_000)gpsObdResumeSplit=true;
          gpsObdHoldStarted=-1;
@@ -486,6 +486,10 @@ public final class RideService extends Service implements LocationListener {
   if(verified)DailyMaintenanceJob.checkSoon(this);
  }
  private void onObdDisconnected(String reason){
+  // A permanent failure may arrive without a reconnect callback (no retry budget).
+  // Check the last fresh, stationary ECU samples; never infer parking from phone GPS.
+  if(running&&gpsObdParkingHold)
+   parkingIsolation.onLinkLoss(SystemClock.elapsedRealtime());
   // No guessing: do not finish or split a moving ride when Bluetooth fails.
   // Keep an already-running GPS session in the same foreground service until its
   // user explicitly ends it. Never auto-arm again or enable group sharing.
