@@ -11,7 +11,10 @@ python3 - <<'PY'
 from pathlib import Path
 s=Path('app/src/main/java/com/motohub/next/RideService.java').read_text()
 assert 'if(gpsObdParkingHold)return;' in s, "phone walk must not be recorded"
-assert 'gpsObdResumeSplit' in s and 'rotateRideSection();' in s
+assert 'gpsObdResumeSplit' in s and 'rotateRideSection(false);' in s, "parking must break the GPS line"
+assert 'private synchronized void rotateRideSection()throws Exception{rotateRideSection(true);}' in s, "normal size rotation must preserve continuity"
+assert 'if(bridgeWithLastFix&&lastGood!=null)' in s, "paused boundary fix must not leak into the next segment"
+assert 'gpsObdResumeSplit=false;' in s, "resume is acknowledged only after rotation"
 assert 'parkingIsolation.onSpeed(kmh,elapsed)' in s
 assert 'parkingIsolation.onLinkLoss(SystemClock.elapsedRealtime())' in s
 assert 'parkingIsolation.dueAfterLost(SystemClock.elapsedRealtime())' in s
