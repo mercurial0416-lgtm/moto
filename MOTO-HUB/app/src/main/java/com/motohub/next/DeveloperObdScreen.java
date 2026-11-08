@@ -445,9 +445,9 @@ final class DeveloperObdScreen {
    labels[i]=reading.label();
    checked[i]=previous.isEmpty()||selected.contains(reading.pid);
   }
+  setStatus("실제 수신 "+readings.size()+"개 · 표시할 센서를 체크하세요. HEX=단위 미확인. ODO 자동 반영 없음.\n선택한 PID 번호만 저장합니다.");
   new AlertDialog.Builder(activity)
    .setTitle("실제 수신 "+readings.size()+"개 · 표시할 센서 선택")
-   .setMessage("값을 읽은 표준 PID만 표시합니다. 'HEX' 항목은 단위가 확인되지 않은 원시 응답이며 ECU 누적거리는 계기판 대조 전까지 앱에 반영되지 않습니다. 선택한 PID 번호만 기기에 저장합니다.")
    .setMultiChoiceItems(labels,checked,(dialog,index,on)->checked[index]=on)
    .setNegativeButton("저장 안 함",null)
    .setPositiveButton("선택한 항목 저장",(dialog,which)->{
