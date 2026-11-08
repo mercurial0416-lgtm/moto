@@ -14,6 +14,7 @@ from pathlib import Path
 ui=Path("app/src/main/java/com/motohub/next/RideUi.java").read_text()
 assert 'RideHistorySessionRows.group(matched,entry->entry.groupKey)' in ui
 assert 'RideHistorySessionDistance.select(entries,entry->entry.groupKey' in ui
+assert 'bikeRides=RideHistorySessionPeriod.select(bikeRides,now,period);' in ui, 'period scope must follow whole ride first start across midnight'
 assert 'RideHistoryDistanceFilter.accepts(distanceRange,km)' in ui
 assert 'RideBikeBinding.readStrict(file)' in ui
 assert 'RideMileageIntegrity.validCompleted(file)' in ui
