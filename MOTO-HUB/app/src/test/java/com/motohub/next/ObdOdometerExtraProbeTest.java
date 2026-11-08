@@ -29,5 +29,10 @@ public class ObdOdometerExtraProbeTest {
   assertTrue(Double.isNaN(ObdOdometer.parseUdsKm("62F4A60001E240\r62F4A60001E241")));
   assertTrue(Double.isNaN(ObdOdometer.parseKm("01 A6")));
   assertTrue(Double.isNaN(ObdOdometer.parseKm("21 00 00 01 E2 40")));
+  assertTrue(Double.isNaN(ObdOdometer.parseKm("7E8 05 41 A6 00 01 E2 40")));
+  assertTrue(Double.isNaN(ObdOdometer.parseKm("7E8 06 99 41 A6 00 01 E2 40")));
+  assertTrue(Double.isNaN(ObdOdometer.parseKm("041A60001E240")));
+  assertTrue(Double.isNaN(ObdOdometer.parseUdsKm("7E8 06 62 F4 A6 00 01 E2 40")));
+  assertEquals(12345.6,ObdOdometer.parseUdsKm("18DAF110 07 62 F4 A6 00 01 E2 40"),0.001);
  }
 }
