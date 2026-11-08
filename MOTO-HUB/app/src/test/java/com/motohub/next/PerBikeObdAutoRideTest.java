@@ -42,7 +42,9 @@ public class PerBikeObdAutoRideTest {
    assertEquals(1000.2,OdometerAutoSyncInbox.pending(c,DUKE),0.001);
    assertEquals(2000.1,OdometerAutoSyncInbox.pending(c,OTHER),0.001);
    assertEquals(DUKE,OdometerAutoSyncInbox.configuredBikeId(c));
-   OdometerAutoSyncInbox.acknowledged(c,DUKE,1000.2);
+   assertFalse(OdometerAutoSyncInbox.acknowledged(c,DUKE,1000.0));
+   assertEquals(1000.2,OdometerAutoSyncInbox.pending(c,DUKE),0.001);
+   assertTrue(OdometerAutoSyncInbox.acknowledged(c,DUKE,1000.2));
    assertEquals(OTHER,OdometerAutoSyncInbox.configuredBikeId(c));
    OdometerAutoSyncInbox.disable(c,DUKE);
    assertFalse(OdometerAutoSyncInbox.enabled(c,DUKE));
