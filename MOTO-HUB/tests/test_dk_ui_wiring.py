@@ -13,7 +13,7 @@ checks={
  'receipt atomic write': 'new AtomicFile(output)' in activity,
  'receipt state restore': 'out.putString("receiptPhotoTarget",receiptPhotoTarget)' in activity,
  'receipt linked to saved record': 'Store.find(db,key,id)==null' in activity,
- 'receipt cleanup after record commit': 'write(next);if(key.equals("vehicles"))for' in activity and 'childReceipts' in activity and 'clearReceiptFiles(id)' in activity,
+ 'receipt cleanup after record commit': 'write(next);if(key.equals("vehicles")){BikeObdPreferences.clearBike(this,id);OdometerAutoSyncInbox.clearBike(this,id);}' in activity and 'childReceipts' in activity and 'clearReceiptFiles(id)' in activity,
  'receipt backed up': '"receipts/"+file.getName()' in backup,
  'receipt restored': 'receipt=name.startsWith("receipts/")' in restore,
  'receipt path whitelisted': 'isReceipt(name)' in fmt,
