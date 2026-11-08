@@ -19,7 +19,10 @@ assert 'RideBikeBinding.readStrict(file)' in ui
 assert 'RideMileageIntegrity.validCompleted(file)' in ui
 assert 'RideHistoryFilter.COMPLETE.equals(status)' in ui
 assert 'new File(file.getPath()+".imported").exists()' in ui
-assert 'if(!session.isEmpty())groupKey=session+"|"+bikeBinding+"|"+category' in ui
+assert 'Set<String> unsafeSessions=new HashSet<>()' in ui
+assert 'unsafeSessions.add(session)' in ui
+assert 'if(!session.isEmpty()&&!unsafeSessions.contains(session))' in ui
+assert 'groupKey=session+"|"+bikeBinding+"|"+category' in ui
 assert 'if(expanded)for(HistoryEntry segment:row.segments)' in ui
 assert 'showHistoryEntry(results,segment,entries,total,selected,summary)' in ui
 assert 'recoverInterrupted(f)' in ui and 'RideFavorite.toggle(f)' in ui
