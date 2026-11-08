@@ -917,7 +917,7 @@ LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·�
   a.action(p,"고급 백업 도구",false,this::advancedBackup);
   a.action(p,"개인정보 없는 진단 보고서",false,this::localDiagnostics);
   a.action(p,"친구·그룹 서버 진단",false,this::serverPreflight);
-  a.action(p,"듀크 390 · OBD2 읽기 전용 (실험)",true,()->{
+  a.action(p,"현재 바이크 · OBD2 읽기 전용 (실험)",true,()->{
    if(a.developerObd!=null)a.developerObd.stop();
    a.developerObd=new DeveloperObdScreen(a);a.developerObd.show();
   });
