@@ -21,7 +21,7 @@ assert 'OdoAutoSyncPolicy.consistent(a,b)' in monitor
 assert 'listener.odometer(verified)' in monitor
 assert 'OdometerAutoSyncInbox.offer(RideService.this,pendingBikeId,km,km' in service
 assert 'OdometerAutoSyncInbox.enable(activity,id,baseline)' in developer
-assert 'OdometerAutoSyncInbox.disable(activity)' in developer
+assert 'OdometerAutoSyncInbox.disable(activity,id)' in developer
 assert 'RideService.running||jsonImportRunning' in main
 assert 'RestoreRideGate.beginFormWrite()' in main
 assert 'OdometerAutoSyncInbox.acknowledged(this,bikeId,offered)' in main
