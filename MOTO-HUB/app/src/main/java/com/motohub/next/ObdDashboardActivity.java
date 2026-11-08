@@ -21,7 +21,7 @@ import java.util.Locale;
 /** Experimental, local-only telemetry view. No interactive riding controls. */
 public final class ObdDashboardActivity extends Activity {
  private final Handler handler=new Handler(Looper.getMainLooper());
- private TextView speed,rpm,temperature,voltage,fuel,ride,status,advisory,linkStatus;
+ private TextView speed,rpm,temperature,voltage,fuel,ride,status,advisory,linkStatus,odoFallback;
  private boolean compactMode;
  private ProgressBar rpmMeter;
  private boolean visible;
@@ -54,6 +54,9 @@ public final class ObdDashboardActivity extends Activity {
     String.format(Locale.KOREA,"GPS %.2f km · 최고 %.0f km/h",RideService.liveDistanceKm,RideService.livePeakKmh):
     "GPS 신호 대기 · 기존 기록 보존"):
     RideService.autoArmed?"자동 기록 대기 · GPS 기록 시작 전":"라이딩 미작동");
+  String bikeId=RideService.activeRideBikeId;
+  odoFallback.setText(HybridOdometerEstimate.label(this,bikeId));
+  odoFallback.setTextColor(0xffffc78d);
   int score=ObdLinkQuality.score(RideService.obdLastSampleElapsed,now,
     RideService.obdAverageLatencyMs,(int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples),
     RideService.obdQueryFailures,RideService.obdReconnects,
@@ -108,6 +111,7 @@ public final class ObdDashboardActivity extends Activity {
   linkStatus.setPadding(0,4,0,compactMode?8:13);
   linkStatus.setGravity(Gravity.CENTER);base.addView(linkStatus);
   ride=value("GPS 라이딩 기록",18);
+  odoFallback=value("총주행거리 대체 추정 · 계기판 실측 기준 필요",18);
   status=new TextView(this);status.setTextColor(0xffb8c5d3);status.setTextSize(13);status.setGravity(Gravity.CENTER);base.addView(status);
   SharedPreferences statusPrefs=getSharedPreferences(PREFS,0);
   status.setVisibility(statusPrefs.getBoolean("details",false)?View.VISIBLE:View.GONE);
