@@ -338,7 +338,7 @@ final class RideUi {
     // Apply the date range BEFORE calculating status-chip counts. Otherwise a
     // 7-day view can claim hundreds of rides even when only two are visible.
     // Imported GPX dates come from their first committed GPS point.
-    bikeRides.removeIf(file->!RideHistoryPeriod.include(file,now,period));
+    bikeRides=RideHistorySessionPeriod.select(bikeRides,now,period);
     // Recovery warning must not disappear just because an unrelated category was selected.
     int unfinished=0;
     for(File file:bikeRides)
