@@ -78,6 +78,9 @@ final class DeveloperObdScreen {
   });
   activity.action(p,"지원하는 전체 센서 탐색 · 실제 수신값 확인",false,()->loadPairedDiscovery(false));
   activity.action(p,"선택한 센서만 다시 읽기",false,()->loadPairedDiscovery(true));
+   activity.action(p,"ODO 우회 추정 · 계기판 기준값 보정",false,()->HybridOdometerUi.show(activity));
+   JSONObject quickBike=activity.bike();
+   activity.label(p,HybridOdometerEstimate.label(activity,quickBike==null?"":quickBike.optString("id")),12,activity.muted,false);
   activity.gap(p,12);
   activity.label(p,"3  지원 결과 확인",16,activity.fg,true);
   activity.label(p,"연결 결과·PID 지원 메모는 이 기기에만 저장되고, 실제 센서값을 확인하지 못했다면 지원 확정으로 보지 않습니다.",13,activity.muted,false);
@@ -184,6 +187,7 @@ final class DeveloperObdScreen {
   });
   activity.action(p,"최근 라이딩 기록 확인",false,()->{stop();activity.close();activity.navigate("라이딩");});
   activity.action(p,"실험 · ODO 직접 조회 (01A6 + UDS F4A6)",false,this::loadPairedOdo);
+   activity.action(p,"ODO 우회 추정 · GPS 누적 · 계기판 보정",false,()->HybridOdometerUi.show(activity));
   activity.action(p,"계기판 누적 주행거리 수동 확인·반영",false,this::manualOdo);
   JSONObject configured=activity.bike();
   String configuredId=configured==null?"":configured.optString("id");
