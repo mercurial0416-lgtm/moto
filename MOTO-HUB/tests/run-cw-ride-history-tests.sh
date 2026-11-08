@@ -24,6 +24,8 @@ assert 'rideHistoryPeriod=RideHistoryPeriod.restore(' in main
 assert 'out.putString("rideHistoryPeriod",rideHistoryPeriod)' in main
 assert 'TrackFile.discardEmptySession(track)' in service
 assert 'Sharing.start(' not in ui
-assert 'if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))' in service
+assert 'boolean developerApproved=getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)' in service
+assert 'BikeObdPreferences.autoRideEnabled(this,pendingBikeId)' in service
+assert 'RideBikeBinding.write(track,pendingBikeId)' in service
 print('PASS: period UI, search debounce, zero-byte GPS cleanup and safety wiring')
 PY
