@@ -1,24 +1,54 @@
 package com.motohub.next;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-/** Standard SAE mode 01 PID A6 reader. Experimental: the bike may not expose this PID. */
+import java.util.Locale;
+
+/**
+ * Read-only ODO decoder. Neither standard PID A6 nor the standardized
+ * UDS/J1979-2 F4A6 DID is guaranteed to be implemented by a motorcycle.
+ * A decoded candidate must be read twice and confirmed against the dash
+ * before it can be saved. This class does not modify ECU or app state.
+ */
 final class ObdOdometer {
- private static final Pattern REPLY=Pattern.compile("(?i)(?:^|[^0-9a-f])41\\s*A6\\s*([0-9a-f]{2})\\s*([0-9a-f]{2})\\s*([0-9a-f]{2})\\s*([0-9a-f]{2})(?=$|\\s|>)");
- static double parseKm(String raw){
-  if(raw==null||raw.length()>4096)return Double.NaN;
-  Matcher match=REPLY.matcher(raw);
+ static final String STANDARD_REQUEST="01A6\r";
+ static final String UDS_REQUEST="22F4A6\r";
+ private static final double MAX_REASONABLE_KM=2_000_000.0;
+
+ /** Legacy caller: Mode 01 / PID A6. */
+ static double parseKm(String raw) {
+  return parse(raw,"41A6");
+ }
+
+ /** ReadDataByIdentifier 0xF4A6, 0x62 positive response. */
+ static double parseUdsKm(String raw) {
+  return parse(raw,"62F4A6");
+ }
+
+ private static double parse(String raw,String marker) {
+  if(raw==null||raw.length()>4096||!ObdReadOnlyProtocol.replyError(raw).isEmpty())return Double.NaN;
   Double first=null;
-  while(match.find()){
-   long value=0;
-   for(int i=1;i<=4;i++)value=(value<<8)|Integer.parseInt(match.group(i),16);
-   double km=value/10.0;
-   if(km<=0||km>2_000_000)return Double.NaN;
-   // Multiple ECU/adapter replies must agree; never import an ambiguous ODO.
+  for(String line:raw.toUpperCase(Locale.ROOT).split("[\r\n>]+")) {
+   // Accept headers, CAN data length and optional zero padding, but never
+   // infer an ODO from an unlabelled group of bytes.
+   String compact=line.replaceAll("[ \t]","");
+   int at=compact.indexOf(marker);
+   if(at<0)continue;
+   String payload=compact.substring(at+marker.length());
+   // Four ODO bytes; an ELM CAN frame can append at most two 00 padding bytes.
+   if(!payload.matches("[0-9A-F]{8}(?:00){0,2}"))return Double.NaN;
+   long v=Long.parseLong(payload.substring(0,8),16);
+   double km=v/10.0;
+   if(km<=0||km>MAX_REASONABLE_KM)return Double.NaN;
    if(first!=null&&Double.compare(first,km)!=0)return Double.NaN;
    first=km;
   }
   return first==null?Double.NaN:first;
  }
+
+ static String responseSummary(String raw) {
+  if(raw==null||raw.trim().isEmpty())return "무응답";
+  String s=raw.replaceAll("[\r\n\t]+"," ").trim();
+  return s.length()>125?s.substring(0,125)+"…":s;
+ }
+
  private ObdOdometer(){}
 }
