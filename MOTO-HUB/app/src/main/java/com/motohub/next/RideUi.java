@@ -19,8 +19,12 @@ import java.util.concurrent.atomic.AtomicLong;
 /** One-touch ride controls, imported GPX and real saved-ride insights. */
 final class RideUi {
  static final class HistoryEntry {
-  final File file;final String date,status,searchKey;
-  HistoryEntry(File file,String date,String status,String memo){this.file=file;this.date=date;this.status=status;this.searchKey=RideHistorySearch.index(date+" "+memo,status);}
+  final File file;final String date,status,searchKey,groupKey;
+  HistoryEntry(File file,String date,String status,String memo,String groupKey){
+   this.file=file;this.date=date;this.status=status;
+   this.searchKey=RideHistorySearch.index(date+" "+memo,status);
+   this.groupKey=groupKey==null?"":groupKey;
+  }
  }
  /** One background reader prevents file-system I/O from freezing the history screen. */
  private static final ExecutorService HISTORY_EXECUTOR=Executors.newSingleThreadExecutor(r->{
@@ -34,6 +38,8 @@ final class RideUi {
  });
  private static final AtomicLong REPORT_GENERATION=new AtomicLong();
  private int historyVisibleLimit=RideHistoryPage.PAGE_SIZE;
+ /** Only view state; never modifies GPS tracks or per-file metadata. */
+ private final Set<String> expandedRideSessions=new HashSet<>();
  private static final class HistoryData {
   final List<File> rides;final List<HistoryEntry> entries;
   final Map<String,Integer> counts;final String selected;final int damaged,unfinished;
@@ -374,7 +380,18 @@ final class RideUi {
       (sessionCounts.getOrDefault(RideSegmentGroup.id(file),0)>1?
        " · 연속 GPS "+sessionCounts.get(RideSegmentGroup.id(file))+"구간":"")+
       " · "+RideHistoryBikeLabel.label(file,bikeNames);
-     entries.add(new HistoryEntry(file,label,RideHistoryFilter.status(file,activeName,recording),savedMemo));
+     String status=RideHistoryFilter.status(file,activeName,recording);
+     String groupKey="";
+     // Background worker only: never inspect sidecars on the UI thread.
+     if(RideHistoryFilter.COMPLETE.equals(status)&&RideMileageIntegrity.validCompleted(file)
+        &&!new File(file.getPath()+".imported").exists()){
+      try{
+       String bikeBinding=RideBikeBinding.readStrict(file);
+       String session=RideSegmentGroup.id(file);
+       if(!session.isEmpty())groupKey=session+"|"+bikeBinding+"|"+category;
+      }catch(IOException corrupted){/* Damaged bike binding never silently joins a ride. */}
+     }
+     entries.add(new HistoryEntry(file,label,status,savedMemo,groupKey));
     }
     File unapplied=null;int unappliedCount=0;
     if(!currentBike.isEmpty())for(File file:rides){
