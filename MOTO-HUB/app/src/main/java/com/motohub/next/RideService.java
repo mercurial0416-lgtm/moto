@@ -599,10 +599,18 @@ public final class RideService extends Service implements LocationListener {
   status="GPS "+(completedSegments+1)+"번째 구간 기록 중 · 이전 구간 저장 완료";
  }
  @Override public synchronized void onLocationChanged(Location location){
+  // The phone belongs to the rider, not the parked motorcycle.
+  if(gpsObdParkingHold)return;
   if(!running||output==null||!checkRuntimeStorage())return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
   if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
   try{
+   // Never bridge an OBD-stationary gap (or walking) as traveled motorcycle km.
+   if(gpsObdResumeSplit){
+    gpsObdResumeSplit=false;
+    if(segmentPoints>0)rotateRideSection();
+    lastGood=null;lastTime=0;
+   }
    byte[] point=TrackFile.point(location.getLatitude(),location.getLongitude(),
     location.getAccuracy(),location.getTime()).getBytes(StandardCharsets.UTF_8);
    if(point.length>TrackFile.MAX_BYTES-track.length())rotateRideSection();
@@ -629,7 +637,9 @@ public final class RideService extends Service implements LocationListener {
      double measuredKmh=metres*3600.0/dt;
      liveDistanceKm+=metres/1000.0;liveSpeedKmh=measuredKmh;
      if(location.getAccuracy()<=25&&RideStopSuggestion.moving(measuredKmh))lastMotionElapsed=SystemClock.elapsedRealtime();
-     if(autoArmed&&location.getAccuracy()<=20){final double speedForGate=measuredKmh;
+     if(autoArmed&&!gpsObdParkingHold&&obdSpeedKmh>=ObdParkingIsolation.RESUME_MIN_KMH
+        &&ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,SystemClock.elapsedRealtime())
+        &&location.getAccuracy()<=20){final double speedForGate=measuredKmh;
       // OBD connection callbacks own the autoGate on the main looper. Serialize GPS hints there.
       handler.post(()->{if(autoArmed&&running){autoGate.gpsMovement(speedForGate,SystemClock.elapsedRealtime());obdStationaryRemainingMs=autoGate.stationaryRemainingMs(SystemClock.elapsedRealtime());}});
      }
@@ -700,6 +710,8 @@ public final class RideService extends Service implements LocationListener {
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(storageWatchdog);
   // Invalidate queued main-thread finalization callbacks after failures or process teardown.
   finishPending=false;autoFinishPending=false;
+  handler.removeCallbacks(finishParkedObdLoss);parkingIsolation.reset();
+  gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
   Sharing.stop();autoArmed=false;activeRideBikeId="";activeAutoAdapterAddress="";obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
