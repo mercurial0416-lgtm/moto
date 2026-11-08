@@ -8,7 +8,8 @@ java -cp "$out" com.motohub.next.RideHistoryPageTest
 python3 - <<'PYTEST'
 from pathlib import Path
 ui=Path('app/src/main/java/com/motohub/next/RideUi.java').read_text()
-assert 'if(page.size()<historyVisibleLimit)page.add(entry);' in ui and 'final int shown=page.size();' in ui, 'visible results remain capped while doing one scan'
+assert 'final int shown=Math.min(count,historyVisibleLimit);' in ui and 'for(int i=0;i<shown;i++)' in ui, 'visible grouped results must remain paginated'
+assert 'RideHistorySessionRows.group(matched,entry->entry.groupKey)' in ui, 'pagination counts whole rides rather than GPS section files'
 assert 'historyVisibleLimit=RideHistoryPage.PAGE_SIZE;' in ui
 assert 'RideHistoryPage.nextLimit(historyVisibleLimit)' in ui
 assert '라이딩 더 보기 · 남은 ' in ui
