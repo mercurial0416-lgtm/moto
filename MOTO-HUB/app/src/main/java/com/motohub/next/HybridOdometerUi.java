@@ -44,15 +44,14 @@ final class HybridOdometerUi {
   input.setSingleLine(true);
   input.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);
   input.setHint("계기판 총 주행거리 km");
-  HybridOdometerEstimate.Reading existing=HybridOdometerEstimate.snapshot(a,id);
-  if(existing.configured&&existing.valid)
-   input.setText(String.format(java.util.Locale.ROOT,"%.1f",existing.estimatedKm));
-  else input.setText(String.format(java.util.Locale.ROOT,"%.0f",current.optDouble("odo",0)));
-  input.selectAll();
+  // Never prefill a GPS estimate or saved garage value as if it were observed
+  // on the bike's physical dashboard. Force a fresh explicit reading.
+  input.setText("");
+  input.setHint("계기판에서 확인한 ODO만 입력 (예: 1254.3)");
   LinearLayout pane=new LinearLayout(a);pane.setOrientation(LinearLayout.VERTICAL);
   pane.setPadding(a.dp(22),0,a.dp(22),0);pane.addView(input);
   AlertDialog dialog=new AlertDialog.Builder(a).setTitle("계기판 실측 기준 등록")
-   .setMessage(name+" · 실제 계기판의 TOTAL/ODO 숫자를 직접 읽어 입력해 주세요."+
+   .setMessage(name+" · 실제 계기판의 TOTAL/ODO 숫자를 직접 읽어 빈 칸에 입력해 주세요."+
      "\nTRIP A/B, 0121, 0131은 총주행거리가 아닙니다."+
      "\n\n이 보정은 GPS 추정 기준만 갱신합니다. 차고 실제 ODO나 정비 기록은 바꾸지 않습니다.")
    .setView(pane).setNegativeButton("취소",null)
