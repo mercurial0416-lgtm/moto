@@ -20,9 +20,10 @@ public final class ObdParkingIsolationTest {
   check(!p.dueAfterLost(121000),"grace must be respected");
   check(p.dueAfterLost(122100),"stationary loss should eventually request verified finish");
   p.onLinkConnected();
-  check(!p.dueAfterLost(500000),"reconnect alone must cancel lost-link deadline");
+  check(p.dueAfterLost(500000),"Bluetooth reconnect without ECU speed must retain parked-loss deadline");
   check(p.holdGps(),"reconnect alone must not imply bike motion");
   p.onSpeed(0,500010);
+  check(!p.dueAfterLost(900000),"fresh stopped ECU response ends disconnect grace");
   check(p.holdGps(),"stationary OBD after reconnect still excludes walk");
   p.onSpeed(7,500100);
   check(!p.holdGps(),"fresh moving ECU samples resume ride GPS");
