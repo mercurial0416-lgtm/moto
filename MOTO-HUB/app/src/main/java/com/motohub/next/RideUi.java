@@ -734,10 +734,19 @@ final class RideUi {
     showHistoryEntry(results,row.segments.get(0),entries,total,selected,summary);
     continue;
    }
-   final HistoryEntry latest=row.segments.get(0);
+   // A grouped ride's display time is its FIRST GPS section, never
+   // whichever end section happens to sort to the top.
+   HistoryEntry earliest=row.segments.get(0);
+   Long firstTime=null;
+   for(HistoryEntry part:row.segments){
+    Long timestamp=RideHistoryLabel.filenameTime(part.file.getName());
+    if(timestamp!=null&&(firstTime==null||timestamp<firstTime)){
+     firstTime=timestamp;earliest=part;
+    }
+   }
    final boolean expanded=expandedRideSessions.contains(row.key);
    new HubScreens(a).line(results,
-    latest.date+" · 라이딩 1회",
+    earliest.date+" · 라이딩 1회",
     "GPS "+row.segments.size()+"개 구간 · 원본 그대로 보존",
     expanded?"구간 접기  ›":"구간 펼치기  ›",
     ()->{
