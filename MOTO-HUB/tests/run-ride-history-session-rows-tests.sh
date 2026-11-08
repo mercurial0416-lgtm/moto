@@ -5,12 +5,16 @@ classes="$(mktemp -d)"
 trap 'rm -rf "$classes"' EXIT
 javac -encoding UTF-8 -d "$classes" \
   app/src/main/java/com/motohub/next/RideHistorySessionRows.java \
-  tests/RideHistorySessionRowsTest.java
+  app/src/main/java/com/motohub/next/RideHistorySessionDistance.java \
+  tests/RideHistorySessionRowsTest.java tests/RideHistorySessionDistanceTest.java
 java -cp "$classes" com.motohub.next.RideHistorySessionRowsTest
+java -cp "$classes" com.motohub.next.RideHistorySessionDistanceTest
 python3 - <<'PY'
 from pathlib import Path
 ui=Path("app/src/main/java/com/motohub/next/RideUi.java").read_text()
 assert 'RideHistorySessionRows.group(matched,entry->entry.groupKey)' in ui
+assert 'RideHistorySessionDistance.select(entries,entry->entry.groupKey' in ui
+assert 'RideHistoryDistanceFilter.accepts(distanceRange,km)' in ui
 assert 'RideBikeBinding.readStrict(file)' in ui
 assert 'RideMileageIntegrity.validCompleted(file)' in ui
 assert 'RideHistoryFilter.COMPLETE.equals(status)' in ui
