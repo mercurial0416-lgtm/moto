@@ -37,8 +37,10 @@ jobs:
       - name: Compile Android app, lint and unit tests
         working-directory: MOTO-HUB
         run: |
-          chmod +x gradlew
-          ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon --stacktrace
+          # Runner-provided Gradle passed the isolated OBD preview build.
+          # The project wrapper URL currently redirects to HTTP 504.
+          command -v gradle
+          gradle :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --no-daemon --stacktrace
       - name: Upload unsigned-development-only verification artifacts
         if: always()
         uses: actions/upload-artifact@v4
