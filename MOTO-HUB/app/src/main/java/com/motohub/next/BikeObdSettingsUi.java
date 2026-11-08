@@ -178,7 +178,7 @@ final class BikeObdSettingsUi {
    .setMessage("선택 바이크: "+a.bikeName(bikeId)+
     "\n동글: "+BikeObdPreferences.deviceName(a,bikeId)+
     "\n\n이 버튼을 누르면 알림이 표시되는 동안 OBD 속도를 읽습니다. 속도 7km/h 이상 3회 감지 시 GPS 기록을 이 바이크에 저장하고, 정차 3/5/10분(설정값) 뒤 파일을 검증한 후 다음 출발을 감지합니다."+
-    "\n\nBluetooth 끊김이 감지되면 제한된 횟수로 재연결합니다. 달리는 중 끊기면 기존 GPS 기록을 중단하거나 삭제하지 않습니다. 키 ON만으로 앱이 스스로 실행되지는 않습니다."+
+    "\n\n정차 중 ECU 속도 0km/h가 반복 확인된 뒤 OBD가 끊기면 휴대폰 도보 GPS는 주행거리에서 제외하고 약 2분간 재연결을 확인한 후 종료를 판단합니다. 주행 중 끊긴 경우 자동으로 종료하지 않으며 GPS 기록을 보존합니다. 키 ON만으로 앱이 스스로 실행되지는 않습니다."+
     "\n\nECU의 실제 누적 주행거리는 별도의 계기판 확인을 거쳐야 자동 동기화할 수 있으며 GPS 추정 거리를 계기판 값으로 속이지 않습니다.")
    .setNegativeButton("취소",null)
    .setPositiveButton("동의하고 연결",(dialog,which)->{
