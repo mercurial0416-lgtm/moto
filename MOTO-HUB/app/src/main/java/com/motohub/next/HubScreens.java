@@ -467,6 +467,9 @@ final class HubScreens {
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
   a.action(p,"바이크 정보 수정",true,()->a.edit("vehicles",b));
+  String bikeObdAddress=BikeObdPreferences.address(a,b.optString("id"));
+  a.label(p,"바이크 설정",15,a.fg,true);
+  a.action(p,"OBD 연결 설정 · "+(bikeObdAddress.isEmpty()?"등록 안 됨":BikeObdPreferences.deviceName(a,b.optString("id"))),false,()->new BikeObdSettingsUi(a).open(b.optString("id")));
   a.action(p,"부품별 관리 장부",false,()->new ComponentBookUi(a).open());
   a.label(p,"차량 라이프로그",15,a.fg,true);
   a.action(p,"판매·정비 이력 PDF · 직접 저장",false,()->a.exportOwnershipPdf(b.optString("id")));
