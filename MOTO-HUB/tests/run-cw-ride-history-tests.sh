@@ -16,7 +16,7 @@ java=Path('app/src/main/java/com/motohub/next')
 ui=(java/'RideUi.java').read_text()
 main=(java/'MainActivity.java').read_text()
 service=(java/'RideService.java').read_text()
-assert 'bikeRides.removeIf(file->!RideHistoryPeriod.include(file,now,period))' in ui
+assert 'bikeRides=RideHistorySessionPeriod.select(bikeRides,now,period)' in ui, 'date filter must include or exclude every section by original session start'
 assert 'selectRideHistoryPeriod(options[which])' in ui
 assert 'results.postDelayed(pendingSearch[0],180)' in ui
 assert 'results.removeCallbacks(pendingSearch[0])' in ui
