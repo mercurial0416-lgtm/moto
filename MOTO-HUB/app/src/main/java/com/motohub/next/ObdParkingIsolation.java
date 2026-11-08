@@ -40,6 +40,7 @@ final class ObdParkingIsolation {
  }
  /** On the first transport error, preserve stopped GPS but freeze phone walking. */
  boolean onLinkLoss(long now){
+  if(confirmedAtLoss)return true;
   boolean stationary=observedParking(now);
   parkingLossAt=stationary?now:-1;
   confirmedAtLoss=stationary;
