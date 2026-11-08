@@ -70,7 +70,7 @@ check('new QuickEntryUi(a).fuel()' in home and
 rideui=(JAVA/'RideUi.java').read_text()
 check('new RideUi(a).requestStart(true)' in home,
       "explicit GPS consent/navigation action missing")
-check('setPositiveButton("저장하고 종료"' in rideui and
+check('MotoDialog.confirm(a,' in rideui and '"저장하고 종료"' in rideui and
       'void finishWithSummary()' in rideui and 'RideService.STOP' in rideui,
       "confirmed GPS stop and verified save must remain available")
 check('changeHeroPhoto(bike,own)' in home and 'switchBike(direction)' in home,
