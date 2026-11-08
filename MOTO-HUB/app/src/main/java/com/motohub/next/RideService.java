@@ -188,7 +188,7 @@ public final class RideService extends Service implements LocationListener {
    if(AUTO_ARM.equals(action)){
     if(running||autoArmed)return START_NOT_STICKY;
     pendingBikeId=intent.getStringExtra(EXTRA_BIKE_ID);
-    if(!RideBikeBinding.valid(pendingBikeId))throw new SecurityException("등록된 바이크를 선택한 뒤 OBD 기록을 켜 주세요.");
+    if(!RideBikeBinding.valid(pendingBikeId)){stopWith("등록된 바이크를 선택한 뒤 OBD 기록을 켜 주세요.",false);return START_NOT_STICKY;}
     activeRideBikeId=pendingBikeId;
     armAutomaticRide(intent.getStringExtra(EXTRA_DEVICE));return START_NOT_STICKY;
    }
