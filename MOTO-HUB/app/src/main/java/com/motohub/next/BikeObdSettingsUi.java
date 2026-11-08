@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.LocationManager;
 import android.os.Build;
 import android.provider.Settings;
 import android.widget.LinearLayout;
@@ -46,6 +47,25 @@ final class BikeObdSettingsUi {
   });
   a.action(p,address.isEmpty()?"이 바이크의 OBD 동글 등록":"이 바이크의 OBD 동글 변경",true,()->pick(bikeId));
   a.gap(p,12);
+  a.label(p,"라이딩 기록 자동 연동",16,a.fg,true);
+  boolean autoEnabled=BikeObdPreferences.autoRideEnabled(a,bikeId);
+  a.label(p,autoEnabled?"이 바이크: OBD 자동 라이딩 사용 설정됨":"현재 꺼짐 · 원할 때 활성화 가능",14,a.muted,false);
+  if(RideService.autoArmed&&bikeId.equals(RideService.activeRideBikeId))
+   a.label(p,"지금 이 바이크의 OBD 자동 출발 감지 진행 중 · "+RideService.obdLink,14,a.fg,false);
+  else if(RideService.autoArmed||RideService.running)
+   a.label(p,"다른 라이딩이 진행 중입니다. 해당 기록을 종료한 뒤 설정하세요.",13,a.muted,false);
+  if(address.isEmpty())a.label(p,"바이크별 동글을 먼저 등록하면 자동 라이딩을 켤 수 있습니다.",13,a.muted,false);
+  else{
+   a.action(p,autoEnabled?"이 바이크 OBD 자동 기록 시작":"이 바이크 OBD 자동 기록 켜고 시작",true,()->beginAuto(bikeId));
+   if(autoEnabled)a.action(p,"이 바이크 OBD 자동 기록 해제",false,()->disableAuto(bikeId));
+  }
+  if(RideService.autoArmed&&bikeId.equals(RideService.activeRideBikeId))
+   a.action(p,"현재 OBD 감지만 중지 · GPS 기록 보존",false,()->{
+    a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));
+    a.toast("OBD 감지 중지 요청 · 이미 시작된 GPS 기록은 유지됩니다.");
+   });
+
+  a.gap(p,12);
   a.label(p,"선택된 계기판 센서",16,a.fg,true);
   a.label(p,selected.isEmpty()?"아직 선별한 센서 없음 · 전체 탐색 후 선택":
    selected.size()+"개 저장 · "+preview(selected),14,a.muted,false);
@@ -66,7 +86,7 @@ final class BikeObdSettingsUi {
     .setNegativeButton("취소",null)
     .setPositiveButton("등록 해제",(d,w)->{BikeObdPreferences.clearDevice(a,bikeId);open(bikeId);}).show());
   a.gap(p,12);
-  a.label(p,"기억한 장치가 있어도 자동 연결되지는 않습니다. 연결 검사/라이딩 감지를 사용자가 직접 시작해야 합니다. ODO 값은 실차 계기판 확인 전까지 자동으로 수정하지 않습니다.",13,a.muted,false);
+  a.label(p,"자동 기록을 켜고 시작하면 앱이 알림과 함께 OBD를 연결하고 주행 시 GPS 경로를 이 바이크에 저장합니다. 재연결은 켜둔 세션 안에서만 시도합니다. 키 ON만으로 앱이 꺼진 상태에서 자동 실행하거나 부팅 후 몰래 연결하지 않습니다. ECU ODO 미지원 시 GPS 기록은 실제 계기판 누적 km로 자동 확정되지 않습니다.",13,a.muted,false);
   a.show();
  }
 
@@ -80,6 +100,62 @@ final class BikeObdSettingsUi {
   return out.toString();
  }
 
+
+ private void beginAuto(String bikeId){
+  if(a.readOnly||RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()||RideService.saving()){
+   a.toast("데이터 보호·복원·저장이 끝난 뒤 실행해 주세요.");return;
+  }
+  if(RideService.running||RideService.autoArmed){
+   a.toast("다른 라이딩 또는 OBD 자동 감지가 이미 진행 중입니다.");return;
+  }
+  if(a.bike()==null||!bikeId.equals(a.bike().optString("id"))){
+   a.toast("현재 선택한 바이크가 바뀌었습니다. 다시 선택해 주세요.");return;
+  }
+  String address=BikeObdPreferences.address(a,bikeId);
+  if(address.isEmpty()){a.toast("이 바이크의 OBD 동글을 먼저 등록해 주세요.");return;}
+  if(a.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+   a.toast("라이딩 화면에서 정확한 위치 권한을 허용한 뒤 시작해 주세요.");return;
+  }
+  if(Build.VERSION.SDK_INT>=31&&a.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED){
+   a.toast("주변 기기 Bluetooth 권한을 허용한 뒤 시작해 주세요.");return;
+  }
+  if(Build.VERSION.SDK_INT>=33&&a.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+   a.toast("알림 권한을 허용한 뒤 시작해 주세요.");return;
+  }
+  LocationManager gps=a.getSystemService(LocationManager.class);
+  if(gps==null||!gps.isProviderEnabled(LocationManager.GPS_PROVIDER)){
+   a.toast("휴대폰 GPS를 켠 뒤 시작해 주세요.");return;
+  }
+  boolean enabled=BikeObdPreferences.autoRideEnabled(a,bikeId);
+  new AlertDialog.Builder(a).setTitle(enabled?"이 바이크 OBD 자동 라이딩 시작":"이 바이크 OBD 자동 라이딩 활성화")
+   .setMessage("선택 바이크: "+a.bikeName(bikeId)+
+    "\n동글: "+BikeObdPreferences.deviceName(a,bikeId)+
+    "\n\n이 버튼을 누르면 알림이 표시되는 동안 OBD 속도를 읽습니다. 속도 7km/h 이상 3회 감지 시 GPS 기록을 이 바이크에 저장하고, 정차 3/5/10분(설정값) 뒤 파일을 검증한 후 다음 출발을 감지합니다."+
+    "\n\nBluetooth 끊김이 감지되면 제한된 횟수로 재연결합니다. 달리는 중 끊기면 기존 GPS 기록을 중단하거나 삭제하지 않습니다. 키 ON만으로 앱이 스스로 실행되지는 않습니다."+
+    "\n\nECU의 실제 누적 주행거리는 별도의 계기판 확인을 거쳐야 자동 동기화할 수 있으며 GPS 추정 거리를 계기판 값으로 속이지 않습니다.")
+   .setNegativeButton("취소",null)
+   .setPositiveButton("동의하고 연결",(dialog,which)->{
+    if(RideService.running||RideService.autoArmed||
+       a.bike()==null||!bikeId.equals(a.bike().optString("id")))return;
+    BikeObdPreferences.setAutoRideEnabled(a,bikeId,true);
+    Intent start=new Intent(a,RideService.class).setAction(RideService.AUTO_ARM)
+     .putExtra(RideService.EXTRA_BIKE_ID,bikeId).putExtra(RideService.EXTRA_DEVICE,address);
+    a.attempt(()->a.startForegroundService(start));
+    a.toast("OBD 자동 감지 시작 요청 · 알림에서 실제 상태 확인");
+   }).show();
+ }
+
+ private void disableAuto(String bikeId){
+  new AlertDialog.Builder(a).setTitle("이 바이크 OBD 자동 기록 해제")
+   .setMessage("현재 OBD 감지도 중지합니다. 진행 중인 GPS 기록은 삭제하지 않고 직접 종료할 때까지 유지합니다. 다른 바이크 기록은 변경하지 않습니다.")
+   .setNegativeButton("취소",null)
+   .setPositiveButton("해제",(dialog,which)->{
+    BikeObdPreferences.setAutoRideEnabled(a,bikeId,false);
+    if(RideService.autoArmed&&bikeId.equals(RideService.activeRideBikeId))
+     a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));
+    open(bikeId);
+   }).show();
+ }
  private void pick(String bikeId){
   if(Build.VERSION.SDK_INT>=31&&a.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED){
    a.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},101);
