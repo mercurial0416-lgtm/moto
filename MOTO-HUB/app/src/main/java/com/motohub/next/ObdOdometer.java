@@ -40,6 +40,20 @@ final class ObdOdometer {
    String compact=line.replaceAll("[ \t]","");
    int at=compact.indexOf(marker);
    if(at<0)continue;
+   // Only trust a full positive reply at the start of a frame or directly
+   // after a CAN responder ID with an optional transport byte count.
+   // Do not accept a coincidental marker embedded inside unrelated payload.
+   String header=compact.substring(0,at);
+   int expectedLength=marker.equals("41A6")?6:7;
+   if(!header.isEmpty()){
+    if(!header.matches("(?:[0-9A-F]{3}|[0-9A-F]{8})(?:[0-9A-F]{2})?"))
+     return Double.NaN;
+    int canIdDigits=header.length()==3||header.length()==5?3:8;
+    if(header.length()>canIdDigits){
+     int declared=Integer.parseInt(header.substring(canIdDigits),16);
+     if(declared!=expectedLength)return Double.NaN;
+    }
+   }
    String payload=compact.substring(at+marker.length());
    // Four ODO bytes; an ELM CAN frame can append at most two 00 padding bytes.
    if(!payload.matches("[0-9A-F]{8}(?:00){0,2}"))return Double.NaN;
