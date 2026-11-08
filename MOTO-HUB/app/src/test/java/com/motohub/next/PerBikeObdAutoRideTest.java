@@ -5,10 +5,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
+import org.robolectric.annotation.Config;
 import java.util.Arrays;
 import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class)
+@Config(sdk=35) // Robolectric 4.14.1 does not support the app's compile/target SDK 36.
 public class PerBikeObdAutoRideTest {
  private static final String DUKE="9f87e196-787f-4dc2-b292-37f70f6f5f3d";
  private static final String OTHER="5dff9845-efae-4200-9078-843042d4bb7e";
