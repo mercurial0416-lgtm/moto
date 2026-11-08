@@ -26,18 +26,18 @@ jobs:
         working-directory: MOTO-HUB
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleObdPreview :app:testObdPreviewUnitTest -PmotoReleaseCode=586 --no-daemon --stacktrace
+          ./gradlew :app:assembleObdPreview :app:testObdPreviewUnitTest -PmotoReleaseCode=587 --no-daemon --stacktrace
       - name: Verify separate package and APK signature
         working-directory: MOTO-HUB
         run: |
           APK="app/build/outputs/apk/obdPreview/app-obdPreview.apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='com.motohub.next.obdpreview' versionCode='586'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='com.motohub.next.obdpreview' versionCode='587'"
           sha256sum "$APK" > "app/build/outputs/apk/obdPreview/SHA256.txt"
       - name: Upload APK (test only, not an update over MOTO HUB)
         uses: actions/upload-artifact@v4
         with:
-          name: MOTO-HUB-OBD-PREVIEW-586
+          name: MOTO-HUB-OBD-PREVIEW-587
           path: |
             MOTO-HUB/app/build/outputs/apk/obdPreview/app-obdPreview.apk
             MOTO-HUB/app/build/outputs/apk/obdPreview/SHA256.txt
