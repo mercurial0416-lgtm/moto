@@ -203,7 +203,7 @@ final class ObdReadOnlyDiscovery {
    case "012C":return "EGR 명령";
    case "012E":return "증발가스 퍼지";
    case "012F":return "연료량 비율 (지원차량만)";
-   case "0130":return "고장코드 삭제 후 시동 횟수";
+   case "0130":return "고장코드 삭제 후 엔진 워밍업 횟수";
    case "0131":return "고장코드 삭제 후 주행거리 (총 ODO 아님)";
    case "0133":return "대기압";
    case "0142":return "ECU 전압";
