@@ -25,6 +25,8 @@ assert 'if(!session.isEmpty()&&!unsafeSessions.contains(session))' in ui
 assert 'groupKey=session+"|"+bikeBinding+"|"+category' in ui
 assert 'if(expanded)for(HistoryEntry segment:row.segments)' in ui
 assert 'showHistoryEntry(results,segment,entries,total,selected,summary)' in ui
+assert 'RideHistoryLabel.filenameTime(part.file.getName())' in ui
+assert 'earliest.date+" · 라이딩 1회"' in ui, 'ride header must show the original session start time'
 assert 'recoverInterrupted(f)' in ui and 'RideFavorite.toggle(f)' in ui
 print('PASS UI: display-only ride groups retain per-file recovery and favorite actions')
 PY
