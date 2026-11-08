@@ -348,24 +348,6 @@ final class RideUi {
     Map<String,Integer> counts=RideHistoryFilter.counts(bikeRides,activeName,recording);
     List<File> visible=RideHistorySort.order(RideHistoryFilter.select(bikeRides,selected,activeName,recording),sort);
     String distanceInfo="";
-    if(!RideHistoryDistanceFilter.ALL.equals(distanceRange)){
-     // The complete filtered list is evaluated off the UI thread. Never drop
-     // the user's filter merely because there are over 150 tracks or 80MB.
-     // Shared bounded cache skips unchanged GPS analyses on subsequent views.
-     List<File> matched=new ArrayList<>();
-     int unreadable=0;
-     for(File file:visible){
-      if(generation!=HISTORY_GENERATION.get())return;
-      try{
-       RideDistanceCache.Summary distance=RideDistanceCache.read(file);
-       if(RideHistoryDistanceFilter.accepts(distanceRange,distance.distanceKm))
-        matched.add(file);
-      }catch(Exception ignored){unreadable++;}
-     }
-     visible=matched;
-     distanceInfo="GPS 거리 "+distanceRange+" · 전체 대상 분석 · 원본 손상·크기 초과 "+unreadable+
-      "건 제외 · 계기판 거리와 다를 수 있어요.";
-    }
     Map<String,Integer> sessionCounts=RideSegmentGroup.counts(rides);
     List<HistoryEntry> entries=new ArrayList<>();
     for(File file:visible){
@@ -392,6 +374,23 @@ final class RideUi {
       }catch(IOException corrupted){/* Damaged bike binding never silently joins a ride. */}
      }
      entries.add(new HistoryEntry(file,label,status,savedMemo,groupKey));
+    }
+    if(!RideHistoryDistanceFilter.ALL.equals(distanceRange)){
+     // Analyze GPS sections off the UI thread and compare session totals,
+     // never mistakenly discard a 60 km ride split into several 20 km files.
+     Map<String,Double> measured=new HashMap<>();
+     int unreadable=0;
+     for(HistoryEntry entry:entries){
+      if(generation!=HISTORY_GENERATION.get())return;
+      try{measured.put(entry.file.getName(),RideDistanceCache.read(entry.file).distanceKm);}
+      catch(Exception invalid){measured.put(entry.file.getName(),Double.NaN);unreadable++;}
+     }
+     entries=RideHistorySessionDistance.select(entries,entry->entry.groupKey,
+      entry->measured.getOrDefault(entry.file.getName(),Double.NaN),
+      km->RideHistoryDistanceFilter.accepts(distanceRange,km));
+     distanceInfo="GPS 거리 "+distanceRange+
+      " · 여러 구간의 한 라이딩은 합산 기준 · 손상·미완료 "+unreadable+
+      "개 제외 · 계기판 거리와 다를 수 있어요.";
     }
     File unapplied=null;int unappliedCount=0;
     if(!currentBike.isEmpty())for(File file:rides){
