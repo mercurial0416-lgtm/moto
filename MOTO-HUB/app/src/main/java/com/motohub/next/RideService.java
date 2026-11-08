@@ -94,8 +94,16 @@ public final class RideService extends Service implements LocationListener {
  volatile boolean gpsObdParkingHold=false,gpsObdResumeSplit=false;
  long gpsObdHoldStarted=-1;
  final Runnable finishParkedObdLoss=new Runnable(){@Override public void run(){
-  if(!running||autoArmed||autoFinishPending||finishPending||!gpsObdParkingHold)return;
+  if(!running||autoFinishPending||finishPending||!gpsObdParkingHold)return;
   if(parkingIsolation.dueAfterLost(SystemClock.elapsedRealtime())){
+   // The link can keep reopening even with the ECU fully off. Stop only the
+   // OBD monitor; completion uses the existing ordered GPS verification writer.
+   if(autoArmed){
+    ObdAutoSpeedMonitor monitor=obdMonitor;
+    if(monitor!=null)monitor.stop();
+    obdMonitor=null;autoArmed=false;autoGate.reset();obdStationaryRemainingMs=-1;
+    obdLink="주차 추정 · OBD 종료";
+   }
    status="주차 후 OBD 끊김 추정 · 휴대폰 도보 경로 제외 · GPS 저장 검증 중";
    finishAutoTrack();
   }
@@ -306,6 +314,8 @@ public final class RideService extends Service implements LocationListener {
       obdSpeedKmh=kmh;obdSpeedSamples++;obdLastSampleElapsed=elapsed;
        boolean heldBefore=gpsObdParkingHold;
        parkingIsolation.onSpeed(kmh,elapsed);
+       // A valid ECU speed sample, not Bluetooth socket establishment, ends loss grace.
+       handler.removeCallbacks(finishParkedObdLoss);
        synchronized(RideService.this){
         gpsObdParkingHold=running&&parkingIsolation.holdGps();
         if(gpsObdParkingHold&&!heldBefore){gpsObdHoldStarted=elapsed;liveSpeedKmh=0;}
@@ -349,6 +359,9 @@ public final class RideService extends Service implements LocationListener {
        gpsObdParkingHold=true;
        if(gpsObdHoldStarted<0)gpsObdHoldStarted=SystemClock.elapsedRealtime();
       }
+      long remaining=parkingIsolation.remainingAfterLost(SystemClock.elapsedRealtime());
+      handler.removeCallbacks(finishParkedObdLoss);
+      handler.postDelayed(finishParkedObdLoss,Math.max(1,remaining));
      }
      obdReconnects=attempt;speedSanity.reset();ObdLocalDiagnosticLog.record(RideService.this,"RECONNECT");obdSpeedKmh=-1;obdLastSampleElapsed=0;
      obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;
