@@ -79,6 +79,7 @@ final class DeveloperObdScreen {
   activity.action(p,"지원하는 전체 센서 탐색 · 실제 수신값 확인",false,()->loadPairedDiscovery(false));
   activity.action(p,"선택한 센서만 다시 읽기",false,()->loadPairedDiscovery(true));
    activity.action(p,"ODO 우회 추정 · 계기판 기준값 보정",false,()->HybridOdometerUi.show(activity));
+   activity.action(p,"PID 0131 · 보조 ODO 연결·설정",false,()->DtcOdoSetupScreen.open(activity));
    JSONObject quickBike=activity.bike();
    activity.label(p,HybridOdometerEstimate.label(activity,quickBike==null?"":quickBike.optString("id")),12,activity.muted,false);
   activity.gap(p,12);
@@ -188,6 +189,7 @@ final class DeveloperObdScreen {
   activity.action(p,"최근 라이딩 기록 확인",false,()->{stop();activity.close();activity.navigate("라이딩");});
   activity.action(p,"실험 · ODO 직접 조회 (01A6 + UDS F4A6)",false,this::loadPairedOdo);
    activity.action(p,"ODO 우회 추정 · GPS 누적 · 계기판 보정",false,()->HybridOdometerUi.show(activity));
+   activity.action(p,"최후 보루 · PID 0131 연동·재보정",false,()->DtcOdoSetupScreen.open(activity));
   activity.action(p,"계기판 누적 주행거리 수동 확인·반영",false,this::manualOdo);
   JSONObject configured=activity.bike();
   String configuredId=configured==null?"":configured.optString("id");
@@ -259,6 +261,8 @@ final class DeveloperObdScreen {
    dialog.show();
   });
   activity.label(p,OdometerAutoSyncInbox.display(activity,configuredId),12,activity.muted,false);
+  activity.label(p,DtcOdoBridge.label(activity,configuredId),12,activity.muted,false);
+  activity.action(p,"PID 0131 현재값·중지·재보정",false,()->DtcOdoSetupScreen.showStatus(activity,configuredId));
   activity.label(p,"01A6·읽기 전용 UDS F4A6은 지원 ECU에서만 수신됩니다. 듀크390 미검증. 두 번 동일하게 수신하고 계기판을 대조한 후에만 수동 반영합니다. GPS·정비 기록 보존.",13,activity.muted,false);
   activity.action(p,"연결 끊기",false,this::stop);
   activity.show();owner=activity.dialog;
