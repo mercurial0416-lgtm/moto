@@ -66,6 +66,13 @@ public class HybridOdometerLedgerSafetyTest {
   writeLedger("{not valid json}");
   assertFalse(HybridOdometerEstimate.snapshot(context,BIKE).valid);
  }
+ @Test public void successfulBackupRestoreDiscardsPriorDashboardAnchor()throws Exception{
+  writeLedger("{"+row(A,BIKE,10)+"}");
+  assertTrue(HybridOdometerEstimate.calibrate(context,BIKE,1710));
+  assertTrue(HybridOdometerEstimate.snapshot(context,BIKE).valid);
+  assertTrue(HybridOdometerEstimate.suspendAfterRestore(context));
+  assertFalse(HybridOdometerEstimate.snapshot(context,BIKE).configured);
+ }
  @Test public void oldV588AnchorWithoutMembershipRequiresRecalibration()throws Exception{
   SharedPreferences p=context.getSharedPreferences("hybrid_odo_v588",0);
   p.edit().putString(BIKE+".baseline","1200").putString(BIKE+".gps","0").commit();
