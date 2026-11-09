@@ -123,6 +123,7 @@ final class DtcOdoSetupScreen {
   void run(){
    String result=null;
    int value=-1;
+   long capturedAtElapsed=0;
    try{
     BluetoothSocket s=device.createRfcommSocketToServiceRecord(SPP);socket=s;
     if(cancelled)return;
@@ -138,10 +139,12 @@ final class DtcOdoSetupScreen {
     int same=DtcDistanceSinceClear.parseKm(second);
     if(same!=value)throw new java.io.IOException("0131 두 번의 응답 불일치: "+value+"km / "+same+"km");
     if(value==65535)throw new java.io.IOException("0131 포화(65,535km) · GPS 방식 사용 필요");
+    capturedAtElapsed=android.os.SystemClock.elapsedRealtime();
    }catch(Exception ex){result=ex.getMessage()==null?ex.getClass().getSimpleName():ex.getMessage();}
    finally{cancel();} // Close socket after sampling. Keep its cancel status separate.
    final String error=result;
    final int counter=value;
+   final long captureAt=capturedAtElapsed;
    activity.runOnUiThread(()->{
     if(progress!=null&&progress.isShowing())progress.dismiss();
     if(userCancelled||activity.isFinishing()||activity.isDestroyed()||RideService.running||
@@ -150,10 +153,10 @@ final class DtcOdoSetupScreen {
      new AlertDialog.Builder(activity).setTitle("PID 0131 조회 실패")
       .setMessage(error+"\n\n차고 주행거리는 변경하지 않았습니다.")
       .setPositiveButton("닫기",null).show();
-    }else showCalibration(counter);
+    }else showCalibration(counter,captureAt);
    });
   }
-  void showCalibration(int counter){
+  void showCalibration(int counter,long capturedAtElapsed){
    JSONObject bike=activity.bike();
    if(bike==null||!bikeId.equals(bike.optString("id"))||activity.readOnly)return;
    EditText input=new EditText(activity);
@@ -186,6 +189,10 @@ final class DtcOdoSetupScreen {
        activity.readOnly||RideService.running||RideService.autoArmed||
        RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()){
      input.setError("바이크 선택·라이딩·복원 상태를 확인하세요.");return;
+    }
+    if(!DtcOdoCapturePolicy.fresh(capturedAtElapsed,android.os.SystemClock.elapsedRealtime())){
+     input.setError("0131 수신 후 2분이 지났습니다. ECU를 다시 조회하고 계기판을 확인해 주세요.");
+     return;
     }
     if(!DtcOdoBridge.calibrate(activity,bikeId,odo,counter)){
      input.setError("PID 0131 보정 저장 실패");return;
