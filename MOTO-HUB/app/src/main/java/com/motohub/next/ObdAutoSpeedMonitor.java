@@ -18,6 +18,9 @@ final class ObdAutoSpeedMonitor {
   default boolean allowOdometer(){return false;}
   default void odometer(double km){}
   default void odometerStatus(String reason){}
+  default boolean allowDtcDistance(){return false;}
+  default void dtcDistance(int km){}
+  default void dtcDistanceStatus(String reason){}
   default void connected(){}
   default void capabilities(ObdPidCapabilities capability){}
   default void auxiliaryDiagnostics(String summary){}
@@ -85,6 +88,11 @@ final class ObdAutoSpeedMonitor {
   if(ObdSpeedResponsePolicy.unsupported(capabilities.forPid("010D")))throw new UnsupportedSpeed();
   connectedAtNanos=System.nanoTime();listener.connected();
   int unsupported=0,samples=0;
+  int priorDtcCandidate=-1,dtcFailures=0;
+  final boolean dtcCandidateEnabled=listener.allowDtcDistance()&&
+    capabilities.forPid("0131")!=ObdPidCapabilities.Support.NO;
+  if(listener.allowDtcDistance()&&!dtcCandidateEnabled)
+   listener.dtcDistanceStatus("PID 0131 지원 목록에서 미지원 · GPS 추정 사용");
   ObdAuxSensorPolicy auxiliary=new ObdAuxSensorPolicy();
   final boolean odoSupported=capabilities.forPid("01A6")==ObdPidCapabilities.Support.YES;
   if(listener.allowOdometer()&&!odoSupported)
@@ -146,6 +154,28 @@ final class ObdAutoSpeedMonitor {
      }
      listener.auxiliaryDiagnostics(auxiliary.summary(System.nanoTime())+
       "\\n응답시간(최근 8회): "+latency.summary());
+    }
+   }
+   // Periodic, explicitly opted-in PID 0131 fallback. It does not require
+   // ODO PID A6; its value is not an actual vehicle lifetime odometer.
+   // Require two plausible reads across different speed cycles. Unlike a
+   // failed speed PID, failure never stops GPS capture or the bike session.
+   if(!stopped&&samples%20==0&&dtcCandidateEnabled&&dtcFailures<3){
+    try{
+     int counter=DtcDistanceSinceClear.parseKm(query(in,out,DtcDistanceSinceClear.REQUEST,2200));
+     if(counter>=0){
+      dtcFailures=0;
+      if(priorDtcCandidate>=0&&counter>=priorDtcCandidate&&
+         counter-priorDtcCandidate<=4)listener.dtcDistance(counter);
+      else if(priorDtcCandidate>=0&&counter<priorDtcCandidate)
+       listener.dtcDistance(counter); // bridge detects a real reset vs prior accepted sample
+      priorDtcCandidate=counter;
+     }else if(++dtcFailures>=3){
+      listener.dtcDistanceStatus("PID 0131 유효 응답 없음 · GPS 추정 유지");
+     }
+    }catch(InterruptedException e){throw e;}
+    catch(Exception e){
+     if(++dtcFailures>=3)listener.dtcDistanceStatus("PID 0131 조회 실패 · GPS 추정 유지");
     }
    }
    if(!stopped)Thread.sleep(ObdSpeedResponsePolicy.pollDelayMs(speed));
