@@ -293,6 +293,16 @@ public final class RideService extends Service implements LocationListener {
    final ObdAutoSpeedMonitor[] ref=new ObdAutoSpeedMonitor[1];
    ObdAutoSpeedMonitor reader=new ObdAutoSpeedMonitor(paired,new ObdAutoSpeedMonitor.Listener(){
     @Override public boolean allowOdometer(){return OdometerAutoSyncInbox.enabled(RideService.this,pendingBikeId);}
+    @Override public boolean allowDtcDistance(){
+     return DtcOdoBridge.enabled(RideService.this,pendingBikeId);
+    }
+    @Override public void dtcDistance(int km){
+     if(autoArmed&&pendingBikeId.equals(activeRideBikeId))
+      DtcOdoBridge.offer(RideService.this,pendingBikeId,km,System.currentTimeMillis());
+    }
+    @Override public void dtcDistanceStatus(String reason){
+     handler.post(()->{if(autoArmed)obdLastError=reason;});
+    }
     @Override public void odometer(double km){
      if(autoArmed&&OdometerAutoSyncInbox.enabled(RideService.this,pendingBikeId))
       OdometerAutoSyncInbox.offer(RideService.this,pendingBikeId,km,km,System.currentTimeMillis());
