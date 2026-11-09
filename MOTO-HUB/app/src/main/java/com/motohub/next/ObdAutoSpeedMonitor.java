@@ -89,6 +89,7 @@ final class ObdAutoSpeedMonitor {
   connectedAtNanos=System.nanoTime();listener.connected();
   int unsupported=0,samples=0;
   int priorDtcCandidate=-1,dtcFailures=0;
+  long dtcRetryAfterNanos=0L;
   final boolean dtcCandidateEnabled=listener.allowDtcDistance()&&
     capabilities.forPid("0131")!=ObdPidCapabilities.Support.NO;
   if(listener.allowDtcDistance()&&!dtcCandidateEnabled)
@@ -160,7 +161,8 @@ final class ObdAutoSpeedMonitor {
    // ODO PID A6; its value is not an actual vehicle lifetime odometer.
    // Require two plausible reads across different speed cycles. Unlike a
    // failed speed PID, failure never stops GPS capture or the bike session.
-   if(!stopped&&samples%20==0&&dtcCandidateEnabled&&dtcFailures<3){
+   if(!stopped&&samples%20==0&&dtcCandidateEnabled&&
+      DtcPollingRetry.due(System.nanoTime(),dtcRetryAfterNanos)){
     try{
      int counter=DtcDistanceSinceClear.parseKm(query(in,out,DtcDistanceSinceClear.REQUEST,2200));
      if(counter>=0){
@@ -170,12 +172,18 @@ final class ObdAutoSpeedMonitor {
       else if(priorDtcCandidate>=0&&counter<priorDtcCandidate)
        listener.dtcDistance(counter); // bridge detects a real reset vs prior accepted sample
       priorDtcCandidate=counter;
-     }else if(++dtcFailures>=3){
-      listener.dtcDistanceStatus("PID 0131 유효 응답 없음 · GPS 추정 유지");
+     }else if(++dtcFailures>=DtcPollingRetry.FAILURE_THRESHOLD){
+      dtcRetryAfterNanos=System.nanoTime()+DtcPollingRetry.COOLDOWN_MS*1_000_000L;
+      dtcFailures=0;priorDtcCandidate=-1;
+      listener.dtcDistanceStatus("PID 0131 수신 실패 · 60초 후 자동 재시도 · GPS 기록 유지");
      }
     }catch(InterruptedException e){throw e;}
     catch(Exception e){
-     if(++dtcFailures>=3)listener.dtcDistanceStatus("PID 0131 조회 실패 · GPS 추정 유지");
+     if(++dtcFailures>=DtcPollingRetry.FAILURE_THRESHOLD){
+      dtcRetryAfterNanos=System.nanoTime()+DtcPollingRetry.COOLDOWN_MS*1_000_000L;
+      dtcFailures=0;priorDtcCandidate=-1;
+      listener.dtcDistanceStatus("PID 0131 타임아웃 · 60초 후 자동 재시도 · GPS 기록 유지");
+     }
     }
    }
    if(!stopped)Thread.sleep(ObdSpeedResponsePolicy.pollDelayMs(speed));
