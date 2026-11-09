@@ -26,7 +26,7 @@ final class ObdReadOnlyProtocol {
   for(String safe:SENSOR_PIDS)if(safe.equals(pid))return pid+"\r";
   for(String safe:CAPABILITY_PIDS)if(safe.equals(pid))return pid+"\r";
   if(ODOMETER_PID.equals(pid))return pid+"\r";
-  if(DtcDistanceSinceClear.PID.equals(pid))return pid+"\r";
+  if("0131".equals(pid))return pid+"\r"; // standard distance since DTC clear
   throw new IllegalArgumentException("읽기 전용으로 허용되지 않은 요청입니다.");
  }
  /** A mixed ECU reply is invalid: never let a corrupted speed arm GPS recording. */
