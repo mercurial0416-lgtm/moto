@@ -29,7 +29,8 @@ final class DtcOdoSetupScreen {
  private static final UUID SPP=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
  private DtcOdoSetupScreen(){}
  static void open(MainActivity a){
-  if(a==null||a.isFinishing()||a.isDestroyed()||a.readOnly||
+  if(a==null)return;
+  if(a.isFinishing()||a.isDestroyed()||a.readOnly||
      RideService.running||RideService.autoArmed||RideService.saving()||
      RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()){
    a.toast("정차 후 OBD 자동 감지·GPS 기록·복원을 종료해 주세요.");return;
@@ -82,6 +83,7 @@ final class DtcOdoSetupScreen {
   final BluetoothDevice device;
   volatile BluetoothSocket socket;
   volatile boolean cancelled=false;
+  volatile boolean userCancelled=false;
   AlertDialog progress;
   Probe(MainActivity activity,String bikeId,BluetoothDevice device){
    this.activity=activity;this.bikeId=bikeId;this.device=device;
@@ -93,7 +95,7 @@ final class DtcOdoSetupScreen {
    progress=new AlertDialog.Builder(activity)
     .setTitle("PID 0131 읽는 중")
     .setMessage("키 ON · 정차 상태. ECU 0131 값을 연속 두 번 확인하고 있습니다.")
-    .setNegativeButton("중지",(d,w)->cancel()).create();
+    .setNegativeButton("중지",(d,w)->{userCancelled=true;cancel();}).create();
    progress.setCancelable(false);progress.show();
    Thread thread=new Thread(this::run,"moto-obd-0131-baseline");
    thread.setDaemon(true);thread.start();
@@ -142,7 +144,7 @@ final class DtcOdoSetupScreen {
    final int counter=value;
    activity.runOnUiThread(()->{
     if(progress!=null&&progress.isShowing())progress.dismiss();
-    if(activity.isFinishing()||activity.isDestroyed()||RideService.running||
+    if(userCancelled||activity.isFinishing()||activity.isDestroyed()||RideService.running||
        RideService.autoArmed)return;
     if(error!=null){
      new AlertDialog.Builder(activity).setTitle("PID 0131 조회 실패")
