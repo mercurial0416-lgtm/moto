@@ -55,7 +55,7 @@ public final class ObdDashboardActivity extends Activity {
     "GPS 신호 대기 · 기존 기록 보존"):
     RideService.autoArmed?"자동 기록 대기 · GPS 기록 시작 전":"라이딩 미작동");
   String bikeId=RideService.activeRideBikeId;
-  odoFallback.setText(HybridOdometerEstimate.label(ObdDashboardActivity.this,bikeId));
+  odoFallback.setText(DtcOdoBridge.label(ObdDashboardActivity.this,bikeId)+"\n"+HybridOdometerEstimate.label(ObdDashboardActivity.this,bikeId));
   odoFallback.setTextColor(0xffffc78d);
   int score=ObdLinkQuality.score(RideService.obdLastSampleElapsed,now,
     RideService.obdAverageLatencyMs,(int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples),
