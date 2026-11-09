@@ -56,6 +56,14 @@ final class DtcOdoBridge {
     .remove(k(bikeId,"last")).remove(k(bikeId,"lastAt"))
     .remove(k(bikeId,"paused")).remove(k(bikeId,"reason")).commit();
  }
+ /** Forget all per-bike OBD-derived state after permanently deleting its garage entry. */
+ static synchronized boolean clearBike(Context c,String bikeId){
+  if(!RideBikeBinding.valid(bikeId))return false;
+  SharedPreferences.Editor e=prefs(c).edit();
+  for(String field:new String[]{"enabled","baseline","anchor","last","lastAt","paused","reason"})
+   e.remove(k(bikeId,field));
+  return e.commit();
+ }
  /** A backend change, restore, or replacement bike invalidates local baselines. */
  static synchronized boolean suspendAfterRestore(Context c){return prefs(c).edit().clear().commit();}
  static synchronized boolean offer(Context c,String bikeId,int current,long nowMs){
