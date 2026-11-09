@@ -88,6 +88,13 @@ final class HybridOdometerEstimate {
    .putString(k(bikeId,"seen"),entries.toString())
    .putLong(k(bikeId,"at"),System.currentTimeMillis()).commit();
  }
+ /** Forget this bike's derived distance ledger and calibration after deletion. */
+ static synchronized boolean clearBike(Context c,String bikeId){
+  if(!RideBikeBinding.valid(bikeId))return false;
+  SharedPreferences.Editor e=prefs(c).edit();
+  for(String field:new String[]{"baseline","gps","seen","at"})e.remove(k(bikeId,field));
+  return e.commit();
+ }
  /** Restoring an old garage can change bike identities or mileage independently
   * of the GPS ledger. Never carry a prior physical ODO anchor across restore. */
  static synchronized boolean suspendAfterRestore(Context c){
