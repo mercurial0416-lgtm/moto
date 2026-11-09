@@ -52,6 +52,15 @@ public class DtcOdoBridgeTest {
   assertFalse(DtcOdoBridge.offer(c,BIKE,5000,System.currentTimeMillis()+1000));
   assertEquals(1111,DtcOdoBridge.snapshot(c,BIKE).estimatedKm,0.001);
  }
+ @Test public void deletingBikePurgesOnlyItsOwnDtcCalibration(){
+  assertTrue(DtcOdoBridge.calibrate(c,BIKE,1200,44));
+  assertTrue(DtcOdoBridge.calibrate(c,OTHER,2000,80));
+  assertTrue(DtcOdoBridge.clearBike(c,BIKE));
+  assertFalse(DtcOdoBridge.enabled(c,BIKE));
+  assertFalse(DtcOdoBridge.snapshot(c,BIKE).valid);
+  assertTrue(DtcOdoBridge.enabled(c,OTHER));
+  assertTrue(DtcOdoBridge.snapshot(c,OTHER).valid);
+ }
  @Test public void backupRestoreClearsAnchors(){
   assertTrue(DtcOdoBridge.calibrate(c,BIKE,1200,44));
   assertTrue(DtcOdoBridge.suspendAfterRestore(c));
