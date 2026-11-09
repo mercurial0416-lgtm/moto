@@ -13,6 +13,10 @@ final class ObdMileageUiState {
   if(gpsEstimate)return Source.GPS_ESTIMATE;
   return Source.UNAVAILABLE;
  }
+ static final long RECENT_COUNTER_MS=20L*60_000L;
+ static boolean recentCounter(long receivedAt,long now){
+  return receivedAt>0&&now>=receivedAt&&now-receivedAt<=RECENT_COUNTER_MS;
+ }
  private static String km(double value){
   return String.format(Locale.KOREA,"%,.1f km",value);
  }
@@ -21,12 +25,13 @@ final class ObdMileageUiState {
   double ecu=OdometerAutoSyncInbox.pending(c,bikeId);
   DtcOdoBridge.Reading dtc=DtcOdoBridge.snapshot(c,bikeId);
   HybridOdometerEstimate.Reading gps=HybridOdometerEstimate.snapshot(c,bikeId);
-  Source selected=choose(OdoAutoSyncPolicy.sane(ecu),dtc.valid,gps.valid);
+  boolean dtcRecent=dtc.valid&&recentCounter(dtc.lastAt,System.currentTimeMillis());
+  Source selected=choose(OdoAutoSyncPolicy.sane(ecu),dtcRecent,gps.valid);
   switch(selected){
    case ECU_VERIFIED:return "ECU 실제 ODO 검증값 "+km(ecu)+" · 차고 확인 대기";
    case PID_0131_ESTIMATE:return "PID 0131 추정 "+km(dtc.estimatedKm);
-   case GPS_ESTIMATE:return "GPS 주행거리 추정 "+km(gps.estimatedKm);
-   default:return "자동 연동값 없음 · 계기판 기준값 등록 필요";
+   case GPS_ESTIMATE:return "GPS 주행거리 추정 "+km(gps.estimatedKm)+(dtc.valid&&!dtcRecent?" · 0131 장시간 미수신":"");
+   default:return dtc.valid?"PID 0131 마지막 확인 "+km(dtc.estimatedKm)+" · 20분 이상 미수신 (현재값 미확인)":"자동 연동값 없음 · 계기판 기준값 등록 필요";
   }
  }
  static String details(Context c,String bikeId,double garageKm){
