@@ -167,10 +167,11 @@ final class ObdAutoSpeedMonitor {
      int counter=DtcDistanceSinceClear.parseKm(query(in,out,DtcDistanceSinceClear.REQUEST,2200));
      if(counter>=0){
       dtcFailures=0;
-      if(priorDtcCandidate>=0&&counter>=priorDtcCandidate&&
-         counter-priorDtcCandidate<=4)listener.dtcDistance(counter);
-      else if(priorDtcCandidate>=0&&counter<priorDtcCandidate)
-       listener.dtcDistance(counter); // bridge detects a real reset vs prior accepted sample
+      // Always require two separate, mutually consistent decoded replies.
+      // A single corrupted low value must never pause this bike's ODO
+      // calibration; the next low reply confirms a genuine decrease.
+      int verified=DtcCounterConfirmPolicy.confirmed(priorDtcCandidate,counter);
+      if(verified>=0)listener.dtcDistance(verified);
       priorDtcCandidate=counter;
      }else if(++dtcFailures>=DtcPollingRetry.FAILURE_THRESHOLD){
       dtcRetryAfterNanos=System.nanoTime()+DtcPollingRetry.COOLDOWN_MS*1_000_000L;
