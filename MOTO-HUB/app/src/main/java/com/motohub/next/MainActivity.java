@@ -2064,6 +2064,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          // queued ODO readings must never overwrite the restored garage.
          boolean odometerCleared=false,gpsLedgerCleared=false;
          try{odometerCleared=OdometerAutoSyncInbox.suspendAfterRestore(this);}catch(Exception ignored){}
+         try{odometerCleared=HybridOdometerEstimate.suspendAfterRestore(this)&&odometerCleared;}catch(Exception ignored){odometerCleared=false;}
          try{gpsLedgerCleared=RideMileageEstimate.resetAfterFullRestore(this);}catch(Exception ignored){}
          final boolean odoResetOk=odometerCleared,mileageResetOk=gpsLedgerCleared;
          jsonImportRevision++;
@@ -2780,6 +2781,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       // The imported garage may be older than a queued ECU value: disable
       // any prior ODO sync before allowing a new foreground Activity to apply it.
       try{odoReset=OdometerAutoSyncInbox.suspendAfterRestore(this);}
+      catch(Exception ignored){odoReset=false;}
+      try{odoReset=HybridOdometerEstimate.suspendAfterRestore(this)&&odoReset;}
       catch(Exception ignored){odoReset=false;}
       try{checkpoint=LocalSafetyBackup.checkpoint(this,validated);}catch(Exception ignored){}
       try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){}
