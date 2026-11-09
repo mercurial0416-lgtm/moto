@@ -88,6 +88,11 @@ final class HybridOdometerEstimate {
    .putString(k(bikeId,"seen"),entries.toString())
    .putLong(k(bikeId,"at"),System.currentTimeMillis()).commit();
  }
+ /** Restoring an old garage can change bike identities or mileage independently
+  * of the GPS ledger. Never carry a prior physical ODO anchor across restore. */
+ static synchronized boolean suspendAfterRestore(Context c){
+  return prefs(c).edit().clear().commit();
+ }
  /** All snapshots are serialized per process to avoid losing a completed ride
   * when UI and telemetry update concurrently. Only additive rides are allowed.
   * v588 baselines that lack a track snapshot require a fresh calibration. */
