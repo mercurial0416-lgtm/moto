@@ -2065,6 +2065,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          boolean odometerCleared=false,gpsLedgerCleared=false;
          try{odometerCleared=OdometerAutoSyncInbox.suspendAfterRestore(this);}catch(Exception ignored){}
          try{odometerCleared=HybridOdometerEstimate.suspendAfterRestore(this)&&odometerCleared;}catch(Exception ignored){odometerCleared=false;}
+         try{odometerCleared=DtcOdoBridge.suspendAfterRestore(this)&&odometerCleared;}catch(Exception ignored){odometerCleared=false;}
          try{gpsLedgerCleared=RideMileageEstimate.resetAfterFullRestore(this);}catch(Exception ignored){}
          final boolean odoResetOk=odometerCleared,mileageResetOk=gpsLedgerCleared;
          jsonImportRevision++;
@@ -2784,6 +2785,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       catch(Exception ignored){odoReset=false;}
       try{odoReset=HybridOdometerEstimate.suspendAfterRestore(this)&&odoReset;}
       catch(Exception ignored){odoReset=false;}
+      try{odoReset=DtcOdoBridge.suspendAfterRestore(this)&&odoReset;}
+      catch(Exception ignored){odoReset=false;}
       try{checkpoint=LocalSafetyBackup.checkpoint(this,validated);}catch(Exception ignored){}
       try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){}
      }catch(Exception failure){
@@ -2813,9 +2816,14 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){
   super.onRequestPermissionsResult(request,permissions,results);
   if(request==DeveloperObdScreen.CONNECT_PERMISSION_REQUEST||request==DeveloperObdScreen.AUTO_CONNECT_PERMISSION_REQUEST||request==DeveloperObdScreen.ODO_CONNECT_PERMISSION_REQUEST||request==DtcOdoSetupScreen.PERMISSION){
+   boolean btGranted=Build.VERSION.SDK_INT<31||
+     checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)==android.content.pm.PackageManager.PERMISSION_GRANTED;
+   if(!btGranted){toast("Bluetooth 연결 권한이 없어 OBD2 장치를 조회하지 않았어요.");return;}
+   if(request==DtcOdoSetupScreen.PERMISSION){DtcOdoSetupScreen.open(this);return;}
    if(developerObd!=null){
-    if(Build.VERSION.SDK_INT<31||checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)==android.content.pm.PackageManager.PERMISSION_GRANTED) {if(request==DeveloperObdScreen.AUTO_CONNECT_PERMISSION_REQUEST)developerObd.loadPairedAuto();else if(request==DeveloperObdScreen.ODO_CONNECT_PERMISSION_REQUEST)developerObd.loadPairedOdo();else if(request==DtcOdoSetupScreen.PERMISSION)DtcOdoSetupScreen.open(this);else developerObd.loadPaired();}
-    else toast("Bluetooth 연결 권한이 없어 OBD2 장치를 조회하지 않았어요.");
+    if(request==DeveloperObdScreen.AUTO_CONNECT_PERMISSION_REQUEST)developerObd.loadPairedAuto();
+    else if(request==DeveloperObdScreen.ODO_CONNECT_PERMISSION_REQUEST)developerObd.loadPairedOdo();
+    else developerObd.loadPaired();
    }
    return;
   }
