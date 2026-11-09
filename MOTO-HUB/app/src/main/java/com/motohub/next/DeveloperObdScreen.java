@@ -90,12 +90,108 @@ final class DeveloperObdScreen {
    .setMessage(ObdLocalDiagnosticLog.summary(activity))
    .setPositiveButton("닫기",null).show());
   activity.action(p,"연결 끊기",false,this::stop);
-  activity.show();owner=activity.dialog;
+  activity.show();owner=activity.dialog;activity.developerObd=this;
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
  }
+ /** Everyday screen: four focused groups, legacy diagnostics remain reachable. */
  void show(){
   if(!activity.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))return;
-  LinearLayout p=activity.page("개발자 · OBD2 실험실");
+  LinearLayout p=activity.page("MOTO HUB · OBD");
+  JSONObject bike=activity.bike();
+  String bikeId=bike==null?"":bike.optString("id");
+  String bikeName=bike==null?"바이크 미등록":bike.optString("name","내 바이크");
+  activity.label(p,bikeName+" · "+(RideService.autoArmed?"OBD 자동 감지 사용 중":"OBD 연결 대기"),14,activity.fg,true);
+  status=activity.text("Bluetooth · ECU 상태 확인 중",13,activity.muted,false);p.addView(status);
+  activity.label(p,"정차 상태에서 설정하세요. ECU 수정·고장코드 삭제는 하지 않습니다.",12,activity.muted,false);
+  activity.gap(p,12);
+
+  activity.label(p,"01   연결",18,activity.fg,true);
+  activity.action(p,"OBD 동글 연결 · 센서 확인",true,this::loadPaired);
+  activity.action(p,"Bluetooth 페어링 설정",false,this::openBluetoothSettings);
+  activity.gap(p,14);
+
+  activity.label(p,"02   라이딩 · 실시간 계기판",18,activity.fg,true);
+  activity.action(p,RideService.autoArmed?"자동 감지 작동 중 · 연결 정보 확인":"OBD 자동 라이딩 감지 켜기",
+   !RideService.autoArmed,()->{
+    if(RideService.autoArmed){showConnectionInfo();return;}
+    loadPairedAuto();
+   });
+  activity.action(p,"실시간 RPM · 속도 · 수온 계기판",false,()->{
+   if(!RideService.autoArmed){setStatus("OBD 자동 감지를 켜야 실시간 값이 표시됩니다.");return;}
+   activity.startActivity(new Intent(activity,ObdDashboardActivity.class));
+  });
+  if(RideService.autoArmed)activity.action(p,"OBD 자동 감지 끄기 (GPS 기록은 보존)",false,()->{
+   activity.startService(new Intent(activity,RideService.class).setAction(RideService.AUTO_DISARM));
+   setStatus("OBD 자동 감지 종료 요청 · 기존 GPS 주행은 보존");
+  });
+  activity.gap(p,14);
+
+  activity.label(p,"03   주행거리 연동",18,activity.fg,true);
+  activity.label(p,"우선순위: ECU 실제 ODO → PID 0131 증가분 → GPS 추정. 두 추정치는 계기판 실측값과 구분합니다.",12,activity.muted,false);
+  TextView odoCurrent=activity.text("현재 주행거리 확인 중",17,activity.fg,true);
+  p.addView(odoCurrent);
+  TextView odoDetails=activity.text("상세 기록 확인 중",12,activity.muted,false);
+  p.addView(odoDetails);
+  activity.action(p,"주행거리 연동 방식 설정 · 확인",true,this::showOdoOptions);
+  activity.action(p,"실제 계기판 ODO 직접 입력",false,this::manualOdo);
+  activity.gap(p,14);
+
+  activity.label(p,"04   상세 진단",18,activity.fg,true);
+  activity.action(p,"전체 PID 탐색 · 오류 로그 · 고급 설정",false,this::showAdvanced);
+  activity.label(p,"원시 응답 분석은 고급 진단에서만. 주행 중 화면 조작은 하지 마세요.",12,activity.muted,false);
+  activity.show();owner=activity.dialog;activity.developerObd=this;
+  owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
+  final Runnable update=new Runnable(){@Override public void run(){
+   if(owner==null||!owner.isShowing()||odoCurrent.getParent()==null)return;
+   JSONObject current=activity.bike();
+   String selectedId=current==null?"":current.optString("id");
+   status.setText(ObdConnectionState.label(RideService.autoArmed,RideService.obdLastSampleElapsed,
+      android.os.SystemClock.elapsedRealtime(),RideService.obdConnectionAttempts,
+      RideService.obdConnectionSuccesses,RideService.obdReconnects,
+      RideService.obdLastError,RideService.obdPidSupport));
+   odoCurrent.setText(ObdMileageUiState.primary(activity,selectedId));
+   odoDetails.setText(ObdMileageUiState.details(activity,selectedId,
+     current==null?Double.NaN:current.optDouble("odo",Double.NaN)));
+   odoCurrent.postDelayed(this,4000);
+  }};odoCurrent.post(update);
+ }
+ private void showConnectionInfo(){
+  new AlertDialog.Builder(activity).setTitle("OBD 자동 연결 상태")
+   .setMessage(RideService.obdLink+"\n"+RideService.obdPidSupport+
+    "\n최근 오류: "+RideService.obdLastError)
+   .setPositiveButton("닫기",null).show();
+ }
+ private void showOdoOptions(){
+  JSONObject bike=activity.bike();
+  if(bike==null||!RideBikeBinding.valid(bike.optString("id"))||
+     GarageBikeStatus.sold(bike.optString("soldDate"))){
+   setStatus("차고에서 현재 운행 중인 바이크를 먼저 선택해 주세요.");return;
+  }
+  final String id=bike.optString("id");
+  final String[] options={
+   "1 · ECU 실제 ODO 조회 (01A6 / F4A6)",
+   "2 · PID 0131 보조 ODO 자동 연동",
+   "3 · GPS 추정 ODO 기준값 보정",
+   "실제 계기판 숫자 수동 입력",
+   "ECU ODO 동기화 동의·고급 설정"
+  };
+  new AlertDialog.Builder(activity).setTitle("주행거리 연동 방식")
+   .setMessage("실제 ECU 누적거리가 있으면 우선합니다. 지원하지 않으면 0131 변화량, 이어서 GPS 기록으로 추정합니다. 실제 ODO와 추정 ODO는 자동으로 혼합하거나 원본 차고 기록에 덮어쓰지 않습니다.")
+   .setItems(options,(d,i)->{
+    switch(i){
+     case 0:loadPairedOdo();break;
+     case 1:DtcOdoSetupScreen.open(activity);break;
+     case 2:HybridOdometerUi.show(activity);break;
+     case 3:manualOdo();break;
+     case 4:showAdvanced();break;
+    }
+   }).setNegativeButton("취소",null).show();
+ }
+ void showAdvanced(){
+  if(!activity.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))return;
+  LinearLayout p=activity.page("OBD · 고급 진단");
+  activity.action(p,"기본 OBD 화면으로 돌아가기",false,this::show);
+  activity.label(p,"고급 센서·통신 설정 · 읽기 전용",13,activity.muted,false);
   activity.label(p,"실험 기능 · KTM 390 DUKE 호환성 미검증",16,activity.accent,true);
   activity.label(p,"페어링된 ELM327 호환 Bluetooth Classic(SPP) 어댑터로 표준 OBD-II 센서만 조회합니다. 바이크 ECU가 지원하는 항목만 표시됩니다. 순정 계기판 Bluetooth 연결과는 별개입니다.",14,activity.muted,false);
   activity.label(p,"ECU 설정 변경 · 고장코드 삭제 · 출력 제어 없음. 주행 중 조작하지 마세요. 장치 연결은 사용자 선택 시에만 시작되고 원격 전송은 없습니다. 자동 라이딩 도중 일시적 연결 실패 시 최대 8회 재접속하며 앱 재시작 후에는 재연결하지 않습니다.",14,activity.muted,false);
@@ -265,7 +361,7 @@ final class DeveloperObdScreen {
   activity.action(p,"PID 0131 현재값·중지·재보정",false,()->DtcOdoSetupScreen.showStatus(activity,configuredId));
   activity.label(p,"01A6·읽기 전용 UDS F4A6은 지원 ECU에서만 수신됩니다. 듀크390 미검증. 두 번 동일하게 수신하고 계기판을 대조한 후에만 수동 반영합니다. GPS·정비 기록 보존.",13,activity.muted,false);
   activity.action(p,"연결 끊기",false,this::stop);
-  activity.show();owner=activity.dialog;
+  activity.show();owner=activity.dialog;activity.developerObd=this;
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
   final Runnable update=new Runnable(){@Override public void run(){
    if(owner==null||!owner.isShowing()||telemetry.getParent()==null)return;
