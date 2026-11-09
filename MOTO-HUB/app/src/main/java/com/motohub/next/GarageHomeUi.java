@@ -379,6 +379,11 @@ final class GarageHomeUi {
   double gps=RideMileageEstimate.total(a,bike.optString("id"));
   a.label(a.content,"저장된 GPS 추정 "+(Double.isFinite(gps)?String.format(Locale.KOREA,"%,.1f km",gps):"확인 불가")+" · 계기판과 별도",12,soft,false);
   if(OdometerAutoSyncInbox.enabled(a,bike.optString("id")))a.label(a.content,OdometerAutoSyncInbox.display(a,bike.optString("id")),12,soft,false);
+  if(DtcOdoBridge.enabled(a,bike.optString("id"))){
+   a.label(a.content,DtcOdoBridge.label(a,bike.optString("id"))+" · 계기판 직접 확인 필요",12,soft,false);
+   a.action(a.content,"PID 0131 추정 주행거리 · 상태/보정",false,
+     ()->DtcOdoSetupScreen.showStatus(a,bike.optString("id")));
+  }
  }
  /** Single prominent trip action. All consent and GPS state controls remain in RideUi. */
  void rideAction(){
