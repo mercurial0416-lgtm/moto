@@ -13,6 +13,13 @@ public class ObdMileageUiStateTest {
   assertEquals(ObdMileageUiState.Source.PID_0131_ESTIMATE,
     ObdMileageUiState.choose(false,true,true));
  }
+ @Test public void counterAgeDoesNotMasqueradeAsLiveData(){
+  long now=1_300_000L;
+  assertFalse(ObdMileageUiState.recentCounter(0L,now));
+  assertTrue(ObdMileageUiState.recentCounter(100_000L,1_300_000L));
+  assertFalse(ObdMileageUiState.recentCounter(99_999L,1_300_000L));
+  assertFalse(ObdMileageUiState.recentCounter(1_300_001L,now));
+ }
  @Test public void gpsIsLastResortAndAllMissingIsClear(){
   assertEquals(ObdMileageUiState.Source.GPS_ESTIMATE,
     ObdMileageUiState.choose(false,false,true));
