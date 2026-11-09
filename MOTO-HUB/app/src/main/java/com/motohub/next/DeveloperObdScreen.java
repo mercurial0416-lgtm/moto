@@ -108,6 +108,17 @@ final class DeveloperObdScreen {
   activity.label(p,"01   연결",18,activity.fg,true);
   activity.action(p,"OBD 동글 연결 · 센서 확인",true,this::loadPaired);
   activity.action(p,"Bluetooth 페어링 설정",false,this::openBluetoothSettings);
+  LinearLayout sensorPanel=new LinearLayout(activity);
+  sensorPanel.setOrientation(LinearLayout.VERTICAL);
+  sensorPanel.setVisibility(android.view.View.GONE);
+  p.addView(sensorPanel);
+  for(int i=0;i<fields.length;i++){
+   fields[i]=activity.text(ObdReadOnlyProtocol.SENSOR_NAMES[i]+": —",13,activity.muted,false);
+   fields[i].setMinHeight(activity.dp(36));sensorPanel.addView(fields[i]);
+  }
+  activity.action(p,"센서 수신값 보기 · 접기",false,()->sensorPanel.setVisibility(
+    sensorPanel.getVisibility()==android.view.View.VISIBLE?
+    android.view.View.GONE:android.view.View.VISIBLE));
   activity.gap(p,14);
 
   activity.label(p,"02   라이딩 · 실시간 계기판",18,activity.fg,true);
@@ -140,15 +151,15 @@ final class DeveloperObdScreen {
   activity.action(p,"전체 PID 탐색 · 오류 로그 · 고급 설정",false,this::showAdvanced);
   activity.label(p,"원시 응답 분석은 고급 진단에서만. 주행 중 화면 조작은 하지 마세요.",12,activity.muted,false);
   activity.show();owner=activity.dialog;activity.developerObd=this;
+  final Dialog screenOwner=owner;
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
   final Runnable update=new Runnable(){@Override public void run(){
-   if(owner==null||!owner.isShowing()||odoCurrent.getParent()==null)return;
+   if(owner!=screenOwner||!screenOwner.isShowing()||odoCurrent.getParent()==null)return;
    JSONObject current=activity.bike();
    String selectedId=current==null?"":current.optString("id");
-   status.setText(ObdConnectionState.label(RideService.autoArmed,RideService.obdLastSampleElapsed,
-      android.os.SystemClock.elapsedRealtime(),RideService.obdConnectionAttempts,
-      RideService.obdConnectionSuccesses,RideService.obdReconnects,
-      RideService.obdLastError,RideService.obdPidSupport));
+   if(worker==null||!worker.isAlive())status.setText(
+     RideService.autoArmed?"OBD 자동 감지: "+RideService.obdLink:
+     "OBD 자동 감지 꺼짐 · 동글 연결 테스트로 센서 확인 가능");
    odoCurrent.setText(ObdMileageUiState.primary(activity,selectedId));
    odoDetails.setText(ObdMileageUiState.details(activity,selectedId,
      current==null?Double.NaN:current.optDouble("odo",Double.NaN)));
@@ -362,9 +373,10 @@ final class DeveloperObdScreen {
   activity.label(p,"01A6·읽기 전용 UDS F4A6은 지원 ECU에서만 수신됩니다. 듀크390 미검증. 두 번 동일하게 수신하고 계기판을 대조한 후에만 수동 반영합니다. GPS·정비 기록 보존.",13,activity.muted,false);
   activity.action(p,"연결 끊기",false,this::stop);
   activity.show();owner=activity.dialog;activity.developerObd=this;
+  final Dialog screenOwner=owner;
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
   final Runnable update=new Runnable(){@Override public void run(){
-   if(owner==null||!owner.isShowing()||telemetry.getParent()==null)return;
+   if(owner!=screenOwner||!screenOwner.isShowing()||telemetry.getParent()==null)return;
    int qualityScore=ObdLinkQuality.score(RideService.obdLastSampleElapsed,
      android.os.SystemClock.elapsedRealtime(),RideService.obdAverageLatencyMs,
      (int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples),
