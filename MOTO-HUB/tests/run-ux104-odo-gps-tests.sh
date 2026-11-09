@@ -15,7 +15,10 @@ main=(p/"MainActivity.java").read_text()
 inbox=(p/"RideCompletionInbox.java").read_text()
 garage=(p/"GarageHomeUi.java").read_text()
 developer=(p/"DeveloperObdScreen.java").read_text()
-assert 'capabilities.forPid("01A6")==ObdPidCapabilities.Support.YES' in monitor
+assert 'odoSupport=capabilities.forPid("01A6")' in monitor
+assert 'ObdOdoPollPolicy.shouldProbe' in monitor
+policy=(p/"ObdOdoPollPolicy.java").read_text()
+assert 'speedKmh==0&&speedPolls>=8' in policy and '!directProbeAttempted' in policy
 assert 'listener.allowOdometer()' in monitor
 assert 'OdoAutoSyncPolicy.consistent(a,b)' in monitor
 assert 'listener.odometer(verified)' in monitor
