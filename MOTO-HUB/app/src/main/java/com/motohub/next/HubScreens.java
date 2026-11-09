@@ -463,7 +463,9 @@ final class HubScreens {
   }
   sc.addView(group);a.content.addView(sc);a.gap(a.content,12);
  }
- void manageBike(){JSONObject b=a.bike();if(b==null){a.edit("vehicles",null);return;}LinearLayout p=a.page("내 바이크 관리");a.label(p,b.optString("name"),25,a.fg,true);a.label(p,b.optInt("year")+"년식 · "+a.num(b.optDouble("odo"))+" km",17,a.muted,false);a.label(p,"구매가 "+a.won(b.optDouble("purchase")),17,a.fg,false);
+ void manageBike(){JSONObject b=a.bike();if(b==null){a.edit("vehicles",null);return;}LinearLayout p=a.page("내 바이크 관리");a.label(p,b.optString("name"),25,a.fg,true);a.label(p,b.optInt("year")+"년식 · "+a.num(b.optDouble("odo"))+" km",17,a.muted,false);
+  a.label(p,DtcOdoBridge.label(a,b.optString("id")),13,a.muted,false);
+  a.action(p,"PID 0131 주행거리 자동 추정 · 연결/보정",false,()->DtcOdoSetupScreen.open(a));a.label(p,"구매가 "+a.won(b.optDouble("purchase")),17,a.fg,false);
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
   a.action(p,"바이크 정보 수정",true,()->a.edit("vehicles",b));
