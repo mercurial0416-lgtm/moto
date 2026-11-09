@@ -29,17 +29,17 @@ jobs:
       - name: Build separate package with preinstalled Gradle
         working-directory: MOTO-HUB
         run: |
-          gradle :app:assembleObdPreview :app:testObdPreviewUnitTest -PmotoReleaseCode=592 --no-daemon --stacktrace
+          gradle :app:assembleObdPreview :app:testObdPreviewUnitTest -PmotoReleaseCode=592 -PmotoObdSideBySide=true --no-daemon --stacktrace
       - name: Check signature and version
         working-directory: MOTO-HUB
         run: |
           APK="app/build/outputs/apk/obdPreview/app-obdPreview.apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='com.motohub.next.obdpreview' versionCode='592'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='com.motohub.next.obdpreview592' versionCode='592'"
           sha256sum "$APK" > "app/build/outputs/apk/obdPreview/SHA256.txt"
       - uses: actions/upload-artifact@v4
         with:
-          name: MOTO-HUB-OBD-PREVIEW-592-runner
+          name: MOTO-HUB-OBD-PREVIEW-592-SIDEBYSIDE
           path: |
             MOTO-HUB/app/build/outputs/apk/obdPreview/app-obdPreview.apk
             MOTO-HUB/app/build/outputs/apk/obdPreview/SHA256.txt
