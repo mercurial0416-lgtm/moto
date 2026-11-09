@@ -90,14 +90,15 @@ final class ObdAutoSpeedMonitor {
   int unsupported=0,samples=0;
   int priorDtcCandidate=-1,dtcFailures=0;
   long dtcRetryAfterNanos=0L;
+  boolean directOdoProbeAttempted=false;
   final boolean dtcCandidateEnabled=listener.allowDtcDistance()&&
     capabilities.forPid("0131")!=ObdPidCapabilities.Support.NO;
   if(listener.allowDtcDistance()&&!dtcCandidateEnabled)
    listener.dtcDistanceStatus("PID 0131 지원 목록에서 미지원 · GPS 추정 사용");
   ObdAuxSensorPolicy auxiliary=new ObdAuxSensorPolicy();
-  final boolean odoSupported=capabilities.forPid("01A6")==ObdPidCapabilities.Support.YES;
-  if(listener.allowOdometer()&&!odoSupported)
-   listener.odometerStatus("ECU ODO 01A6 미지원 또는 확인 불가 · 계기판 km 보존");
+  final ObdPidCapabilities.Support odoSupport=capabilities.forPid("01A6");
+  if(listener.allowOdometer()&&odoSupport!=ObdPidCapabilities.Support.YES)
+   listener.odometerStatus("ECU ODO 지원 목록 미확인 · 정차 상태에서 1회 직접 확인 예정");
   ObdLatencyStats latency=new ObdLatencyStats();
   while(!stopped){
    long started=System.nanoTime();
@@ -121,7 +122,9 @@ final class ObdAutoSpeedMonitor {
    else {unsupported=0;listener.speed(speed);}
    // Optional and explicitly opted-in ODO: two independent read-only samples.
    // Failure must never disrupt safety-critical speed-triggered GPS tracking.
-   if(!stopped&&samples>0&&samples%60==0&&odoSupported&&listener.allowOdometer()){
+   if(!stopped&&ObdOdoPollPolicy.shouldProbe(listener.allowOdometer(),
+      odoSupport,speed,samples,directOdoProbeAttempted)){
+    if(odoSupport!=ObdPidCapabilities.Support.YES)directOdoProbeAttempted=true;
     try{
      double a=ObdOdometer.parseKm(query(in,out,ObdReadOnlyProtocol.query("01A6"),2500));
      double b=ObdOdometer.parseKm(query(in,out,ObdReadOnlyProtocol.query("01A6"),2500));
