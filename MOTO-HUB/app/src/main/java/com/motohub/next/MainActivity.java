@@ -19,6 +19,7 @@ import java.util.*;
 
 /** Native recovery of the prior P0 implementation. No WebView or network SDK. */
 public class MainActivity extends Activity {
+ static volatile boolean obdVisible=false;
  boolean settingsDetailPage=false,ledgerSchedulePage=false;
  JSONObject db;AtomicFile disk;LinearLayout root,content,formFooter;Dialog dialog;LinearLayout formBody;
  String tab="홈",selected="",query="",filter="전체",sort="최신순";
@@ -94,6 +95,7 @@ public class MainActivity extends Activity {
   applyWidgetForm(getIntent());
   boolean widgetActionTaken=applyWidgetQuickActions(getIntent());
   boolean notificationActionTaken=confirmStopFromNotification(getIntent());
+  if(state==null)applyCardoStartTap(getIntent());
   DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
   if(state==null)receiveSharedListing(getIntent());
@@ -261,7 +263,7 @@ public class MainActivity extends Activity {
   super.onWindowFocusChanged(focused);
   if(focused&&root!=null)root.postDelayed(this::showPendingRideSummary,200);
  }
- @Override protected void onResume(){super.onResume();
+ @Override protected void onResume(){super.onResume();obdVisible=true;
   refreshJsonImportAfterRecreation();
   odoSyncHandler.removeCallbacks(odoSyncTick);
   odoSyncHandler.postDelayed(odoSyncTick,1200L);
@@ -309,7 +311,13 @@ public class MainActivity extends Activity {
    });
   },"moto-async-state-reload").start();
  }
- @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);applyWidgetQuickActions(intent);confirmStopFromNotification(intent);receiveSharedListing(intent);}
+ @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(applyWidgetTab(intent))render();applyWidgetForm(intent);applyWidgetQuickActions(intent);confirmStopFromNotification(intent);applyCardoStartTap(intent);receiveSharedListing(intent);}
+ void applyCardoStartTap(Intent i){
+  if(i==null||!CardoRideStarter.ACTION_TAP.equals(i.getAction()))return;
+  i.setAction(null); // consume once
+  if(readOnly||RestoreRideGate.isRestoring()){toast("복구/데이터 보호 중 · 카르도 시작 보류");return;}
+  CardoRideStarter.startFromTap(this);
+ }
  boolean applyWidgetTab(Intent intent){
   if(intent==null)return false;
   String requested=intent.getStringExtra(MotoWidgetProvider.EXTRA_TAB);
@@ -1959,7 +1967,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   if(Store.find(db,key,id)==null)throw new java.io.IOException("이미 삭제된 기록이에요.");
    if(key.equals("vehicles"))BackupGpsProof.requireFullCurrent(this,db.toString(2));
   if(key.equals("vehicles"))for(String collection:new String[]{"services","expenses"})for(JSONObject oldEntry:items(collection))if(id.equals(oldEntry.optString("vehicleId")))childReceipts.add(oldEntry.optString("id"));
-  Store.remove(next,key,id);if(key.equals("vehicles")){for(String k:new String[]{"services","expenses"}){JSONArray a=next.getJSONArray(k);for(int i=a.length()-1;i>=0;i--)if(a.getJSONObject(i).optString("vehicleId").equals(id))a.remove(i);}if(next.getJSONObject("settings").optString("primary").equals(id))next.getJSONObject("settings").remove("primary");selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();}write(next);if(key.equals("vehicles")){BikeObdPreferences.clearBike(this,id);OdometerAutoSyncInbox.clearBike(this,id);DtcOdoBridge.clearBike(this,id);HybridOdometerEstimate.clearBike(this,id);}if(key.equals("vehicles"))for(String childId:childReceipts)clearReceiptFiles(childId);if(key.equals("services")||key.equals("expenses")){clearReceiptFiles(id);}render();});}
+  Store.remove(next,key,id);if(key.equals("vehicles")){for(String k:new String[]{"services","expenses"}){JSONArray a=next.getJSONArray(k);for(int i=a.length()-1;i>=0;i--)if(a.getJSONObject(i).optString("vehicleId").equals(id))a.remove(i);}if(next.getJSONObject("settings").optString("primary").equals(id))next.getJSONObject("settings").remove("primary");selected="";getSharedPreferences("garage_ui",MODE_PRIVATE).edit().remove("selected_bike").apply();}write(next);if(key.equals("vehicles")){CardoAutoRidePrefs.clearBike(this,id);BikeObdPreferences.clearBike(this,id);OdometerAutoSyncInbox.clearBike(this,id);DtcOdoBridge.clearBike(this,id);HybridOdometerEstimate.clearBike(this,id);}if(key.equals("vehicles"))for(String childId:childReceipts)clearReceiptFiles(childId);if(key.equals("services")||key.equals("expenses")){clearReceiptFiles(id);}render();});}
 
  boolean restoreIsBlocked(){return RestoreRideGate.blocked(RideService.running,RideService.autoArmed);}
  void explainRestoreBlocked(){error(RestoreRideGate.MESSAGE);}
@@ -2575,7 +2583,13 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
     toast("입력칸에만 적용했어요. 확인 후 저장해 주세요.");
    }).show();
  }
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==95){TripJournalUi target=pendingTripJournal;pendingTripJournal=null;if(target!=null&&result==RESULT_OK)target.receive(data);return;}if(request==94){QuickFuelReceipt target=quickFuelReceipt;if(target!=null&&result==RESULT_OK&&data!=null&&data.getData()!=null)target.receive(data.getData());return;}if(request==93){RidePhotoUi.receive(this,result==RESULT_OK&&data!=null?data.getData():null);return;}if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){BackupPickerTransfer.cancel(request);if(request==69)pendingOwnershipReportBike="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==69){
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);
+  if(request==CardoCompanionPairing.REQUEST){
+   if(result==RESULT_OK){CardoCompanionPairing.afterSystemApproval(this);toast("카르도 동반 기기 승인됨 · Bluetooth 연결 감지 대기");}
+   else toast("동반 기기 승인 취소 · Bluetooth 이벤트/알림 방식 유지");
+   return;
+  }
+  if(request==95){TripJournalUi target=pendingTripJournal;pendingTripJournal=null;if(target!=null&&result==RESULT_OK)target.receive(data);return;}if(request==94){QuickFuelReceipt target=quickFuelReceipt;if(target!=null&&result==RESULT_OK&&data!=null&&data.getData()!=null)target.receive(data.getData());return;}if(request==93){RidePhotoUi.receive(this,result==RESULT_OK&&data!=null?data.getData():null);return;}if(request==90){toast(result==RESULT_OK?"설치 결과를 확인했습니다.":"설치 취소 또는 실패 · 기존 기록과 검증된 다운로드는 유지됩니다. 더보기 → 앱 업데이트에서 다시 설치할 수 있어요.");return;}if(request==55||request==56||request==58){finishReceiptCapture(request,result);return;}if(result!=RESULT_OK||data==null||data.getData()==null){BackupPickerTransfer.cancel(request);if(request==69)pendingOwnershipReportBike="";if(request==52)garagePhotoTarget="";if(request==53){receiptPhotoTarget="";receiptPhotoKey="";receiptPhotoSlot=1;}if(request==54){ocrFields=null;ocrKind="";}return;}Uri uri=data.getData();if(request==69){
    final String bikeId=pendingOwnershipReportBike;pendingOwnershipReportBike="";
    if(!RideBikeBinding.valid(bikeId)){error("PDF 내보내기 바이크 정보를 찾지 못했습니다.");return;}
    final String snapshot=db.toString();
@@ -2884,8 +2898,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
    toast("OBD 자동 연결 대기 시작 실패 · OBD 메뉴에서 다시 시작해 주세요.");
   }
  }
- @Override protected void onDestroy(){odoSyncHandler.removeCallbacks(odoSyncTick);if(isFinishing())BackupPickerTransfer.cancelAll();if(developerObd!=null){developerObd.stop();developerObd=null;}super.onDestroy();}
- @Override protected void onPause(){odoSyncHandler.removeCallbacks(odoSyncTick);flushQuickFuelDraft();persistDraft();super.onPause();}
+ @Override protected void onDestroy(){obdVisible=false;odoSyncHandler.removeCallbacks(odoSyncTick);if(isFinishing())BackupPickerTransfer.cancelAll();if(developerObd!=null){developerObd.stop();developerObd=null;}super.onDestroy();}
+ @Override protected void onPause(){obdVisible=false;odoSyncHandler.removeCallbacks(odoSyncTick);flushQuickFuelDraft();persistDraft();super.onPause();}
  void clearDraft(){formDirty=false;getSharedPreferences("draft",MODE_PRIVATE).edit().remove("active").apply();}
  void confirmDiscardDraft(){
   if(!getSharedPreferences("draft",MODE_PRIVATE).contains("active")){render();return;}
