@@ -39,6 +39,10 @@ public final class RideService extends Service implements LocationListener {
    if(instance!=s||!s.cardoSession||!autoArmed||!bikeId.equals(activeRideBikeId))return;
    s.cardoConnected=connected;
    s.handler.removeCallbacks(s.cardoDisconnectGrace);
+   if(connected&&s.cardoGpsFallbackRecording){
+    s.handler.removeCallbacks(s.cardoGpsStopWatch);
+    s.handler.postDelayed(s.cardoGpsStopWatch,30_000L);
+   }
    if(!connected){
     s.handler.postDelayed(s.cardoDisconnectGrace,10_000L);
     if(!running){
@@ -115,6 +119,21 @@ public final class RideService extends Service implements LocationListener {
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="",activeAutoAdapterAddress="";ObdAutoSpeedMonitor obdMonitor;
  boolean cardoSession=false,cardoConnected=false,requestedCardoStart=false;
+ boolean cardoGpsFallbackRecording=false,cardoGpsProbeRegistered=false;
+ final CardoGpsFallbackGate cardoGpsGate=new CardoGpsFallbackGate();
+ Location cardoGpsPrevious=null;
+ /** GPS fallback never fabricates mileage and auto-stops only after a fresh
+  * GPS fix confirms a sustained stationary interval. */
+ final Runnable cardoGpsStopWatch=new Runnable(){public void run(){
+  if(!cardoGpsFallbackRecording||!running||autoFinishPending)return;
+  long now=SystemClock.elapsedRealtime();
+  long idleLimit=cardoConnected?600_000L:300_000L;
+  if(GpsSignalStatus.fresh(lastFixElapsed,now)&&lastMotionElapsed>0&&
+     now>=lastMotionElapsed&&now-lastMotionElapsed>=idleLimit){
+   status="GPS 안전망 정차 확인 · 파일 저장 검증 중";
+   finishAutoTrack();
+  }else handler.postDelayed(this,30_000L);
+ }};
  final Runnable cardoIdleStop=new Runnable(){public void run(){
   if(cardoSession&&autoArmed&&!running&&!autoFinishPending)
    stopWith("카르도 연결 후 5분 대기 만료 · 배터리 절약",false);
@@ -129,7 +148,9 @@ public final class RideService extends Service implements LocationListener {
    status="카르도 연결 종료 확인 · 정차 후 GPS 저장 중";
    finishAutoTrack();
   }else{
-   status="카르도 연결 끊김 · 주행 중일 수 있어 GPS 기록 유지";
+   status=cardoGpsFallbackRecording?
+    "카르도 해제 · GPS 안전망 이동 추적 중 · 정차 확인 후 종료":
+    "카르도 연결 끊김 · 주행 중일 수 있어 GPS 기록 유지";
    notifySafely(status);
   }
  }};
@@ -350,6 +371,8 @@ public final class RideService extends Service implements LocationListener {
    activeAutoAdapterAddress=address.toUpperCase(java.util.Locale.ROOT);
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
    cardoSession=cardoApproved;cardoConnected=cardoApproved;
+   cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
+   cardoGpsPrevious=null;cardoGpsGate.reset();
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    parkingIsolation.reset();gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
@@ -458,7 +481,37 @@ public final class RideService extends Service implements LocationListener {
    ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    reader.start();handler.postDelayed(permissionCheck,5000);
    if(cardoSession){handler.removeCallbacks(cardoIdleStop);handler.postDelayed(cardoIdleStop,300_000L);}
+   if(cardoSession&&BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)){
+    requestGpsUpdatesChecked();
+    cardoGpsProbeRegistered=true;
+    status="카르도 GPS 안전망 대기 · OBD 속도 미수신 시만 출발 감지";
+    notifySafely(status);
+   }
   }catch(Exception e){stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);}
+ }
+ private void startCardoGpsFallbackRide(){
+  if(!cardoSession||!autoArmed||running||autoFinishPending||finishPending||
+     !BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)||
+     ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,SystemClock.elapsedRealtime()))return;
+  if(!RestoreRideGate.beginRideStart()){
+   cardoGpsGate.reset();
+   status="GPS 안전망 출발 감지 · 백업/복원이 끝나면 다시 확인";
+   notifySafely(status);return;
+  }
+  try{
+   if(!autoArmed||running||autoFinishPending)return;
+   openRideTrack();
+   if(!cardoGpsProbeRegistered)requestGpsUpdatesChecked();
+   cardoGpsFallbackRecording=true;
+   handler.removeCallbacks(cardoIdleStop);
+   handler.removeCallbacks(cardoGpsStopWatch);
+   handler.postDelayed(cardoGpsStopWatch,30_000L);
+   status="OBD 속도 미수신 · GPS 이동 검증 후 로컬 기록 중";
+   ObdLocalDiagnosticLog.record(this,"GPS_STARTED");
+   notifySafely(status);
+  }catch(Exception e){
+   stopWith("GPS 안전망 기록 시작 실패 · 원본 보존: "+e.getMessage(),false);
+  }finally{RestoreRideGate.endRideStart();}
  }
  private void handleAutoSpeed(int speedKmh){
   if(!autoArmed||autoFinishPending||finishPending)return;
@@ -560,8 +613,13 @@ public final class RideService extends Service implements LocationListener {
   autoFinishPending=false;running=false;
   // Reset recording after the stored ride; new movement can start a new track.
   autoGate.reset();parkingIsolation.reset();
+  cardoGpsFallbackRecording=false;cardoGpsPrevious=null;cardoGpsGate.reset();
+  handler.removeCallbacks(cardoGpsStopWatch);
   synchronized(this){gpsObdParkingHold=false;gpsObdHoldStarted=-1;gpsObdResumeSplit=false;}
   if(cardoSession){
+   if(cardoConnected&&BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId))
+    try{requestGpsUpdatesChecked();cardoGpsProbeRegistered=true;}
+    catch(Exception ignored){status="GPS 안전망 재대기 실패 · 위치 권한 확인 필요";}
    if(!cardoConnected){
     stopWith(verified?
       "카르도 OFF · GPS 기록 검증 완료 · OBD 대기 종료":
@@ -616,6 +674,15 @@ public final class RideService extends Service implements LocationListener {
   obdLink="연결 종료 · "+ObdFailureGuide.classify(reason);MotoWidgetProvider.refresh(this);speedSanity.reset();ObdLocalDiagnosticLog.record(this,"AUTO_OFF");obdSpeedKmh=-1;obdLastSampleElapsed=0;
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
   obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;
+  // The user separately opted in to GPS safety net for a missing 010D PID.
+  // Leave the 5-minute foreground sampler alive, but never invent ECU ODO.
+  if(cardoSession&&autoArmed&&BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)){
+   if(obdMonitor!=null)obdMonitor.stop();
+   obdMonitor=null;autoGate.reset();obdStationaryRemainingMs=-1;
+   status=running?"OBD 통신 종료 · GPS 로컬 기록 유지":
+     "OBD 속도 미지원/종료 · 카르도 GPS 안전망 감지 대기";
+   notifySafely(status);return;
+  }
   autoArmed=false;autoGate.reset();obdStationaryRemainingMs=-1;obdMonitor=null;
   Sharing.stop();
   if(autoFinishPending){
@@ -729,6 +796,25 @@ public final class RideService extends Service implements LocationListener {
   // The phone belongs to the rider, not the parked motorcycle.
   if(location==null)return;
   if(gpsObdParkingHold)return;
+  if(!running&&autoArmed&&cardoSession&&
+     BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)){
+   long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
+   if(location.isFromMockProvider()||age<0||age>10_000_000_000L||
+      !location.hasAccuracy()||location.getAccuracy()>20||location.getAccuracy()<0||
+      !TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||
+      !GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),0)){
+    cardoGpsGate.reset();cardoGpsPrevious=null;return;
+   }
+   Location old=cardoGpsPrevious;cardoGpsPrevious=new Location(location);
+   if(old!=null){
+    long gapMs=(location.getElapsedRealtimeNanos()-old.getElapsedRealtimeNanos())/1_000_000L;
+    float metres=location.distanceTo(old);
+    boolean obdFresh=ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,SystemClock.elapsedRealtime());
+    if(cardoGpsGate.accept(gapMs,metres,old.getAccuracy(),location.getAccuracy(),obdFresh))
+     handler.post(this::startCardoGpsFallbackRide);
+   }
+   return;
+  }
   if(!running||output==null||!checkRuntimeStorage())return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
   if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
@@ -840,8 +926,10 @@ public final class RideService extends Service implements LocationListener {
   // Invalidate queued main-thread finalization callbacks after failures or process teardown.
   finishPending=false;autoFinishPending=false;
   handler.removeCallbacks(finishParkedObdLoss);handler.removeCallbacks(cardoIdleStop);
-  handler.removeCallbacks(cardoDisconnectGrace);
-  cardoSession=false;cardoConnected=false;requestedCardoStart=false;parkingIsolation.reset();
+  handler.removeCallbacks(cardoDisconnectGrace);handler.removeCallbacks(cardoGpsStopWatch);
+  cardoSession=false;cardoConnected=false;requestedCardoStart=false;
+  cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
+  cardoGpsPrevious=null;cardoGpsGate.reset();parkingIsolation.reset();
   gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
   Sharing.stop();autoArmed=false;activeRideBikeId="";activeAutoAdapterAddress="";obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
