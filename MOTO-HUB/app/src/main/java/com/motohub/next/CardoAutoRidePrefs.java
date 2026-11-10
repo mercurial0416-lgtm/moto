@@ -45,7 +45,7 @@ final class CardoAutoRidePrefs {
   p(c).edit().clear().commit();
  }
  static synchronized void clearBike(Context c,String bike){
-  if(bike!=null&&bike.equals(bikeId(c)))disable(c);
+  if(bike!=null&&bike.equals(bikeId(c))){CardoCompanionPairing.stopObserving(c);disable(c);}
  }
  static synchronized boolean claim(Context c,String mac,boolean rideActive){
   if(!matches(c,mac)||!forBike(c,bikeId(c)))return false;
