@@ -8,7 +8,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
-/** Explicitly armed, read-only ELM327 telemetry with bounded in-session reconnects. */
+/** Explicitly armed, read-only ELM327 telemetry with bounded backoff foreground standby. */
 final class ObdAutoSpeedMonitor {
  interface Listener {
   void speed(int kmh);
@@ -55,11 +55,15 @@ final class ObdAutoSpeedMonitor {
       // Consume the healthy-session credit. Otherwise every subsequent failed
       // reconnect reuses the stale timestamp and retries forever.
       connectedAtNanos=0;
-      if(!ObdConnectionPolicy.shouldRetry(failures,true,true))break;
-      listener.reconnecting(failures,ObdConnectionPolicy.MAX_RETRIES);
+      // The user-approved foreground standby remains armed across key-off
+      // and repeated failures. Back off to one check per minute after the
+      // initial eight retries, instead of silently giving up overnight.
+      if(!ObdConnectionPolicy.standbyAllowed(true,stopped))break;
+      listener.reconnecting(failures,failures<=ObdConnectionPolicy.MAX_RETRIES?
+        ObdConnectionPolicy.MAX_RETRIES:0);
       closeSocket();
-      long until=System.nanoTime()+ObdConnectionPolicy.delayMs(failures)*1_000_000L;
-      while(!stopped&&System.nanoTime()<until)Thread.sleep(100);
+      long until=System.nanoTime()+ObdConnectionPolicy.standbyDelayMs(failures)*1_000_000L;
+      while(!stopped&&System.nanoTime()<until)Thread.sleep(200);
      }
     finally{closeSocket();}
    }
