@@ -98,9 +98,15 @@ public final class RideService extends Service implements LocationListener {
   if(parkingIsolation.dueAfterLost(SystemClock.elapsedRealtime())){
    // Complete the parked bike ride while leaving the explicitly armed
    // Bluetooth foreground watcher ready for the next ignition ON.
+   if(!BikeObdPreferences.autoRideEnabled(this,pendingBikeId)){
+    // A one-shot reader must not remain connected indefinitely.
+    ObdAutoSpeedMonitor reader=obdMonitor;
+    if(reader!=null)reader.stop();
+    obdMonitor=null;autoArmed=false;
+   }
    autoGate.reset();obdStationaryRemainingMs=-1;
-   obdLink="주차 추정 · 다음 시동 자동 재연결 대기";
-   status="주차 후 시동 OFF 추정 · GPS 저장 확인 · 다음 시동 연결 대기";
+   obdLink=autoArmed?"주차 추정 · 다음 시동 자동 재연결 대기":"주차 추정 · 자동 감지 종료";
+   status=autoArmed?"GPS 저장 확인 · 다음 시동 OBD 연결 대기":"주차 후 GPS 저장 확인";
    notifySafely(status);
    finishAutoTrack();
   }
@@ -183,7 +189,10 @@ public final class RideService extends Service implements LocationListener {
    finishUserRideAsync();return START_NOT_STICKY;
   }
   if(AUTO_DISARM.equals(action)){
-   // Disarming the experimental reader must NOT silently discard an active GPS ride.
+   // Explicit stop revokes the always-ready opt-in. Existing GPS stays intact.
+   if(RideBikeBinding.valid(pendingBikeId))
+    BikeObdPreferences.setAutoRideEnabled(this,pendingBikeId,false);
+   // Disarming the reader must NOT silently discard an active GPS ride.
    if(autoArmed){
     ObdAutoSpeedMonitor monitor=obdMonitor;
     if(monitor!=null)monitor.stop();
@@ -381,7 +390,7 @@ public final class RideService extends Service implements LocationListener {
      notifySafely(status);
     }});}
     @Override public void disconnected(String reason){handler.post(()->{if(autoArmed&&obdMonitor==ref[0])onObdDisconnected(reason);});}
-   });
+   },bikeApproved);
    ref[0]=reader;obdMonitor=reader;
    ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    reader.start();handler.postDelayed(permissionCheck,5000);
