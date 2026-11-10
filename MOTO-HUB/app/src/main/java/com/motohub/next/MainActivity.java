@@ -2899,7 +2899,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   }
  }
  @Override protected void onDestroy(){obdVisible=false;odoSyncHandler.removeCallbacks(odoSyncTick);if(isFinishing())BackupPickerTransfer.cancelAll();if(developerObd!=null){developerObd.stop();developerObd=null;}super.onDestroy();}
- @Override protected void onPause(){obdVisible=false;odoSyncHandler.removeCallbacks(odoSyncTick);flushQuickFuelDraft();persistDraft();super.onPause();}
+ @Override protected void onPause(){odoSyncHandler.removeCallbacks(odoSyncTick);flushQuickFuelDraft();persistDraft();super.onPause();}
+ @Override protected void onStop(){obdVisible=false;super.onStop();}
  void clearDraft(){formDirty=false;getSharedPreferences("draft",MODE_PRIVATE).edit().remove("active").apply();}
  void confirmDiscardDraft(){
   if(!getSharedPreferences("draft",MODE_PRIVATE).contains("active")){render();return;}
