@@ -720,7 +720,7 @@ final class DeveloperObdScreen {
   if(location==null||!location.isProviderEnabled(LocationManager.GPS_PROVIDER)){
    setStatus("먼저 휴대폰 GPS를 켜 주세요.");return;
   }
-  final boolean[] remember={true};
+  final boolean[] remember={false}; // Never enable all-night OBD polling by default
   new AlertDialog.Builder(activity).setTitle("OBD2 자동 라이딩 기록을 켤까요?")
    .setMessage("동의를 선택하면 OBD 자동 감지를 실행합니다. 속도 7km/h 이상을 3회 읽으면 GPS 기록을 시작하고, 주차 후 저장합니다. '상시 대기'를 켜면 시동 OFF 후에도 Bluetooth 연결을 약 60초 간격으로 재시도하며 다음 시동을 기다립니다.\n\n이 모드는 지속 알림·배터리를 사용하며 앱 강제종료/휴대폰 재부팅 뒤에는 보장되지 않습니다. 그룹 위치 공유·ECU 설정 변경은 하지 않습니다. 실차 KTM 동작 검증 전입니다.")
    .setMultiChoiceItems(new String[]{"이 바이크에서 상시 연결 대기 (시동 OFF 후에도 유지 · 배터리 사용)"},remember,(dialog,index,selected)->remember[index]=selected)
@@ -729,6 +729,12 @@ final class DeveloperObdScreen {
      String bikeId=activity.bike().optString("id");
      // Explicitly persist background-ready consent only when chosen.
      if(remember[0]){
+      // User explicitly switched from low-power Cardo to persistent OBD.
+      // Never leave both modes enabled; stop the old system observer first.
+      if(CardoAutoRidePrefs.forBike(activity,bikeId)){
+       CardoCompanionPairing.stopObserving(activity);
+       CardoAutoRidePrefs.disable(activity);
+      }
       BikeObdPreferences.setDevice(activity,bikeId,device.getAddress(),device.getName());
       BikeObdPreferences.setAutoRideEnabled(activity,bikeId,true);
      }else if(BikeObdPreferences.autoRideEnabled(activity,bikeId)){
