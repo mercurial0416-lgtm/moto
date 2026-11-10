@@ -128,7 +128,10 @@ public final class RideService extends Service implements LocationListener {
   if(!cardoGpsFallbackRecording||!running||autoFinishPending)return;
   long now=SystemClock.elapsedRealtime();
   long idleLimit=cardoConnected?600_000L:300_000L;
-  if(GpsSignalStatus.fresh(lastFixElapsed,now)&&lastMotionElapsed>0&&
+  boolean stationaryGps=GpsSignalStatus.fresh(lastFixElapsed,now);
+  boolean stationaryEcu=obdSpeedKmh>=0&&obdSpeedKmh<=2&&
+    parkingIsolation.observedParking(now);
+  if((stationaryGps||stationaryEcu)&&lastMotionElapsed>0&&
      now>=lastMotionElapsed&&now-lastMotionElapsed>=idleLimit){
    status="GPS 안전망 정차 확인 · 파일 저장 검증 중";
    finishAutoTrack();
@@ -679,6 +682,12 @@ public final class RideService extends Service implements LocationListener {
   if(cardoSession&&autoArmed&&BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)){
    if(obdMonitor!=null)obdMonitor.stop();
    obdMonitor=null;autoGate.reset();obdStationaryRemainingMs=-1;
+   if(running&&gpsObdParkingHold&&
+      parkingIsolation.remainingAfterLost(SystemClock.elapsedRealtime())>=0){
+    long remaining=parkingIsolation.remainingAfterLost(SystemClock.elapsedRealtime());
+    handler.removeCallbacks(finishParkedObdLoss);
+    handler.postDelayed(finishParkedObdLoss,Math.max(1,remaining));
+   }
    status=running?"OBD 통신 종료 · GPS 로컬 기록 유지":
      "OBD 속도 미지원/종료 · 카르도 GPS 안전망 감지 대기";
    notifySafely(status);return;
