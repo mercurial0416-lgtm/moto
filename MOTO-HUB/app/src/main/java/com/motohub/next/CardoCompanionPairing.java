@@ -7,7 +7,6 @@ import android.net.MacAddress;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import java.util.regex.Pattern;
 
 /**
  * A deliberate Android companion association for the user's bonded Cardo.
@@ -38,7 +37,7 @@ final class CardoCompanionPairing {
     }
    }
    BluetoothDeviceFilter filter=new BluetoothDeviceFilter.Builder()
-    .setAddress(Pattern.compile(Pattern.quote(mac))).build();
+    .setAddress(mac).build();
    AssociationRequest request=new AssociationRequest.Builder()
     .addDeviceFilter(filter).setSingleDevice(true).build();
    mgr.associate(request,new CompanionDeviceManager.Callback(){
