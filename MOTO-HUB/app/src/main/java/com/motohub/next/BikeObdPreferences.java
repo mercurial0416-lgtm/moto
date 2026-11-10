@@ -37,7 +37,7 @@ final class BikeObdPreferences {
   if(safe.length()>80)safe=safe.substring(0,80);
   SharedPreferences.Editor edit=prefs(context).edit();
   if(!address.equalsIgnoreCase(address(context,bikeId))){
-   edit.remove(key(bikeId,"autoRide"));
+   edit.remove(key(bikeId,"autoRide")).remove(key(bikeId,"gpsFallback"));
    // Auto ride consent belongs to a specific OBD hardware identity.
    // Changing the dongle invalidates the headset-triggered session too.
    if(bikeId.equals(CardoAutoRidePrefs.bikeId(context))){
@@ -54,7 +54,7 @@ final class BikeObdPreferences {
    CardoAutoRidePrefs.disable(context);
   }
   prefs(context).edit().remove(key(bikeId,"mac")).remove(key(bikeId,"name"))
-   .remove(key(bikeId,"autoRide")).apply();
+   .remove(key(bikeId,"autoRide")).remove(key(bikeId,"gpsFallback")).apply();
  }
  static List<String> selectedPids(Context context,String bikeId){
   if(!RideBikeBinding.valid(bikeId))return new ArrayList<>();
@@ -89,10 +89,23 @@ final class BikeObdPreferences {
   if(enabled&&address(context,bikeId).isEmpty())throw new IllegalStateException("먼저 이 바이크에 OBD 동글을 등록해 주세요.");
   prefs(context).edit().putBoolean(key(bikeId,"autoRide"),enabled).apply();
  }
+ /** Disabled by default. Explicit, per-bike GPS energy and false-positive consent. */
+ static boolean gpsFallbackEnabled(Context context,String bikeId){
+  return RideBikeBinding.valid(bikeId)&&
+   CardoAutoRidePrefs.forBike(context,bikeId)&&
+   prefs(context).getBoolean(key(bikeId,"gpsFallback"),false);
+ }
+ static void setGpsFallbackEnabled(Context context,String bikeId,boolean enabled){
+  if(!RideBikeBinding.valid(bikeId))throw new IllegalArgumentException("바이크 선택 필요");
+  if(enabled&&!CardoAutoRidePrefs.forBike(context,bikeId))
+   throw new IllegalStateException("카르도 장치를 먼저 등록해 주세요");
+  prefs(context).edit().putBoolean(key(bikeId,"gpsFallback"),enabled).commit();
+ }
  static void clearBike(Context context,String bikeId){
   if(!RideBikeBinding.valid(bikeId))return;
   prefs(context).edit().remove(key(bikeId,"mac")).remove(key(bikeId,"name"))
-   .remove(key(bikeId,"selected")).remove(key(bikeId,"autoRide")).apply();
+   .remove(key(bikeId,"selected")).remove(key(bikeId,"autoRide"))
+   .remove(key(bikeId,"gpsFallback")).apply();
  }
 
 }
