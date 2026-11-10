@@ -316,7 +316,9 @@ public class MainActivity extends Activity {
   if(i==null||!CardoRideStarter.ACTION_TAP.equals(i.getAction()))return;
   i.setAction(null); // consume once
   if(readOnly||RestoreRideGate.isRestoring()){toast("복구/데이터 보호 중 · 카르도 시작 보류");return;}
-  CardoRideStarter.startFromTap(this);
+  if(!obdVisible&&root!=null)
+   root.postDelayed(()->{if(!isFinishing()&&!isDestroyed())CardoRideStarter.startFromTap(this);},450L);
+  else CardoRideStarter.startFromTap(this);
  }
  boolean applyWidgetTab(Intent intent){
   if(intent==null)return false;
@@ -2077,6 +2079,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
          try{odometerCleared=OdometerAutoSyncInbox.suspendAfterRestore(this);}catch(Exception ignored){}
          try{odometerCleared=HybridOdometerEstimate.suspendAfterRestore(this)&&odometerCleared;}catch(Exception ignored){odometerCleared=false;}
          try{odometerCleared=DtcOdoBridge.suspendAfterRestore(this)&&odometerCleared;}catch(Exception ignored){odometerCleared=false;}
+         CardoCompanionPairing.stopObserving(this);CardoAutoRidePrefs.disable(this);
          try{gpsLedgerCleared=RideMileageEstimate.resetAfterFullRestore(this);}catch(Exception ignored){}
          final boolean odoResetOk=odometerCleared,mileageResetOk=gpsLedgerCleared;
          jsonImportRevision++;
@@ -2803,6 +2806,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       try{odoReset=HybridOdometerEstimate.suspendAfterRestore(this)&&odoReset;}
       catch(Exception ignored){odoReset=false;}
       try{odoReset=DtcOdoBridge.suspendAfterRestore(this)&&odoReset;}
+      CardoCompanionPairing.stopObserving(this);CardoAutoRidePrefs.disable(this);
       catch(Exception ignored){odoReset=false;}
       try{checkpoint=LocalSafetyBackup.checkpoint(this,validated);}catch(Exception ignored){}
       try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){}
