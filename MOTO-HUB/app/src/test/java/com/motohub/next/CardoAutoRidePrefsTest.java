@@ -40,6 +40,33 @@ public class CardoAutoRidePrefsTest {
   assertTrue(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom"));
   assertFalse(BikeObdPreferences.autoRideEnabled(c,A));
  }
+ @Test public void replacedObdDongleMustRevokeHelmetTriggerConsent(){
+  BikeObdPreferences.setDevice(c,A,OBD,"Old OBD");
+  assertTrue(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom"));
+  BikeObdPreferences.setDevice(c,A,"22:33:44:55:66:77","New OBD");
+  assertFalse(CardoAutoRidePrefs.enabled(c));
+  assertFalse(CardoAutoRidePrefs.forBike(c,A));
+ }
+ @Test public void unlinkingObdAlsoRemovesHelmetTrigger(){
+  BikeObdPreferences.setDevice(c,A,OBD,"Old OBD");
+  assertTrue(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom"));
+  BikeObdPreferences.clearDevice(c,A);
+  assertFalse(CardoAutoRidePrefs.enabled(c));
+ }
+ @Test public void aHeadsetDisconnectRearmsItsNextRealConnect(){
+  BikeObdPreferences.setDevice(c,A,OBD,"OBD");
+  assertTrue(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom"));
+  c.getSharedPreferences("cardo_autoride_v595",0).edit().putLong("triggerAt",1_000L).commit();
+  CardoAutoRidePrefs.noteDisconnect(c,CARDO);
+  assertFalse(c.getSharedPreferences("cardo_autoride_v595",0).contains("triggerAt"));
+ }
+ @Test public void unrelatedBluetoothDisconnectDoesNotResetTheTrigger(){
+  BikeObdPreferences.setDevice(c,A,OBD,"OBD");
+  assertTrue(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom"));
+  c.getSharedPreferences("cardo_autoride_v595",0).edit().putLong("triggerAt",1_000L).commit();
+  CardoAutoRidePrefs.noteDisconnect(c,OBD);
+  assertTrue(c.getSharedPreferences("cardo_autoride_v595",0).contains("triggerAt"));
+ }
  @Test public void disablingIsScopedAndDoesNotTouchGarageOdo(){
   BikeObdPreferences.setDevice(c,A,OBD,"iCar Pro");
   assertTrue(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom"));
