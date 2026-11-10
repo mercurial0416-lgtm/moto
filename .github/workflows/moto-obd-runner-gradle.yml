@@ -29,17 +29,17 @@ jobs:
       - name: Build separate package with preinstalled Gradle
         working-directory: MOTO-HUB
         run: |
-          gradle :app:assembleObdPreview :app:testObdPreviewUnitTest -PmotoReleaseCode=595 -PmotoObdSideBySide=true -PmotoObdPreviewTag=595 --no-daemon --stacktrace
+          gradle :app:assembleObdPreview :app:testObdPreviewUnitTest -PmotoReleaseCode=596 -PmotoObdSideBySide=true -PmotoObdPreviewTag=596 --no-daemon --stacktrace
       - name: Check signature and version
         working-directory: MOTO-HUB
         run: |
           APK="app/build/outputs/apk/obdPreview/app-obdPreview.apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='com.motohub.next.obdpreview595' versionCode='595'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='com.motohub.next.obdpreview596' versionCode='596'"
           sha256sum "$APK" > "app/build/outputs/apk/obdPreview/SHA256.txt"
       - uses: actions/upload-artifact@v4
         with:
-          name: MOTO-HUB-OBD-PREVIEW-595-CARDO
+          name: MOTO-HUB-OBD-PREVIEW-596-CARDO
           path: |
             MOTO-HUB/app/build/outputs/apk/obdPreview/app-obdPreview.apk
             MOTO-HUB/app/build/outputs/apk/obdPreview/SHA256.txt
