@@ -52,6 +52,19 @@ android {
      matchingFallbacks = ['release']
      buildConfigField "boolean", "STORE_DISTRIBUTION", "true"
    }
+   // Independent package: safe to install alongside the original signed MOTO HUB.
+   obdPreview {
+     initWith debug
+     // Use a distinct package only when CI explicitly requests a non-destructive
+     // side-by-side test. CI debug signing keys are not stable across runners.
+     def isolatedObdPreview=providers.gradleProperty("motoObdSideBySide").getOrElse("false").toBoolean()
+     def isolatedTag=providers.gradleProperty("motoObdPreviewTag").getOrElse("592")
+     if(isolatedObdPreview && !(isolatedTag ==~ /[0-9]{3,6}/))
+       throw new GradleException("Invalid isolated OBD preview tag")
+     applicationIdSuffix (isolatedObdPreview ? ".obdpreview"+isolatedTag : ".obdpreview")
+     versionNameSuffix "-obd-preview"
+     matchingFallbacks = ['debug']
+   }
  }
 
 }

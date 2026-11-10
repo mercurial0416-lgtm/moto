@@ -23,7 +23,8 @@ assert 'finally{RestoreRideGate.endRideStart();}' in auto
 assert auto.index('RestoreRideGate.beginRideStart()') < auto.index('openRideTrack();requestGpsUpdatesChecked()')
 assert 'OdometerAutoSyncInbox.rebaseline(activity,configuredId,confirmed,oldKm)' in dev
 assert 'OdometerSyncPolicy.checkedManual(entryKm.getText().toString(),oldKm)' in dev
-assert '.remove("last").remove("lastAt").remove("pending")' in odo
+assert '.remove(k(bikeId,"last")).remove(k(bikeId,"lastAt"))' in odo
+assert '.remove(k(bikeId,"pending"))' in odo
 assert 'first(previous,actual)' in odo and 'lastNote' in odo
 assert 'suspendAfterRestore(this)' in main
 zip_restore=main.split('void prepareBundleRestore(Uri uri,char[] password)',1)[1].split('void exportEncryptedBundle()',1)[0]

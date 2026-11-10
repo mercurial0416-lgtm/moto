@@ -16,7 +16,7 @@ java=Path('app/src/main/java/com/motohub/next')
 ui=(java/'RideUi.java').read_text()
 main=(java/'MainActivity.java').read_text()
 service=(java/'RideService.java').read_text()
-assert 'bikeRides.removeIf(file->!RideHistoryPeriod.include(file,now,period))' in ui
+assert 'bikeRides=RideHistorySessionPeriod.select(bikeRides,now,period)' in ui, 'date filter must include or exclude every section by original session start'
 assert 'selectRideHistoryPeriod(options[which])' in ui
 assert 'results.postDelayed(pendingSearch[0],180)' in ui
 assert 'results.removeCallbacks(pendingSearch[0])' in ui
@@ -24,6 +24,8 @@ assert 'rideHistoryPeriod=RideHistoryPeriod.restore(' in main
 assert 'out.putString("rideHistoryPeriod",rideHistoryPeriod)' in main
 assert 'TrackFile.discardEmptySession(track)' in service
 assert 'Sharing.start(' not in ui
-assert 'if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))' in service
+assert 'boolean developerApproved=getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)' in service
+assert 'BikeObdPreferences.autoRideEnabled(this,pendingBikeId)' in service
+assert 'RideBikeBinding.write(track,pendingBikeId)' in service
 print('PASS: period UI, search debounce, zero-byte GPS cleanup and safety wiring')
 PY

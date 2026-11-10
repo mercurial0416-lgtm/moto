@@ -19,8 +19,12 @@ import java.util.concurrent.atomic.AtomicLong;
 /** One-touch ride controls, imported GPX and real saved-ride insights. */
 final class RideUi {
  static final class HistoryEntry {
-  final File file;final String date,status,searchKey;
-  HistoryEntry(File file,String date,String status,String memo){this.file=file;this.date=date;this.status=status;this.searchKey=RideHistorySearch.index(date+" "+memo,status);}
+  final File file;final String date,status,searchKey,groupKey;
+  HistoryEntry(File file,String date,String status,String memo,String groupKey){
+   this.file=file;this.date=date;this.status=status;
+   this.searchKey=RideHistorySearch.index(date+" "+memo,status);
+   this.groupKey=groupKey==null?"":groupKey;
+  }
  }
  /** One background reader prevents file-system I/O from freezing the history screen. */
  private static final ExecutorService HISTORY_EXECUTOR=Executors.newSingleThreadExecutor(r->{
@@ -34,6 +38,8 @@ final class RideUi {
  });
  private static final AtomicLong REPORT_GENERATION=new AtomicLong();
  private int historyVisibleLimit=RideHistoryPage.PAGE_SIZE;
+ /** Only view state; never modifies GPS tracks or per-file metadata. */
+ private final Set<String> expandedRideSessions=new HashSet<>();
  private static final class HistoryData {
   final List<File> rides;final List<HistoryEntry> entries;
   final Map<String,Integer> counts;final String selected;final int damaged,unfinished;
@@ -332,7 +338,7 @@ final class RideUi {
     // Apply the date range BEFORE calculating status-chip counts. Otherwise a
     // 7-day view can claim hundreds of rides even when only two are visible.
     // Imported GPX dates come from their first committed GPS point.
-    bikeRides.removeIf(file->!RideHistoryPeriod.include(file,now,period));
+    bikeRides=RideHistorySessionPeriod.select(bikeRides,now,period);
     // Recovery warning must not disappear just because an unrelated category was selected.
     int unfinished=0;
     for(File file:bikeRides)
@@ -342,25 +348,17 @@ final class RideUi {
     Map<String,Integer> counts=RideHistoryFilter.counts(bikeRides,activeName,recording);
     List<File> visible=RideHistorySort.order(RideHistoryFilter.select(bikeRides,selected,activeName,recording),sort);
     String distanceInfo="";
-    if(!RideHistoryDistanceFilter.ALL.equals(distanceRange)){
-     // The complete filtered list is evaluated off the UI thread. Never drop
-     // the user's filter merely because there are over 150 tracks or 80MB.
-     // Shared bounded cache skips unchanged GPS analyses on subsequent views.
-     List<File> matched=new ArrayList<>();
-     int unreadable=0;
-     for(File file:visible){
-      if(generation!=HISTORY_GENERATION.get())return;
-      try{
-       RideDistanceCache.Summary distance=RideDistanceCache.read(file);
-       if(RideHistoryDistanceFilter.accepts(distanceRange,distance.distanceKm))
-        matched.add(file);
-      }catch(Exception ignored){unreadable++;}
-     }
-     visible=matched;
-     distanceInfo="GPS 거리 "+distanceRange+" · 전체 대상 분석 · 원본 손상·크기 초과 "+unreadable+
-      "건 제외 · 계기판 거리와 다를 수 있어요.";
-    }
     Map<String,Integer> sessionCounts=RideSegmentGroup.counts(rides);
+    // Do not advertise a partly recorded/recovered session as one complete ride.
+    // All sibling metadata is checked on the history worker, never the UI thread.
+    Set<String> unsafeSessions=new HashSet<>();
+    for(File sibling:rides){
+     String session=RideSegmentGroup.id(sibling);
+     if(session.isEmpty())continue;
+     if(!RideHistoryFilter.COMPLETE.equals(RideHistoryFilter.status(sibling,activeName,recording))
+        ||!RideMileageIntegrity.validCompleted(sibling)
+        ||new File(sibling.getPath()+".imported").exists())unsafeSessions.add(session);
+    }
     List<HistoryEntry> entries=new ArrayList<>();
     for(File file:visible){
      if(generation!=HISTORY_GENERATION.get())return;
@@ -374,7 +372,36 @@ final class RideUi {
       (sessionCounts.getOrDefault(RideSegmentGroup.id(file),0)>1?
        " · 연속 GPS "+sessionCounts.get(RideSegmentGroup.id(file))+"구간":"")+
       " · "+RideHistoryBikeLabel.label(file,bikeNames);
-     entries.add(new HistoryEntry(file,label,RideHistoryFilter.status(file,activeName,recording),savedMemo));
+     String status=RideHistoryFilter.status(file,activeName,recording);
+     String groupKey="";
+     // Background worker only: never inspect sidecars on the UI thread.
+     if(RideHistoryFilter.COMPLETE.equals(status)&&RideMileageIntegrity.validCompleted(file)
+        &&!new File(file.getPath()+".imported").exists()){
+      try{
+       String bikeBinding=RideBikeBinding.readStrict(file);
+       String session=RideSegmentGroup.id(file);
+       if(!session.isEmpty()&&!unsafeSessions.contains(session))
+        groupKey=session+"|"+bikeBinding+"|"+category;
+      }catch(IOException corrupted){/* Damaged bike binding never silently joins a ride. */}
+     }
+     entries.add(new HistoryEntry(file,label,status,savedMemo,groupKey));
+    }
+    if(!RideHistoryDistanceFilter.ALL.equals(distanceRange)){
+     // Analyze GPS sections off the UI thread and compare session totals,
+     // never mistakenly discard a 60 km ride split into several 20 km files.
+     Map<String,Double> measured=new HashMap<>();
+     int unreadable=0;
+     for(HistoryEntry entry:entries){
+      if(generation!=HISTORY_GENERATION.get())return;
+      try{measured.put(entry.file.getName(),RideDistanceCache.read(entry.file).distanceKm);}
+      catch(Exception invalid){measured.put(entry.file.getName(),Double.NaN);unreadable++;}
+     }
+     entries=RideHistorySessionDistance.select(entries,entry->entry.groupKey,
+      entry->measured.getOrDefault(entry.file.getName(),Double.NaN),
+      km->RideHistoryDistanceFilter.accepts(distanceRange,km));
+     distanceInfo="GPS 거리 "+distanceRange+
+      " · 여러 구간의 한 라이딩은 합산 기준 · 손상·미완료 "+unreadable+
+      "개 제외 · 계기판 거리와 다를 수 있어요.";
     }
     File unapplied=null;int unappliedCount=0;
     if(!currentBike.isEmpty())for(File file:rides){
@@ -437,7 +464,7 @@ final class RideUi {
   }
    // One state selector replaces six always-visible horizontal chips.
    String[] statusOptions=RideHistoryFilter.OPTIONS;
-   Button statusButton=a.button("상태 · "+selected+"  ("+counts.getOrDefault(selected,0)+")  ▾",false,()->
+   Button statusButton=a.button("상태 · "+selected+"  (GPS 구간 "+counts.getOrDefault(selected,0)+"개)  ▾",false,()->
     new AlertDialog.Builder(a).setTitle("라이딩 상태")
      .setSingleChoiceItems(statusOptions,Math.max(0,Arrays.asList(statusOptions).indexOf(selected)),
       (dialog,index)->{dialog.dismiss();a.selectRideHistoryFilter(statusOptions[index]);})
@@ -676,18 +703,17 @@ final class RideUi {
  }
  void showHistoryResults(LinearLayout results,List<HistoryEntry> entries,int total,String selected,TextView summary){
   results.removeAllViews();
-  int count=0;
   final String[] terms=RideHistorySearch.terms(a.rideHistoryQuery);
-  // One pass counts all matches and collects only the visible page. This avoids
-  // scanning the same 10k-record history again every time the user types.
-  final List<HistoryEntry> page=new ArrayList<>(Math.min(entries.size(),Math.min(historyVisibleLimit,100)));
-  for(HistoryEntry entry:entries)if(RideHistorySearch.matchesIndex(entry.searchKey,terms)){
-   count++;
-   if(page.size()<historyVisibleLimit)page.add(entry);
-  }
-  String bikeLabel=RideHistoryBikeFilter.ALL.equals(a.rideHistoryBike)?"전체":
+  final List<HistoryEntry> matched=new ArrayList<>();
+  for(HistoryEntry entry:entries)if(RideHistorySearch.matchesIndex(entry.searchKey,terms))matched.add(entry);
+  final List<RideHistorySessionRows.Row<HistoryEntry>> rows=
+   RideHistorySessionRows.group(matched,entry->entry.groupKey);
+  final int count=rows.size();
+  final int shown=Math.min(count,historyVisibleLimit);
+  final String bikeLabel=RideHistoryBikeFilter.ALL.equals(a.rideHistoryBike)?"전체":
    RideHistoryBikeFilter.UNASSIGNED.equals(a.rideHistoryBike)?"미지정":a.bikeName(a.rideHistoryBike);
-  summary.setText("검색 "+count+"건 / 전체 "+total+"건 · 바이크 "+bikeLabel+" · "+a.rideHistoryPeriod+(count>historyVisibleLimit?" · 처음 "+historyVisibleLimit+"건 표시":""));
+  summary.setText("검색 라이딩 "+count+"회 · GPS 구간 "+matched.size()+"개 / 전체 파일 "+total+"개 · 바이크 "+bikeLabel+
+   " · "+a.rideHistoryPeriod+(count>historyVisibleLimit?" · 처음 "+historyVisibleLimit+"회 표시":""));
   if(count==0){
    String message=total==0?"아직 저장된 주행이 없어요. GPS를 시작하거나 GPX 파일을 가져와 주세요.":
     entries.isEmpty()?"선택한 바이크·상태·기간에 라이딩이 없어요. 필터를 바꿔 주세요.":
@@ -702,8 +728,49 @@ final class RideUi {
    }
    return;
   }
-  final int shown=page.size();
-  for(HistoryEntry entry:page){
+  for(int i=0;i<shown;i++){
+   RideHistorySessionRows.Row<HistoryEntry> row=rows.get(i);
+   if(!row.grouped()){
+    showHistoryEntry(results,row.segments.get(0),entries,total,selected,summary);
+    continue;
+   }
+   // A grouped ride's display time is its FIRST GPS section, never
+   // whichever end section happens to sort to the top.
+   HistoryEntry earliest=row.segments.get(0);
+   Long firstTime=null;
+   for(HistoryEntry part:row.segments){
+    Long timestamp=RideHistoryLabel.filenameTime(part.file.getName());
+    if(timestamp!=null&&(firstTime==null||timestamp<firstTime)){
+     firstTime=timestamp;earliest=part;
+    }
+   }
+   final boolean expanded=expandedRideSessions.contains(row.key);
+   new HubScreens(a).line(results,
+    earliest.date+" · 라이딩 1회",
+    "GPS "+row.segments.size()+"개 구간 · 원본 그대로 보존",
+    expanded?"구간 접기  ›":"구간 펼치기  ›",
+    ()->{
+     if(!expandedRideSessions.add(row.key))expandedRideSessions.remove(row.key);
+     showHistoryResults(results,entries,total,selected,summary);
+    },null,false);
+   if(expanded)for(HistoryEntry segment:row.segments)
+    showHistoryEntry(results,segment,entries,total,selected,summary);
+  }
+  final int remaining=RideHistoryPage.remaining(count,shown);
+  if(remaining>0){
+   a.gap(results,8);
+   Button more=a.button("라이딩 더 보기 · 남은 "+remaining+"회",false,()->{
+    historyVisibleLimit=RideHistoryPage.nextLimit(historyVisibleLimit);
+    showHistoryResults(results,entries,total,selected,summary);
+   });
+   more.setContentDescription("라이딩 기록 "+Math.min(RideHistoryPage.PAGE_SIZE,remaining)+"회 더 보기");
+   more.setMinHeight(a.dp(50));
+   results.addView(more);
+  }
+ }
+ private void showHistoryEntry(LinearLayout results,HistoryEntry entry,
+                               List<HistoryEntry> entries,int total,String selected,TextView summary){
+
    File f=entry.file;String date=entry.date,status=entry.status;
    boolean live=RideHistoryFilter.ACTIVE.equals(status);
    boolean interrupted=RideHistoryFilter.INTERRUPTED.equals(status);
@@ -727,18 +794,6 @@ final class RideUi {
       showHistoryResults(results,entries,total,selected,summary);
      });
     },starred);
-  }
-  final int remaining=RideHistoryPage.remaining(count,shown);
-  if(remaining>0){
-   a.gap(results,8);
-   Button more=a.button("라이딩 더 보기 · 남은 "+remaining+"건",false,()->{
-    historyVisibleLimit=RideHistoryPage.nextLimit(historyVisibleLimit);
-    showHistoryResults(results,entries,total,selected,summary);
-   });
-   more.setContentDescription("라이딩 기록 "+Math.min(RideHistoryPage.PAGE_SIZE,remaining)+"건 더 보기");
-   more.setMinHeight(a.dp(50));
-   results.addView(more);
-  }
  }
  RideReadiness.State readiness(){
   boolean fine=a.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;

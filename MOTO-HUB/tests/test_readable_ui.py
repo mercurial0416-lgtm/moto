@@ -61,7 +61,7 @@ test('new QuickEntryUi(a).fuel()' in garage and
 rideui=get("RideUi.java")
 test('new RideUi(a).requestStart(true)' in garage and
      'void finishWithSummary()' in rideui and
-     'setPositiveButton("저장하고 종료"' in rideui and
+     'MotoDialog.confirm(a' in rideui and '"저장하고 종료"' in rideui and
      'RideService.STOP' in rideui and '".done"' in rideui,
      "ride start consent, stop confirmation and verified finish still wired")
 test('switchBike(direction)' in garage and 'changeHeroPhoto(bike,own)' in garage,

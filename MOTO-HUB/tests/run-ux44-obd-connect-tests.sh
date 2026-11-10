@@ -25,7 +25,7 @@ tests={
  "sensor results not inferred":'ObdFirstConnectionGuide.result(' in screen,
  "multiple transient sensor timeouts tolerated":'catch(Exception temporary)' in screen and 'noDataCycles>=3' in screen,
  "read only":'ObdReadOnlyProtocol.query(pid)' in screen and 'ObdReadOnlyProtocol.query("0100")' in screen,
- "OBD setup hidden from everyday ride":'OBD2 동글 연결 · ECU 센서 테스트' not in ride and '듀크 390 · OBD2 읽기 전용 (실험)' in (p/'HubScreens.java').read_text(),
+ "OBD setup hidden from everyday ride":'OBD2 동글 연결 · ECU 센서 테스트' not in ride and '현재 바이크 · OBD2 읽기 전용 (실험)' in (p/'HubScreens.java').read_text() and 'OBD 연결 설정' in (p/'HubScreens.java').read_text(),
  "experimental opt in":'getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)' in (p/'HubScreens.java').read_text(),
  "ODO permission callback":'DeveloperObdScreen.ODO_CONNECT_PERMISSION_REQUEST' in main and 'developerObd.loadPairedOdo()' in main,
  "no boot reconnection":'App.onCreate()' not in screen and 'onBoot' not in screen,

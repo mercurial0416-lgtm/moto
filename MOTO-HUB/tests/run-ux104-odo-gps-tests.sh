@@ -15,16 +15,23 @@ main=(p/"MainActivity.java").read_text()
 inbox=(p/"RideCompletionInbox.java").read_text()
 garage=(p/"GarageHomeUi.java").read_text()
 developer=(p/"DeveloperObdScreen.java").read_text()
-assert 'capabilities.forPid("01A6")==ObdPidCapabilities.Support.YES' in monitor
+assert 'odoSupport=capabilities.forPid("01A6")' in monitor
+assert 'ObdOdoPollPolicy.shouldProbe' in monitor
+policy=(p/"ObdOdoPollPolicy.java").read_text()
+assert 'speedKmh==0&&speedPolls>=8' in policy and '!directProbeAttempted' in policy
 assert 'listener.allowOdometer()' in monitor
 assert 'OdoAutoSyncPolicy.consistent(a,b)' in monitor
 assert 'listener.odometer(verified)' in monitor
 assert 'OdometerAutoSyncInbox.offer(RideService.this,pendingBikeId,km,km' in service
 assert 'OdometerAutoSyncInbox.enable(activity,id,baseline)' in developer
-assert 'OdometerAutoSyncInbox.disable(activity)' in developer
+assert 'OdometerAutoSyncInbox.disable(activity,id)' in developer
 assert 'RideService.running||jsonImportRunning' in main
 assert 'RestoreRideGate.beginFormWrite()' in main
 assert 'OdometerAutoSyncInbox.acknowledged(this,bikeId,offered)' in main
+assert 'if((saved||ignored)&&ackSaved)syncVerifiedOdoInbox();' in main, 'only durably acknowledged ECU mileage may advance the next bike'
+assert 'if(OdometerAutoSyncInbox.acknowledged(this,bikeId,offered))' in main, 'failed acknowledgement must not cause an infinite retry loop'
+assert 'post(this::syncVerifiedOdoInbox)' in main, 'already-applied ODO must not block next bike or recursively block UI'
+assert 'if(!ignored&&why!=null)' in main, 'failed ODO writes must not enter a hot retry loop'
 assert 'atomic(disk,original.toString(2)' in main
 assert 'LocalSafetyBackup.checkpoint(this,original)' in main
 assert 'RideMileageEstimate.record(context,track,boundBike,result.distanceKm)' in inbox

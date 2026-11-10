@@ -21,7 +21,7 @@ import java.util.Locale;
 /** Experimental, local-only telemetry view. No interactive riding controls. */
 public final class ObdDashboardActivity extends Activity {
  private final Handler handler=new Handler(Looper.getMainLooper());
- private TextView speed,rpm,temperature,voltage,fuel,ride,status,advisory,linkStatus;
+ private TextView speed,rpm,temperature,voltage,fuel,ride,status,advisory,linkStatus,odoFallback;
  private boolean compactMode;
  private ProgressBar rpmMeter;
  private boolean visible;
@@ -36,7 +36,7 @@ public final class ObdDashboardActivity extends Activity {
   speed.setContentDescription(speedFresh?"차량 속도 "+RideService.obdSpeedKmh+"킬로미터 매시":"OBD2 속도 지연, 마지막 값 숨김");
   linkStatus.setText(ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,speedFresh)
    +" · "+RideService.obdLink+" · "+ObdSignalAge.label(RideService.obdLastSampleElapsed,now)
-   +(speedFresh?"":"\\n최신 ECU 응답이 없으므로 마지막 속도는 숨깁니다."));
+   +(speedFresh?"":"\n최신 ECU 응답이 없으므로 마지막 속도는 숨깁니다."));
   boolean rpmFresh=RideService.autoArmed&&ObdTelemetryFreshness.fresh(RideService.obdRpmAt,now);
   rpm.setText(rpmFresh?format(RideService.obdRpm,"%.0f"):"—");
   rpmMeter.setProgress(rpmFresh?ObdGaugeWarnings.rpmBar(RideService.obdRpm):0);
@@ -54,6 +54,9 @@ public final class ObdDashboardActivity extends Activity {
     String.format(Locale.KOREA,"GPS %.2f km · 최고 %.0f km/h",RideService.liveDistanceKm,RideService.livePeakKmh):
     "GPS 신호 대기 · 기존 기록 보존"):
     RideService.autoArmed?"자동 기록 대기 · GPS 기록 시작 전":"라이딩 미작동");
+  String bikeId=RideService.activeRideBikeId;
+  odoFallback.setText(ObdMileageUiState.primary(ObdDashboardActivity.this,bikeId));
+  odoFallback.setTextColor(OdoAutoSyncPolicy.sane(OdometerAutoSyncInbox.pending(ObdDashboardActivity.this,bikeId))?Color.WHITE:0xffffc78d);
   int score=ObdLinkQuality.score(RideService.obdLastSampleElapsed,now,
     RideService.obdAverageLatencyMs,(int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples),
     RideService.obdQueryFailures,RideService.obdReconnects,
@@ -66,7 +69,8 @@ public final class ObdDashboardActivity extends Activity {
    ObdTelemetryFreshness.connectionLabel(RideService.autoArmed,RideService.running,speedFresh)+
    "\n"+RideService.engineEstimate()+"\n지원 PID: "+RideService.obdPidSupport+
    "\n"+ObdRestStatus.label(RideService.autoArmed,RideService.running,RideService.obdStationaryRemainingMs)+
-   "\n보조 센서 진단: "+RideService.obdAuxDiagnostics+"\n최근 OBD 오류: "+RideService.obdLastError);
+   "\n보조 센서 진단: "+RideService.obdAuxDiagnostics+"\n최근 OBD 오류: "+RideService.obdLastError+"\n"+
+   ObdMileageUiState.details(ObdDashboardActivity.this,bikeId,Double.NaN));
   handler.postDelayed(this,RideService.autoArmed&&speedFresh?1300:3000);
  }};
  static String format(double x,String fmt){return Double.isFinite(x)?String.format(Locale.KOREA,fmt,x):"—";}
@@ -87,7 +91,7 @@ public final class ObdDashboardActivity extends Activity {
   base.setOrientation(LinearLayout.VERTICAL);
   scroll.addView(base);
   setContentView(scroll);
-  TextView title=new TextView(this);title.setText("MOTO HUB · DEV DASH");title.setTextColor(0xffff8641);title.setTextSize(20);title.setGravity(Gravity.CENTER);title.setPadding(0,0,0,18);base.addView(title);
+  TextView title=new TextView(this);title.setText("MOTO HUB · OBD 계기판");title.setTextColor(0xffff8641);title.setTextSize(20);title.setGravity(Gravity.CENTER);title.setPadding(0,0,0,18);base.addView(title);
   speed=value("차량 속도  ·  km/h",60);
   rpm=value("엔진 회전수  ·  RPM",29);
   rpmMeter=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
@@ -108,6 +112,7 @@ public final class ObdDashboardActivity extends Activity {
   linkStatus.setPadding(0,4,0,compactMode?8:13);
   linkStatus.setGravity(Gravity.CENTER);base.addView(linkStatus);
   ride=value("GPS 라이딩 기록",18);
+  odoFallback=value("주행거리 · 실제 ECU / 0131 / GPS",18);
   status=new TextView(this);status.setTextColor(0xffb8c5d3);status.setTextSize(13);status.setGravity(Gravity.CENTER);base.addView(status);
   SharedPreferences statusPrefs=getSharedPreferences(PREFS,0);
   status.setVisibility(statusPrefs.getBoolean("details",false)?View.VISIBLE:View.GONE);
@@ -121,7 +126,7 @@ public final class ObdDashboardActivity extends Activity {
    toggleDetails.setText(show?"진단 상세 접기":"진단 상세 보기");
   });
   base.addView(toggleDetails);
-  TextView warning=new TextView(this);warning.setText("실험용 읽기 전용 · ODO 및 연료소모량 미검증 · 연료 잔량은 지원 ECU에서만\nRPM 막대 최대값은 앱 표시 범위이며 레드라인이 아닙니다.\n순정 계기판 경고를 우선하고 주행 중 화면을 조작하지 마세요.");warning.setGravity(Gravity.CENTER);warning.setTextColor(0xffa3a9b0);warning.setTextSize(12);warning.setPadding(0,14,0,14);base.addView(warning);
+  TextView warning=new TextView(this);warning.setText("OBD 읽기 전용 · ECU 실제 주행거리와 추정값은 별도입니다.\nRPM 막대는 앱 표시 범위이며 제조사 레드라인이 아닙니다.\n안전 경고는 순정 계기판을 우선하고 주행 중 조작하지 마세요.");warning.setGravity(Gravity.CENTER);warning.setTextColor(0xffa3a9b0);warning.setTextSize(12);warning.setPadding(0,14,0,14);base.addView(warning);
   SharedPreferences prefs=getSharedPreferences(PREFS,0);
   Button landscape=new Button(this);
   landscape.setText(prefs.getBoolean("landscape",false)?"세로 화면으로 전환":"가로 화면으로 전환");

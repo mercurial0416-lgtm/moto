@@ -128,8 +128,10 @@ jobs:
           set -euo pipefail
           CODE="$(tr -d '[:space:]' < release-code.txt)"
           [[ "$CODE" =~ ^[0-9]{3,4}$ ]] || { echo "Invalid release code"; exit 1; }
-          chmod +x gradlew
-          ./gradlew :app:assembleDebug :app:assembleRelease :app:assemblePlayRelease :app:bundlePlayRelease :app:lintDebug :app:testDebugUnitTest -PmotoReleaseCode="$CODE" --no-daemon --stacktrace
+          # Runner-provided Gradle passed the isolated OBD preview build.
+          # The project wrapper URL currently redirects to HTTP 504.
+          command -v gradle
+          gradle :app:assembleDebug :app:assembleRelease :app:assemblePlayRelease :app:bundlePlayRelease :app:lintDebug :app:testDebugUnitTest -PmotoReleaseCode="$CODE" --no-daemon --stacktrace
       - name: Verify APK build outputs (signing happens outside CI)
         working-directory: MOTO-HUB
         run: |

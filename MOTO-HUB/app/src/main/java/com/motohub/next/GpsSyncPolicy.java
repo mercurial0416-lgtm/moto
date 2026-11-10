@@ -15,7 +15,8 @@ final class GpsSyncPolicy {
   dirty++;
   if(dirty>=MAX_DIRTY_POINTS||lastSyncElapsed<0||
      now<lastSyncElapsed||now-lastSyncElapsed>=MAX_DIRTY_MS){
-   dirty=0;lastSyncElapsed=now;return true;
+   // Until FileDescriptor.sync succeeds, data stays explicitly dirty.
+   return true;
   }
   return false;
  }

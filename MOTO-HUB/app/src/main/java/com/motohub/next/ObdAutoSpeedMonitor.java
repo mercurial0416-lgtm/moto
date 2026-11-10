@@ -8,7 +8,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
-/** Explicitly armed, read-only ELM327 telemetry with bounded in-session reconnects. */
+/** Explicitly armed, read-only ELM327 telemetry with bounded backoff foreground standby. */
 final class ObdAutoSpeedMonitor {
  interface Listener {
   void speed(int kmh);
@@ -18,6 +18,9 @@ final class ObdAutoSpeedMonitor {
   default boolean allowOdometer(){return false;}
   default void odometer(double km){}
   default void odometerStatus(String reason){}
+  default boolean allowDtcDistance(){return false;}
+  default void dtcDistance(int km){}
+  default void dtcDistanceStatus(String reason){}
   default void connected(){}
   default void capabilities(ObdPidCapabilities capability){}
   default void auxiliaryDiagnostics(String summary){}
@@ -26,12 +29,16 @@ final class ObdAutoSpeedMonitor {
  private static final UUID SPP=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
  private final BluetoothDevice device;
  private final Listener listener;
+ private final boolean persistentStandby;
  private volatile BluetoothSocket socket;
  private volatile boolean stopped;
  private Thread worker;
  private volatile long connectedAtNanos;
  private static final class UnsupportedSpeed extends IOException {UnsupportedSpeed(){super("차량 속도 PID 010D 미지원");}}
- ObdAutoSpeedMonitor(BluetoothDevice device,Listener listener){this.device=device;this.listener=listener;}
+ ObdAutoSpeedMonitor(BluetoothDevice device,Listener listener){this(device,listener,false);}
+ ObdAutoSpeedMonitor(BluetoothDevice device,Listener listener,boolean persistentStandby){
+  this.device=device;this.listener=listener;this.persistentStandby=persistentStandby;
+ }
  void start(){worker=new Thread(this::readLoop,"moto-obd-autoride");worker.setDaemon(true);worker.start();}
  void stop(){stopped=true;closeSocket();}
  private void closeSocket(){BluetoothSocket s=socket;socket=null;if(s!=null)try{s.close();}catch(Exception ignored){}}
@@ -52,11 +59,19 @@ final class ObdAutoSpeedMonitor {
       // Consume the healthy-session credit. Otherwise every subsequent failed
       // reconnect reuses the stale timestamp and retries forever.
       connectedAtNanos=0;
-      if(!ObdConnectionPolicy.shouldRetry(failures,true,true))break;
-      listener.reconnecting(failures,ObdConnectionPolicy.MAX_RETRIES);
+      // The user-approved foreground standby remains armed across key-off
+      // and repeated failures. Back off to one check per minute after the
+      // initial eight retries, instead of silently giving up overnight.
+      if(!persistentStandby&&
+         !ObdConnectionPolicy.shouldRetry(failures,true,true))break;
+      if(persistentStandby&&!ObdConnectionPolicy.standbyAllowed(true,stopped))break;
+      listener.reconnecting(failures,persistentStandby&&
+        failures>ObdConnectionPolicy.MAX_RETRIES?0:ObdConnectionPolicy.MAX_RETRIES);
       closeSocket();
-      long until=System.nanoTime()+ObdConnectionPolicy.delayMs(failures)*1_000_000L;
-      while(!stopped&&System.nanoTime()<until)Thread.sleep(100);
+      long until=System.nanoTime()+
+       (persistentStandby?ObdConnectionPolicy.standbyDelayMs(failures):
+         ObdConnectionPolicy.delayMs(failures))*1_000_000L;
+      while(!stopped&&System.nanoTime()<until)Thread.sleep(200);
      }
     finally{closeSocket();}
    }
@@ -85,10 +100,17 @@ final class ObdAutoSpeedMonitor {
   if(ObdSpeedResponsePolicy.unsupported(capabilities.forPid("010D")))throw new UnsupportedSpeed();
   connectedAtNanos=System.nanoTime();listener.connected();
   int unsupported=0,samples=0;
+  int priorDtcCandidate=-1,dtcFailures=0;
+  long dtcRetryAfterNanos=0L;
+  boolean directOdoProbeAttempted=false;
+  final boolean dtcCandidateEnabled=listener.allowDtcDistance()&&
+    capabilities.forPid("0131")!=ObdPidCapabilities.Support.NO;
+  if(listener.allowDtcDistance()&&!dtcCandidateEnabled)
+   listener.dtcDistanceStatus("PID 0131 지원 목록에서 미지원 · GPS 추정 사용");
   ObdAuxSensorPolicy auxiliary=new ObdAuxSensorPolicy();
-  final boolean odoSupported=capabilities.forPid("01A6")==ObdPidCapabilities.Support.YES;
-  if(listener.allowOdometer()&&!odoSupported)
-   listener.odometerStatus("ECU ODO 01A6 미지원 또는 확인 불가 · 계기판 km 보존");
+  final ObdPidCapabilities.Support odoSupport=capabilities.forPid("01A6");
+  if(listener.allowOdometer()&&odoSupport!=ObdPidCapabilities.Support.YES)
+   listener.odometerStatus("ECU ODO 지원 목록 미확인 · 정차 상태에서 1회 직접 확인 예정");
   ObdLatencyStats latency=new ObdLatencyStats();
   while(!stopped){
    long started=System.nanoTime();
@@ -112,7 +134,9 @@ final class ObdAutoSpeedMonitor {
    else {unsupported=0;listener.speed(speed);}
    // Optional and explicitly opted-in ODO: two independent read-only samples.
    // Failure must never disrupt safety-critical speed-triggered GPS tracking.
-   if(!stopped&&samples>0&&samples%60==0&&odoSupported&&listener.allowOdometer()){
+   if(!stopped&&ObdOdoPollPolicy.shouldProbe(listener.allowOdometer(),
+      odoSupport,speed,samples,directOdoProbeAttempted)){
+    if(odoSupport!=ObdPidCapabilities.Support.YES)directOdoProbeAttempted=true;
     try{
      double a=ObdOdometer.parseKm(query(in,out,ObdReadOnlyProtocol.query("01A6"),2500));
      double b=ObdOdometer.parseKm(query(in,out,ObdReadOnlyProtocol.query("01A6"),2500));
@@ -146,6 +170,36 @@ final class ObdAutoSpeedMonitor {
      }
      listener.auxiliaryDiagnostics(auxiliary.summary(System.nanoTime())+
       "\\n응답시간(최근 8회): "+latency.summary());
+    }
+   }
+   // Periodic, explicitly opted-in PID 0131 fallback. It does not require
+   // ODO PID A6; its value is not an actual vehicle lifetime odometer.
+   // Require two plausible reads across different speed cycles. Unlike a
+   // failed speed PID, failure never stops GPS capture or the bike session.
+   if(!stopped&&samples%20==0&&dtcCandidateEnabled&&
+      DtcPollingRetry.due(System.nanoTime(),dtcRetryAfterNanos)){
+    try{
+     int counter=DtcDistanceSinceClear.parseKm(query(in,out,DtcDistanceSinceClear.REQUEST,2200));
+     if(counter>=0){
+      dtcFailures=0;
+      // Always require two separate, mutually consistent decoded replies.
+      // A single corrupted low value must never pause this bike's ODO
+      // calibration; the next low reply confirms a genuine decrease.
+      int verified=DtcCounterConfirmPolicy.confirmed(priorDtcCandidate,counter);
+      if(verified>=0)listener.dtcDistance(verified);
+      priorDtcCandidate=counter;
+     }else if(++dtcFailures>=DtcPollingRetry.FAILURE_THRESHOLD){
+      dtcRetryAfterNanos=System.nanoTime()+DtcPollingRetry.COOLDOWN_MS*1_000_000L;
+      dtcFailures=0;priorDtcCandidate=-1;
+      listener.dtcDistanceStatus("PID 0131 수신 실패 · 60초 후 자동 재시도 · GPS 기록 유지");
+     }
+    }catch(InterruptedException e){throw e;}
+    catch(Exception e){
+     if(++dtcFailures>=DtcPollingRetry.FAILURE_THRESHOLD){
+      dtcRetryAfterNanos=System.nanoTime()+DtcPollingRetry.COOLDOWN_MS*1_000_000L;
+      dtcFailures=0;priorDtcCandidate=-1;
+      listener.dtcDistanceStatus("PID 0131 타임아웃 · 60초 후 자동 재시도 · GPS 기록 유지");
+     }
     }
    }
    if(!stopped)Thread.sleep(ObdSpeedResponsePolicy.pollDelayMs(speed));

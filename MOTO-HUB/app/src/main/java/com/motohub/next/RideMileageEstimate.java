@@ -73,6 +73,32 @@ final class RideMileageEstimate {
  static synchronized boolean resetAfterFullRestore(Context c){
   return c.getSharedPreferences(PREF,Context.MODE_PRIVATE).edit().remove("ledger").commit();
  }
+ /**
+  * Stable, bike-bound completed ride entries for an odometer fallback anchor.
+  * Return null for a corrupt ledger rather than treating it as 0 km.
+  * Only copies derived distances; GPS coordinates never leave local storage.
+  */
+ static JSONObject bikeEntries(Context c,String bikeId){
+  if(!RideBikeBinding.valid(bikeId))return null;
+  try{
+   String raw=c.getSharedPreferences(PREF,Context.MODE_PRIVATE).getString("ledger","{}");
+   if(raw==null||raw.length()>250_000)return null;
+   JSONObject ledger=new JSONObject(raw);
+   JSONObject entries=new JSONObject();
+   java.util.Iterator<String> keys=ledger.keys();
+   while(keys.hasNext()){
+    String key=keys.next();
+    JSONObject item=ledger.optJSONObject(key);
+    if(item==null)continue;
+    if(!bikeId.equals(item.optString("bike")))continue;
+    if(!key.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"))return null;
+    double km=item.optDouble("km",Double.NaN);
+    if(!Double.isFinite(km)||km<0||km>500)return null;
+    entries.put(key,km);
+   }
+   return entries;
+  }catch(Exception e){return null;}
+ }
  // SharedPreferences publishes one atomic snapshot. Do not acquire the writer
  // monitor here: the dashboard must remain usable during a full GPS scan/hash.
  static double total(Context c,String bikeId){

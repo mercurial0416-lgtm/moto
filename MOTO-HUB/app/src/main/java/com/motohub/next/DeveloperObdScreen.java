@@ -31,7 +31,7 @@ final class DeveloperObdScreen {
  static final int CONNECT_PERMISSION_REQUEST=88;
  static final int AUTO_CONNECT_PERMISSION_REQUEST=89;
  static final int ODO_CONNECT_PERMISSION_REQUEST=90;
- private static final String PREFERRED_ADAPTER="obd_remembered_device";
+ // Per-bike adapter and PID selection are stored by BikeObdPreferences.
  static final UUID SPP=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
  private final MainActivity activity;
  private final String[] values=new String[ObdReadOnlyProtocol.SENSOR_PIDS.length];
@@ -41,6 +41,7 @@ final class DeveloperObdScreen {
  private volatile boolean stopped=true;
  private volatile BluetoothSocket socket;
  private Thread worker;
+ private volatile long discoveryGeneration;
  DeveloperObdScreen(MainActivity activity){this.activity=activity;}
  /** A short, opt-in first-connection flow. Reuses the existing read-only SPP engine. */
  static void launchQuick(MainActivity a){
@@ -60,6 +61,7 @@ final class DeveloperObdScreen {
   if(RideService.running||RideService.autoArmed||RideService.saving())return;
   LinearLayout p=activity.page("OBD 연결 · 3단계");
   activity.label(p,"1  준비",16,activity.fg,true);
+  activity.label(p,"대상: "+(activity.bike()==null?"바이크 미선택":activity.bike().optString("name"))+" · 동글/센서 설정은 바이크별 저장",14,activity.fg,true);
   activity.label(p,"바이크 정차 → 진단 케이블·동글 장착 → 시동 ON → 갤럭시 Bluetooth 페어링",13,activity.muted,false);
   activity.action(p,"Bluetooth 페어링 설정",false,this::openBluetoothSettings);
   activity.gap(p,12);
@@ -74,6 +76,12 @@ final class DeveloperObdScreen {
    if(RideService.running||RideService.autoArmed){setStatus("라이딩 중에는 별도 ECU 연결을 시작하지 않습니다.");return;}
    loadPaired();
   });
+  activity.action(p,"지원하는 전체 센서 탐색 · 실제 수신값 확인",false,()->loadPairedDiscovery(false));
+  activity.action(p,"선택한 센서만 다시 읽기",false,()->loadPairedDiscovery(true));
+   activity.action(p,"ODO 우회 추정 · 계기판 기준값 보정",false,()->HybridOdometerUi.show(activity));
+   activity.action(p,"PID 0131 · 보조 ODO 연결·설정",false,()->DtcOdoSetupScreen.open(activity));
+   JSONObject quickBike=activity.bike();
+   activity.label(p,HybridOdometerEstimate.label(activity,quickBike==null?"":quickBike.optString("id")),12,activity.muted,false);
   activity.gap(p,12);
   activity.label(p,"3  지원 결과 확인",16,activity.fg,true);
   activity.label(p,"연결 결과·PID 지원 메모는 이 기기에만 저장되고, 실제 센서값을 확인하지 못했다면 지원 확정으로 보지 않습니다.",13,activity.muted,false);
@@ -82,12 +90,119 @@ final class DeveloperObdScreen {
    .setMessage(ObdLocalDiagnosticLog.summary(activity))
    .setPositiveButton("닫기",null).show());
   activity.action(p,"연결 끊기",false,this::stop);
-  activity.show();owner=activity.dialog;
+  activity.show();owner=activity.dialog;activity.developerObd=this;
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
  }
+ /** Everyday screen: four focused groups, legacy diagnostics remain reachable. */
  void show(){
   if(!activity.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))return;
-  LinearLayout p=activity.page("개발자 · OBD2 실험실");
+  LinearLayout p=activity.page("MOTO HUB · OBD");
+  JSONObject bike=activity.bike();
+  String bikeId=bike==null?"":bike.optString("id");
+  String bikeName=bike==null?"바이크 미등록":bike.optString("name","내 바이크");
+  activity.label(p,bikeName+" · "+(RideService.autoArmed?"OBD 자동 감지 사용 중":BikeObdPreferences.autoRideEnabled(activity,bikeId)?"상시 대기 동의됨 · 연결 재개 예정":"OBD 연결 대기 꺼짐"),14,activity.fg,true);
+  status=activity.text("Bluetooth · ECU 상태 확인 중",13,activity.muted,false);p.addView(status);
+  activity.label(p,"정차 상태에서 설정하세요. ECU 수정·고장코드 삭제는 하지 않습니다.",12,activity.muted,false);
+  activity.gap(p,12);
+
+  activity.label(p,"01   연결",18,activity.fg,true);
+  activity.action(p,"OBD 동글 연결 · 센서 확인",true,this::loadPaired);
+  activity.action(p,"Bluetooth 페어링 설정",false,this::openBluetoothSettings);
+  LinearLayout sensorPanel=new LinearLayout(activity);
+  sensorPanel.setOrientation(LinearLayout.VERTICAL);
+  sensorPanel.setVisibility(android.view.View.GONE);
+  p.addView(sensorPanel);
+  for(int i=0;i<fields.length;i++){
+   fields[i]=activity.text(ObdReadOnlyProtocol.SENSOR_NAMES[i]+": —",13,activity.muted,false);
+   fields[i].setMinHeight(activity.dp(36));sensorPanel.addView(fields[i]);
+  }
+  activity.action(p,"센서 수신값 보기 · 접기",false,()->sensorPanel.setVisibility(
+    sensorPanel.getVisibility()==android.view.View.VISIBLE?
+    android.view.View.GONE:android.view.View.VISIBLE));
+  activity.gap(p,14);
+
+  activity.label(p,"02   라이딩 · 실시간 계기판",18,activity.fg,true);
+  activity.action(p,RideService.autoArmed?"자동 감지 작동 중 · 연결 정보 확인":"OBD 자동 라이딩 · 시동 연결 대기 켜기",
+   !RideService.autoArmed,()->{
+    if(RideService.autoArmed){showConnectionInfo();return;}
+    loadPairedAuto();
+   });
+  activity.action(p,"실시간 RPM · 속도 · 수온 계기판",false,()->{
+   if(!RideService.autoArmed){setStatus("OBD 자동 감지를 켜야 실시간 값이 표시됩니다.");return;}
+   activity.startActivity(new Intent(activity,ObdDashboardActivity.class));
+  });
+  if(RideService.autoArmed)activity.action(p,"OBD 자동 감지 끄기 (GPS 기록은 보존)",false,()->{
+   activity.startService(new Intent(activity,RideService.class).setAction(RideService.AUTO_DISARM));
+   setStatus("OBD 자동 감지 종료 요청 · 기존 GPS 주행은 보존");
+  });
+  activity.gap(p,14);
+
+  activity.label(p,"03   주행거리 연동",18,activity.fg,true);
+  activity.label(p,"우선순위: ECU 실제 ODO → PID 0131 증가분 → GPS 추정. 두 추정치는 계기판 실측값과 구분합니다.",12,activity.muted,false);
+  TextView odoCurrent=activity.text("현재 주행거리 확인 중",17,activity.fg,true);
+  p.addView(odoCurrent);
+  TextView odoDetails=activity.text("상세 기록 확인 중",12,activity.muted,false);
+  p.addView(odoDetails);
+  activity.action(p,"주행거리 연동 방식 설정 · 확인",true,this::showOdoOptions);
+  activity.action(p,"실제 계기판 ODO 직접 입력",false,this::manualOdo);
+  activity.gap(p,14);
+
+  activity.label(p,"04   상세 진단",18,activity.fg,true);
+  activity.action(p,"전체 PID 탐색 · 오류 로그 · 고급 설정",false,this::showAdvanced);
+  activity.label(p,"원시 응답 분석은 고급 진단에서만. 주행 중 화면 조작은 하지 마세요.",12,activity.muted,false);
+  activity.show();owner=activity.dialog;activity.developerObd=this;
+  final Dialog screenOwner=owner;
+  owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
+  final Runnable update=new Runnable(){@Override public void run(){
+   if(owner!=screenOwner||!screenOwner.isShowing()||odoCurrent.getParent()==null)return;
+   JSONObject current=activity.bike();
+   String selectedId=current==null?"":current.optString("id");
+   if(worker==null||!worker.isAlive())status.setText(
+     RideService.autoArmed?"OBD 자동 감지: "+RideService.obdLink:
+     "OBD 자동 감지 꺼짐 · 동글 연결 테스트로 센서 확인 가능");
+   odoCurrent.setText(ObdMileageUiState.primary(activity,selectedId));
+   odoDetails.setText(ObdMileageUiState.details(activity,selectedId,
+     current==null?Double.NaN:current.optDouble("odo",Double.NaN)));
+   odoCurrent.postDelayed(this,4000);
+  }};odoCurrent.post(update);
+ }
+ private void showConnectionInfo(){
+  new AlertDialog.Builder(activity).setTitle("OBD 자동 연결 상태")
+   .setMessage(RideService.obdLink+"\n"+RideService.obdPidSupport+
+    "\n최근 오류: "+RideService.obdLastError)
+   .setPositiveButton("닫기",null).show();
+ }
+ private void showOdoOptions(){
+  JSONObject bike=activity.bike();
+  if(bike==null||!RideBikeBinding.valid(bike.optString("id"))||
+     GarageBikeStatus.sold(bike.optString("soldDate"))){
+   setStatus("차고에서 현재 운행 중인 바이크를 먼저 선택해 주세요.");return;
+  }
+  final String id=bike.optString("id");
+  final String[] options={
+   "1 · ECU 실제 ODO 조회 (01A6 / F4A6)",
+   "2 · PID 0131 보조 ODO 자동 연동",
+   "3 · GPS 추정 ODO 기준값 보정",
+   "실제 계기판 숫자 수동 입력",
+   "ECU ODO 동기화 동의·고급 설정"
+  };
+  new AlertDialog.Builder(activity).setTitle("주행거리 연동 방식")
+   .setMessage("실제 ECU 누적거리가 있으면 우선합니다. 지원하지 않으면 0131 변화량, 이어서 GPS 기록으로 추정합니다. 실제 ODO와 추정 ODO는 자동으로 혼합하거나 원본 차고 기록에 덮어쓰지 않습니다.")
+   .setItems(options,(d,i)->{
+    switch(i){
+     case 0:loadPairedOdo();break;
+     case 1:DtcOdoSetupScreen.open(activity);break;
+     case 2:HybridOdometerUi.show(activity);break;
+     case 3:manualOdo();break;
+     case 4:showAdvanced();break;
+    }
+   }).setNegativeButton("취소",null).show();
+ }
+ void showAdvanced(){
+  if(!activity.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))return;
+  LinearLayout p=activity.page("OBD · 고급 진단");
+  activity.action(p,"기본 OBD 화면으로 돌아가기",false,this::show);
+  activity.label(p,"고급 센서·통신 설정 · 읽기 전용",13,activity.muted,false);
   activity.label(p,"실험 기능 · KTM 390 DUKE 호환성 미검증",16,activity.accent,true);
   activity.label(p,"페어링된 ELM327 호환 Bluetooth Classic(SPP) 어댑터로 표준 OBD-II 센서만 조회합니다. 바이크 ECU가 지원하는 항목만 표시됩니다. 순정 계기판 Bluetooth 연결과는 별개입니다.",14,activity.muted,false);
   activity.label(p,"ECU 설정 변경 · 고장코드 삭제 · 출력 제어 없음. 주행 중 조작하지 마세요. 장치 연결은 사용자 선택 시에만 시작되고 원격 전송은 없습니다. 자동 라이딩 도중 일시적 연결 실패 시 최대 8회 재접속하며 앱 재시작 후에는 재연결하지 않습니다.",14,activity.muted,false);
@@ -103,6 +218,8 @@ final class DeveloperObdScreen {
   }
   activity.gap(p,12);
   activity.action(p,"페어링된 장치로 센서 연결 테스트",true,this::loadPaired);
+  activity.action(p,"ECU 전체 지원 센서 탐색 · 선별",false,()->loadPairedDiscovery(false));
+  activity.action(p,"선택한 센서만 재조회",false,()->loadPairedDiscovery(true));
   activity.action(p,"지난 ECU 지원 항목 · 연결 테스트 기록",false,()->{
    new AlertDialog.Builder(activity).setTitle("OBD2 로컬 점검 기록")
     .setMessage(ObdLocalDiagnosticLog.summary(activity))
@@ -148,12 +265,12 @@ final class DeveloperObdScreen {
     }).show();
   });
   activity.label(p,"주차·배터리 주의: 일부 OBD 동글은 시동 OFF 후에도 전력을 사용할 수 있어요. 장기 주차 시 동글 분리 또는 대기전류 실측을 권장합니다. 시트 잠금장치와 배선이 눌리지 않는지도 확인하세요.",13,activity.muted,false);
-  activity.label(p,"자동 감지를 켜는 동안 알림이 계속 표시됩니다. GPS 기록은 이 휴대폰에만 저장하고 친구·그룹 위치 공유는 시작하지 않습니다. 앱 종료/폰 재부팅 뒤 새로 자동 실행하지 않습니다. 같은 기록 세션 중에는 연결을 최대 8회 재시도합니다.",13,activity.muted,false);
-  String remembered=activity.getSharedPreferences("developer_experiments",0).getString(PREFERRED_ADAPTER,"");
+  activity.label(p,"상시 연결 대기 승인 시 지속 알림·배터리를 사용합니다. 시동 OFF 뒤에도 재접속을 시도하며 초기 8회 이후 약 60초 간격으로 대기합니다. 휴대폰 강제종료·재부팅 뒤 즉시 자동 시작은 보장되지 않지만 앱을 다시 열면 대기를 재개합니다. GPS 기록은 로컬에만 저장하고 그룹 위치 공유는 자동 시작하지 않습니다.",13,activity.muted,false);
+  String remembered=activity.bike()==null?"":BikeObdPreferences.address(activity,activity.bike().optString("id"));
   if(!remembered.isEmpty()){
    activity.action(p,"최근 OBD2 장치로 빠르게 연결",true,this::connectRememberedAuto);
    activity.action(p,"기억한 OBD2 장치 삭제",false,()->{
-    activity.getSharedPreferences("developer_experiments",0).edit().remove(PREFERRED_ADAPTER).apply();
+    if(activity.bike()!=null)BikeObdPreferences.clearDevice(activity,activity.bike().optString("id"));
     setStatus("기억한 장치를 삭제했습니다. 다음부터 다시 선택해 주세요.");
    });
   }
@@ -177,7 +294,9 @@ final class DeveloperObdScreen {
    activity.startActivity(new Intent(activity,ObdDashboardActivity.class));
   });
   activity.action(p,"최근 라이딩 기록 확인",false,()->{stop();activity.close();activity.navigate("라이딩");});
-  activity.action(p,"실험 · ECU 표준 ODO(01A6) 1회 조회",false,this::loadPairedOdo);
+  activity.action(p,"실험 · ODO 직접 조회 (01A6 + UDS F4A6)",false,this::loadPairedOdo);
+   activity.action(p,"ODO 우회 추정 · GPS 누적 · 계기판 보정",false,()->HybridOdometerUi.show(activity));
+   activity.action(p,"최후 보루 · PID 0131 연동·재보정",false,()->DtcOdoSetupScreen.open(activity));
   activity.action(p,"계기판 누적 주행거리 수동 확인·반영",false,this::manualOdo);
   JSONObject configured=activity.bike();
   String configuredId=configured==null?"":configured.optString("id");
@@ -191,7 +310,7 @@ final class DeveloperObdScreen {
     new AlertDialog.Builder(activity).setTitle("ODO 자동 동기화 끄기")
      .setMessage("기존 주행 기록과 차고 km는 그대로 유지합니다.")
      .setNegativeButton("취소",null).setPositiveButton("끄기",(d,w)->{
-       OdometerAutoSyncInbox.disable(activity);setStatus("ODO 자동 동기화 꺼짐 · 기록 유지");
+       OdometerAutoSyncInbox.disable(activity,id);setStatus("이 바이크 ODO 자동 동기화 꺼짐 · 기록 유지");
      }).show();return;
    }
    double baseline=chosen.optDouble("odo",Double.NaN);
@@ -249,12 +368,15 @@ final class DeveloperObdScreen {
    dialog.show();
   });
   activity.label(p,OdometerAutoSyncInbox.display(activity,configuredId),12,activity.muted,false);
-  activity.label(p,"표준 01A6 ODO는 지원 차량에서만 조회됩니다. 듀크 390 지원은 미검증입니다. 조회 결과가 실제 계기판과 일치하는지 두 번 확인해야만 앱 주행거리를 변경합니다. GPS·정비 이력은 그대로 보존합니다.",13,activity.muted,false);
+  activity.label(p,DtcOdoBridge.label(activity,configuredId),12,activity.muted,false);
+  activity.action(p,"PID 0131 현재값·중지·재보정",false,()->DtcOdoSetupScreen.showStatus(activity,configuredId));
+  activity.label(p,"01A6·읽기 전용 UDS F4A6은 지원 ECU에서만 수신됩니다. 듀크390 미검증. 두 번 동일하게 수신하고 계기판을 대조한 후에만 수동 반영합니다. GPS·정비 기록 보존.",13,activity.muted,false);
   activity.action(p,"연결 끊기",false,this::stop);
-  activity.show();owner=activity.dialog;
+  activity.show();owner=activity.dialog;activity.developerObd=this;
+  final Dialog screenOwner=owner;
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
   final Runnable update=new Runnable(){@Override public void run(){
-   if(owner==null||!owner.isShowing()||telemetry.getParent()==null)return;
+   if(owner!=screenOwner||!screenOwner.isShowing()||telemetry.getParent()==null)return;
    int qualityScore=ObdLinkQuality.score(RideService.obdLastSampleElapsed,
      android.os.SystemClock.elapsedRealtime(),RideService.obdAverageLatencyMs,
      (int)Math.min(Integer.MAX_VALUE,RideService.obdSpeedSamples),
@@ -318,14 +440,15 @@ final class DeveloperObdScreen {
   entry.show();
  }
  private boolean permissionGranted(){return Build.VERSION.SDK_INT<31||activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED;}
- void loadPaired(){loadPaired(false,false);}
- void loadPairedAuto(){loadPaired(true,false);}
- void loadPairedOdo(){loadPaired(false,true);}
+ void loadPaired(){loadPaired(false,false,false,false);}
+ void loadPairedAuto(){loadPaired(true,false,false,false);}
+ void loadPairedOdo(){loadPaired(false,true,false,false);}
+ void loadPairedDiscovery(boolean selectedOnly){loadPaired(false,false,true,selectedOnly);}
  private void openBluetoothSettings(){
   try{activity.startActivity(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS));}
   catch(Exception unavailable){setStatus("갤럭시 설정 → 연결 → Bluetooth에서 동글을 페어링해 주세요.");}
  }
- private void loadPaired(boolean automatic,boolean odo){
+ private void loadPaired(boolean automatic,boolean odo,boolean discovery,boolean selectedOnly){
   if(owner==null||!owner.isShowing())return;
   if(!permissionGranted()){
    activity.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},automatic?AUTO_CONNECT_PERMISSION_REQUEST:odo?ODO_CONNECT_PERMISSION_REQUEST:CONNECT_PERMISSION_REQUEST);
@@ -346,30 +469,145 @@ final class DeveloperObdScreen {
     return;
    }
    List<BluetoothDevice> devices=new ArrayList<>(bonded);
-   devices.sort(Comparator.comparingInt((BluetoothDevice device)->ObdFirstConnectionGuide.adapterPriority(device.getName()))
+   String bikeRegistered=activity.bike()==null?"":BikeObdPreferences.address(activity,activity.bike().optString("id"));
+   devices.sort(Comparator.comparingInt((BluetoothDevice device)->bikeRegistered.equalsIgnoreCase(device.getAddress())?-1:ObdFirstConnectionGuide.adapterPriority(device.getName()))
     .thenComparing(device->{String name=device.getName();return name==null?"":name.toLowerCase(java.util.Locale.ROOT);}));
    String[] labels=new String[devices.size()];
-   for(int i=0;i<devices.size();i++){String name=devices.get(i).getName();labels[i]=ObdFirstConnectionGuide.adapterLabel(name)+(name==null||name.trim().isEmpty()?"이름 없는 장치":name)+" · "+devices.get(i).getAddress();}
+   for(int i=0;i<devices.size();i++){String name=devices.get(i).getName();labels[i]=(bikeRegistered.equalsIgnoreCase(devices.get(i).getAddress())?"★ 등록된 동글 · ":"")+ObdFirstConnectionGuide.adapterLabel(name)+(name==null||name.trim().isEmpty()?"이름 없는 장치":name)+" · "+devices.get(i).getAddress();}
    new AlertDialog.Builder(activity).setTitle("OBD2 어댑터 선택")
-    .setItems(labels,(d,index)->{if(automatic)confirmAuto(devices.get(index));else if(odo)confirmOdo(devices.get(index));else confirmConnect(devices.get(index));})
+    .setItems(labels,(d,index)->{if(automatic)confirmAuto(devices.get(index));else if(odo)confirmOdo(devices.get(index));else if(discovery)confirmDiscovery(devices.get(index),selectedOnly);else confirmConnect(devices.get(index));})
     .setNegativeButton("취소",null).show();
   }catch(SecurityException e){setStatus("Bluetooth 연결 권한이 필요합니다.");}
  }
 
+
+ private void confirmDiscovery(BluetoothDevice device,boolean selectedOnly){
+  if(RideService.running||RideService.autoArmed||RideService.saving()||RestoreRideGate.isRestoring()){
+   setStatus("라이딩·복원 작업 중에는 별도 OBD 센서 탐색을 시작하지 않습니다.");return;
+  }
+  String currentBikeId=activity.bike()==null?"":activity.bike().optString("id");
+  if(!RideBikeBinding.valid(currentBikeId)){setStatus("먼저 바이크를 등록해 주세요.");return;}
+  if(selectedOnly&&BikeObdPreferences.selectedPids(activity,currentBikeId).isEmpty()){
+   setStatus("먼저 '전체 센서 탐색'에서 읽힌 센서를 선택해 주세요.");return;
+  }
+  new AlertDialog.Builder(activity)
+   .setTitle(selectedOnly?"선택한 OBD 센서 다시 읽기":"ECU 지원 PID 일괄 탐색")
+   .setMessage(selectedOnly
+    ?"선택했던 PID만 한 번씩 다시 읽습니다. 주행 중 실행하지 마세요."
+    :"ECU 지원 비트맵을 따라 표준 Mode 01 읽기 전용 PID만 한 번씩 조회합니다. 센서가 많으면 오래 걸릴 수 있습니다. 결과는 이 화면에서 선택할 수 있고, 총주행거리는 계기판과 대조 전까지 앱에 반영하지 않습니다.")
+   .setNegativeButton("취소",null)
+   .setPositiveButton("정차 상태에서 조회",(d,w)->startDiscovery(device,selectedOnly)).show();
+ }
+ private synchronized void startDiscovery(BluetoothDevice device,boolean selectedOnly){
+  stop();
+  if(worker!=null&&worker.isAlive()){setStatus("이전 OBD 연결을 종료 중입니다. 다시 시도해 주세요.");return;}
+  if(!permissionGranted()){setStatus("먼저 Bluetooth 연결 권한을 허용해 주세요.");return;}
+  long generation=++discoveryGeneration;
+  stopped=false;
+  setStatus(selectedOnly?"선택 센서 조회 연결 중…":"ECU 지원 목록 탐색 연결 중…");
+  final String bikeId=activity.bike().optString("id");
+  worker=new Thread(()->runDiscovery(device,selectedOnly,generation,bikeId),"moto-obd-readonly-discovery");
+  worker.setDaemon(true);worker.start();
+ }
+ private void runDiscovery(BluetoothDevice device,boolean selectedOnly,long generation,String bikeId){
+  try{
+   BluetoothSocket connected=device.createRfcommSocketToServiceRecord(SPP);
+   socket=connected;
+   if(stopped)return;
+   connected.connect();
+   if(stopped)return;
+   InputStream in=connected.getInputStream();
+   OutputStream out=connected.getOutputStream();
+   for(String setup:new String[]{"ATZ\r","ATE0\r","ATL0\r","ATS0\r","ATSP0\r"}){
+    request(in,out,setup,4000);
+    if(stopped)return;
+   }
+   ObdReadOnlyDiscovery.Request reader=(command,timeoutMs)->request(in,out,command,timeoutMs);
+   ObdReadOnlyDiscovery.Progress progress=(done,total,valid)->
+     setStatus("OBD 읽기 전용 탐색 "+done+"/"+total+" · 실제 응답 "+valid+"개\n중단하려면 이 창을 닫거나 '연결 끊기'를 누르세요.");
+   java.util.function.BooleanSupplier cancel=()->stopped||discoveryGeneration!=generation;
+   ObdReadOnlyDiscovery.Result result;
+   if(selectedOnly){
+    List<String> pids=BikeObdPreferences.selectedPids(activity,bikeId);
+    if(pids.isEmpty()){setStatus("저장된 선택 PID가 없습니다. 먼저 전체 탐색을 실행하세요.");return;}
+    result=ObdReadOnlyDiscovery.selected(reader,pids,progress,cancel);
+   }else result=ObdReadOnlyDiscovery.all(reader,progress,cancel);
+   if(cancel.getAsBoolean())return;
+   activity.runOnUiThread(()->{
+    if(owner==null||!owner.isShowing()||activity.dialog!=owner||generation!=discoveryGeneration)return;
+    if(activity.bike()==null||!bikeId.equals(activity.bike().optString("id"))){setStatus("대상 바이크가 바뀌어 결과 저장을 건너뛰었습니다.");return;}
+    showDiscoveryResult(result,selectedOnly,bikeId);
+   });
+  }catch(InterruptedException ignored){/* User cancelled the scan. */}
+  catch(Exception e){
+   if(!stopped&&generation==discoveryGeneration)
+    setStatus("OBD 센서 탐색 실패: "+e.getClass().getSimpleName()+
+      " · 시동 ON/동글 연결 확인. 기존 라이딩·누적거리 기록 변경 없음.");
+  }finally{closeSocket();stopped=true;}
+ }
+ private void showDiscoveryResult(ObdReadOnlyDiscovery.Result result,boolean selectedOnly,String bikeId){
+  List<ObdReadOnlyDiscovery.Reading> readings=result.readings;
+  setStatus("지원 표준 PID "+result.advertised+"개 탐색 · 실제 응답 "+readings.size()+
+   "개 · 무응답/오류 "+result.rejected+"개 · ECU 기록 변경 없음");
+  if(readings.isEmpty()){
+   new AlertDialog.Builder(activity).setTitle("실제 수신된 센서 없음")
+    .setMessage("표준 Mode 01 PID에서 유효한 수신값이 없습니다. 기존 센서 검사가 성공했다면 시동·연결 상태를 확인하고 다시 시도해 주세요.")
+    .setPositiveButton("확인",null).show();
+   return;
+  }
+  final String[] labels=new String[readings.size()];
+  final boolean[] checked=new boolean[readings.size()];
+  java.util.Set<String> selected=new java.util.HashSet<>(BikeObdPreferences.selectedPids(activity,bikeId));
+  for(int i=0;i<readings.size();i++){
+   ObdReadOnlyDiscovery.Reading reading=readings.get(i);
+   labels[i]=reading.label();
+   checked[i]=selected.isEmpty()||selected.contains(reading.pid);
+  }
+  setStatus("실제 수신 "+readings.size()+"개 · 표시할 센서를 체크하세요. HEX=단위 미확인. ODO 자동 반영 없음.\n선택한 PID 번호만 저장합니다.");
+  new AlertDialog.Builder(activity)
+   .setTitle("실제 수신 "+readings.size()+"개 · 표시할 센서 선택")
+   .setMultiChoiceItems(labels,checked,(dialog,index,on)->checked[index]=on)
+   .setNegativeButton("저장 안 함",null)
+   .setPositiveButton("선택한 항목 저장",(dialog,which)->{
+    List<String> kept=new ArrayList<>();
+    for(int i=0;i<checked.length;i++)if(checked[i])kept.add(readings.get(i).pid);
+    if(activity.bike()==null||!bikeId.equals(activity.bike().optString("id"))){setStatus("바이크가 바뀌어 선택을 저장하지 않았습니다.");return;}
+    BikeObdPreferences.setSelectedPids(activity,bikeId,kept);
+    setStatus("실제 수신 "+readings.size()+"개 확인 · 선택 "+kept.size()+
+     "개 저장 (PID 번호만) · '선택한 센서만 다시 읽기'에서 재조회 가능");
+   }).show();
+ }
  private void confirmOdo(BluetoothDevice device){
   if(RideService.running||RideService.autoArmed){setStatus("주행 중에는 ODO 실험 조회를 사용할 수 없습니다.");return;}
   if(activity.readOnly){setStatus("저장 데이터 보호 상태에서는 ODO를 반영하지 않습니다.");return;}
   if(activity.bike()==null||GarageBikeStatus.sold(activity.bike().optString("soldDate"))){setStatus("먼저 운행 중인 바이크를 선택해 주세요.");return;}
-  new AlertDialog.Builder(activity).setTitle("표준 ODO 조회 · 실험")
-   .setMessage("선택한 OBD2 장치에 지원 목록 01A0과 읽기 전용 01A6 요청만 전송합니다. 듀크 390 지원 여부는 확인되지 않았습니다. 측정값은 계기판과 대조하기 전 앱에 저장하지 않습니다. 주행 중에는 조작하지 마세요.")
+  new AlertDialog.Builder(activity).setTitle("ODO 읽기 전용 추가 진단 · 실험")
+   .setMessage("정차 상태에서 01A0 지원목록 → 01A6 직접 조회 → 읽기 전용 22 F4 A6을 차례로 확인합니다. CAN 11비트인 경우 ECU 주소 7E0으로도 재시도합니다. ECU 설정·고장코드·계기판은 변경하지 않습니다. 수신 km는 두 차례 일치하고 계기판과 직접 대조할 때만 앱에 반영할 수 있습니다. 듀크390 호환성은 아직 확인되지 않았습니다.")
    .setNegativeButton("취소",null).setPositiveButton("조회 동의",(d,w)->startOdoProbe(device)).show();
  }
  private synchronized void startOdoProbe(BluetoothDevice device){
   stop();
   if(worker!=null&&worker.isAlive()){setStatus("기존 조회 연결을 종료 중입니다. 다시 시도해 주세요.");return;}
   if(!permissionGranted()){setStatus("Bluetooth 연결 권한이 필요합니다.");return;}
-  stopped=false;setStatus("표준 ODO PID 지원 확인 중…");
+  stopped=false;setStatus("표준 01A6 → 읽기 전용 22 F4 A6 확인 중…");
   worker=new Thread(()->runOdoProbe(device),"moto-obd-odo-probe");worker.setDaemon(true);worker.start();
+ }
+ /** Timeouts do not prove non-support; display the read-only probe outcome. */
+ private String tryOdoRequest(InputStream in,OutputStream out,String command,long timeoutMs){
+  try{return request(in,out,command,timeoutMs);}
+  catch(Exception e){return stopped?"중지됨":"응답 실패 ("+e.getClass().getSimpleName()+")";}
+ }
+ /** Two distinct, identical reads required before showing an ODO candidate. */
+ private void checkSecondOdoReply(InputStream in,OutputStream out,String cmd,double first,boolean uds,String source){
+  String secondRaw=tryOdoRequest(in,out,cmd,3000);
+  double second=uds?ObdOdometer.parseUdsKm(secondRaw):ObdOdometer.parseKm(secondRaw);
+  if(!Double.isFinite(second)||Double.compare(first,second)!=0){
+   setStatus(source+" · 2회 응답 검증 실패 · 첫 값 "+
+    String.format(java.util.Locale.KOREA,"%.1f",first)+
+    " km · 재조회 "+ObdOdometer.responseSummary(secondRaw)+" · 기록 변경 없음");
+   return;
+  }
+  if(!stopped)activity.runOnUiThread(()->confirmProbedOdo(first,source));
  }
  private void runOdoProbe(BluetoothDevice device){
   try{
@@ -380,19 +618,52 @@ final class DeveloperObdScreen {
    for(String setup:new String[]{"ATZ\r","ATE0\r","ATL0\r","ATS0\r","ATSP0\r"}){
     request(in,out,setup,4000);if(stopped)return;
    }
-   String bitmap=request(in,out,ObdReadOnlyProtocol.query("01A0"),3000);
+   // A functional 0100 helps the ELM adapter autodetect the vehicle protocol.
+   tryOdoRequest(in,out,ObdReadOnlyProtocol.query("0100"),2500);
+   String bitmap=tryOdoRequest(in,out,ObdReadOnlyProtocol.query("01A0"),2500);
    ObdPidCapabilities.Support support=ObdPidCapabilities.fromResponses(null,null,bitmap).forPid("01A6");
-   if(support!=ObdPidCapabilities.Support.YES){
-    setStatus(support==ObdPidCapabilities.Support.NO?"이 ECU는 표준 ODO PID 01A6을 지원하지 않습니다.":"ODO 지원 목록을 확인할 수 없습니다. 앱 기록은 변경되지 않았습니다.");return;
+   // Bitmap unavailable/NO is not treated as proof a direct reply is impossible.
+   String standard=tryOdoRequest(in,out,ObdOdometer.STANDARD_REQUEST,3000);
+   double km=ObdOdometer.parseKm(standard);
+   if(Double.isFinite(km)){
+    checkSecondOdoReply(in,out,ObdOdometer.STANDARD_REQUEST,km,false,"표준 OBD 01A6");return;
    }
-   String raw=request(in,out,ObdReadOnlyProtocol.query(ObdReadOnlyProtocol.ODOMETER_PID),3000);
-   double odo=ObdOdometer.parseKm(raw);
-   if(!Double.isFinite(odo)){setStatus("ODO 응답이 없거나 유효하지 않습니다. 기록 변경 없음.");return;}
-   if(!stopped)activity.runOnUiThread(()->confirmProbedOdo(odo));
+   if(stopped)return;
+   String uds=tryOdoRequest(in,out,ObdOdometer.UDS_REQUEST,3000);
+   km=ObdOdometer.parseUdsKm(uds);
+   if(Double.isFinite(km)){
+    checkSecondOdoReply(in,out,ObdOdometer.UDS_REQUEST,km,true,"UDS 22 F4 A6 · 기본 주소");return;
+   }
+   if(stopped)return;
+   // ATSH selects a tester request header on the ELM dongle, not an ECU setting.
+   // Restrict it to confirmed 11-bit CAN transport only.
+   String dpn=tryOdoRequest(in,out,"ATDPN\r",1500).trim().toUpperCase(java.util.Locale.ROOT);
+   String physical="시도하지 않음 (11비트 CAN 미확인)";
+   if(dpn.matches("A?[68]")){
+    String header=tryOdoRequest(in,out,"ATSH7E0\r",1500);
+    if(header.toUpperCase(java.util.Locale.ROOT).contains("OK")){
+     physical=tryOdoRequest(in,out,ObdOdometer.UDS_REQUEST,3000);
+     km=ObdOdometer.parseUdsKm(physical);
+     if(Double.isFinite(km)){
+      checkSecondOdoReply(in,out,ObdOdometer.UDS_REQUEST,km,true,"UDS 22 F4 A6 · ECU 7E0");return;
+     }
+     String physicalStandard=tryOdoRequest(in,out,ObdOdometer.STANDARD_REQUEST,3000);
+     km=ObdOdometer.parseKm(physicalStandard);
+     if(Double.isFinite(km)){
+      checkSecondOdoReply(in,out,ObdOdometer.STANDARD_REQUEST,km,false,"표준 01A6 · ECU 7E0");return;
+     }
+     physical+=" · 01A6: "+ObdOdometer.responseSummary(physicalStandard);
+    }else physical="헤더 변경 거부: "+ObdOdometer.responseSummary(header);
+   }
+   if(!stopped)setStatus("ODO 미수신 · 01A0 지원: "+support+
+    "\n01A6: "+ObdOdometer.responseSummary(standard)+
+    "\n22 F4 A6: "+ObdOdometer.responseSummary(uds)+
+    "\nECU 7E0: "+ObdOdometer.responseSummary(physical)+
+    "\n앱 km 변경 없음 · 원시 응답 화면을 캡처해 분석할 수 있습니다.");
   }catch(Exception e){if(!stopped)setStatus("ODO 조회 실패: "+e.getClass().getSimpleName()+" · 기록 변경 없음");}
   finally{closeSocket();stopped=true;}
  }
- private void confirmProbedOdo(double odo){
+ private void confirmProbedOdo(double odo,String source){
   if(owner==null||!owner.isShowing()||activity.dialog!=owner||RideService.running||RideService.autoArmed)return;
   JSONObject bike=activity.bike();
   if(bike==null||GarageBikeStatus.sold(bike.optString("soldDate"))||activity.readOnly)return;
@@ -400,7 +671,7 @@ final class DeveloperObdScreen {
   try{OdometerSyncPolicy.checkedManual(String.valueOf(odo),before);}
   catch(IllegalArgumentException ex){setStatus("ECU 값 "+odo+" km · "+ex.getMessage()+" · 반영하지 않음");return;}
   new AlertDialog.Builder(activity).setTitle("실험 ODO 수신 · 1차 확인")
-   .setMessage("ECU 표준 PID 01A6: "+activity.num(odo)+" km\n앱: "+activity.num(before)+" km\n이 값이 실제 KTM 계기판에 표시된 누적거리와 정확히 같은지 직접 확인했나요? 자동 변경되지 않습니다.")
+   .setMessage(source+" · 2회 동일한 ECU 응답: "+activity.num(odo)+" km\n앱: "+activity.num(before)+" km\n실제 KTM 계기판의 총주행거리와 일치하는지 직접 확인했나요? 자동 변경되지 않습니다.")
    .setNegativeButton("반영 안 함",null).setPositiveButton("계기판과 일치",(d,w)->{
     new AlertDialog.Builder(activity).setTitle("주행거리 변경 · 최종 확인")
      .setMessage("바이크 "+bike.optString("name")+"\n"+activity.num(before)+" → "+activity.num(odo)+" km\n확인한 ODO만 앱에 반영하고 기존 정비·주행 기록은 보존합니다.")
@@ -423,7 +694,7 @@ final class DeveloperObdScreen {
   if(!permissionGranted()){
    activity.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},AUTO_CONNECT_PERMISSION_REQUEST);return;
   }
-  String address=activity.getSharedPreferences("developer_experiments",0).getString(PREFERRED_ADAPTER,"");
+  String address=activity.bike()==null?"":BikeObdPreferences.address(activity,activity.bike().optString("id"));
   if(address.isEmpty()||!BluetoothAdapter.checkBluetoothAddress(address)){
    setStatus("기억한 OBD2 장치가 없습니다. 다시 선택해 주세요.");return;
   }
@@ -449,17 +720,32 @@ final class DeveloperObdScreen {
   if(location==null||!location.isProviderEnabled(LocationManager.GPS_PROVIDER)){
    setStatus("먼저 휴대폰 GPS를 켜 주세요.");return;
   }
-  final boolean[] remember={false};
+  final boolean[] remember={false}; // Never enable all-night OBD polling by default
   new AlertDialog.Builder(activity).setTitle("OBD2 자동 라이딩 기록을 켤까요?")
-   .setMessage("이 장치가 연결된 동안 속도 7km/h 이상을 연속 3회 감지하면 GPS 경로를 이 휴대폰에 자동 저장합니다. 설정한 정차 시간 후 종료하며 다음 출발을 다시 감지합니다. 백그라운드 위치 사용과 지속 알림이 필요합니다. 그룹 공유는 켜지지 않습니다. 재연결에 최종 실패하면 진행 중인 GPS 주행은 유지되며 알림에서 직접 종료합니다. 원할 때 알림에서 중지하세요. 실험 기능이므로 실제 듀크 390 동작은 아직 검증되지 않았습니다.")
-   .setMultiChoiceItems(new String[]{"이 장치를 이 휴대폰에 기억하기 (다음 연결 선택만 생략)"},remember,(dialog,index,selected)->remember[index]=selected)
+   .setMessage("동의를 선택하면 OBD 자동 감지를 실행합니다. 속도 7km/h 이상을 3회 읽으면 GPS 기록을 시작하고, 주차 후 저장합니다. '상시 대기'를 켜면 시동 OFF 후에도 Bluetooth 연결을 약 60초 간격으로 재시도하며 다음 시동을 기다립니다.\n\n이 모드는 지속 알림·배터리를 사용하며 앱 강제종료/휴대폰 재부팅 뒤에는 보장되지 않습니다. 그룹 위치 공유·ECU 설정 변경은 하지 않습니다. 실차 KTM 동작 검증 전입니다.")
+   .setMultiChoiceItems(new String[]{"이 바이크에서 상시 연결 대기 (시동 OFF 후에도 유지 · 배터리 사용)"},remember,(dialog,index,selected)->remember[index]=selected)
    .setNegativeButton("취소",null).setPositiveButton("동의하고 자동 감지 시작",(d,w)->{
-    if(remember[0])activity.getSharedPreferences("developer_experiments",0).edit().putString(PREFERRED_ADAPTER,device.getAddress()).apply();
+    if(activity.bike()!=null){
+     String bikeId=activity.bike().optString("id");
+     // Explicitly persist background-ready consent only when chosen.
+     if(remember[0]){
+      // User explicitly switched from low-power Cardo to persistent OBD.
+      // Never leave both modes enabled; stop the old system observer first.
+      if(CardoAutoRidePrefs.forBike(activity,bikeId)){
+       CardoCompanionPairing.stopObserving(activity);
+       CardoAutoRidePrefs.disable(activity);
+      }
+      BikeObdPreferences.setDevice(activity,bikeId,device.getAddress(),device.getName());
+      BikeObdPreferences.setAutoRideEnabled(activity,bikeId,true);
+     }else if(BikeObdPreferences.autoRideEnabled(activity,bikeId)){
+      BikeObdPreferences.setAutoRideEnabled(activity,bikeId,false);
+     }
+    }
     stop();
     Intent start=new Intent(activity,RideService.class).setAction(RideService.AUTO_ARM).putExtra(RideService.EXTRA_DEVICE,device.getAddress())
      .putExtra(RideService.EXTRA_BIKE_ID,activity.bike()==null?"":activity.bike().optString("id"));
     activity.attempt(()->activity.startForegroundService(start));
-    setStatus("OBD2 자동 감지 시작 요청 · 알림으로 상태 확인");
+    setStatus(remember[0]?"OBD 상시 연결 대기 시작 · 시동 OFF 후에도 다음 출발 감지":"OBD 자동 감지 시작 · 상시 대기는 꺼짐");
    }).show();
  }
  private void confirmConnect(BluetoothDevice device){
@@ -573,7 +859,7 @@ final class DeveloperObdScreen {
  private void setStatus(String message){activity.runOnUiThread(()->{
   if(owner!=null&&owner.isShowing()&&activity.dialog==owner)status.setText(message);
  });}
- synchronized void stop(){stopped=true;closeSocket();for(int i=0;i<fields.length;i++)updateStopped(i);setStatus("연결 끊김");}
+ synchronized void stop(){stopped=true;discoveryGeneration++;closeSocket();for(int i=0;i<fields.length;i++)updateStopped(i);setStatus("연결 끊김");}
  private void updateStopped(int index){activity.runOnUiThread(()->{
   if(owner!=null&&owner.isShowing()&&activity.dialog==owner){
    fields[index].setVisibility(android.view.View.VISIBLE);

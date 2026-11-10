@@ -463,10 +463,15 @@ final class HubScreens {
   }
   sc.addView(group);a.content.addView(sc);a.gap(a.content,12);
  }
- void manageBike(){JSONObject b=a.bike();if(b==null){a.edit("vehicles",null);return;}LinearLayout p=a.page("내 바이크 관리");a.label(p,b.optString("name"),25,a.fg,true);a.label(p,b.optInt("year")+"년식 · "+a.num(b.optDouble("odo"))+" km",17,a.muted,false);a.label(p,"구매가 "+a.won(b.optDouble("purchase")),17,a.fg,false);
+ void manageBike(){JSONObject b=a.bike();if(b==null){a.edit("vehicles",null);return;}LinearLayout p=a.page("내 바이크 관리");a.label(p,b.optString("name"),25,a.fg,true);a.label(p,b.optInt("year")+"년식 · "+a.num(b.optDouble("odo"))+" km",17,a.muted,false);
+  a.label(p,DtcOdoBridge.label(a,b.optString("id")),13,a.muted,false);
+  a.action(p,"PID 0131 주행거리 자동 추정 · 연결/보정",false,()->DtcOdoSetupScreen.open(a));a.label(p,"구매가 "+a.won(b.optDouble("purchase")),17,a.fg,false);
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
   a.action(p,"바이크 정보 수정",true,()->a.edit("vehicles",b));
+  String bikeObdAddress=BikeObdPreferences.address(a,b.optString("id"));
+  a.label(p,"바이크 설정",15,a.fg,true);
+  a.action(p,"OBD 연결 설정 · "+(bikeObdAddress.isEmpty()?"등록 안 됨":BikeObdPreferences.deviceName(a,b.optString("id"))),false,()->new BikeObdSettingsUi(a).open(b.optString("id")));
   a.action(p,"부품별 관리 장부",false,()->new ComponentBookUi(a).open());
   a.label(p,"차량 라이프로그",15,a.fg,true);
   a.action(p,"판매·정비 이력 PDF · 직접 저장",false,()->a.exportOwnershipPdf(b.optString("id")));
@@ -914,7 +919,7 @@ LinearLayout p=a.page("백업 · 복원");a.label(p,"ZIP 하나로 바이크·�
   a.action(p,"고급 백업 도구",false,this::advancedBackup);
   a.action(p,"개인정보 없는 진단 보고서",false,this::localDiagnostics);
   a.action(p,"친구·그룹 서버 진단",false,this::serverPreflight);
-  a.action(p,"듀크 390 · OBD2 읽기 전용 (실험)",true,()->{
+  a.action(p,"현재 바이크 · OBD2 읽기 전용 (실험)",true,()->{
    if(a.developerObd!=null)a.developerObd.stop();
    a.developerObd=new DeveloperObdScreen(a);a.developerObd.show();
   });

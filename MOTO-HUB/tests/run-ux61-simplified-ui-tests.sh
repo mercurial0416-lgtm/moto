@@ -20,7 +20,7 @@ assert 'a.action(p,"보관된 보호장구 기록"' in settings
 assert 'a.action(p,"기변 계산기"' in settings
 assert 'a.action(p,"개인정보 없는 진단 보고서"' in settings
 assert 'a.action(p,"친구·그룹 서버 진단"' in settings
-assert 'a.action(p,"듀크 390 · OBD2 읽기 전용 (실험)"' in settings
+assert 'a.action(p,"현재 바이크 · OBD2 읽기 전용 (실험)"' in settings
 assert 'ridePreflight' not in settings
 assert 'OBD2 동글 연결 · ECU 센서 테스트' not in ride
 assert 'OBD2 데이터를 읽는 중' not in ride
