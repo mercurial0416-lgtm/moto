@@ -2,7 +2,7 @@ package com.motohub.next;
 import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.content.pm.ServiceInfo;import android.location.*;import android.os.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.UUID;import android.bluetooth.*;
 /** User-started location FGS. Local recording with explicit group sharing. No boot restart, network or mock positions. */
 public final class RideService extends Service implements LocationListener {
- static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;static volatile long liveMovingMillis=0,liveStationaryMillis=0,lastWidgetRefreshElapsed=0;
+ static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id",EXTRA_CARDO_TRIGGER="cardo_trigger",CARDO_DISCONNECTED="com.motohub.next.CARDO_DISCONNECTED";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;static volatile long liveMovingMillis=0,liveStationaryMillis=0,lastWidgetRefreshElapsed=0;
  // Volatile display data only: neither ECU samples nor Bluetooth address are uploaded/stored.
  static volatile int obdSpeedKmh=-1,obdReconnects=0;
  static volatile long obdAverageLatencyMs=-1;
@@ -89,6 +89,11 @@ public final class RideService extends Service implements LocationListener {
  final RideNotificationRate notificationRate=new RideNotificationRate();
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="",activeAutoAdapterAddress="";ObdAutoSpeedMonitor obdMonitor;
+ boolean cardoSession=false,cardoConnected=false,requestedCardoStart=false;
+ final Runnable cardoIdleStop=new Runnable(){public void run(){
+  if(cardoSession&&autoArmed&&!running&&!autoFinishPending)
+   stopWith("카르도 연결 후 5분 대기 만료 · 배터리 절약",false);
+ }};
  final ObdParkingIsolation parkingIsolation=new ObdParkingIsolation();
  /** The phone may walk after the motorcycle is parked. */
  volatile boolean gpsObdParkingHold=false,gpsObdResumeSplit=false;
@@ -98,7 +103,7 @@ public final class RideService extends Service implements LocationListener {
   if(parkingIsolation.dueAfterLost(SystemClock.elapsedRealtime())){
    // Complete the parked bike ride while leaving the explicitly armed
    // Bluetooth foreground watcher ready for the next ignition ON.
-   if(!BikeObdPreferences.autoRideEnabled(RideService.this,pendingBikeId)){
+   if(!BikeObdPreferences.autoRideEnabled(RideService.this,pendingBikeId)&&!cardoSession){
     // A one-shot reader must not remain connected indefinitely.
     ObdAutoSpeedMonitor reader=obdMonitor;
     if(reader!=null)reader.stop();
@@ -140,6 +145,7 @@ public final class RideService extends Service implements LocationListener {
  }};
  volatile boolean finishPending=false,autoFinishPending=false;
  final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)
+   &&!(cardoSession&&CardoAutoRidePrefs.forBike(RideService.this,pendingBikeId))
    &&(!BikeObdPreferences.autoRideEnabled(RideService.this,pendingBikeId)
        ||!BikeObdPreferences.address(RideService.this,pendingBikeId).equals(activeAutoAdapterAddress))){
     // Turning off developer experiments revokes OBD permission, not consent to a
@@ -200,6 +206,19 @@ public final class RideService extends Service implements LocationListener {
    }else if(!RideSessionInterlock.keepExistingSession(running,autoArmed))stopSelf();
    return START_NOT_STICKY;
   }
+  if(CARDO_DISCONNECTED.equals(action)){
+   if(!cardoSession||!autoArmed)return START_NOT_STICKY;
+   cardoConnected=false;
+   if(!running){stopWith("카르도 연결 종료 · OBD 대기 종료",false);return START_NOT_STICKY;}
+   if(autoGate.stoppedBeforeDisconnect(SystemClock.elapsedRealtime())){
+    status="카르도 종료 · 정차 확인 · GPS 저장";
+    finishAutoTrack();
+   }else{
+    status="카르도 연결 끊김 · 주행 중일 수 있어 GPS 기록 유지";
+    notifySafely(status);
+   }
+   return START_NOT_STICKY;
+  }
   if(!RestoreRideGate.beginRideStart()){
    // A rejected duplicate start must never stop an already-running foreground
    // ride: Android can deliver a second start intent while a restore is pending.
@@ -215,6 +234,7 @@ public final class RideService extends Service implements LocationListener {
     pendingBikeId=intent.getStringExtra(EXTRA_BIKE_ID);
     if(!RideBikeBinding.valid(pendingBikeId)){stopWith("등록된 바이크를 선택한 뒤 OBD 기록을 켜 주세요.",false);return START_NOT_STICKY;}
     activeRideBikeId=pendingBikeId;
+    requestedCardoStart=intent.getBooleanExtra(EXTRA_CARDO_TRIGGER,false);
     armAutomaticRide(intent.getStringExtra(EXTRA_DEVICE));return START_NOT_STICKY;
    }
    if(running||autoArmed)return START_NOT_STICKY;
@@ -275,7 +295,9 @@ public final class RideService extends Service implements LocationListener {
    boolean developerApproved=getSharedPreferences("developer_experiments",0).getBoolean("enabled",false);
    boolean bikeApproved=BikeObdPreferences.autoRideEnabled(this,pendingBikeId)
      &&address!=null&&address.equalsIgnoreCase(BikeObdPreferences.address(this,pendingBikeId));
-   if(!developerApproved&&!bikeApproved)
+   boolean cardoApproved=requestedCardoStart&&CardoAutoRidePrefs.forBike(this,pendingBikeId)
+     &&address!=null&&address.equalsIgnoreCase(BikeObdPreferences.address(this,pendingBikeId));
+   if(!developerApproved&&!bikeApproved&&!cardoApproved)
     throw new SecurityException("바이크 설정에서 이 동글의 OBD 자동 라이딩을 먼저 동의해 주세요.");
    if(address==null||!BluetoothAdapter.checkBluetoothAddress(address))throw new IllegalArgumentException("OBD2 어댑터를 다시 선택해 주세요.");
    if(Build.VERSION.SDK_INT>=31&&checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("Bluetooth 연결 권한이 필요합니다.");
@@ -287,6 +309,7 @@ public final class RideService extends Service implements LocationListener {
    if(paired==null)throw new SecurityException("이미 페어링된 OBD2 장치만 사용할 수 있습니다.");
    activeAutoAdapterAddress=address.toUpperCase(java.util.Locale.ROOT);
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
+   cardoSession=cardoApproved;cardoConnected=cardoApproved;
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    parkingIsolation.reset();gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
@@ -390,10 +413,11 @@ public final class RideService extends Service implements LocationListener {
      notifySafely(status);
     }});}
     @Override public void disconnected(String reason){handler.post(()->{if(autoArmed&&obdMonitor==ref[0])onObdDisconnected(reason);});}
-   },bikeApproved);
+   },bikeApproved&&!cardoSession);
    ref[0]=reader;obdMonitor=reader;
    ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    reader.start();handler.postDelayed(permissionCheck,5000);
+   if(cardoSession){handler.removeCallbacks(cardoIdleStop);handler.postDelayed(cardoIdleStop,300_000L);}
   }catch(Exception e){stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);}
  }
  private void handleAutoSpeed(int speedKmh){
@@ -402,6 +426,7 @@ public final class RideService extends Service implements LocationListener {
   ObdRideAutoGate.Event event=autoGate.accept(speedKmh,now);
   obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
   if(event==ObdRideAutoGate.Event.START){
+   if(cardoSession)handler.removeCallbacks(cardoIdleStop);
    // The externally requested GPS start is interlocked; auto-start must use
    // the same reservation or a concurrent form save/restore could begin.
    if(!RestoreRideGate.beginRideStart()){
@@ -495,6 +520,15 @@ public final class RideService extends Service implements LocationListener {
   // Reset recording after the stored ride; new movement can start a new track.
   autoGate.reset();parkingIsolation.reset();
   synchronized(this){gpsObdParkingHold=false;gpsObdHoldStarted=-1;gpsObdResumeSplit=false;}
+  if(cardoSession){
+   if(!cardoConnected){
+    stopWith("카르도 OFF · GPS 라이딩 저장 후 대기 종료",false);
+    if(verified)DailyMaintenanceJob.checkSoon(this);
+    return;
+   }
+   handler.removeCallbacks(cardoIdleStop);
+   handler.postDelayed(cardoIdleStop,300_000L);
+  }
   if(finishPending){
    finishPending=false;
    stopWith(verified?"자동 라이딩을 저장하고 종료했습니다.":"GPS 저장 검증 실패 · 원본 복구가 필요합니다.",false);
@@ -760,7 +794,8 @@ public final class RideService extends Service implements LocationListener {
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(storageWatchdog);
   // Invalidate queued main-thread finalization callbacks after failures or process teardown.
   finishPending=false;autoFinishPending=false;
-  handler.removeCallbacks(finishParkedObdLoss);parkingIsolation.reset();
+  handler.removeCallbacks(finishParkedObdLoss);handler.removeCallbacks(cardoIdleStop);
+  cardoSession=false;cardoConnected=false;requestedCardoStart=false;parkingIsolation.reset();
   gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
   Sharing.stop();autoArmed=false;activeRideBikeId="";activeAutoAdapterAddress="";obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
