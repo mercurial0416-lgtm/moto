@@ -2806,8 +2806,8 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
       try{odoReset=HybridOdometerEstimate.suspendAfterRestore(this)&&odoReset;}
       catch(Exception ignored){odoReset=false;}
       try{odoReset=DtcOdoBridge.suspendAfterRestore(this)&&odoReset;}
-      CardoCompanionPairing.stopObserving(this);CardoAutoRidePrefs.disable(this);
       catch(Exception ignored){odoReset=false;}
+      CardoCompanionPairing.stopObserving(this);CardoAutoRidePrefs.disable(this);
       try{checkpoint=LocalSafetyBackup.checkpoint(this,validated);}catch(Exception ignored){}
       try{MotoWidgetProvider.refresh(this);}catch(Exception ignored){}
      }catch(Exception failure){
