@@ -391,7 +391,7 @@ public final class RideService extends Service implements LocationListener {
      if(!running)status="OBD2 연결됨 · 출발 대기";
     }});}
     @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
-     obdLink=max==0?"OBD 재연결 상시 대기 · 약 60초 간격":
+     obdLink=max==0?(cardoSession?"카르도 감지 · OBD 연결 재시도":"OBD 재연결 상시 대기 · 약 60초 간격"):
       "연결 재시도 "+attempt+"/"+max;
      obdConnectionAttempts++;MotoWidgetProvider.refresh(RideService.this);
      boolean parkedBeforeLoss=running&&parkingIsolation.onLinkLoss(SystemClock.elapsedRealtime());
@@ -413,7 +413,7 @@ public final class RideService extends Service implements LocationListener {
      notifySafely(status);
     }});}
     @Override public void disconnected(String reason){handler.post(()->{if(autoArmed&&obdMonitor==ref[0])onObdDisconnected(reason);});}
-   },bikeApproved&&!cardoSession);
+   },bikeApproved||cardoSession); // Cardo retries stop at five-minute idle deadline
    ref[0]=reader;obdMonitor=reader;
    ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    reader.start();handler.postDelayed(permissionCheck,5000);
