@@ -378,6 +378,10 @@ final class GarageHomeUi {
   a.content.addView(panel);a.gap(a.content,8);
   double gps=RideMileageEstimate.total(a,bike.optString("id"));
   a.label(a.content,"저장된 GPS 추정 "+(Double.isFinite(gps)?String.format(Locale.KOREA,"%,.1f km",gps):"확인 불가")+" · 계기판과 별도",12,soft,false);
+  if(BikeObdPreferences.autoRideEnabled(a,bike.optString("id")))
+   a.label(a.content,RideService.autoArmed&&bike.optString("id").equals(RideService.activeRideBikeId)?
+    "OBD 시동 자동 연결 대기 중 · "+RideService.obdLink:
+    "OBD 상시 연결 동의됨 · 앱 실행 시 자동 대기 복구",12,soft,false);
   if(OdometerAutoSyncInbox.enabled(a,bike.optString("id")))a.label(a.content,OdometerAutoSyncInbox.display(a,bike.optString("id")),12,soft,false);
   if(DtcOdoBridge.enabled(a,bike.optString("id"))){
    a.label(a.content,DtcOdoBridge.label(a,bike.optString("id"))+" · 계기판 직접 확인 필요",12,soft,false);
