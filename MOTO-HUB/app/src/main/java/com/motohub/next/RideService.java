@@ -523,7 +523,9 @@ public final class RideService extends Service implements LocationListener {
   synchronized(this){gpsObdParkingHold=false;gpsObdHoldStarted=-1;gpsObdResumeSplit=false;}
   if(cardoSession){
    if(!cardoConnected){
-    stopWith("카르도 OFF · GPS 라이딩 저장 후 대기 종료",false);
+    stopWith(verified?
+      "카르도 OFF · GPS 기록 검증 완료 · OBD 대기 종료":
+      "카르도 OFF · GPS 파일 검증 실패 · 복구 화면에서 원본 확인",false);
     if(verified)DailyMaintenanceJob.checkSoon(this);
     return;
    }
