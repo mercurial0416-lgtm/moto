@@ -49,14 +49,17 @@ final class BikeObdSettingsUi {
   a.gap(p,12);
   a.label(p,"라이딩 기록 자동 연동",16,a.fg,true);
   boolean autoEnabled=BikeObdPreferences.autoRideEnabled(a,bikeId);
-  a.label(p,autoEnabled?"이 바이크: OBD 자동 라이딩 사용 설정됨":"현재 꺼짐 · 원할 때 활성화 가능",14,a.muted,false);
+  a.label(p,autoEnabled?(RideService.autoArmed&&bikeId.equals(RideService.activeRideBikeId)?
+    "상시 대기 중 · 시동 OFF 뒤에도 다음 연결을 감시합니다":
+    "상시 대기 동의 저장됨 · 앱을 다시 열면 연결 감지 재개"):
+    "상시 대기 꺼짐 · 한 번 켜면 주차 뒤에도 다음 시동을 감지",14,a.muted,false);
   if(RideService.autoArmed&&bikeId.equals(RideService.activeRideBikeId))
    a.label(p,"지금 이 바이크의 OBD 자동 출발 감지 진행 중 · "+RideService.obdLink,14,a.fg,false);
   else if(RideService.autoArmed||RideService.running)
    a.label(p,"다른 라이딩이 진행 중입니다. 해당 기록을 종료한 뒤 설정하세요.",13,a.muted,false);
   if(address.isEmpty())a.label(p,"바이크별 동글을 먼저 등록하면 자동 라이딩을 켤 수 있습니다.",13,a.muted,false);
   else{
-   a.action(p,autoEnabled?"이 바이크 OBD 자동 기록 시작":"이 바이크 OBD 자동 기록 켜고 시작",true,()->beginAuto(bikeId));
+   a.action(p,autoEnabled?"OBD 상시 대기 다시 시작":"OBD 시동 자동 연결 · 상시 대기 켜기",true,()->beginAuto(bikeId));
    if(autoEnabled)a.action(p,"이 바이크 OBD 자동 기록 해제",false,()->disableAuto(bikeId));
   }
   if(RideService.autoArmed&&bikeId.equals(RideService.activeRideBikeId))
@@ -94,7 +97,7 @@ final class BikeObdSettingsUi {
     .setNegativeButton("취소",null)
     .setPositiveButton("등록 해제",(d,w)->{BikeObdPreferences.clearDevice(a,bikeId);open(bikeId);}).show());
   a.gap(p,12);
-  a.label(p,"자동 기록을 켜고 시작하면 앱이 알림과 함께 OBD를 연결하고 주행 시 GPS 경로를 이 바이크에 저장합니다. 재연결은 켜둔 세션 안에서만 시도합니다. 키 ON만으로 앱이 꺼진 상태에서 자동 실행하거나 부팅 후 몰래 연결하지 않습니다. ECU ODO 미지원 시 GPS 기록은 실제 계기판 누적 km로 자동 확정되지 않습니다.",13,a.muted,false);
+  a.label(p,"상시 대기를 한 번 켜면 알림과 함께 OBD Bluetooth 연결을 유지하거나 60초 간격으로 재시도합니다. 시동 OFF 후 주행 기록은 저장하지만 연결 대기는 계속됩니다. 앱을 다시 열면 동의한 바이크에 한해 대기를 재개합니다. 휴대폰 강제종료·재부팅 후 자동 시작은 보장하지 않습니다. 지속 알림과 배터리 소모가 발생합니다. 필요 없으면 반드시 상시 대기를 해제하세요.",13,a.muted,false);
   a.show();
  }
 
@@ -178,17 +181,17 @@ final class BikeObdSettingsUi {
    .setMessage("선택 바이크: "+a.bikeName(bikeId)+
     "\n동글: "+BikeObdPreferences.deviceName(a,bikeId)+
     "\n\n이 버튼을 누르면 알림이 표시되는 동안 OBD 속도를 읽습니다. 속도 7km/h 이상 3회 감지 시 GPS 기록을 이 바이크에 저장하고, 정차 3/5/10분(설정값) 뒤 파일을 검증한 후 다음 출발을 감지합니다."+
-    "\n\n정차 중 ECU 속도 0km/h가 반복 확인된 뒤 OBD가 끊기면 휴대폰 도보 GPS는 주행거리에서 제외하고 약 2분간 재연결을 확인한 후 종료를 판단합니다. 주행 중 끊긴 경우 자동으로 종료하지 않으며 GPS 기록을 보존합니다. 키 ON만으로 앱이 스스로 실행되지는 않습니다."+
+    "\n\n시동 OFF 후 휴대폰 도보 GPS는 제외하고 바이크 주행기록만 저장합니다. OBD 상시 대기는 계속 남아 다음 시동을 기다립니다. 연결 실패 8회 이후에는 약 60초마다 재시도합니다. 백그라운드 알림/배터리가 계속 사용됩니다. 강제종료·재부팅 후 재실행은 보장하지 않으며 앱을 다시 열면 복구를 시도합니다."+
     "\n\nECU의 실제 누적 주행거리는 별도의 계기판 확인을 거쳐야 자동 동기화할 수 있으며 GPS 추정 거리를 계기판 값으로 속이지 않습니다.")
    .setNegativeButton("취소",null)
-   .setPositiveButton("동의하고 연결",(dialog,which)->{
+   .setPositiveButton("동의하고 상시 대기 시작",(dialog,which)->{
     if(RideService.running||RideService.autoArmed||
        a.bike()==null||!bikeId.equals(a.bike().optString("id")))return;
     BikeObdPreferences.setAutoRideEnabled(a,bikeId,true);
     Intent start=new Intent(a,RideService.class).setAction(RideService.AUTO_ARM)
      .putExtra(RideService.EXTRA_BIKE_ID,bikeId).putExtra(RideService.EXTRA_DEVICE,address);
     a.attempt(()->a.startForegroundService(start));
-    a.toast("OBD 자동 감지 시작 요청 · 알림에서 실제 상태 확인");
+    a.toast("상시 OBD 자동 연결 대기 요청 · 알림에서 실제 상태 확인");
    }).show();
  }
 
