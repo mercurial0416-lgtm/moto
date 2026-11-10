@@ -35,6 +35,16 @@ checks={
  "notification tap is explicit user intent": "ACTION_TAP" in starter and "applyCardoStartTap" in activity,
  "consent cannot trigger for arbitrary bike": "CardoAutoRidePrefs.forBike(this,pendingBikeId)" in service,
  "reboot does not silently start GPS": "startForegroundService" not in read("BootRideReminder.java"),
+ "idle cutoff persists if backup/restore rejects a GPS start": 
+   "openRideTrack();requestGpsUpdatesChecked();\n    if(cardoSession)handler.removeCallbacks(cardoIdleStop);" in service,
+ "rapid helmet OFF/ON can retrigger": "CardoAutoRidePrefs.noteDisconnect(c,mac);" in starter,
+ "new OBD hardware revokes old helmet consent":
+   "CardoAutoRidePrefs.disable(context);" in read("BikeObdPreferences.java"),
+ "cardo and all-night modes never silently coexist":
+   "CardoAutoRidePrefs.disable(activity);" in read("DeveloperObdScreen.java") and
+   "final boolean[] remember={false};" in read("DeveloperObdScreen.java"),
+ "GPS verification failure not misreported as saved": 
+   "카르도 OFF · GPS 파일 검증 실패" in service,
  "no DTC erase or ECU programming": "ATSH" not in starter and "04\r" not in starter
 }
 for name,ok in checks.items():print(("PASS" if ok else "FAIL")+": "+name)
