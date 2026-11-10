@@ -271,6 +271,9 @@ public class MainActivity extends Activity {
   if(!readOnly)DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
   if(!RideService.running&&!RideService.autoArmed&&!readOnly&&!"라이딩".equals(tab))showInterruptedRidePrompt();
+  // Only an explicitly opted-in bike is rearmed after the user opens the app.
+  // Android does not guarantee background re-start after process death/boot.
+  if(!readOnly&&root!=null)root.postDelayed(this::resumeApprovedObdReady,1800L);
   AppUpdateNotice.checkOnResume(this);
  }
  /** Reload data when a JSON restore finishes after the Activity was recreated. */
@@ -2848,6 +2851,39 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
  }
  void back(){if(dialog!=null&&dialog.isShowing()){close();return;}if(tab.equals("더보기")&&settingsDetailPage){settingsDetailPage=false;render();return;}if(tab.equals("더보기")){tab=previousTab;render();}else if(!tab.equals("홈")){tab="홈";render();}else finish();}
 
+ long lastAutoReadyResumeAt=0;
+ private void resumeApprovedObdReady(){
+  if(isFinishing()||isDestroyed()||readOnly||db==null||RideService.running||
+     RideService.autoArmed||RestoreRideGate.isRestoring()||
+     RestoreRideGate.isFormWriting()||RideService.saving()||dialog!=null)return;
+  JSONObject b=bike();
+  if(b==null||GarageBikeStatus.sold(b.optString("soldDate")))return;
+  String id=b.optString("id");
+  if(!RideBikeBinding.valid(id)||!BikeObdPreferences.autoRideEnabled(this,id))return;
+  String address=BikeObdPreferences.address(this,id);
+  if(!BikeObdPreferences.validAddress(address))return;
+  if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=android.content.pm.PackageManager.PERMISSION_GRANTED)return;
+  if(android.os.Build.VERSION.SDK_INT>=33&&
+     checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)return;
+  if(android.os.Build.VERSION.SDK_INT>=31&&
+     checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)!=android.content.pm.PackageManager.PERMISSION_GRANTED)return;
+  android.location.LocationManager location=getSystemService(android.location.LocationManager.class);
+  if(location==null||!location.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER))return;
+  long now=android.os.SystemClock.elapsedRealtime();
+  if(lastAutoReadyResumeAt>0&&now-lastAutoReadyResumeAt<90_000L)return;
+  lastAutoReadyResumeAt=now;
+  try{
+   startForegroundService(new Intent(this,RideService.class)
+     .setAction(RideService.AUTO_ARM)
+     .putExtra(RideService.EXTRA_DEVICE,address)
+     .putExtra(RideService.EXTRA_BIKE_ID,id));
+   toast("OBD 상시 대기 재개 · 다음 시동/출발 감지");
+  }catch(Exception ex){
+   // Fail visibly; the app must not represent a rejected background start
+   // as an already armed recording service.
+   toast("OBD 자동 연결 대기 시작 실패 · OBD 메뉴에서 다시 시작해 주세요.");
+  }
+ }
  @Override protected void onDestroy(){odoSyncHandler.removeCallbacks(odoSyncTick);if(isFinishing())BackupPickerTransfer.cancelAll();if(developerObd!=null){developerObd.stop();developerObd=null;}super.onDestroy();}
  @Override protected void onPause(){odoSyncHandler.removeCallbacks(odoSyncTick);flushQuickFuelDraft();persistDraft();super.onPause();}
  void clearDraft(){formDirty=false;getSharedPreferences("draft",MODE_PRIVATE).edit().remove("active").apply();}
