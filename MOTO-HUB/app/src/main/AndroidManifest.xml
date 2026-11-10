@@ -1,5 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+ <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+ <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND"/>
+ <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND"/>
+ <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE"/>
  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
@@ -27,6 +31,16 @@
   <receiver android:name=".MotoWidgetProvider" android:exported="true"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/moto_widget_info"/></receiver>
   <receiver android:name=".MotoQuickWidgetProvider" android:exported="true"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/moto_widget_quick_info"/></receiver>
   <receiver android:name=".BootRideReminder" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter></receiver>
+  <receiver android:name=".CardoBluetoothReceiver" android:exported="true">
+   <intent-filter>
+    <action android:name="android.bluetooth.device.action.ACL_CONNECTED"/>
+    <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED"/>
+   </intent-filter>
+  </receiver>
+  <service android:name=".CardoCompanionService" android:exported="true"
+   android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
+   <intent-filter><action android:name="android.companion.CompanionDeviceService"/></intent-filter>
+  </service>
   <service android:name=".DailyMaintenanceJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true"/>
   <service android:name=".RideService" android:exported="false" android:foregroundServiceType="location|connectedDevice"/>
   <activity android:name=".GroupMapActivity" android:exported="false"/>
