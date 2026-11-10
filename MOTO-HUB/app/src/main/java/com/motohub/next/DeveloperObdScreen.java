@@ -100,7 +100,7 @@ final class DeveloperObdScreen {
   JSONObject bike=activity.bike();
   String bikeId=bike==null?"":bike.optString("id");
   String bikeName=bike==null?"바이크 미등록":bike.optString("name","내 바이크");
-  activity.label(p,bikeName+" · "+(RideService.autoArmed?"OBD 자동 감지 사용 중":"OBD 연결 대기"),14,activity.fg,true);
+  activity.label(p,bikeName+" · "+(RideService.autoArmed?"OBD 자동 감지 사용 중":BikeObdPreferences.autoRideEnabled(activity,bikeId)?"상시 대기 동의됨 · 연결 재개 예정":"OBD 연결 대기 꺼짐"),14,activity.fg,true);
   status=activity.text("Bluetooth · ECU 상태 확인 중",13,activity.muted,false);p.addView(status);
   activity.label(p,"정차 상태에서 설정하세요. ECU 수정·고장코드 삭제는 하지 않습니다.",12,activity.muted,false);
   activity.gap(p,12);
@@ -122,7 +122,7 @@ final class DeveloperObdScreen {
   activity.gap(p,14);
 
   activity.label(p,"02   라이딩 · 실시간 계기판",18,activity.fg,true);
-  activity.action(p,RideService.autoArmed?"자동 감지 작동 중 · 연결 정보 확인":"OBD 자동 라이딩 감지 켜기",
+  activity.action(p,RideService.autoArmed?"자동 감지 작동 중 · 연결 정보 확인":"OBD 자동 라이딩 · 시동 연결 대기 켜기",
    !RideService.autoArmed,()->{
     if(RideService.autoArmed){showConnectionInfo();return;}
     loadPairedAuto();
@@ -265,7 +265,7 @@ final class DeveloperObdScreen {
     }).show();
   });
   activity.label(p,"주차·배터리 주의: 일부 OBD 동글은 시동 OFF 후에도 전력을 사용할 수 있어요. 장기 주차 시 동글 분리 또는 대기전류 실측을 권장합니다. 시트 잠금장치와 배선이 눌리지 않는지도 확인하세요.",13,activity.muted,false);
-  activity.label(p,"자동 감지를 켜는 동안 알림이 계속 표시됩니다. GPS 기록은 이 휴대폰에만 저장하고 친구·그룹 위치 공유는 시작하지 않습니다. 앱 종료/폰 재부팅 뒤 새로 자동 실행하지 않습니다. 같은 기록 세션 중에는 연결을 최대 8회 재시도합니다.",13,activity.muted,false);
+  activity.label(p,"상시 연결 대기 승인 시 지속 알림·배터리를 사용합니다. 시동 OFF 뒤에도 재접속을 시도하며 초기 8회 이후 약 60초 간격으로 대기합니다. 휴대폰 강제종료·재부팅 뒤 즉시 자동 시작은 보장되지 않지만 앱을 다시 열면 대기를 재개합니다. GPS 기록은 로컬에만 저장하고 그룹 위치 공유는 자동 시작하지 않습니다.",13,activity.muted,false);
   String remembered=activity.bike()==null?"":BikeObdPreferences.address(activity,activity.bike().optString("id"));
   if(!remembered.isEmpty()){
    activity.action(p,"최근 OBD2 장치로 빠르게 연결",true,this::connectRememberedAuto);
