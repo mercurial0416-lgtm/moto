@@ -29,12 +29,16 @@ final class ObdAutoSpeedMonitor {
  private static final UUID SPP=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
  private final BluetoothDevice device;
  private final Listener listener;
+ private final boolean persistentStandby;
  private volatile BluetoothSocket socket;
  private volatile boolean stopped;
  private Thread worker;
  private volatile long connectedAtNanos;
  private static final class UnsupportedSpeed extends IOException {UnsupportedSpeed(){super("차량 속도 PID 010D 미지원");}}
- ObdAutoSpeedMonitor(BluetoothDevice device,Listener listener){this.device=device;this.listener=listener;}
+ ObdAutoSpeedMonitor(BluetoothDevice device,Listener listener){this(device,listener,false);}
+ ObdAutoSpeedMonitor(BluetoothDevice device,Listener listener,boolean persistentStandby){
+  this.device=device;this.listener=listener;this.persistentStandby=persistentStandby;
+ }
  void start(){worker=new Thread(this::readLoop,"moto-obd-autoride");worker.setDaemon(true);worker.start();}
  void stop(){stopped=true;closeSocket();}
  private void closeSocket(){BluetoothSocket s=socket;socket=null;if(s!=null)try{s.close();}catch(Exception ignored){}}
@@ -58,11 +62,15 @@ final class ObdAutoSpeedMonitor {
       // The user-approved foreground standby remains armed across key-off
       // and repeated failures. Back off to one check per minute after the
       // initial eight retries, instead of silently giving up overnight.
-      if(!ObdConnectionPolicy.standbyAllowed(true,stopped))break;
-      listener.reconnecting(failures,failures<=ObdConnectionPolicy.MAX_RETRIES?
-        ObdConnectionPolicy.MAX_RETRIES:0);
+      if(!persistentStandby&&
+         !ObdConnectionPolicy.shouldRetry(failures,true,true))break;
+      if(persistentStandby&&!ObdConnectionPolicy.standbyAllowed(true,stopped))break;
+      listener.reconnecting(failures,persistentStandby&&
+        failures>ObdConnectionPolicy.MAX_RETRIES?0:ObdConnectionPolicy.MAX_RETRIES);
       closeSocket();
-      long until=System.nanoTime()+ObdConnectionPolicy.standbyDelayMs(failures)*1_000_000L;
+      long until=System.nanoTime()+
+       (persistentStandby?ObdConnectionPolicy.standbyDelayMs(failures):
+         ObdConnectionPolicy.delayMs(failures))*1_000_000L;
       while(!stopped&&System.nanoTime()<until)Thread.sleep(200);
      }
     finally{closeSocket();}
