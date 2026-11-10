@@ -29,6 +29,7 @@ final class CardoRideStarter {
  static void cardoEvent(Context c,String mac,boolean connected){
   if(!CardoAutoRidePrefs.matches(c,mac))return;
   if(!connected){
+   CardoAutoRidePrefs.noteDisconnect(c,mac);
    CardoAutoRidePrefs.status(c,"카르도 연결 해제 · 대기 종료");
    if(RideService.autoArmed&&CardoAutoRidePrefs.bikeId(c).equals(RideService.activeRideBikeId)){
     try{c.startService(new Intent(c,RideService.class).setAction(RideService.CARDO_DISCONNECTED));}
