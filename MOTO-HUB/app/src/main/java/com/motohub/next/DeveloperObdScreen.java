@@ -720,17 +720,26 @@ final class DeveloperObdScreen {
   if(location==null||!location.isProviderEnabled(LocationManager.GPS_PROVIDER)){
    setStatus("먼저 휴대폰 GPS를 켜 주세요.");return;
   }
-  final boolean[] remember={false};
+  final boolean[] remember={true};
   new AlertDialog.Builder(activity).setTitle("OBD2 자동 라이딩 기록을 켤까요?")
-   .setMessage("이 장치가 연결된 동안 속도 7km/h 이상을 연속 3회 감지하면 GPS 경로를 이 휴대폰에 자동 저장합니다. 설정한 정차 시간 후 종료하며 다음 출발을 다시 감지합니다. 백그라운드 위치 사용과 지속 알림이 필요합니다. 그룹 공유는 켜지지 않습니다. 재연결에 최종 실패하면 진행 중인 GPS 주행은 유지되며 알림에서 직접 종료합니다. 원할 때 알림에서 중지하세요. 실험 기능이므로 실제 듀크 390 동작은 아직 검증되지 않았습니다.")
-   .setMultiChoiceItems(new String[]{"이 장치를 현재 바이크에 기억하기 (다음 선택 시 위에 표시)"},remember,(dialog,index,selected)->remember[index]=selected)
+   .setMessage("동의를 선택하면 OBD 자동 감지를 실행합니다. 속도 7km/h 이상을 3회 읽으면 GPS 기록을 시작하고, 주차 후 저장합니다. '상시 대기'를 켜면 시동 OFF 후에도 Bluetooth 연결을 약 60초 간격으로 재시도하며 다음 시동을 기다립니다.\n\n이 모드는 지속 알림·배터리를 사용하며 앱 강제종료/휴대폰 재부팅 뒤에는 보장되지 않습니다. 그룹 위치 공유·ECU 설정 변경은 하지 않습니다. 실차 KTM 동작 검증 전입니다.")
+   .setMultiChoiceItems(new String[]{"이 바이크에서 상시 연결 대기 (시동 OFF 후에도 유지 · 배터리 사용)"},remember,(dialog,index,selected)->remember[index]=selected)
    .setNegativeButton("취소",null).setPositiveButton("동의하고 자동 감지 시작",(d,w)->{
-    if(remember[0]&&activity.bike()!=null)BikeObdPreferences.setDevice(activity,activity.bike().optString("id"),device.getAddress(),device.getName());
+    if(activity.bike()!=null){
+     String bikeId=activity.bike().optString("id");
+     // Explicitly persist background-ready consent only when chosen.
+     if(remember[0]){
+      BikeObdPreferences.setDevice(activity,bikeId,device.getAddress(),device.getName());
+      BikeObdPreferences.setAutoRideEnabled(activity,bikeId,true);
+     }else if(BikeObdPreferences.autoRideEnabled(activity,bikeId)){
+      BikeObdPreferences.setAutoRideEnabled(activity,bikeId,false);
+     }
+    }
     stop();
     Intent start=new Intent(activity,RideService.class).setAction(RideService.AUTO_ARM).putExtra(RideService.EXTRA_DEVICE,device.getAddress())
      .putExtra(RideService.EXTRA_BIKE_ID,activity.bike()==null?"":activity.bike().optString("id"));
     activity.attempt(()->activity.startForegroundService(start));
-    setStatus("OBD2 자동 감지 시작 요청 · 알림으로 상태 확인");
+    setStatus(remember[0]?"OBD 상시 연결 대기 시작 · 시동 OFF 후에도 다음 출발 감지":"OBD 자동 감지 시작 · 상시 대기는 꺼짐");
    }).show();
  }
  private void confirmConnect(BluetoothDevice device){
