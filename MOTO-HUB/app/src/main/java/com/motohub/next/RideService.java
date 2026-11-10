@@ -98,7 +98,7 @@ public final class RideService extends Service implements LocationListener {
   if(parkingIsolation.dueAfterLost(SystemClock.elapsedRealtime())){
    // Complete the parked bike ride while leaving the explicitly armed
    // Bluetooth foreground watcher ready for the next ignition ON.
-   if(!BikeObdPreferences.autoRideEnabled(this,pendingBikeId)){
+   if(!BikeObdPreferences.autoRideEnabled(RideService.this,pendingBikeId)){
     // A one-shot reader must not remain connected indefinitely.
     ObdAutoSpeedMonitor reader=obdMonitor;
     if(reader!=null)reader.stop();
