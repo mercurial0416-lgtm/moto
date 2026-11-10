@@ -63,6 +63,7 @@ final class CardoCompanionPairing {
       CardoAutoRidePrefs.matches(a,info.getDeviceMacAddress().toString()))observe(a,info);
   }}catch(RuntimeException ignored){}
  }
+ @android.annotation.TargetApi(33)
  private static void observe(Context c,AssociationInfo info){
   if(info==null||info.getDeviceMacAddress()==null||
      !CardoAutoRidePrefs.matches(c,info.getDeviceMacAddress().toString()))return;
@@ -81,6 +82,7 @@ final class CardoCompanionPairing {
    CardoAutoRidePrefs.status(c,"동반 기기 감지 미승인 · 일반 Bluetooth 이벤트 사용");
   }
  }
+ @android.annotation.TargetApi(33)
  static void stopObserving(Context c){
   if(Build.VERSION.SDK_INT<33)return;
   CompanionDeviceManager mgr=c.getSystemService(CompanionDeviceManager.class);
