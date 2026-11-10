@@ -29,6 +29,31 @@ public final class RideService extends Service implements LocationListener {
  }
  /** Read current service-owned finalization state without leaking it across service instances. */
  static boolean saving(){RideService s=instance;return s!=null&&(s.finishPending||s.autoFinishPending);}
+ /** An already running foreground service receives helmet presence updates
+  * directly. This avoids Android background startService restrictions and
+  * allows a brief disconnect/reconnect without misclassifying a parked trip. */
+ static boolean cardoPresenceChanged(String bikeId,boolean connected){
+  RideService s=instance;
+  if(s==null||!s.cardoSession||!autoArmed||!bikeId.equals(activeRideBikeId))return false;
+  s.handler.post(()->{
+   if(!s.cardoSession||!autoArmed||!bikeId.equals(activeRideBikeId))return;
+   s.cardoConnected=connected;
+   s.handler.removeCallbacks(s.cardoDisconnectGrace);
+   if(!connected){
+    s.handler.postDelayed(s.cardoDisconnectGrace,10_000L);
+    if(!running){
+     s.status="카르도 연결 해제 · 10초 동안 재연결 확인";
+     s.notifySafely(s.status);
+    }
+   }else{
+    s.status=running?"카르도 다시 연결됨 · GPS 기록 유지":
+      "카르도 다시 연결됨 · OBD 출발 감지 대기";
+    s.notifySafely(s.status);
+   }
+  });
+  return true;
+ }
+
  static boolean gpsFresh(){RideService s=instance;
   return s!=null&&running&&GpsSignalStatus.fresh(s.lastFixElapsed,SystemClock.elapsedRealtime());
  }
@@ -93,6 +118,20 @@ public final class RideService extends Service implements LocationListener {
  final Runnable cardoIdleStop=new Runnable(){public void run(){
   if(cardoSession&&autoArmed&&!running&&!autoFinishPending)
    stopWith("카르도 연결 후 5분 대기 만료 · 배터리 절약",false);
+ }};
+ // A single Bluetooth ACL disconnect can be transient while the headset
+ // swaps audio profiles. Reconnect during grace must restore the session.
+ final Runnable cardoDisconnectGrace=new Runnable(){public void run(){
+  if(!cardoSession||!autoArmed||cardoConnected)return;
+  if(!running){
+   stopWith("카르도 연결 종료 확인 · OBD 대기 종료",false);
+  }else if(autoGate.stoppedBeforeDisconnect(SystemClock.elapsedRealtime())){
+   status="카르도 연결 종료 확인 · 정차 후 GPS 저장 중";
+   finishAutoTrack();
+  }else{
+   status="카르도 연결 끊김 · 주행 중일 수 있어 GPS 기록 유지";
+   notifySafely(status);
+  }
  }};
  final ObdParkingIsolation parkingIsolation=new ObdParkingIsolation();
  /** The phone may walk after the motorcycle is parked. */
@@ -207,16 +246,11 @@ public final class RideService extends Service implements LocationListener {
    return START_NOT_STICKY;
   }
   if(CARDO_DISCONNECTED.equals(action)){
+   // Explicit UI disable also exits this Cardo session; preserve active GPS.
    if(!cardoSession||!autoArmed)return START_NOT_STICKY;
    cardoConnected=false;
-   if(!running){stopWith("카르도 연결 종료 · OBD 대기 종료",false);return START_NOT_STICKY;}
-   if(autoGate.stoppedBeforeDisconnect(SystemClock.elapsedRealtime())){
-    status="카르도 종료 · 정차 확인 · GPS 저장";
-    finishAutoTrack();
-   }else{
-    status="카르도 연결 끊김 · 주행 중일 수 있어 GPS 기록 유지";
-    notifySafely(status);
-   }
+   handler.removeCallbacks(cardoDisconnectGrace);
+   handler.post(cardoDisconnectGrace);
    return START_NOT_STICKY;
   }
   if(!RestoreRideGate.beginRideStart()){
@@ -798,6 +832,7 @@ public final class RideService extends Service implements LocationListener {
   // Invalidate queued main-thread finalization callbacks after failures or process teardown.
   finishPending=false;autoFinishPending=false;
   handler.removeCallbacks(finishParkedObdLoss);handler.removeCallbacks(cardoIdleStop);
+  handler.removeCallbacks(cardoDisconnectGrace);
   cardoSession=false;cardoConnected=false;requestedCardoStart=false;parkingIsolation.reset();
   gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
   Sharing.stop();autoArmed=false;activeRideBikeId="";activeAutoAdapterAddress="";obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
