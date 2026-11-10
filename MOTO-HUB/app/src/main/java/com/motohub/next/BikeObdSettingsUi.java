@@ -170,8 +170,8 @@ final class BikeObdSettingsUi {
     String name=bonded.get(i).getName();
     names[i]=(name==null?"이름 없는 기기":name)+" · "+bonded.get(i).getAddress();
    }
+   a.toast("실제 Cardo Freecom 2X를 선택해 주세요 · OBD 동글 제외");
    new AlertDialog.Builder(a).setTitle("카르도 연결 감지 기기 선택")
-    .setMessage("OBD 동글이나 자동차가 아니라 실제 Freecom 2X 장치를 선택하세요.")
     .setItems(names,(d,index)->{
      BluetoothDevice selected=bonded.get(index);
      String mac=selected.getAddress(),name=selected.getName();
