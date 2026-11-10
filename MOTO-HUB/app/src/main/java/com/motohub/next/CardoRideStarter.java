@@ -28,7 +28,8 @@ final class CardoRideStarter {
 
  static void cardoEvent(Context c,String mac,boolean connected){
   if(!CardoAutoRidePrefs.matches(c,mac))return;
-  CardoAutoRidePrefs.notePresence(c,mac,connected);
+  if(!connected)CardoAutoRidePrefs.noteDisconnect(c,mac);
+  else CardoAutoRidePrefs.notePresence(c,mac,true);
   // Update the already-running FGS directly. Android can reject starting a
   // service from an ACL broadcast in the background. Two presence sources
   // may emit the same event; the FGS uses a 10-second disconnect grace.
