@@ -96,15 +96,12 @@ public final class RideService extends Service implements LocationListener {
  final Runnable finishParkedObdLoss=new Runnable(){@Override public void run(){
   if(!running||autoFinishPending||finishPending||!gpsObdParkingHold)return;
   if(parkingIsolation.dueAfterLost(SystemClock.elapsedRealtime())){
-   // The link can keep reopening even with the ECU fully off. Stop only the
-   // OBD monitor; completion uses the existing ordered GPS verification writer.
-   if(autoArmed){
-    ObdAutoSpeedMonitor monitor=obdMonitor;
-    if(monitor!=null)monitor.stop();
-    obdMonitor=null;autoArmed=false;autoGate.reset();obdStationaryRemainingMs=-1;
-    obdLink="주차 추정 · OBD 종료";
-   }
-   status="주차 후 OBD 끊김 추정 · 휴대폰 도보 경로 제외 · GPS 저장 검증 중";
+   // Complete the parked bike ride while leaving the explicitly armed
+   // Bluetooth foreground watcher ready for the next ignition ON.
+   autoGate.reset();obdStationaryRemainingMs=-1;
+   obdLink="주차 추정 · 다음 시동 자동 재연결 대기";
+   status="주차 후 시동 OFF 추정 · GPS 저장 확인 · 다음 시동 연결 대기";
+   notifySafely(status);
    finishAutoTrack();
   }
  }};final ObdRideAutoGate autoGate=new ObdRideAutoGate();final ObdSpeedSanityPolicy speedSanity=new ObdSpeedSanityPolicy();LocationManager manager;FileOutputStream output;File track;
@@ -362,7 +359,9 @@ public final class RideService extends Service implements LocationListener {
      if(!running)status="OBD2 연결됨 · 출발 대기";
     }});}
     @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
-     obdLink="연결 재시도 "+attempt+"/"+max;obdConnectionAttempts++;MotoWidgetProvider.refresh(RideService.this);
+     obdLink=max==0?"OBD 재연결 상시 대기 · 약 60초 간격":
+      "연결 재시도 "+attempt+"/"+max;
+     obdConnectionAttempts++;MotoWidgetProvider.refresh(RideService.this);
      boolean parkedBeforeLoss=running&&parkingIsolation.onLinkLoss(SystemClock.elapsedRealtime());
      if(parkedBeforeLoss){
       synchronized(RideService.this){
@@ -484,6 +483,9 @@ public final class RideService extends Service implements LocationListener {
  }
  private void completeAutoTrack(File savedTrack,boolean verified){
   autoFinishPending=false;running=false;
+  // Reset recording after the stored ride; new movement can start a new track.
+  autoGate.reset();parkingIsolation.reset();
+  synchronized(this){gpsObdParkingHold=false;gpsObdHoldStarted=-1;gpsObdResumeSplit=false;}
   if(finishPending){
    finishPending=false;
    stopWith(verified?"자동 라이딩을 저장하고 종료했습니다.":"GPS 저장 검증 실패 · 원본 복구가 필요합니다.",false);
