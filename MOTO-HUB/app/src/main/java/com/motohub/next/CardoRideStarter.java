@@ -28,13 +28,18 @@ final class CardoRideStarter {
 
  static void cardoEvent(Context c,String mac,boolean connected){
   if(!CardoAutoRidePrefs.matches(c,mac))return;
+  if(!connected)CardoAutoRidePrefs.noteDisconnect(c,mac);
+  // Update the already-running FGS directly. Android can reject starting a
+  // service from an ACL broadcast in the background. Two presence sources
+  // may emit the same event; the FGS uses a 10-second disconnect grace.
+  if(RideService.cardoPresenceChanged(CardoAutoRidePrefs.bikeId(c),connected)){
+   CardoAutoRidePrefs.status(c,connected?
+     "카르도 재연결됨 · 자동 기록 감지 유지":
+     "카르도 잠시 끊김 · 10초 재연결 확인");
+   return;
+  }
   if(!connected){
-   CardoAutoRidePrefs.noteDisconnect(c,mac);
-   CardoAutoRidePrefs.status(c,"카르도 연결 해제 · 대기 종료");
-   if(RideService.autoArmed&&CardoAutoRidePrefs.bikeId(c).equals(RideService.activeRideBikeId)){
-    try{c.startService(new Intent(c,RideService.class).setAction(RideService.CARDO_DISCONNECTED));}
-    catch(RuntimeException ex){CardoAutoRidePrefs.status(c,"카르도 종료 신호 전달 제한 · 앱에서 기록 확인");}
-   }
+   CardoAutoRidePrefs.status(c,"카르도 연결 해제 · 자동 시작 대기");
    return;
   }
   boolean inRide=RideService.autoArmed||RideService.running;
