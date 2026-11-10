@@ -13,7 +13,7 @@ checks={
  'ready uses the opted-in bike only': '},bikeApproved);' in service,
  'one shot bounded reconnect still exists': 'if(!persistentStandby&&' in monitor and 'ObdConnectionPolicy.shouldRetry' in monitor,
  'foreground ready reconnect backs off': 'ObdConnectionPolicy.standbyDelayMs' in monitor and 'STANDBY_COOLDOWN_MS=60_000L' in policy,
- 'parked ride saves without disarming persistent watcher': 'GPS 저장 확인 · 다음 시동 OBD 연결 대기' in service and 'if(!BikeObdPreferences.autoRideEnabled(this,pendingBikeId))' in service,
+ 'parked ride saves without disarming persistent watcher': 'GPS 저장 확인 · 다음 시동 OBD 연결 대기' in service and 'if(!BikeObdPreferences.autoRideEnabled(RideService.this,pendingBikeId))' in service,
  'next ride gate reset after completed file': 'autoGate.reset();parkingIsolation.reset();' in service,
  'user disarm revokes future auto resume': 'BikeObdPreferences.setAutoRideEnabled(this,pendingBikeId,false);' in service,
  'foreground reopen re-arms opted in bike': 'root.postDelayed(this::resumeApprovedObdReady' in activity and 'BikeObdPreferences.autoRideEnabled(this,id)' in activity,
