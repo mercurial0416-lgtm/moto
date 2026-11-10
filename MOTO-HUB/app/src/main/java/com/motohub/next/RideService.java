@@ -426,7 +426,7 @@ public final class RideService extends Service implements LocationListener {
   ObdRideAutoGate.Event event=autoGate.accept(speedKmh,now);
   obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
   if(event==ObdRideAutoGate.Event.START){
-   if(cardoSession)handler.removeCallbacks(cardoIdleStop);
+   // Keep Cardo idle deadline until GPS file has successfully started.
    // The externally requested GPS start is interlocked; auto-start must use
    // the same reservation or a concurrent form save/restore could begin.
    if(!RestoreRideGate.beginRideStart()){
@@ -440,6 +440,7 @@ public final class RideService extends Service implements LocationListener {
     // Re-check after obtaining the process-wide write/start reservation.
     if(!autoArmed||running||autoFinishPending)return;
     openRideTrack();requestGpsUpdatesChecked();
+    if(cardoSession)handler.removeCallbacks(cardoIdleStop);
     status="OBD2 출발 감지 · GPS 기록 중";ObdLocalDiagnosticLog.record(this,"GPS_STARTED");
    }catch(Exception e){stopWith("GPS 자동 기록 시작 실패: "+e.getMessage(),false);return;}
    finally{RestoreRideGate.endRideStart();}
