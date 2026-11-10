@@ -91,6 +91,26 @@ final class BikeObdSettingsUi {
      open(bikeId);
     }).show());
   }
+  if(cardoHere){
+   boolean gpsBackup=BikeObdPreferences.gpsFallbackEnabled(a,bikeId);
+   a.label(p,gpsBackup?
+    "GPS 안전망 켜짐 · ECU 속도 미수신 시 검증된 이동으로 기록 시작":
+    "GPS 안전망 꺼짐 · ECU 속도 미수신 시 자동기록을 시작할 수 없음",13,a.muted,false);
+   a.action(p,gpsBackup?"GPS 자동기록 안전망 끄기":"OBD 미지원 대비 GPS 안전망 켜기",false,()->{
+    if(RideService.running||RideService.autoArmed||RideService.saving()){
+     a.toast("현재 라이딩과 OBD 감지를 종료한 후 변경해 주세요.");return;
+    }
+    new AlertDialog.Builder(a).setTitle(gpsBackup?"GPS 안전망 해제":"카르도 GPS 안전망 · 추가 배터리 사용")
+     .setMessage(gpsBackup?
+      "GPS 이동 감지를 끕니다. 기존 주행 기록과 정비 내역은 보존합니다.":
+      "카르도 연결 시 최장 5분간 GPS를 확인합니다. 실제 좌표를 3회 이상 검증하고 70m 이상 이동하면 OBD 속도 미지원 시에도 기록을 시작합니다. GPS 센서는 추가 전력을 사용하므로 기본적으로 꺼져 있습니다. 보행이나 다른 차량 이동을 바이크 주행이라고 오인할 수 있어 계기판 ODO에는 반영하지 않습니다.")
+     .setNegativeButton("취소",null)
+     .setPositiveButton(gpsBackup?"안전망 끄기":"동의하고 켜기",(dialog,which)->{
+      BikeObdPreferences.setGpsFallbackEnabled(a,bikeId,!gpsBackup);
+      open(bikeId);
+     }).show();
+   });
+  }
   a.label(p,"카르도 Bluetooth 연결 이벤트만 감지합니다. 밤새 OBD 재연결을 반복하지 않습니다. Android 동반 기기 승인을 하면 앱이 닫혀도 연결 감지를 지원할 수 있습니다. Android 14+에서 화면이 꺼진 채 완전 자동 GPS 시작은 '위치 항상 허용' 등 시스템 권한이 필요하며 기기 정책에 따라 막힐 수 있습니다. 막히면 알림으로 시작합니다.",12,a.muted,false);
   a.action(p,"백그라운드 위치·배터리 권한 확인",false,()->{
    new AlertDialog.Builder(a).setTitle("카르도 자동시작 권한")
