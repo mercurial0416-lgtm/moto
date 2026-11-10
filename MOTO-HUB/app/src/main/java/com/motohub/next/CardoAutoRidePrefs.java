@@ -51,6 +51,11 @@ final class CardoAutoRidePrefs {
  static synchronized void clearBike(Context c,String bike){
   if(bike!=null&&bike.equals(bikeId(c))){CardoCompanionPairing.stopObserving(c);disable(c);}
  }
+ /** A real headset disconnect ends the prior trigger window.
+  * A quick helmet restart must be eligible again rather than blocked for 90s. */
+ static synchronized void noteDisconnect(Context c,String mac){
+  if(matches(c,mac))p(c).edit().remove("triggerAt").commit();
+ }
  static synchronized boolean claim(Context c,String mac,boolean rideActive){
   if(!matches(c,mac)||!forBike(c,bikeId(c)))return false;
   SharedPreferences x=p(c);
