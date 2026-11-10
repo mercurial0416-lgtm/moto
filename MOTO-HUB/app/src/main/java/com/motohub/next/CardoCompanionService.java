@@ -7,13 +7,17 @@ import android.companion.DevicePresenceEvent;
 import android.os.Build;
 
 /** System-managed low-energy presence observer (requires system association). */
+@android.annotation.TargetApi(31)
 public final class CardoCompanionService extends CompanionDeviceService {
+ @android.annotation.TargetApi(33)
  @Override public void onDeviceAppeared(AssociationInfo info){
   if(Build.VERSION.SDK_INT<36)onMatch(info,true);
  }
+ @android.annotation.TargetApi(33)
  @Override public void onDeviceDisappeared(AssociationInfo info){
   if(Build.VERSION.SDK_INT<36)onMatch(info,false);
  }
+ @android.annotation.TargetApi(36)
  @Override public void onDevicePresenceEvent(DevicePresenceEvent event){
   if(Build.VERSION.SDK_INT<36)return;
   if(event==null)return;
@@ -27,6 +31,7 @@ public final class CardoCompanionService extends CompanionDeviceService {
     if(info.getId()==id){onMatch(info,kind==DevicePresenceEvent.EVENT_BT_CONNECTED);break;}}
   catch(RuntimeException ignored){}
  }
+ @android.annotation.TargetApi(33)
  private void onMatch(AssociationInfo info,boolean connected){
   if(info==null||info.getDeviceMacAddress()==null)return;
   String mac=info.getDeviceMacAddress().toString();
