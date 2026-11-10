@@ -19,9 +19,10 @@ final class CardoAutoRidePrefs {
  static String address(Context c){return p(c).getString("mac","");}
  static String name(Context c){return p(c).getString("name","Cardo");}
  static boolean forBike(Context c,String bike){
-  return enabled(c)&&RideBikeBinding.valid(bike)&&bike.equals(bikeId(c))&&
-   BikeObdPreferences.validAddress(address(c))&&
-   BikeObdPreferences.validAddress(BikeObdPreferences.address(c,bike));
+  if(!enabled(c)||!RideBikeBinding.valid(bike)||!bike.equals(bikeId(c)))return false;
+  String obd=BikeObdPreferences.address(c,bike),cardo=address(c);
+  return BikeObdPreferences.validAddress(cardo)&&BikeObdPreferences.validAddress(obd)&&
+    !cardo.equalsIgnoreCase(obd);
  }
  static boolean matches(Context c,String mac){
   return enabled(c)&&BikeObdPreferences.validAddress(mac)&&
@@ -34,6 +35,9 @@ final class CardoAutoRidePrefs {
   String safe=name==null?"Cardo":name.trim();
   if(safe.length()>64)safe=safe.substring(0,64);
   if(safe.isEmpty())safe="Cardo";
+  // An old Android association must not keep observing a replaced headset.
+  if(enabled(c)&&!mac.equalsIgnoreCase(address(c)))
+   CardoCompanionPairing.stopObserving(c);
   boolean saved=p(c).edit()
     .putBoolean("enabled",true).putString("bike",bikeId)
     .putString("mac",mac.toUpperCase(Locale.ROOT))
