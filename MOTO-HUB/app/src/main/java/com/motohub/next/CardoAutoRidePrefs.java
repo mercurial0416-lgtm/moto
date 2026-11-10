@@ -37,8 +37,12 @@ final class CardoAutoRidePrefs {
   if(safe.length()>64)safe=safe.substring(0,64);
   if(safe.isEmpty())safe="Cardo";
   // An old Android association must not keep observing a replaced headset.
-  if(enabled(c)&&!mac.equalsIgnoreCase(address(c)))
+  if(enabled(c)&&!mac.equalsIgnoreCase(address(c))){
    CardoCompanionPairing.stopObserving(c);
+   String oldBike=bikeId(c);
+   if(RideBikeBinding.valid(oldBike))
+    BikeObdPreferences.setGpsFallbackEnabled(c,oldBike,false);
+  }
   boolean saved=p(c).edit()
     .putBoolean("enabled",true).putString("bike",bikeId)
     .putString("mac",mac.toUpperCase(Locale.ROOT))
@@ -47,6 +51,9 @@ final class CardoAutoRidePrefs {
   return saved;
  }
  static synchronized void disable(Context c){
+  String oldBike=bikeId(c);
+  if(RideBikeBinding.valid(oldBike))
+   BikeObdPreferences.setGpsFallbackEnabled(c,oldBike,false);
   p(c).edit().clear().commit();
  }
  static synchronized void clearBike(Context c,String bike){
