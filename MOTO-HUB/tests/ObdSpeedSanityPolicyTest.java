@@ -19,6 +19,7 @@ public final class ObdSpeedSanityPolicyTest {
   check(p.accept(0,20000),"reset");
   check(p.accept(60,21000),"borderline acceleration");
   check(!p.accept(121,22000),"above threshold");
+  check(p.accept(122,22500),"confirmed large speed change recovers");
   System.out.println("PASS ObdSpeedSanityPolicyTest "+checks);
  }
 }

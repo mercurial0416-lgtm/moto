@@ -28,7 +28,7 @@ final class CardoRideStarter {
 
  static void cardoEvent(Context c,String mac,boolean connected){
   if(!CardoAutoRidePrefs.matches(c,mac))return;
-  if(!connected)CardoAutoRidePrefs.noteDisconnect(c,mac);
+  CardoAutoRidePrefs.notePresence(c,mac,connected);
   // Update the already-running FGS directly. Android can reject starting a
   // service from an ACL broadcast in the background. Two presence sources
   // may emit the same event; the FGS uses a 10-second disconnect grace.
@@ -39,18 +39,21 @@ final class CardoRideStarter {
    return;
   }
   if(!connected){
-   CardoAutoRidePrefs.status(c,"카르도 연결 해제 · 자동 시작 대기");
+   cancelTap(c);
+   CardoAutoRidePrefs.status(c,"카르도 연결 해제 · 다음 연결 대기");
    return;
   }
-  boolean inRide=RideService.autoArmed||RideService.running;
-  if(!CardoAutoRidePrefs.claim(c,mac,inRide))return;
+  // Do not consume the debounce slot until permissions and FGS conditions pass.
   if(!eligible(c)){CardoAutoRidePrefs.status(c,"권한/GPS 설정 필요 · 알림에서 확인");notifyTap(c);return;}
   if(Build.VERSION.SDK_INT>=29&&!MainActivity.obdVisible&&
      c.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)!=PackageManager.PERMISSION_GRANTED){
    CardoAutoRidePrefs.status(c,"백그라운드 위치 허용 안 됨 · 알림에서 시작");
    notifyTap(c);return;
   }
+  boolean inRide=RideService.autoArmed||RideService.running;
+  if(!CardoAutoRidePrefs.claim(c,mac,inRide))return;
   if(!start(c)){
+   CardoAutoRidePrefs.releaseClaim(c,mac);
    CardoAutoRidePrefs.status(c,"Android 백그라운드 시작 제한 · 알림으로 시작");
    notifyTap(c);
   }
@@ -72,8 +75,13 @@ final class CardoRideStarter {
    return true;
   }catch(RuntimeException ex){return false;}
  }
- static void startFromTap(MainActivity a){
+ static void startFromTap(MainActivity a){startFromTap(a,false);}
+ static void startFromTap(MainActivity a,boolean fromNotification){
   if(!CardoAutoRidePrefs.enabled(a))return;
+  if(fromNotification&&!CardoAutoRidePrefs.recentlyConnected(a)){
+   cancelTap(a);a.toast("카르도 연결 상태를 다시 확인해 주세요 · 오래된 알림은 실행하지 않았습니다");
+   return;
+  }
   if(!eligible(a)){a.toast("정확한 위치·주변 기기·알림 권한 및 GPS 확인");return;}
   if(RideService.autoArmed||RideService.running){a.toast("OBD 자동 감지가 이미 진행 중");cancelTap(a);return;}
   if(!start(a))a.toast("OBD 시작 제한 · 차고에서 연결 설정을 확인해 주세요");

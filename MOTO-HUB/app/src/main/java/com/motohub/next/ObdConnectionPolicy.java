@@ -23,7 +23,7 @@ final class ObdConnectionPolicy {
  static int nextFailureCount(int failures,long connectedAtNanos,long nowNanos){
   boolean healthy=connectedAtNanos>0 && nowNanos>=connectedAtNanos
    && nowNanos-connectedAtNanos>=60_000_000_000L;
-  return (healthy?0:failures)+1;
+  return healthy?1:(failures>=Integer.MAX_VALUE?Integer.MAX_VALUE:failures+1);
  }
  static boolean shouldRetry(int failures,boolean armed,boolean supported){
   return armed&&supported&&failures<=MAX_RETRIES;

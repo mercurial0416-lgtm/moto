@@ -317,7 +317,7 @@ public class MainActivity extends Activity {
   i.setAction(null); // consume once
   if(readOnly||RestoreRideGate.isRestoring()){toast("복구/데이터 보호 중 · 카르도 시작 보류");return;}
   if(!obdVisible&&root!=null)
-   root.postDelayed(()->{if(!isFinishing()&&!isDestroyed())CardoRideStarter.startFromTap(this);},450L);
+   root.postDelayed(()->{if(!isFinishing()&&!isDestroyed())CardoRideStarter.startFromTap(this,true);},450L);
   else CardoRideStarter.startFromTap(this);
  }
  boolean applyWidgetTab(Intent intent){

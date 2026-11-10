@@ -36,7 +36,7 @@ public final class RideService extends Service implements LocationListener {
   RideService s=instance;
   if(s==null||!s.cardoSession||!autoArmed||!bikeId.equals(activeRideBikeId))return false;
   s.handler.post(()->{
-   if(!s.cardoSession||!autoArmed||!bikeId.equals(activeRideBikeId))return;
+   if(instance!=s||!s.cardoSession||!autoArmed||!bikeId.equals(activeRideBikeId))return;
    s.cardoConnected=connected;
    s.handler.removeCallbacks(s.cardoDisconnectGrace);
    if(!connected){
@@ -234,6 +234,12 @@ public final class RideService extends Service implements LocationListener {
    finishUserRideAsync();return START_NOT_STICKY;
   }
   if(AUTO_DISARM.equals(action)){
+   // Explicit opt-out revokes both foreground readiness modes, never the GPS file.
+   if(cardoSession&&CardoAutoRidePrefs.forBike(this,pendingBikeId)){
+    CardoCompanionPairing.stopObserving(this);
+    CardoAutoRidePrefs.disable(this);
+    CardoRideStarter.cancelTap(this);
+   }
    // Explicit stop revokes the always-ready opt-in. Existing GPS stays intact.
    if(RideBikeBinding.valid(pendingBikeId))
     BikeObdPreferences.setAutoRideEnabled(this,pendingBikeId,false);
@@ -721,7 +727,7 @@ public final class RideService extends Service implements LocationListener {
  }
  @Override public synchronized void onLocationChanged(Location location){
   // The phone belongs to the rider, not the parked motorcycle.
-  if(gpsObdParkingHold)return;
+  if(location==null||gpsObdParkingHold)return;
   if(!running||output==null||!checkRuntimeStorage())return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
   if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
@@ -739,6 +745,7 @@ public final class RideService extends Service implements LocationListener {
    long writeAt=SystemClock.elapsedRealtime();
    if(gpsSync.shouldSync(writeAt)){
     output.getFD().sync();
+    gpsSync.synced(writeAt);
     if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);
     gpsSyncScheduled=false;
    }else if(!gpsSyncScheduled&&gpsWriteHandler!=null){
@@ -849,7 +856,9 @@ public final class RideService extends Service implements LocationListener {
   MotoWidgetProvider.refresh(this);
   if(completed&&verified)DailyMaintenanceJob.checkSoon(this);
  }
- @Override public void onDestroy(){if(running||autoArmed)status="라이딩 서비스가 중단됐습니다. 저장된 GPS 좌표는 복구할 수 있어요.";
+ @Override public void onDestroy(){
+  if(running)RideCaptureHealth.failedIfActive(this,"비정상 종료 · GPS 원본 복구 확인 필요");
+  if(running||autoArmed)status="라이딩 서비스가 중단됐습니다. 저장된 GPS 좌표는 복구할 수 있어요.";
   cleanup(false);
   if(gpsIoThread!=null){gpsIoThread.quitSafely();gpsIoThread=null;}
   instance=null;super.onDestroy();}

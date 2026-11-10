@@ -77,7 +77,7 @@ final class BikeObdSettingsUi {
   a.action(p,cardoHere?"카르도 자동기록 장치 변경":"카르도 자동기록 켜기 · 기기 선택",
     false,()->pickCardo(bikeId));
   if(cardoHere){
-   a.action(p,"카르도 자동기록 시작 테스트 (정차)",false,()->CardoRideStarter.startFromTap(a));
+   a.action(p,"카르도 자동기록 시작 테스트 (정차)",false,()->CardoRideStarter.startFromTap(a,false));
    a.action(p,"카르도 자동기록 끄기",false,()->new AlertDialog.Builder(a)
     .setTitle("카르도 자동기록 해제")
     .setMessage("연결 감지만 해제합니다. 기존 라이딩 GPS 파일과 차고 기록은 유지합니다.")

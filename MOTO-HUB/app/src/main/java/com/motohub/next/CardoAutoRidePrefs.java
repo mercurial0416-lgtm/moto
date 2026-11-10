@@ -12,6 +12,7 @@ import java.util.Locale;
  */
 final class CardoAutoRidePrefs {
  private static final String FILE="cardo_autoride_v595";
+ static final long PRESENCE_TTL_MS=900_000L;
  private CardoAutoRidePrefs(){}
  private static SharedPreferences p(Context c){return c.getSharedPreferences(FILE,Context.MODE_PRIVATE);}
  static boolean enabled(Context c){return p(c).getBoolean("enabled",false);}
@@ -41,7 +42,7 @@ final class CardoAutoRidePrefs {
   boolean saved=p(c).edit()
     .putBoolean("enabled",true).putString("bike",bikeId)
     .putString("mac",mac.toUpperCase(Locale.ROOT))
-    .putString("name",safe).putLong("triggerAt",0).commit();
+    .putString("name",safe).putLong("triggerAt",0).putBoolean("connected",false).remove("presenceAt").commit();
   if(saved)BikeObdPreferences.setAutoRideEnabled(c,bikeId,false);
   return saved;
  }
@@ -53,8 +54,23 @@ final class CardoAutoRidePrefs {
  }
  /** A real headset disconnect ends the prior trigger window.
   * A quick helmet restart must be eligible again rather than blocked for 90s. */
- static synchronized void noteDisconnect(Context c,String mac){
-  if(matches(c,mac))p(c).edit().remove("triggerAt").commit();
+ static synchronized void noteDisconnect(Context c,String mac){notePresence(c,mac,false);}
+ static synchronized void notePresence(Context c,String mac,boolean connected){
+  if(!matches(c,mac))return;
+  SharedPreferences.Editor e=p(c).edit().putBoolean("connected",connected)
+    .putLong("presenceAt",SystemClock.elapsedRealtime());
+  if(!connected)e.remove("triggerAt");
+  e.commit();
+ }
+ static boolean recentlyConnected(Context c){
+  SharedPreferences x=p(c);
+  if(!enabled(c)||!x.getBoolean("connected",false))return false;
+  long at=x.getLong("presenceAt",0),now=SystemClock.elapsedRealtime();
+  return at>0&&now>=at&&now-at<=PRESENCE_TTL_MS;
+ }
+ static synchronized void releaseClaim(Context c,String mac){
+  if(matches(c,mac)&&!RideService.running&&!RideService.autoArmed)
+   p(c).edit().remove("triggerAt").commit();
  }
  static synchronized boolean claim(Context c,String mac,boolean rideActive){
   if(!matches(c,mac)||!forBike(c,bikeId(c)))return false;
