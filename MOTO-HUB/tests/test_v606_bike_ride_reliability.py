@@ -12,7 +12,7 @@ obd=read("BikeObdSettingsUi.java")
 checks={
  "garage Duke name opens actual bike settings":'bike.setContentDescription(b.optString("name","내 바이크")+" 바이크 설정과 OBD 연결 열기")' in hub and 'setOnClickListener(v->new HubScreens(a).manageBike())' in home,
  "garage keeps a separate change-bike control":'Button change=a.button("변경 ▾",false,this::chooseBike)' in hub,
- "OBD settings are first in bike settings":hub.index('a.action(p,"OBD · 카르도 · 자동 라이딩 설정"')<hub.index('a.action(p,"바이크 정보 수정"'),
+ "OBD settings are first in bike settings":hub.index('a.action(p,"OBD 연결 설정 · 카르도 / 자동 라이딩"')<hub.index('a.action(p,"바이크 정보 수정"'),
  "diagnosis available for currently selected bike":'RideMissingRecordingGuide.summary(a,bikeId)' in hub and 'RideMissingRecordingGuide.summary(a,bikeId)' in obd,
  "no false success for unconfigured bike":'mode==ConnectionSetupMode.Mode.NONE' in guide and '실제 ECU 속도 PID 010D' in guide,
  "auto wait allows explicit manual GPS rescue":'MANUAL_GPS_WHILE_ARMED' in ride and 'MANUAL_GPS_WHILE_ARMED' in service and '지금 GPS 기록 시작' in ride,
