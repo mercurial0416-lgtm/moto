@@ -302,11 +302,63 @@ final class BikeObdSettingsUi {
    .setPositiveButton("닫기",null).show();
  }
  private void showConnectionHelp(String bikeId){
-  new AlertDialog.Builder(a).setTitle("연결이 안 될 때")
-   .setMessage("① OBD 동글 목록에 안 보임\n바이크 키 ON → 갤럭시 Bluetooth에서 먼저 페어링 → 앱에 돌아와 동글 선택.\n\n② 동글은 등록했는데 속도/RPM 안 나옴\n바이크 정차 후 시동 ON → 'OBD 실제 연결 검사'. 동글은 Bluetooth Classic SPP를 지원해야 해. ECU가 PID를 지원하지 않을 수도 있어.\n\n③ 카르도 연결해도 자동기록 안 됨\nFreecom 2X를 휴대폰과 연결했는지, 카르도 등록·위치/알림 권한을 확인해. Android 백그라운드 제한 시 시작 알림을 눌러.\n\n④ OBD 없이 쓰려면\n카르도 등록 후 GPS 안전망을 별도 활성화해. 보행/다른 차량 이동도 오인할 수 있어.\n\n⑤ 자동기록은 켜졌는데 경로가 없음\n라이딩 화면에서 GPS 좌표 수신을 확인해. 계기판 누적거리(ODO)와 GPS 기록 거리는 별개야.")
+  ConnectionSetupMode.Mode mode=ConnectionSetupMode.get(a,bikeId);
+  boolean same=bikeId.equals(RideService.activeRideBikeId);
+  BluetoothManager bm=a.getSystemService(BluetoothManager.class);
+  BluetoothAdapter adapter=bm==null?null:bm.getAdapter();
+  boolean bluetooth=adapter!=null&&adapter.isEnabled();
+  boolean btPermission=Build.VERSION.SDK_INT<31||
+    a.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED;
+  boolean locationPermission=a.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;
+  boolean notifications=Build.VERSION.SDK_INT<33||
+    a.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED;
+  LocationManager lm=a.getSystemService(LocationManager.class);
+  boolean gps=lm!=null&&lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+  boolean active=same&&(RideService.autoArmed||RideService.running);
+  boolean obdFresh=active&&RideService.obdSpeedKmh>=0&&
+    ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime());
+  ConnectionIssueGuide.Issue issue=ConnectionIssueGuide.diagnose(mode,
+   !BikeObdPreferences.address(a,bikeId).isEmpty(),
+   CardoAutoRidePrefs.forBike(a,bikeId),
+   BikeObdPreferences.gpsFallbackEnabled(a,bikeId),
+   bluetooth,btPermission,locationPermission,notifications,gps,
+   active,same&&RideService.running,same&&RideService.gpsFresh(),
+   obdFresh,same?RideService.obdLastError:"",
+   CardoAutoRidePrefs.recentlyConnected(a));
+  new AlertDialog.Builder(a).setTitle(issue.title)
+   .setMessage("가능한 원인\n"+issue.reason+"\n\n다음 행동\n"+issue.next+
+    "\n\n※ 앱이 실제로 관측한 신호만 사용해 분류했어. 원인을 확정한 건 아닐 수 있어.")
    .setNegativeButton("닫기",null)
-   .setPositiveButton("OBD 검사",(d,w)->DeveloperObdScreen.launchQuick(a))
+   .setPositiveButton(issue.button,(d,w)->resolveConnectionIssue(bikeId,issue))
    .show();
+ }
+ private void resolveConnectionIssue(String bikeId,ConnectionIssueGuide.Issue issue){
+  switch(issue){
+   case MODE:chooseMode(bikeId);return;
+   case OBD_DEVICE:pick(bikeId);return;
+   case CARDO_DEVICE:pickCardo(bikeId);return;
+   case GPS_CONSENT:changeGpsFallback(bikeId,false);return;
+   case BLUETOOTH_OFF:
+   case CARDO_NOT_SEEN:openBluetoothSettings();return;
+   case BT_PERMISSION:
+   case LOCATION_PERMISSION:
+   case NOTIFICATION_PERMISSION:
+   case BACKGROUND_LIMIT:showPermissionHelp();return;
+   case GPS_OFF:
+   case GPS_NO_FIX:
+    try{a.startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));}
+    catch(Exception e){showPermissionHelp();}
+    return;
+   case ECU_NO_REPLY:
+   case ECU_SPEED_UNSUPPORTED:
+   case OBD_UNVERIFIED:
+    if(RideService.autoArmed||RideService.running){
+     a.toast("진행 중인 자동 감지와 라이딩을 종료한 뒤 정차 상태에서 OBD 검사를 시작해.");
+     return;
+    }
+    DeveloperObdScreen.launchQuick(a);return;
+   default:showConnectionStatus(bikeId);
+  }
  }
  private void changeGpsFallback(String bikeId,boolean enabled){
   if(!CardoAutoRidePrefs.forBike(a,bikeId)){
