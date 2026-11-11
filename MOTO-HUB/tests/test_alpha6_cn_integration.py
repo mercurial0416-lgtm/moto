@@ -17,7 +17,9 @@ checks={
   and 'directOdoProbeAttempted=true' in monitor
   and 'OdoAutoSyncPolicy.consistent(a,b)' in monitor
   and 'ObdReadOnlyProtocol.query("01A6")' in monitor
-  and 'speedKmh==0&&speedPolls>=8' in source('ObdOdoPollPolicy.java')
+  and all(part in source('ObdOdoPollPolicy.java') for part in
+   ('if(speedKmh!=0)return false;', 'if(support==ObdPidCapabilities.Support.NO)return false;',
+    '!directProbeAttempted&&speedPolls>=8'))
   and '!directProbeAttempted' in source('ObdOdoPollPolicy.java')
  ),
  'no ECU writes': 'ObdReadOnlyProtocol.query("010D")' in monitor and 'ATSH' not in monitor and 'CLEAR' not in monitor,

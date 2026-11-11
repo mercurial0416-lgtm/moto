@@ -14,7 +14,7 @@ checks={
  "gps position age limited":'age>10_000_000_000L' in ride,
  "gps timestamps validated":'GpsFixPolicy.acceptTime(location.getTime()' in ride,
  "gps accuracy <=20m":'location.getAccuracy()>20' in ride,
- "minimum sustained 70m progress":'segments>=3&&metres>=70&&spanMs>=10000' in policy,
+ "minimum sustained 70m progress":'segments>=(lowSpeed?5:3)' in policy and 'metres>=(lowSpeed?95:70)' in policy and 'spanMs>=(lowSpeed?30_000:10_000)' in policy,
  "live ECU speed blocks GPS fallback":'ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed' in ride,
  "GPS cannot start amid restore":'RestoreRideGate.beginRideStart()' in ride,
  "no automatic ECU odometer overwrite":'OdometerAutoSyncInbox' not in policy,

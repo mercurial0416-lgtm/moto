@@ -22,7 +22,9 @@ checks={
     and 'ObdOdoPollPolicy.shouldProbe' in load('app/src/main/java/com/motohub/next/ObdAutoSpeedMonitor.java')
     and 'OdoAutoSyncPolicy.consistent(a,b)' in load('app/src/main/java/com/motohub/next/ObdAutoSpeedMonitor.java')
     and 'OdometerAutoSyncInbox.enable(activity,id,baseline)' in screen
-    and 'speedKmh==0&&speedPolls>=8' in load('app/src/main/java/com/motohub/next/ObdOdoPollPolicy.java')
+    and all(part in load('app/src/main/java/com/motohub/next/ObdOdoPollPolicy.java') for part in
+       ('if(speedKmh!=0)return false;', 'if(support==ObdPidCapabilities.Support.NO)return false;',
+        '!directProbeAttempted&&speedPolls>=8'))
     and '!directProbeAttempted' in load('app/src/main/java/com/motohub/next/ObdOdoPollPolicy.java')
   ),
  'ignition is RPM estimate only': 'ObdEngineState.label' in service and '시동 상태 확인 불가' in load('app/src/main/java/com/motohub/next/ObdEngineState.java'),
