@@ -178,11 +178,24 @@ public class MainActivity extends Activity {
      // Never reuse the old seen flag: it hid missed rides permanently on Later.
      interruptedRecoveryPromptVisible=true;
      AlertDialog prompt=new AlertDialog.Builder(this).setTitle("중단된 라이딩 기록 발견")
-      .setMessage("정상 종료되지 않은 GPS 경로가 있어요. 저장된 좌표를 확인하고 복구할 수 있습니다. 위치 기록이나 공유를 자동 시작하지 않습니다.")
+      .setMessage("정상 종료되지 않은 GPS 경로가 있어요. 원본은 보존됩니다. 15분 이내라면 GPS 이어 기록으로 같은 세션에 새 GPS 구간을 시작할 수 있습니다. 이전 파일은 자동 수정하지 않습니다.")
       .setNegativeButton("내일 다시 알림",(d,w)->prefs.edit()
         .putString("snoozed_file",filename)
         .putLong("snoozed_at",System.currentTimeMillis()).apply())
-      .setPositiveButton("기록 확인",(d,w)->{
+      .setNeutralButton("GPS 이어 기록",(d,w)->{
+        if(RideService.running||RideService.autoArmed||readOnly)return;
+        try{
+         if(!RideResumePolicy.eligible(filename,file.lastModified(),System.currentTimeMillis())){
+          toast("15분이 지나 같은 주행으로 이어 기록할 수 없어요. 새 라이딩을 시작해 주세요.");return;
+         }
+         Intent resume=new Intent(this,RideService.class).setAction(RideService.RESUME_INTERRUPTED)
+          .putExtra(RideService.EXTRA_INTERRUPTED_NAME,filename);
+         if(android.os.Build.VERSION.SDK_INT>=26)startForegroundService(resume);
+         else startService(resume);
+         toast("원본은 그대로 두고 새 GPS 구간을 이어 기록합니다.");
+        }catch(Exception e){toast("GPS 이어 기록 시작이 제한됐어요 · 라이딩 탭에서 다시 시작해 주세요.");}
+       })
+       .setPositiveButton("기록 확인",(d,w)->{
        prefs.edit().putString("acknowledged",filename)
         .remove("snoozed_file").remove("snoozed_at").apply();
        tab="라이딩";rideHistoryFilter=RideHistoryFilter.INTERRUPTED;render();

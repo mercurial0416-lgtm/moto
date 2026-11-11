@@ -2,7 +2,7 @@ package com.motohub.next;
 import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.content.pm.ServiceInfo;import android.location.*;import android.os.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.UUID;import android.bluetooth.*;
 /** User-started location FGS. Local recording with explicit group sharing. No boot restart, network or mock positions. */
 public final class RideService extends Service implements LocationListener {
- static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id",EXTRA_CARDO_TRIGGER="cardo_trigger",CARDO_DISCONNECTED="com.motohub.next.CARDO_DISCONNECTED";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;static volatile long liveMovingMillis=0,liveStationaryMillis=0,lastWidgetRefreshElapsed=0;
+ static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id",EXTRA_CARDO_TRIGGER="cardo_trigger",CARDO_DISCONNECTED="com.motohub.next.CARDO_DISCONNECTED",RESUME_INTERRUPTED="com.motohub.next.RESUME_INTERRUPTED",EXTRA_INTERRUPTED_NAME="interrupted_track_name";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;static volatile long liveMovingMillis=0,liveStationaryMillis=0,lastWidgetRefreshElapsed=0;
  // Volatile display data only: neither ECU samples nor Bluetooth address are uploaded/stored.
  static volatile int obdSpeedKmh=-1,obdReconnects=0;
  static volatile long obdAverageLatencyMs=-1;
@@ -330,6 +330,21 @@ public final class RideService extends Service implements LocationListener {
    return START_NOT_STICKY;
   }
   try{
+   if(RESUME_INTERRUPTED.equals(action)){
+    if(running||autoArmed)return START_NOT_STICKY;
+    try{
+     File old=RideResumePolicy.source(getFilesDir(),intent.getStringExtra(EXTRA_INTERRUPTED_NAME),System.currentTimeMillis());
+     String uuid=RideActiveSessionPolicy.session(old.getName());
+     pendingBikeId=RideBikeBinding.readStrict(old);
+     activeRideBikeId=RideBikeBinding.valid(pendingBikeId)?pendingBikeId:"";
+     prepareForeground(false);openRideTrack(uuid);requestGpsUpdatesChecked();
+     handler.postDelayed(permissionCheck,5000L);
+     status="중단 이전 원본 보존 · 같은 세션으로 새 GPS 구간 기록";
+     notifySafely(status);
+    }catch(Exception error){stopWith("GPS 이어 기록 실패 · 원본 보존: "+
+     (error.getMessage()==null?"확인 필요":error.getMessage()),false);}
+    return START_NOT_STICKY;
+   }
    if(AUTO_ARM.equals(action)){
     if(running||autoArmed)return START_NOT_STICKY;
     pendingBikeId=intent.getStringExtra(EXTRA_BIKE_ID);
@@ -371,11 +386,13 @@ public final class RideService extends Service implements LocationListener {
   else if(Build.VERSION.SDK_INT>=29)startForeground(404,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
   else startForeground(404,n);
  }
- private synchronized void openRideTrack()throws Exception{
+ private synchronized void openRideTrack()throws Exception{openRideTrack(null);}
+ private synchronized void openRideTrack(String priorSession)throws Exception{
   // Must be checked here as well as the UI: OBD auto-start has no foreground confirmation screen.
   GpsStorageSpacePolicy.require(getFilesDir());
-  activeRideSession=UUID.randomUUID().toString();
+  activeRideSession=RideResumePolicy.validSession(priorSession)?priorSession:UUID.randomUUID().toString();
   track=new File(TrackFile.directory(getFilesDir()),System.currentTimeMillis()+"-"+activeRideSession+".track");
+  if(!track.createNewFile())throw new IOException("이미 같은 이름의 GPS 기록이 있습니다 · 원본 보호");
   output=new FileOutputStream(track);
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
   catch(IOException error){output.close();output=null;track.delete();throw error;}
