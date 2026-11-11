@@ -14,7 +14,10 @@ import java.util.function.Consumer;
 final class CardoConnectionProbe {
  enum Status { CONNECTED, DISCONNECTED, UNKNOWN, BLUETOOTH_OFF, PERMISSION }
  static final long TIMEOUT_MS=4000L;
- private static final Handler MAIN=new Handler(Looper.getMainLooper());
+ // Do not construct an Android Handler when pure policy tests load this class.
+ private static final class MainHandler{
+  static final Handler INSTANCE=new Handler(Looper.getMainLooper());
+ }
  private static final Map<String,Probe> PENDING=new HashMap<>();
  private CardoConnectionProbe(){}
  private static final class Probe {
@@ -47,7 +50,7 @@ final class CardoConnectionProbe {
    }
    p=new Probe(mac);p.waiters.add(callback);PENDING.put(mac,p);
   }
-  MAIN.postDelayed(()->finish(p,Status.UNKNOWN),TIMEOUT_MS);
+  MainHandler.INSTANCE.postDelayed(()->finish(p,Status.UNKNOWN),TIMEOUT_MS);
   Context app=c.getApplicationContext();
   for(int profile:new int[]{BluetoothProfile.HEADSET,BluetoothProfile.A2DP}){
    try{
@@ -96,6 +99,6 @@ final class CardoConnectionProbe {
  }
  private static void onMain(Consumer<Status> cb,Status status){
   if(Looper.myLooper()==Looper.getMainLooper())cb.accept(status);
-  else MAIN.post(()->cb.accept(status));
+  else MainHandler.INSTANCE.post(()->cb.accept(status));
  }
 }
