@@ -154,6 +154,7 @@ final class BikeObdSettingsUi {
   if(!BikeObdPreferences.address(a,bikeId).isEmpty())
    a.label(p,ObdLocalDiagnosticLog.recentManualSummary(a),13,a.muted,false);
   a.label(p,FirstRideSetupProof.summary(a,bikeId),13,a.muted,false);
+  a.action(p,"자동기록 없이 연결 테스트",true,()->showSafeConnectionTest(bikeId));
   a.action(p,"블루투스 페어링 설정 열기",false,()->openBluetoothSettings());
   a.action(p,"연결 문제 진단 · 지금 해결하기",false,()->showConnectionHelp(bikeId));
   a.divider(p);
@@ -163,6 +164,50 @@ final class BikeObdSettingsUi {
   startLiveStatus(bikeId,a.dialog,obdLive,cardoLive,gpsLive);
  }
 
+ private void showSafeConnectionTest(String bikeId){
+  if(RideService.running||RideService.autoArmed||RideService.saving()){
+   a.toast("라이딩 또는 자동감지를 종료한 뒤 정차 상태에서 연결을 검사해.");return;
+  }
+  ConnectionSetupMode.Mode mode=ConnectionSetupMode.get(a,bikeId);
+  boolean hasObd=BikeObdPreferences.validAddress(BikeObdPreferences.address(a,bikeId));
+  boolean hasCardo=CardoAutoRidePrefs.forBike(a,bikeId);
+  boolean bt=Build.VERSION.SDK_INT<31||
+   a.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED;
+  boolean gps=a.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;
+  boolean background=Build.VERSION.SDK_INT<29||
+   a.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)==PackageManager.PERMISSION_GRANTED;
+  String summary="기록 방식: "+mode.label+
+   "\nOBD 등록: "+(hasObd?"있음":"없음")+
+   "\n카르도 등록: "+(hasCardo?"있음":"없음")+
+   "\n주변 기기 권한: "+(bt?"허용":"미허용")+
+   "\nGPS 위치 권한: "+(gps?"허용":"미허용")+
+   "\n백그라운드 위치: "+(mode.needsCardo()?(background?"허용":"미허용 · 시작 알림 필요"):"현재 방식에서는 불필요")+
+   "\n\n"+(hasObd?ObdLocalDiagnosticLog.recentManualSummary(a):
+    "OBD 미등록 · ECU 검사는 선택한 동글로 따로 진행")+
+   "\n\n이 검사는 GPS 기록 서비스를 시작하지 않아. 카르도 오디오 실제 연결을 확인하고, ECU 센서는 별도의 읽기 전용 검사에서 확인해.";
+  android.widget.TextView message=new android.widget.TextView(a);
+  message.setText(summary+"\n카르도 현재 오디오 연결: "+(hasCardo?"검사 중…":"미등록"));
+  message.setTextColor(a.fg);message.setTextSize(14);message.setPadding(a.dp(18),a.dp(12),a.dp(18),a.dp(12));
+  android.widget.ScrollView scroll=new android.widget.ScrollView(a);scroll.addView(message);
+  AlertDialog dialog=new AlertDialog.Builder(a)
+   .setTitle("연결만 검사 · 라이딩 기록 없음")
+   .setView(scroll).setNegativeButton("닫기",null)
+   .setPositiveButton("정차 상태에서 OBD 실제 센서 검사",(d,w)->{
+    if(RideService.running||RideService.autoArmed)return;
+    DeveloperObdScreen.launchQuick(a);
+   }).show();
+  if(hasCardo)CardoConnectionProbe.probe(a,CardoAutoRidePrefs.address(a),result->{
+   a.runOnUiThread(()->{
+    if(!dialog.isShowing())return;
+    String status=result==CardoConnectionProbe.Status.CONNECTED?"현재 오디오 연결 확인":
+     result==CardoConnectionProbe.Status.DISCONNECTED?"현재 오디오 연결 확인 안 됨":
+     result==CardoConnectionProbe.Status.PERMISSION?"주변 기기 권한 필요":
+     result==CardoConnectionProbe.Status.BLUETOOTH_OFF?"Bluetooth 꺼짐":
+     "시스템에서 연결 상태 확인 불가 · 페어링과 별개";
+    message.setText(summary+"\n카르도 현재 오디오 연결: "+status);
+   });
+  });
+ }
  private void startLiveStatus(String bikeId,android.app.Dialog owner,
    android.widget.TextView obdLive,android.widget.TextView cardoLive,android.widget.TextView gpsLive){
   android.os.Handler main=new android.os.Handler(android.os.Looper.getMainLooper());
