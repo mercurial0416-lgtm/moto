@@ -58,6 +58,16 @@ final class BikeObdSettingsUi {
   panel(p,"현재 상태",state,
    active?"GPS가 기록 중인지 라이딩 화면과 알림에서 확인해.":
    "블루투스에 기기가 등록돼 있어도 ECU에 연결됐다는 뜻은 아니야.",true);
+  // Live, read-only telemetry. Never treat paired devices as active ECU data.
+  LinearLayout livePanel=a.col();
+  livePanel.setPadding(a.dp(14),a.dp(11),a.dp(14),a.dp(11));
+  livePanel.setBackground(a.shape(a.panel,a.line,14));
+  a.label(livePanel,"실시간 연결 상태 · 화면 열려 있을 때만 확인",13,a.fg,true);
+  android.widget.TextView obdLive=a.text("",13,a.muted,false);
+  android.widget.TextView cardoLive=a.text("",13,a.muted,false);
+  android.widget.TextView gpsLive=a.text("",13,a.muted,false);
+  livePanel.addView(obdLive);livePanel.addView(cardoLive);livePanel.addView(gpsLive);
+  a.gap(p,8);p.addView(livePanel);
 
   a.gap(p,10);
   a.action(p,mode==ConnectionSetupMode.Mode.NONE?"자동기록 방식 먼저 선택":
@@ -126,10 +136,49 @@ final class BikeObdSettingsUi {
   a.gap(p,12);
   a.label(p,FirstRideSetupProof.summary(a,bikeId),13,a.muted,false);
   a.action(p,"블루투스 페어링 설정 열기",false,()->openBluetoothSettings());
-  a.action(p,"연결이 안 될 때 · 원인별 해결법",false,()->showConnectionHelp(bikeId));
+  a.action(p,"연결 문제 진단 · 지금 해결하기",false,()->showConnectionHelp(bikeId));
   a.divider(p);
   a.action(p,"고급 설정 · ODO / 센서 / 로그 / 해제",false,()->openAdvanced(bikeId));
   a.show();
+  startLiveStatus(bikeId,a.dialog,obdLive,cardoLive,gpsLive);
+ }
+
+ private void startLiveStatus(String bikeId,android.app.Dialog owner,
+   android.widget.TextView obdLive,android.widget.TextView cardoLive,android.widget.TextView gpsLive){
+  android.os.Handler main=new android.os.Handler(android.os.Looper.getMainLooper());
+  main.post(new Runnable(){@Override public void run(){
+   if(a.isFinishing()||owner==null||!owner.isShowing()||a.dialog!=owner)return;
+   boolean current=bikeId.equals(RideService.activeRideBikeId);
+   boolean ecu=current&&RideService.autoArmed&&RideService.obdSpeedKmh>=0&&
+     ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime());
+   boolean hasObd=!BikeObdPreferences.address(a,bikeId).isEmpty();
+   obdLive.setText(!hasObd?"OBD: 이 바이크에 등록되지 않음":
+     ecu?"OBD: 실제 ECU 속도 수신 중":
+     current&&RideService.autoArmed?"OBD: 연결 대기/ECU 속도 미수신":
+     "OBD: 동글 등록됨 · 현재 ECU 응답 확인 전");
+   gpsLive.setText(current&&RideService.running?
+     RideService.gpsFresh()?"GPS: 실제 좌표 수신 및 기록 중":
+       "GPS: 기록 서비스 작동 · 최신 좌표 미수신":
+     "GPS: 라이딩 좌표 기록 시작 전");
+   if(!CardoAutoRidePrefs.forBike(a,bikeId)){
+    cardoLive.setText("카르도: 미등록 · OBD 전용이면 정상");
+   }else{
+    final String target=CardoAutoRidePrefs.address(a);
+    cardoLive.setText("카르도: 현재 Bluetooth 오디오 연결 확인 중…");
+    CardoConnectionProbe.probe(a,target,result->a.runOnUiThread(()->{
+     if(!owner.isShowing()||a.dialog!=owner)return;
+     switch(result){
+      case CONNECTED:cardoLive.setText("카르도: 현재 연결 확인됨 (Android 오디오 프로필)");break;
+      case DISCONNECTED:cardoLive.setText("카르도: 현재 오디오 연결 확인 안 됨 · 페어링 상태와 구별");break;
+      case PERMISSION:cardoLive.setText("카르도: 주변 기기 권한 필요");break;
+      case BLUETOOTH_OFF:cardoLive.setText("카르도: 휴대폰 Bluetooth 꺼짐");break;
+      default:cardoLive.setText("카르도: Android 연결 상태 확인 불가 · 연결 감지 알림 확인");
+     }
+    }));
+   }
+   // Screen-scoped and bounded. Closing this dialog stops future queries.
+   main.postDelayed(this,8_000L);
+  }});
  }
 
  private boolean setupPermissionsOk(){
