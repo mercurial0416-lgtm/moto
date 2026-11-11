@@ -127,13 +127,13 @@ final class RideUi {
      String liveStatus=recordingFeedback();
      gpsHealth.setText(liveStatus);
      gpsHealth.setTextColor(RideService.count==0?a.accent:a.muted);
-     android.location.Location last=RideService.lastGood;
+     float gpsAccuracy=RideService.gpsAccuracyMeters();
      boolean freshGps=RideService.gpsFresh();
      sub.setText(RideService.count+"개 위치 기록 · "+(freshGps?"GPS 수신 정상":"GPS 신호 공백")+
-      (freshGps&&last!=null&&last.hasAccuracy()?
-       String.format(Locale.KOREA," · 정확도 ±%.0fm",last.getAccuracy()):"")+
-      (RideService.lastFixElapsed>0?
-       " · 마지막 수신 "+Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.lastFixElapsed)/1000)+"초 전":" · 첫 수신 대기"));
+      (freshGps&&Float.isFinite(gpsAccuracy)?
+       String.format(Locale.KOREA," · 정확도 ±%.0fm",gpsAccuracy):"")+
+      (RideService.gpsFixElapsed()>0?
+       " · 마지막 수신 "+Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.gpsFixElapsed())/1000)+"초 전":" · 첫 수신 대기"));
     long seconds=Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.startedElapsed)/1000);
     // Gauge cards are invisible in navigation-first focus mode; GPS is still recorded.
     if(!focus){
