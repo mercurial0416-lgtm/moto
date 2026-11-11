@@ -71,10 +71,13 @@ final class ObdLocalDiagnosticLog {
   String[] previous=p.getString("events","").split("\\n",-1);
   StringBuilder history=new StringBuilder(now).append(" · ").append(ObdDiagnosticEventPolicy.text(code));
   int appended=1;
-  for(String item:previous)if(!item.isEmpty()&&appended++<MAX_ENTRIES){
-   // Discard unknown legacy/free-form records rather than persisting identifiers.
-   if(item.length()<=90&&item.matches("[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} · [가-힣0-9 ·]+"))
-    history.append('\n').append(item);
+  for(String item:previous){
+   // Malformed legacy records must not consume the limited safe-history quota.
+   if(item.isEmpty()||item.length()>90||
+      !item.matches("[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} · [가-힣0-9 ·]+"))continue;
+   if(appended>=MAX_ENTRIES)break;
+   history.append('\n').append(item);
+   appended++;
   }
   p.edit().putString("events",history.toString()).apply();
  }
@@ -127,15 +130,15 @@ final class ObdLocalDiagnosticLog {
   }
   long ended=p.getLong("auto_at",0);
   if(ended>0&&ended<=System.currentTimeMillis()){
-   text.append("\\n\\n마지막 OBD 자동 연결: ")
+   text.append("\n\n마지막 OBD 자동 연결: ")
     .append(new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.KOREA).format(new Date(ended)))
-    .append("\\n연결 시도 ").append(p.getInt("auto_attempts",0)).append("회 · 성공 ")
+    .append("\n연결 시도 ").append(p.getInt("auto_attempts",0)).append("회 · 성공 ")
     .append(p.getInt("auto_successes",0)).append("회 · 재시도 ")
     .append(p.getInt("auto_reconnects",0)).append("회")
-    .append("\\n속도 응답 ").append(p.getLong("auto_samples",0)).append("회 · 쿼리 오류 ")
+    .append("\n속도 응답 ").append(p.getLong("auto_samples",0)).append("회 · 쿼리 오류 ")
     .append(p.getInt("auto_failures",0)).append("회")
-    .append("\\n진단: ").append(p.getString("auto_reason","확인되지 않음"))
-    .append("\\n실차 ECU 호환성은 연결 상태에서 직접 확인해야 합니다.");
+    .append("\n진단: ").append(p.getString("auto_reason","확인되지 않음"))
+    .append("\n실차 ECU 호환성은 연결 상태에서 직접 확인해야 합니다.");
   }
   String events=p.getString("events","");
   if(events!=null&&!events.isEmpty())text.append("\n\n최근 연결 점검\n").append(events);
