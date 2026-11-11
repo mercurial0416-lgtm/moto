@@ -77,7 +77,7 @@ final class DtcOdoBridge {
   try{baseline=Double.parseDouble(p.getString(k(bikeId,"baseline"),"NaN"));}
   catch(Exception e){return false;}
   if(!Double.isFinite(DtcOdoCounterPolicy.estimated(baseline,anchor,last))||
-     nowMs<previousAt||previousAt<=0)return false;
+     nowMs<=previousAt||previousAt<=0)return false;
   DtcOdoCounterPolicy.Decision verdict=DtcOdoCounterPolicy.check(last,current,nowMs-previousAt);
   if(verdict==DtcOdoCounterPolicy.Decision.RESET){
    p.edit().putBoolean(k(bikeId,"paused"),true)
