@@ -359,9 +359,14 @@ final class BikeObdSettingsUi {
    String[] names=new String[bonded.size()];
    for(int i=0;i<bonded.size();i++){
     String name=bonded.get(i).getName();
-    names[i]=(name==null?"이름 없는 기기":name)+" · "+bonded.get(i).getAddress();
+    String mac=bonded.get(i).getAddress();
+    boolean cardoName=name!=null&&(name.toLowerCase(java.util.Locale.ROOT).contains("cardo")||
+     name.toLowerCase(java.util.Locale.ROOT).contains("freecom")||
+     name.toLowerCase(java.util.Locale.ROOT).contains("packtalk"));
+    names[i]=(cardoName?"카르도 추천 · ":"")+(name==null?"이름 없는 기기":name)+
+     " · 끝번호 "+mac.substring(mac.length()-5);
    }
-   a.toast("실제 Cardo Freecom 2X를 선택해 주세요 · OBD 동글 제외");
+   a.toast("Freecom 2X를 선택해. OBD 동글은 선택하면 안 돼.");
    new AlertDialog.Builder(a).setTitle("카르도 연결 감지 기기 선택")
     .setItems(names,(d,index)->{
      BluetoothDevice selected=bonded.get(index);
@@ -370,14 +375,16 @@ final class BikeObdSettingsUi {
       a.toast("OBD 동글과 같은 주소는 카르도로 등록할 수 없습니다.");return;
      }
      new AlertDialog.Builder(a).setTitle("카르도 자동 라이딩 활성화")
-      .setMessage((name==null?"선택 장치":name)+"\n"+mac+
-       "\n\n카르도가 휴대폰에 연결될 때만 OBD 연결을 짧게 시도하고 실제 ECU 속도 확인 시 GPS를 기록합니다. OBD만 사용하면 최대 10분, GPS 안전망을 켜면 최대 15분 후 대기를 종료합니다. 기존 상시 OBD 반복 대기는 끕니다.\n\nAndroid 동반 기기로 승인하면 시스템 연결 감지가 더 안정적입니다. 백그라운드 GPS 실행이 Android 정책으로 막히면 알림을 눌러 시작해야 합니다.")
+      .setMessage((name==null?"선택 장치":name)+
+       "\n\n휴대폰에 이 카르도가 연결되면 자동으로 출발을 감지하도록 등록해.\n"+
+       "OBD가 없거나 속도를 못 읽으면 GPS 안전망을 따로 켜야 해.\n\n"+
+       "Android가 자동시작을 제한하면 알림을 눌러 시작할 수 있어.")
       .setNegativeButton("취소",null)
       .setPositiveButton("동의 · 카르도 등록",(dd,w)->{
        if(!CardoAutoRidePrefs.enable(a,bikeId,mac,name)){
         a.toast("카르도 주소·바이크 설정 확인 필요");return;
        }
-       a.toast("카르도 자동 감지 등록 · Android 동반 기기 승인 진행");
+       a.toast("카르도 등록 완료 · 시스템 연결 감지 승인 후 설정 화면에서 상태 확인");
        CardoCompanionPairing.associate(a,mac);
       }).show();
     }).setNegativeButton("취소",null).show();

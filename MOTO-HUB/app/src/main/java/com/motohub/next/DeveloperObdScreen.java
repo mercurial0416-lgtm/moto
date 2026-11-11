@@ -48,14 +48,11 @@ final class DeveloperObdScreen {
   if(RideService.running||RideService.autoArmed||RideService.saving()||RestoreRideGate.isRestoring()){
    a.toast("라이딩·복원을 종료한 뒤 정차 상태에서 OBD를 확인해 주세요.");return;
   }
-  new AlertDialog.Builder(a).setTitle("OBD 연결 검사")
-   .setMessage("정차 상태에서만 진행해 주세요. 페어링된 ELM327 Bluetooth Classic 동글을 선택해 표준 센서를 읽습니다. ECU 설정 변경·고장코드 삭제·자동 출발은 하지 않습니다. KTM 390 DUKE 실차 호환성은 아직 확인되지 않았습니다.")
-   .setNegativeButton("취소",null)
-   .setPositiveButton("읽기 전용 검사 시작",(d,w)->{
-    if(a.developerObd!=null)a.developerObd.stop();
-    a.developerObd=new DeveloperObdScreen(a);
-    a.developerObd.showQuick();
-   }).show();
+  // The screen itself explains the safety boundary; don't stack an extra
+  // confirmation dialog before the user has even chosen a device.
+  if(a.developerObd!=null)a.developerObd.stop();
+  a.developerObd=new DeveloperObdScreen(a);
+  a.developerObd.showQuick();
  }
  void showQuick(){
   if(RideService.running||RideService.autoArmed||RideService.saving()||RestoreRideGate.isRestoring()){
