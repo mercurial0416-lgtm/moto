@@ -657,7 +657,7 @@ final class DeveloperObdScreen {
    }
    if(!stopped)setStatus("ODO 미수신 · 01A0 지원: "+support+
     "\n01A6: "+ObdOdometer.responseSummary(standard)+
-    "\n22 F4 A6: "+ObdOdometer.responseSummary(uds)+
+    "\n22 F4 A6: "+ObdOdometer.responseSummary(uds)+" · "+ObdOdometer.udsDiagnosis(uds)+
     "\nECU 7E0: "+ObdOdometer.responseSummary(physical)+
     "\n앱 km 변경 없음 · 원시 응답 화면을 캡처해 분석할 수 있습니다.");
   }catch(Exception e){if(!stopped)setStatus("ODO 조회 실패: "+e.getClass().getSimpleName()+" · 기록 변경 없음");}
