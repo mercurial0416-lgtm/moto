@@ -145,6 +145,8 @@ final class ObdAutoSpeedMonitor {
    }
    int speed=ObdReadOnlyProtocol.speedKmh(response);
    if(speed<0){
+    String responderIssue=ObdReadOnlyProtocol.speedReplyDiagnosis(response);
+    if(!responderIssue.isEmpty())listener.auxiliaryDiagnostics(responderIssue);
     // A supported PID can still time out on a noisy adapter. Reconnect rather
     // than permanently disarming; only an explicit negative capability bitmap
     // proves that the ECU does not expose vehicle speed.
