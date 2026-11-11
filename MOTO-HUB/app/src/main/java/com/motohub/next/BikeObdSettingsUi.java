@@ -26,6 +26,168 @@ final class BikeObdSettingsUi {
  BikeObdSettingsUi(MainActivity a){this.a=a;}
 
  void open(String bikeId){
+  if(!RideBikeBinding.valid(bikeId)){a.toast("먼저 차고에서 바이크를 선택해 주세요.");return;}
+  org.json.JSONObject bike=null;
+  for(org.json.JSONObject item:a.items("vehicles"))
+   if(bikeId.equals(item.optString("id"))){bike=item;break;}
+  if(bike==null){a.toast("등록된 바이크가 없습니다. 차고에서 먼저 등록해 주세요.");return;}
+  boolean obd=!BikeObdPreferences.address(a,bikeId).isEmpty();
+  boolean cardo=CardoAutoRidePrefs.forBike(a,bikeId);
+  boolean fallback=BikeObdPreferences.gpsFallbackEnabled(a,bikeId);
+  boolean obdOnly=BikeObdPreferences.autoRideEnabled(a,bikeId);
+  boolean sameBike=bikeId.equals(RideService.activeRideBikeId);
+  boolean liveObd=sameBike&&RideService.autoArmed&&RideService.obdSpeedKmh>=0&&
+   ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime());
+  boolean active=sameBike&&(RideService.autoArmed||RideService.running);
+  boolean gpsRecording=sameBike&&RideService.running&&RideService.gpsFresh();
+  boolean armed=cardo&&(obd||fallback);
+  boolean permissions=setupPermissionsOk();
+  LinearLayout p=a.page("라이딩 연결 도우미");
+  a.label(p,bike.optString("name","내 바이크"),23,a.fg,true);
+  a.label(p,"처음 한 번만 설정하면 돼. 아래에 지금 필요한 일만 표시해.",13,a.muted,false);
+  a.gap(p,10);
+  String state=gpsRecording?"GPS 경로 기록 중":sameBike&&RideService.running?
+   "GPS 기록 시작됨 · 위치 수신 대기":active&&liveObd?
+   "OBD 데이터 수신 중 · 출발 감지 활성":active?
+   "자동 감지 대기 · 실제 연결 확인 중":armed?
+   "카르도 연결을 기다리는 중":obdOnly?
+   "OBD 상시 대기 설정됨 · 앱 실행 시 다시 확인":"설정 전 · 아직 자동기록은 꺼져 있어";
+  panel(p,"현재 상태",state,
+   active?"GPS가 기록 중인지 라이딩 화면과 알림에서 확인해.":
+   "블루투스에 기기가 등록돼 있어도 ECU에 연결됐다는 뜻은 아니야.",true);
+
+  a.gap(p,12);
+  a.label(p,"설정 순서",16,a.fg,true);
+  step(p,"01","바이크",bike.optString("name","내 바이크")+" 선택됨",
+   "이 화면에서 설정한 연결은 이 바이크에만 적용돼.",true);
+  step(p,"02","OBD 동글",obd?
+   liveObd?"실제 ECU 속도 수신 확인":"등록 완료 · 실제 ECU 연결은 미확인":
+   "미등록 · 카르도+GPS만 쓴다면 건너뛰어도 돼",
+   obd?"키 ON 상태에서 읽기 전용 연결 검사로 확인할 수 있어.":
+   "동글 장착 → 바이크 키 ON → 휴대폰 Bluetooth 페어링 → 앱에 등록.",obd);
+  step(p,"03","카르도",cardo?
+   CardoAutoRidePrefs.recentlyConnected(a)?"최근 연결 감지 · 자동기록 장치 등록됨":
+   "등록됨 · 다음 Bluetooth 연결 대기":
+   "미등록 · OBD 상시 대기만 사용한다면 생략 가능",
+   "Freecom 2X 전원 ON → 갤럭시에서 연결 → 앱에 기기 등록.",cardo);
+  step(p,"04","자동기록",gpsRecording?"GPS 기록 중":active?"출발 감시 작동 중":
+   armed?"카르도 연결 감지 사용 · 실제 자동시작은 미확인":
+   obdOnly?"OBD 상시 대기 동의 저장됨":"아직 자동기록 방법을 선택하지 않았어",
+   cardo?(fallback?"GPS 안전망도 켜짐 · OBD 응답이 없으면 GPS 이동을 검증.":
+     "GPS 안전망은 꺼져 있어. OBD가 응답하지 않으면 자동시작이 안 될 수 있어."):
+    "카르도 방식은 배터리 부담이 적어. OBD 상시 대기는 지속 알림·전력을 사용해.",
+   active||armed||obdOnly);
+
+  a.gap(p,14);
+  a.label(p,"지금 할 일",17,a.fg,true);
+  if(!permissions){
+   a.label(p,"위치·주변 기기·알림 권한과 GPS를 확인해. 권한이 없으면 자동시작이 막힐 수 있어.",13,a.muted,false);
+   a.action(p,"필수 권한 확인하기",true,()->showPermissionHelp());
+  }else if(active){
+   a.label(p,gpsRecording?"이미 주행 좌표를 저장 중이야. 주행 중 설정을 변경하지 마.":
+    "연결/속도 응답을 확인 중이야. 키 ON 후에도 속도가 안 들어오면 정차해서 진단해.",13,a.muted,false);
+   a.action(p,"현재 상태 자세히 보기",true,()->showConnectionStatus(bikeId));
+  }else if(!obd&&!cardo){
+   a.label(p,"권장: OBD 동글부터 등록해. GPS만 쓸 거면 카르도를 먼저 등록해도 돼.",13,a.muted,false);
+   a.action(p,"1. OBD 동글 등록하기",true,()->pick(bikeId));
+   a.action(p,"OBD 없이 카르도로 기록할래",false,()->pickCardo(bikeId));
+  }else if(!cardo&&obd){
+   a.label(p,"OBD 등록은 끝났어. 카르도를 연결하면 헬멧 연결 시 자동 출발 감지를 시작할 수 있어.",13,a.muted,false);
+   a.action(p,"2. Freecom 2X 등록하기",true,()->pickCardo(bikeId));
+   a.action(p,"카르도 없이 OBD 상시대기 켜기",false,()->beginAuto(bikeId));
+  }else if(cardo&&!obd&&!fallback){
+   a.label(p,"OBD 없이 기록하려면 GPS 안전망에 먼저 동의해야 해. 위치를 이용하므로 배터리가 추가 소모돼.",13,a.muted,false);
+   a.action(p,"3. GPS 안전망 켜기",true,()->changeGpsFallback(bikeId,false));
+   a.action(p,"OBD 동글도 등록하기",false,()->pick(bikeId));
+  }else if(cardo){
+   a.label(p,"카르도 등록 완료. 평소에는 Freecom 2X를 휴대폰에 연결한 뒤 출발해. Android가 차단하면 알림을 눌러 시작해.",13,a.muted,false);
+   if(obd)a.action(p,"OBD 실제 연결 검사 (정차)",true,()->DeveloperObdScreen.launchQuick(a));
+   else a.action(p,"정차 상태에서 감지 시작 시험",true,()->CardoRideStarter.startFromTap(a,false));
+   if(!fallback)a.action(p,"OBD 미응답 대비 GPS 안전망 켜기",false,()->changeGpsFallback(bikeId,false));
+   else a.action(p,"GPS 안전망 설정 확인",false,()->changeGpsFallback(bikeId,true));
+  }else{
+   a.action(p,"OBD 자동 감지 다시 시작",true,()->beginAuto(bikeId));
+  }
+
+  a.gap(p,12);
+  a.action(p,"블루투스 페어링 설정 열기",false,()->openBluetoothSettings());
+  a.action(p,"연결이 안 될 때 · 원인별 해결법",false,()->showConnectionHelp(bikeId));
+  a.divider(p);
+  a.action(p,"고급 설정 · ODO / 센서 / 로그 / 해제",false,()->openAdvanced(bikeId));
+  a.show();
+ }
+
+ private boolean setupPermissionsOk(){
+  if(a.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)return false;
+  if(Build.VERSION.SDK_INT>=31&&a.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)return false;
+  if(Build.VERSION.SDK_INT>=33&&a.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return false;
+  LocationManager lm=a.getSystemService(LocationManager.class);
+  return lm!=null&&lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+ }
+ private void step(LinearLayout parent,String number,String title,String state,String hint,boolean ready){
+  LinearLayout panel=a.col();
+  panel.setPadding(a.dp(15),a.dp(13),a.dp(15),a.dp(12));
+  panel.setBackground(a.shape(a.panel,a.line,16));
+  a.label(panel,number+"   "+title+(ready?"   ✓":""),16,a.fg,true);
+  a.label(panel,state,14,ready?a.fg:a.muted,true);
+  a.label(panel,hint,12,a.muted,false);
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);
+  lp.bottomMargin=a.dp(9);parent.addView(panel,lp);
+ }
+ private void panel(LinearLayout parent,String title,String message,String hint,boolean highlight){
+  LinearLayout box=a.col();box.setPadding(a.dp(16),a.dp(15),a.dp(16),a.dp(14));
+  box.setBackground(a.shape(a.panel,highlight?a.accent:a.line,16));
+  a.label(box,title,12,a.muted,true);
+  a.label(box,message,17,a.fg,true);
+  a.label(box,hint,12,a.muted,false);
+  parent.addView(box,new LinearLayout.LayoutParams(-1,-2));
+ }
+ private void openBluetoothSettings(){
+  try{a.startActivity(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));}
+  catch(Exception e){a.toast("갤럭시 설정 → 연결 → Bluetooth에서 OBD 또는 Freecom 2X를 페어링해.");}
+ }
+ private void showPermissionHelp(){
+  new AlertDialog.Builder(a).setTitle("자동기록 권한 확인")
+   .setMessage("1. 갤럭시 설정 → 앱 → MOTO HUB → 권한\n2. 위치: 정확한 위치 허용\n3. 주변 기기와 알림 허용\n4. 휴대폰 위치 기능 켜기\n\n화면이 꺼져도 카르도로 시작하려면 위치 '항상 허용'이 필요할 수 있어. Android가 허용하지 않으면 알림으로 직접 시작할 수 있어.")
+   .setNegativeButton("닫기",null)
+   .setPositiveButton("앱 권한 설정 열기",(d,w)->a.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+     android.net.Uri.parse("package:"+a.getPackageName())))).show();
+ }
+ private void showConnectionStatus(String bikeId){
+  new AlertDialog.Builder(a).setTitle("연결 상태 · 실제 수신 기준")
+   .setMessage("바이크: "+a.bikeName(bikeId)+"\nOBD: "+RideService.obdLink+
+    "\nECU 속도 수신: "+(RideService.autoArmed&&bikeId.equals(RideService.activeRideBikeId)&&
+      ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime())?
+       "최근 응답 있음":"최근 응답 확인 안 됨")+
+    "\nGPS 기록: "+(RideService.running?"서비스 작동 중":"시작 안 됨")+
+    "\nGPS 좌표: "+(RideService.gpsFresh()?"최근 수신":"대기 또는 오래된 신호")+
+    "\n\n센서 미수신을 연결 성공으로 표시하지 않아.")
+   .setPositiveButton("닫기",null).show();
+ }
+ private void showConnectionHelp(String bikeId){
+  new AlertDialog.Builder(a).setTitle("연결이 안 될 때")
+   .setMessage("① OBD 동글 목록에 안 보임\n바이크 키 ON → 갤럭시 Bluetooth에서 먼저 페어링 → 앱에 돌아와 동글 선택.\n\n② 동글은 등록했는데 속도/RPM 안 나옴\n바이크 정차 후 시동 ON → 'OBD 실제 연결 검사'. 동글은 Bluetooth Classic SPP를 지원해야 해. ECU가 PID를 지원하지 않을 수도 있어.\n\n③ 카르도 연결해도 자동기록 안 됨\nFreecom 2X를 휴대폰과 연결했는지, 카르도 등록·위치/알림 권한을 확인해. Android 백그라운드 제한 시 시작 알림을 눌러.\n\n④ OBD 없이 쓰려면\n카르도 등록 후 GPS 안전망을 별도 활성화해. 보행/다른 차량 이동도 오인할 수 있어.\n\n⑤ 자동기록은 켜졌는데 경로가 없음\n라이딩 화면에서 GPS 좌표 수신을 확인해. 계기판 누적거리(ODO)와 GPS 기록 거리는 별개야.")
+   .setNegativeButton("닫기",null)
+   .setPositiveButton("OBD 검사",(d,w)->DeveloperObdScreen.launchQuick(a))
+   .show();
+ }
+ private void changeGpsFallback(String bikeId,boolean enabled){
+  if(!CardoAutoRidePrefs.forBike(a,bikeId)){
+   a.toast("먼저 카르도를 등록해.");return;
+  }
+  if(RideService.autoArmed||RideService.running||RideService.saving()){
+   a.toast("주행과 연결 감지를 종료한 뒤 설정을 바꿀 수 있어.");return;
+  }
+  new AlertDialog.Builder(a).setTitle(enabled?"GPS 안전망 끄기":"GPS 안전망 켜기")
+   .setMessage(enabled?"GPS로 출발을 감지하는 기능을 끌까? 기존 기록은 그대로 보존돼.":
+    "OBD 속도가 수신되지 않을 때 카르도 연결 후 GPS 이동으로 출발을 판정해. 배터리를 더 쓰고, 도보·다른 차량 이동을 오인할 수 있어. 계기판 ODO에는 자동 반영하지 않아.")
+   .setNegativeButton("취소",null)
+   .setPositiveButton(enabled?"끄기":"동의하고 켜기",(d,w)->{
+    BikeObdPreferences.setGpsFallbackEnabled(a,bikeId,!enabled);open(bikeId);
+   }).show();
+ }
+
+ void openAdvanced(String bikeId){
   if(!RideBikeBinding.valid(bikeId)){a.toast("바이크를 먼저 등록해 주세요.");return;}
   org.json.JSONObject bike=null;
   for(org.json.JSONObject entry:a.items("vehicles"))if(bikeId.equals(entry.optString("id"))){bike=entry;break;}

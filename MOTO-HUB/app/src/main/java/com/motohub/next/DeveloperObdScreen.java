@@ -58,6 +58,40 @@ final class DeveloperObdScreen {
    }).show();
  }
  void showQuick(){
+  if(RideService.running||RideService.autoArmed||RideService.saving()||RestoreRideGate.isRestoring()){
+   activity.toast("정차 후 자동 감지를 종료하고 검사해 주세요.");return;
+  }
+  LinearLayout p=activity.page("OBD 연결 검사");
+  activity.label(p,"연결 확인은 딱 2단계",22,activity.fg,true);
+  activity.label(p,"1. 바이크를 정차하고 진단 동글을 장착한 뒤 키 ON (필요하면 시동 ON)\n2. 갤럭시에서 Bluetooth 페어링 후 아래 검사 버튼을 눌러.",14,activity.muted,false);
+  activity.action(p,"갤럭시 Bluetooth 페어링",false,this::openBluetoothSettings);
+  activity.gap(p,10);
+  activity.label(p,"실제 ECU 데이터 확인",17,activity.fg,true);
+  status=activity.text("검사 전 · 페어링만으로는 ECU 연결을 확인할 수 없어",14,activity.muted,true);
+  p.addView(status);
+  activity.gap(p,8);
+  LinearLayout results=activity.col();
+  results.setVisibility(android.view.View.GONE);
+  results.setPadding(activity.dp(14),activity.dp(12),activity.dp(14),activity.dp(12));
+  results.setBackground(activity.shape(activity.panel,activity.line,16));
+  for(int i=0;i<fields.length;i++){
+   fields[i]=activity.text(ObdReadOnlyProtocol.SENSOR_NAMES[i]+": —",15,activity.fg,false);
+   fields[i].setMinHeight(activity.dp(36));results.addView(fields[i]);
+  }
+  p.addView(results);
+  activity.action(p,"페어링된 OBD 동글 선택 · 읽기 전용 검사",true,()->{
+   results.setVisibility(android.view.View.VISIBLE);loadPaired();
+  });
+  activity.label(p,"값이 실제로 뜨면 통신 확인. 응답이 없으면 연결 실패 또는 ECU 미지원일 수 있어. 이 검사는 ECU를 수정하거나 고장코드를 지우지 않아.",12,activity.muted,false);
+  activity.gap(p,12);
+  activity.action(p,"지난 검사 결과",false,()->new AlertDialog.Builder(activity)
+   .setTitle("OBD 연결 검사 결과").setMessage(ObdLocalDiagnosticLog.summary(activity))
+   .setPositiveButton("닫기",null).show());
+  activity.action(p,"고급 PID/ODO 검사",false,this::showQuickAdvanced);
+  activity.show();owner=activity.dialog;activity.developerObd=this;
+  owner.setOnDismissListener(done->{stop();if(activity.developerObd==this)activity.developerObd=null;});
+ }
+ void showQuickAdvanced(){
   if(RideService.running||RideService.autoArmed||RideService.saving())return;
   LinearLayout p=activity.page("OBD 연결 · 3단계");
   activity.label(p,"1  준비",16,activity.fg,true);
