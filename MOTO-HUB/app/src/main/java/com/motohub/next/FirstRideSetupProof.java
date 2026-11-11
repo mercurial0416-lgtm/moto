@@ -44,6 +44,20 @@ final class FirstRideSetupProof {
    .putString("attempt_reason",accepted?"GPS 경로·이동거리 정상 검증":reason)
    .putLong("attempt_at",System.currentTimeMillis()).commit();
  }
+ static void reportSessionCompletion(Context c,String bike,File track,boolean fileVerified,
+   int points,double km,RideSessionVerification.Result whole){
+  if(!RideBikeBinding.valid(bike))return;
+  boolean passed=fileVerified&&whole!=null&&whole.ok;
+  String reason=passed?whole.reason:
+   whole!=null?whole.reason:attemptReason(track,fileVerified,points,km);
+  // Never erase a previously successful setup proof just because a later
+  // session is incomplete, nor write the original GPS track.
+  boolean accepted=passed&&confirm(c,bike,track,points,km);
+  prefs(c,bike).edit().putString("attempt_fingerprint",fingerprint(c,bike))
+   .putString("attempt_reason",accepted?whole.reason:reason)
+   .putLong("attempt_at",System.currentTimeMillis())
+   .putInt("attempt_parts",whole==null?0:whole.parts).commit();
+ }
  static boolean confirm(Context c,String bike,File track,int points,double gpsKm){
   if(!RideBikeBinding.valid(bike)||track==null||!track.isFile()||
      !new File(track.getPath()+".done").isFile()||

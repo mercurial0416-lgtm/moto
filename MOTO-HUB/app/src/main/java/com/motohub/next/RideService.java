@@ -733,21 +733,26 @@ public final class RideService extends Service implements LocationListener {
   HandlerThread worker=gpsIoThread;
   if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
    boolean verified=closeTrack(true);
+   RideSessionVerification.Result whole=verified?
+    RideSessionVerification.verify(getFilesDir(),savedTrack,completedSegments,count,liveDistanceKm):
+    RideSessionVerification.fail("마지막 GPS 구간 검증 실패 · 원본 보존");
    RideCaptureHealth.finished(getApplicationContext(),verified,count);
    if(verified)RideCompletionInbox.record(getApplicationContext(),savedTrack);
    // Reconcile previous sections in the derived GPS ledger, never the vehicle ODO.
    if(verified&&completedSegments>0)new Thread(()->{
     try{RideMileageEstimate.rebuild(getApplicationContext());}catch(IOException ignored){}
    },"moto-rollover-distance-reconcile").start();
-   handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,verified);});
+   handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,verified,whole);});
   })){
-   completeAutoTrack(savedTrack,closeTrack(true));
+   // If the GPS disk worker is unavailable, preserve the original and don't
+   // assert the session is proven without a full readback.
+   completeAutoTrack(savedTrack,closeTrack(true),
+    RideSessionVerification.fail("GPS 검증 스레드 이용 불가 · 전체 구간 미확인"));
   }
  }
- private void completeAutoTrack(File savedTrack,boolean verified){
-  // Never claim first setup success from Bluetooth pairing, a foreground
-  // service start, a test notification, or a file that wasn't verified.
-  FirstRideSetupProof.reportCompletion(this,pendingBikeId,savedTrack,verified,count,liveDistanceKm);
+ private void completeAutoTrack(File savedTrack,boolean verified,RideSessionVerification.Result whole){
+  // Mark setup verified only after all parts of one session were read back.
+  FirstRideSetupProof.reportSessionCompletion(this,pendingBikeId,savedTrack,verified,count,liveDistanceKm,whole);
   autoFinishPending=false;running=false;
   // Reset recording after the stored ride; new movement can start a new track.
   autoGate.reset();parkingIsolation.reset();
