@@ -362,6 +362,7 @@ final class HubScreens {
   ExperienceUi.title(a,"정비 · 주유","지출부터 정비 일정까지, 나의 바이크 장부");
   if(a.bike()==null){empty("기록할 바이크가 없어요","먼저 바이크를 등록해 주세요.","바이크 등록",()->a.edit("vehicles",null));return;}
   bikePicker();
+  a.action(a.content,"현재 바이크 설정 · OBD / 카르도 / 자동기록  ›",false,this::manageBike);
   if(UndoLastSave.available(a)){
    a.action(a.content,"↶ 방금 저장한 기록 취소 · 2분",false,()->UndoLastSave.undo(a));
   }
@@ -463,15 +464,32 @@ final class HubScreens {
   }
   sc.addView(group);a.content.addView(sc);a.gap(a.content,12);
  }
- void manageBike(){JSONObject b=a.bike();if(b==null){a.edit("vehicles",null);return;}LinearLayout p=a.page("내 바이크 관리");a.label(p,b.optString("name"),25,a.fg,true);a.label(p,b.optInt("year")+"년식 · "+a.num(b.optDouble("odo"))+" km",17,a.muted,false);
-  a.label(p,DtcOdoBridge.label(a,b.optString("id")),13,a.muted,false);
-  a.action(p,"PID 0131 주행거리 자동 추정 · 연결/보정",false,()->DtcOdoSetupScreen.open(a));a.label(p,"구매가 "+a.won(b.optDouble("purchase")),17,a.fg,false);
+ void manageBike(){JSONObject b=a.bike();if(b==null){a.edit("vehicles",null);return;}
+  final String bikeId=b.optString("id");
+  LinearLayout p=a.page("내 바이크 설정");
+  a.label(p,b.optString("name"),25,a.fg,true);
+  a.label(p,b.optInt("year")+"년식 · "+a.num(b.optDouble("odo"))+" km",17,a.muted,false);
+  a.gap(p,10);
+  a.label(p,"이 바이크 연결 · 자동 라이딩",17,a.fg,true);
+  String address=BikeObdPreferences.address(a,bikeId);
+  ConnectionSetupMode.Mode connection=ConnectionSetupMode.get(a,bikeId);
+  a.label(p,"자동기록 방식: "+connection.label+
+    "\nOBD 동글: "+(address.isEmpty()?"미등록":"등록됨 · 실제 ECU 응답과 별개")+
+    "\n지난 자동기록: "+ObdAutoRideProgress.summary(a,bikeId),13,a.muted,false);
+  a.action(p,"OBD · 카르도 · 자동 라이딩 설정",true,()->new BikeObdSettingsUi(a).open(bikeId));
+  a.action(p,"오늘 기록이 안 됐을 때 · 오류 확인",false,()->new AlertDialog.Builder(a)
+   .setTitle("이 바이크 자동기록 진단")
+   .setMessage(RideMissingRecordingGuide.summary(a,bikeId))
+   .setNegativeButton("닫기",null)
+   .setPositiveButton("OBD·자동기록 설정",(d,w)->new BikeObdSettingsUi(a).open(bikeId)).show());
+  a.divider(p);
+  a.label(p,"바이크 정보 및 관리",16,a.fg,true);
+  a.label(p,DtcOdoBridge.label(a,bikeId),13,a.muted,false);
+  a.action(p,"PID 0131 주행거리 자동 추정 · 연결/보정",false,()->DtcOdoSetupScreen.open(a));
+  a.label(p,"구매가 "+a.won(b.optDouble("purchase")),17,a.fg,false);
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
-  a.action(p,"바이크 정보 수정",true,()->a.edit("vehicles",b));
-  String bikeObdAddress=BikeObdPreferences.address(a,b.optString("id"));
-  a.label(p,"바이크 설정",15,a.fg,true);
-  a.action(p,"OBD 연결 설정 · "+(bikeObdAddress.isEmpty()?"등록 안 됨":BikeObdPreferences.deviceName(a,b.optString("id"))),false,()->new BikeObdSettingsUi(a).open(b.optString("id")));
+  a.action(p,"바이크 정보 수정",false,()->a.edit("vehicles",b));
   a.action(p,"부품별 관리 장부",false,()->new ComponentBookUi(a).open());
   a.label(p,"차량 라이프로그",15,a.fg,true);
   a.action(p,"판매·정비 이력 PDF · 직접 저장",false,()->a.exportOwnershipPdf(b.optString("id")));
