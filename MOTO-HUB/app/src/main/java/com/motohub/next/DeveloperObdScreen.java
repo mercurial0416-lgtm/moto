@@ -39,7 +39,7 @@ final class DeveloperObdScreen {
  private TextView status;
  private Dialog owner;
  private android.widget.Button verifiedRegisterButton;
- private BluetoothDevice verifiedRegisterDevice;
+ private String verifiedRegisterMac="",verifiedRegisterName="";
  private String verifiedBikeId="";
  private volatile boolean stopped=true;
  private volatile BluetoothSocket socket;
@@ -83,12 +83,13 @@ final class DeveloperObdScreen {
    results.setVisibility(android.view.View.VISIBLE);loadPaired();
   });
   verifiedRegisterButton=activity.button("이 동글로 사용하기 · ECU 응답 확인",true,()->{
-   BluetoothDevice checked=verifiedRegisterDevice;
-   if(checked==null||activity.bike()==null||!verifiedBikeId.equals(activity.bike().optString("id"))){
+   String checked=verifiedRegisterMac;
+   if(!BikeObdPreferences.validAddress(checked)||activity.bike()==null||
+      !verifiedBikeId.equals(activity.bike().optString("id"))){
     activity.toast("바이크가 바뀌었어. 동글 검사를 다시 진행해.");return;
    }
    new BikeObdSettingsUi(activity).confirmDeviceRegistration(verifiedBikeId,
-    checked.getAddress(),checked.getName(),true);
+    checked,verifiedRegisterName,true);
   });
   verifiedRegisterButton.setVisibility(android.view.View.GONE);
   p.addView(verifiedRegisterButton);
@@ -102,7 +103,7 @@ final class DeveloperObdScreen {
   owner.setOnDismissListener(done->{stop();if(activity.developerObd==this)activity.developerObd=null;});
  }
  void showQuickAdvanced(){
-  verifiedRegisterButton=null;verifiedRegisterDevice=null;verifiedBikeId="";
+  verifiedRegisterButton=null;verifiedRegisterMac="";verifiedRegisterName="";verifiedBikeId="";
   if(RideService.running||RideService.autoArmed||RideService.saving())return;
   LinearLayout p=activity.page("OBD 연결 · 3단계");
   activity.label(p,"1  준비",16,activity.fg,true);
@@ -801,7 +802,7 @@ final class DeveloperObdScreen {
  }
  private synchronized void connect(BluetoothDevice device){
   stop();
-  verifiedRegisterDevice=null;verifiedBikeId="";
+  verifiedRegisterMac="";verifiedRegisterName="";verifiedBikeId="";
   if(verifiedRegisterButton!=null)verifiedRegisterButton.setVisibility(android.view.View.GONE);
   if(worker!=null&&worker.isAlive()){setStatus("기존 연결을 종료 중입니다. 잠시 후 다시 선택해 주세요.");return;}
   if(!permissionGranted()){setStatus("Bluetooth 권한이 필요합니다.");return;}
@@ -888,11 +889,17 @@ final class DeveloperObdScreen {
  }
  private void showVerifiedRegistration(BluetoothDevice device,String bikeId){
   if(!RideBikeBinding.valid(bikeId))return;
+  if(Build.VERSION.SDK_INT>=31&&activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    !=PackageManager.PERMISSION_GRANTED)return;
+  final String address,name;
+  try{address=device.getAddress();name=device.getName();}
+  catch(SecurityException revoked){return;}
+  if(!BikeObdPreferences.validAddress(address))return;
   activity.runOnUiThread(()->{
    if(stopped||verifiedRegisterButton==null||owner==null||
       !owner.isShowing()||activity.dialog!=owner||
       activity.bike()==null||!bikeId.equals(activity.bike().optString("id")))return;
-   verifiedRegisterDevice=device;verifiedBikeId=bikeId;
+   verifiedRegisterMac=address;verifiedRegisterName=name;verifiedBikeId=bikeId;
    verifiedRegisterButton.setVisibility(android.view.View.VISIBLE);
    setStatus("실제 ECU 센서 응답 확인 · 아래에서 이 동글을 바이크에 등록할 수 있어");
   });
