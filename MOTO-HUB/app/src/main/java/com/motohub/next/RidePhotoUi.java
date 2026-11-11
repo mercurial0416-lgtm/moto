@@ -108,7 +108,7 @@ final class RidePhotoUi {
    Canvas canvas=new Canvas(image);
    Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
    canvas.drawColor(Color.rgb(16,30,53));
-   File journal=new File(track.getParentFile().getParentFile(),RidePhotoJournal.photoName(track.getName()));
+   File journal=RidePhotoJournal.file(track.getParentFile().getParentFile(),track);
    if(journal.isFile())cover=RidePhotoJournal.readPreview(journal,1600);
    if(cover!=null){
     p.setFilterBitmap(true);
