@@ -487,7 +487,7 @@ final class HubScreens {
   a.label(p,"자동기록 방식: "+connection.label+
     "\nOBD 동글: "+(address.isEmpty()?"미등록":"등록됨 · 실제 ECU 응답과 별개")+
     "\n지난 자동기록: "+ObdAutoRideProgress.summary(a,bikeId),13,a.muted,false);
-  a.action(p,"OBD · 카르도 · 자동 라이딩 설정",true,()->new BikeObdSettingsUi(a).open(bikeId));
+  a.action(p,"OBD 연결 설정 · 카르도 / 자동 라이딩",true,()->new BikeObdSettingsUi(a).open(bikeId));
   a.action(p,"오늘 기록이 안 됐을 때 · 오류 확인",false,()->new AlertDialog.Builder(a)
    .setTitle("이 바이크 자동기록 진단")
    .setMessage(RideMissingRecordingGuide.summary(a,bikeId))
