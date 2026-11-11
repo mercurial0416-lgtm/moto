@@ -10,6 +10,7 @@ final class ConnectionIssueGuide {
   GPS_CONSENT("GPS 안전망 동의 필요","GPS로 자동 출발을 감지하도록 아직 동의하지 않았어.","배터리/오인 가능성을 확인한 뒤 안전망을 켜.","안전망 설정"),
   BLUETOOTH_OFF("휴대폰 Bluetooth 꺼짐","Bluetooth가 꺼져 있어 장치 상태를 읽을 수 없어.","휴대폰 Bluetooth를 켠 뒤 다시 연결해.","Bluetooth 설정"),
   BT_PERMISSION("주변 기기 권한 필요","앱에 Bluetooth 연결 확인 권한이 없어.","앱 권한에서 주변 기기를 허용해.","앱 권한 열기"),
+  BACKGROUND_LOCATION("백그라운드 위치 권한 필요","카르도가 연결돼도 화면이 꺼진 상태에서 Android가 자동기록 서비스를 시작하지 못할 수 있어.","앱 정보 → 권한 → 위치에서 항상 허용을 선택해. 허용할 수 없다면 카르도 시작 알림을 눌러.","위치 권한 열기"),
   LOCATION_PERMISSION("정확한 위치 권한 필요","GPS 경로 저장을 위한 정확한 위치 권한이 없어.","앱 위치 권한을 허용해.","앱 권한 열기"),
   NOTIFICATION_PERMISSION("알림 권한 필요","자동 감지 알림을 보여줄 권한이 없어.","알림 권한을 허용해.","앱 권한 열기"),
   GPS_OFF("GPS 위치 기능 꺼짐","휴대폰 위치 기능이 꺼져 있어.","위치 기능을 켠 다음 다시 확인해.","위치 설정"),
@@ -30,7 +31,17 @@ final class ConnectionIssueGuide {
    boolean gpsFallback,boolean bluetooth,boolean btPermission,boolean locationPermission,
    boolean notifications,boolean gpsOn,boolean active,boolean running,
    boolean freshGps,boolean freshEcu,String latestError,boolean recentCardo){
+  return diagnose(mode,hasObd,hasCardo,gpsFallback,bluetooth,btPermission,
+   locationPermission,notifications,gpsOn,active,running,freshGps,freshEcu,
+   latestError,recentCardo,false,true);
+ }
+ static Issue diagnose(ConnectionSetupMode.Mode mode,boolean hasObd,boolean hasCardo,
+   boolean gpsFallback,boolean bluetooth,boolean btPermission,boolean locationPermission,
+   boolean notifications,boolean gpsOn,boolean active,boolean running,
+   boolean freshGps,boolean freshEcu,String latestError,boolean recentCardo,
+   boolean backgroundRequired,boolean backgroundGranted){
   if(mode==null||mode==ConnectionSetupMode.Mode.NONE)return Issue.MODE;
+  if(!btPermission)return Issue.BT_PERMISSION;
   if(!bluetooth)return Issue.BLUETOOTH_OFF;
   if(mode.needsObd()&&!hasObd)return Issue.OBD_DEVICE;
   if(mode.needsCardo()&&!hasCardo)return Issue.CARDO_DEVICE;
@@ -39,6 +50,7 @@ final class ConnectionIssueGuide {
   if(!locationPermission)return Issue.LOCATION_PERMISSION;
   if(!notifications)return Issue.NOTIFICATION_PERMISSION;
   if(!gpsOn)return Issue.GPS_OFF;
+  if(backgroundRequired&&!backgroundGranted)return Issue.BACKGROUND_LOCATION;
   if(running&&!freshGps)return Issue.GPS_NO_FIX;
   String error=latestError==null?"":latestError.toLowerCase(Locale.ROOT);
   if(active&&(error.contains("010d")||error.contains("속도 pid"))&&

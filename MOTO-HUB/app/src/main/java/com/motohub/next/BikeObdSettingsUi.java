@@ -22,6 +22,23 @@ import java.util.Set;
  * Storing an adapter never silently connects it, arms tracking, or changes the ECU.
  */
 final class BikeObdSettingsUi {
+ private static final java.lang.ref.WeakReference<android.app.Dialog> EMPTY =
+   new java.lang.ref.WeakReference<>(null);
+ private static java.lang.ref.WeakReference<android.app.Dialog> guideDialog=EMPTY;
+ private static String guideBike="";
+ private static boolean refreshOnReturn=false;
+ static void notePause(MainActivity activity){
+  android.app.Dialog d=guideDialog.get();
+  if(d!=null&&d.isShowing()&&activity.dialog==d)refreshOnReturn=true;
+ }
+ static void refreshAfterReturn(MainActivity activity){
+  if(!refreshOnReturn)return;
+  refreshOnReturn=false;
+  android.app.Dialog d=guideDialog.get();
+  if(d==null||!d.isShowing()||activity.dialog!=d||!RideBikeBinding.valid(guideBike))return;
+  String bike=guideBike;
+  new BikeObdSettingsUi(activity).open(bike);
+ }
  private final MainActivity a;
  BikeObdSettingsUi(MainActivity a){this.a=a;}
 
@@ -44,7 +61,7 @@ final class BikeObdSettingsUi {
   boolean armed=cardo&&(obd||fallback);
   ConnectionSetupMode.Mode mode=ConnectionSetupMode.get(a,bikeId);
   boolean wantsObd=mode.needsObd(),wantsCardo=mode.needsCardo();
-  boolean permissions=setupPermissionsOk();
+  boolean permissions=setupPermissionsOk(mode);
   LinearLayout p=a.page("라이딩 연결 도우미");
   a.label(p,bike.optString("name","내 바이크"),23,a.fg,true);
   a.label(p,"처음 한 번만 설정하면 돼. 아래에 지금 필요한 일만 표시해.",13,a.muted,false);
@@ -140,6 +157,7 @@ final class BikeObdSettingsUi {
   a.divider(p);
   a.action(p,"고급 설정 · ODO / 센서 / 로그 / 해제",false,()->openAdvanced(bikeId));
   a.show();
+  guideBike=bikeId;guideDialog=new java.lang.ref.WeakReference<>(a.dialog);
   startLiveStatus(bikeId,a.dialog,obdLive,cardoLive,gpsLive);
  }
 
@@ -181,10 +199,12 @@ final class BikeObdSettingsUi {
   }});
  }
 
- private boolean setupPermissionsOk(){
+ private boolean setupPermissionsOk(ConnectionSetupMode.Mode mode){
   if(a.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)return false;
   if(Build.VERSION.SDK_INT>=31&&a.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)return false;
   if(Build.VERSION.SDK_INT>=33&&a.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return false;
+  if(mode!=null&&mode.needsCardo()&&Build.VERSION.SDK_INT>=29&&
+    a.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)!=PackageManager.PERMISSION_GRANTED)return false;
   LocationManager lm=a.getSystemService(LocationManager.class);
   return lm!=null&&lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
  }
@@ -285,7 +305,10 @@ final class BikeObdSettingsUi {
  }
  private void showPermissionHelp(){
   new AlertDialog.Builder(a).setTitle("자동기록 권한 확인")
-   .setMessage("1. 갤럭시 설정 → 앱 → MOTO HUB → 권한\n2. 위치: 정확한 위치 허용\n3. 주변 기기와 알림 허용\n4. 휴대폰 위치 기능 켜기\n\n화면이 꺼져도 카르도로 시작하려면 위치 '항상 허용'이 필요할 수 있어. Android가 허용하지 않으면 알림으로 직접 시작할 수 있어.")
+   .setMessage("1. 갤럭시 설정 → 앱 → MOTO HUB → 권한\n2. 위치: 정확한 위치 허용\n3. 주변 기기와 알림 허용\n4. 휴대폰 위치 기능 켜기\n"+
+    (a.bike()!=null&&ConnectionSetupMode.get(a,a.bike().optString("id")).needsCardo()?
+     "\n카르도 자동시작은 Android 10 이상에서 위치 '항상 허용'이 추가로 필요해. 허용하지 않으면 자동시작 대신 알림을 눌러 시작해야 해.":"")+
+    "\n\n설정에서 돌아오면 연결 준비 상태를 다시 확인해.")
    .setNegativeButton("닫기",null)
    .setPositiveButton("앱 권한 설정 열기",(d,w)->a.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
      android.net.Uri.parse("package:"+a.getPackageName())))).show();
@@ -320,6 +343,9 @@ final class BikeObdSettingsUi {
   boolean active=same&&(RideService.autoArmed||RideService.running);
   boolean obdFresh=active&&RideService.obdSpeedKmh>=0&&
     ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime());
+  boolean backgroundRequired=mode.needsCardo()&&Build.VERSION.SDK_INT>=29;
+  boolean backgroundGranted=!backgroundRequired||
+   a.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)==PackageManager.PERMISSION_GRANTED;
   ConnectionIssueGuide.Issue issue=ConnectionIssueGuide.diagnose(mode,
    !BikeObdPreferences.address(a,bikeId).isEmpty(),
    CardoAutoRidePrefs.forBike(a,bikeId),
@@ -327,7 +353,7 @@ final class BikeObdSettingsUi {
    bluetooth,btPermission,locationPermission,notifications,gps,
    active,same&&RideService.running,same&&RideService.gpsFresh(),
    obdFresh,same?RideService.obdLastError:"",
-   CardoAutoRidePrefs.recentlyConnected(a));
+   CardoAutoRidePrefs.recentlyConnected(a),backgroundRequired,backgroundGranted);
   new AlertDialog.Builder(a).setTitle(issue.title)
    .setMessage("가능한 원인\n"+issue.reason+"\n\n다음 행동\n"+issue.next+
     "\n\n※ 앱이 실제로 관측한 신호만 사용해 분류했어. 원인을 확정한 건 아닐 수 있어.")
@@ -345,6 +371,7 @@ final class BikeObdSettingsUi {
    case CARDO_NOT_SEEN:openBluetoothSettings();return;
    case BT_PERMISSION:
    case LOCATION_PERMISSION:
+   case BACKGROUND_LOCATION:
    case NOTIFICATION_PERMISSION:
    case BACKGROUND_LIMIT:showPermissionHelp();return;
    case GPS_OFF:

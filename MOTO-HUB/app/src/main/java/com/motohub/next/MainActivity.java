@@ -276,6 +276,10 @@ public class MainActivity extends Activity {
   super.onWindowFocusChanged(focused);
   if(focused&&root!=null)root.postDelayed(this::showPendingRideSummary,200);
  }
+ @Override protected void onPause(){
+  BikeObdSettingsUi.notePause(this);
+  super.onPause();
+ }
  @Override protected void onResume(){super.onResume();obdVisible=true;
   refreshJsonImportAfterRecreation();
   odoSyncHandler.removeCallbacks(odoSyncTick);
@@ -290,6 +294,7 @@ public class MainActivity extends Activity {
   // Android does not guarantee background re-start after process death/boot.
   if(!readOnly&&root!=null)root.postDelayed(this::resumeApprovedObdReady,1800L);
   CardoPresenceReconciler.onForeground(this);
+  if(root!=null)root.postDelayed(()->BikeObdSettingsUi.refreshAfterReturn(this),250L);
   AppUpdateNotice.checkOnResume(this);
  }
  /** Reload data when a JSON restore finishes after the Activity was recreated. */
