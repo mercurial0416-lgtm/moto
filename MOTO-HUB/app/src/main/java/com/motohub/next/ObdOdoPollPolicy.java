@@ -10,8 +10,11 @@ final class ObdOdoPollPolicy {
  static boolean shouldProbe(boolean consented,ObdPidCapabilities.Support support,
                             int speedKmh,int speedPolls,boolean directProbeAttempted){
   if(!consented||speedKmh<0)return false;
+  // Long ODO reads may stall the safety-critical speed PID; ask only at rest.
+  if(speedKmh!=0)return false;
+  if(support==ObdPidCapabilities.Support.NO)return false;
   if(support==ObdPidCapabilities.Support.YES)
    return speedPolls>0&&speedPolls%60==0;
-  return !directProbeAttempted&&speedKmh==0&&speedPolls>=8;
+  return !directProbeAttempted&&speedPolls>=8;
  }
 }

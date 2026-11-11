@@ -16,7 +16,10 @@ final class ObdOnBikeVerification {
  };
  private ObdOnBikeVerification(){}
  static void show(MainActivity a){
-  SharedPreferences prefs=a.getSharedPreferences(KEY,0);
+  String bikeId=a.bike()==null?"":a.bike().optString("id","");
+  if(!RideBikeBinding.valid(bikeId)){a.toast("실차 검증할 바이크를 먼저 선택해 주세요.");return;}
+  // A manual check belongs to the physical motorcycle, not a global checkbox.
+  SharedPreferences prefs=a.getSharedPreferences(KEY+"_"+bikeId,0);
   boolean[] values=new boolean[ITEMS.length];
   for(int i=0;i<values.length;i++)values[i]=prefs.getBoolean("item_"+i,false);
   String observed="현재 수신 샘플 "+RideService.obdSpeedSamples+
@@ -27,7 +30,7 @@ final class ObdOnBikeVerification {
     "\nRPM: "+(ObdTelemetryFreshness.fresh(RideService.obdRpmAt,android.os.SystemClock.elapsedRealtime())&&
       Double.isFinite(RideService.obdRpm)?
       String.format(Locale.KOREA,"%.0f",RideService.obdRpm):"미수신 또는 신호 만료");
-  new AlertDialog.Builder(a).setTitle("듀크 390 실차 검증 · 미검증")
+  new AlertDialog.Builder(a).setTitle(a.bikeName(bikeId)+" 실차 검증 · 수동 확인")
    .setMessage("실시간 수신 진단\n"+observed+
     "\n\n아래 체크는 사용자가 실제 계기판을 대조한 경우에만 직접 선택하세요. 소프트웨어 테스트 통과를 실차 호환 확인으로 표시하지 않습니다. 이동 중 화면 조작은 금지합니다.")
    .setMultiChoiceItems(ITEMS,values,(d,index,on)->values[index]=on)

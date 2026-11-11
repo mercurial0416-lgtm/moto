@@ -146,7 +146,9 @@ final class HybridOdometerEstimate {
     ?"ODO 추정 중지 · GPS 기록 삭제/수정 또는 이전 버전 기준값 · 계기판 재보정 필요"
     :"ODO 추정 보류 · GPS 기록 또는 보정 기준값 확인 필요";
   return String.format(Locale.KOREA,
-   "ODO 추정 %.1f km · 계기판 확인 %.1f + GPS 기록 %.1f km (미기록 주행 제외)",
-   r.estimatedKm,r.baselineKm,r.deltaKm);
+   "ODO 추정 %.1f km · 계기판 확인 %.1f + GPS 기록 %.1f km (미기록 주행 제외) · 기준값 %s · GPS 누락 시 실제 ODO와 오차 발생",
+   r.estimatedKm,r.baselineKm,r.deltaKm,
+   r.checkedAt>0&&System.currentTimeMillis()>=r.checkedAt?
+     ((System.currentTimeMillis()-r.checkedAt)/86_400_000L)+"일 전":"확인 불가");
  }
 }
