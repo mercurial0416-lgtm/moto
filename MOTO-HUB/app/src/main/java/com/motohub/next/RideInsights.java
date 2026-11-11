@@ -103,7 +103,7 @@ public final class RideInsights {
       peakConfirmed[0]=Double.isFinite(lastSegmentSpeed[0])&&
        Math.abs(speed-lastSegmentSpeed[0])<=Math.max(15,speed*.35);
       max[0]=speed;peakLat[0]=x;peakLon[0]=y;
-     }else if(speed>=max[0]*.7)peakConfirmed[0]=true;
+     }else if(Double.isFinite(lastSegmentSpeed[0])&&speed>=max[0]*.7)peakConfirmed[0]=true;
      lastSegmentSpeed[0]=speed;
      if(speed>=3)moving[0]+=delta;
     }else if(delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS){

@@ -407,6 +407,7 @@ public final class RideService extends Service implements LocationListener {
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
    cardoSession=cardoApproved;cardoConnected=cardoApproved;
    cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
+   cardoGpsProbeFailures=0;cardoGpsRetryAt=0;
    cardoGpsPrevious=null;cardoGpsGate.reset();
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
@@ -589,6 +590,7 @@ public final class RideService extends Service implements LocationListener {
     openRideTrack();requestGpsUpdatesChecked();
     if(cardoSession)handler.removeCallbacks(cardoIdleStop);
     status="OBD2 출발 감지 · GPS 기록 중";ObdLocalDiagnosticLog.record(this,"GPS_STARTED");
+    ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.GPS);
    }catch(Exception e){stopWith("GPS 자동 기록 시작 실패: "+e.getMessage(),false);return;}
    finally{RestoreRideGate.endRideStart();}
   }else if(event==ObdRideAutoGate.Event.FINISH){finishAutoTrack();}
