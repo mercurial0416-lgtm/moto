@@ -125,7 +125,7 @@ final class RideUi {
     }
     if(!RideService.running){a.renderPreservingPosition();return;}
      String liveStatus=recordingFeedback();
-     gpsHealth.setText(liveStatus);
+     gpsHealth.setText(RideService.gpsParkingHeld()?"주차 후보 · 휴대폰 도보 GPS 제외 · 자동저장 대기":liveStatus);
      gpsHealth.setTextColor(RideService.count==0?a.accent:a.muted);
      float gpsAccuracy=RideService.gpsAccuracyMeters();
      boolean freshGps=RideService.gpsFresh();
