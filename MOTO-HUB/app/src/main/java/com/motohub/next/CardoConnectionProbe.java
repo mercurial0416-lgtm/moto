@@ -19,7 +19,8 @@ final class CardoConnectionProbe {
  private CardoConnectionProbe(){}
  private static final class Probe {
   final String mac;final ArrayList<Consumer<Status>> waiters=new ArrayList<>();
-  int completed=0,readable=0;boolean found=false,finished=false;
+  final Set<Integer> completedProfiles=new HashSet<>();
+  int readable=0;boolean found=false,finished=false;
   Probe(String mac){this.mac=mac;}
  }
  static boolean inFlight(String mac){synchronized(PENDING){return PENDING.containsKey(mac);}}
@@ -61,25 +62,29 @@ final class CardoConnectionProbe {
       finally{
        try{adapter.closeProfileProxy(type,proxy);}catch(RuntimeException ignored){}
       }
-      answer(p,read,found);
+      answer(p,type,read,found);
      }
-     @Override public void onServiceDisconnected(int type){answer(p,false,false);}
+     @Override public void onServiceDisconnected(int type){answer(p,type,false,false);}
     },profile);
-    if(!launched)answer(p,false,false);
-   }catch(SecurityException ignored){answer(p,false,false);}
+    if(!launched)answer(p,profile,false,false);
+   }catch(SecurityException ignored){answer(p,profile,false,false);}
   }
  }
- private static void answer(Probe p,boolean readable,boolean found){
+ private static void answer(Probe p,int profile,boolean readable,boolean found){
   Status result=null;
   synchronized(PENDING){
-   if(p.finished)return;
-   p.completed++;if(readable)p.readable++;
+   if(p.finished||!acceptProfileReply(p.completedProfiles,profile))return;
+   if(readable)p.readable++;
    if(found)p.found=true;
    if(p.found)result=Status.CONNECTED;
-   else if(p.completed>=2)result=p.readable==2?Status.DISCONNECTED:Status.UNKNOWN;
+   else if(p.completedProfiles.size()>=2)
+    result=p.readable==2?Status.DISCONNECTED:Status.UNKNOWN;
   }
   if(result!=null)finish(p,result);
  }
+ /** One profile may call onConnected and onDisconnected; count it once. */
+ static boolean acceptProfileReply(Set<Integer> seen,int profile){return seen.add(profile);}
+
  private static void finish(Probe p,Status result){
   final ArrayList<Consumer<Status>> callbacks;
   synchronized(PENDING){
