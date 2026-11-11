@@ -154,6 +154,11 @@ final class BikeObdSettingsUi {
   if(!BikeObdPreferences.address(a,bikeId).isEmpty())
    a.label(p,ObdLocalDiagnosticLog.recentManualSummary(a),13,a.muted,false);
   a.label(p,FirstRideSetupProof.summary(a,bikeId),13,a.muted,false);
+  a.action(p,"자동연결·기록 실패 이력",false,()->new AlertDialog.Builder(a)
+   .setTitle("자동기록 단계와 실패 이력")
+   .setMessage(ConnectionEventLog.summary(a,bikeId)+"\n\n"+
+    ObdAutoRideProgress.summary(a,bikeId))
+   .setPositiveButton("닫기",null).show());
   a.action(p,"자동기록 없이 연결 테스트",true,()->showSafeConnectionTest(bikeId));
   a.action(p,"블루투스 페어링 설정 열기",false,()->openBluetoothSettings());
   a.action(p,"연결 문제 진단 · 지금 해결하기",false,()->showConnectionHelp(bikeId));

@@ -148,6 +148,7 @@ public final class RideService extends Service implements LocationListener {
     status="OBD 속도 미수신 · 5분 한정 GPS 안전망 이동 감지";
     notifySafely(status);
    }catch(Exception error){
+    ConnectionEventLog.record(this,pendingBikeId,ConnectionEventLog.Event.GPS_PERMISSION_BLOCKED);
     cardoGpsProbeFailures=Math.min(8,cardoGpsProbeFailures+1);
     long delay=Math.min(60_000L,5_000L*(1L<<Math.min(4,cardoGpsProbeFailures-1)));
     cardoGpsRetryAt=now+delay;
@@ -738,7 +739,7 @@ public final class RideService extends Service implements LocationListener {
  private void completeAutoTrack(File savedTrack,boolean verified){
   // Never claim first setup success from Bluetooth pairing, a foreground
   // service start, a test notification, or a file that wasn't verified.
-  if(verified)FirstRideSetupProof.confirm(this,pendingBikeId,savedTrack,count,liveDistanceKm);
+  FirstRideSetupProof.reportCompletion(this,pendingBikeId,savedTrack,verified,count,liveDistanceKm);
   autoFinishPending=false;running=false;
   // Reset recording after the stored ride; new movement can start a new track.
   autoGate.reset();parkingIsolation.reset();
@@ -802,6 +803,7 @@ public final class RideService extends Service implements LocationListener {
   // Keep an already-running GPS session in the same foreground service until its
   // user explicitly ends it. Never auto-arm again or enable group sharing.
   ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.FAILED);
+  ConnectionEventLog.record(this,pendingBikeId,ConnectionEventLog.Event.OBD_LOST);
   ObdLocalDiagnosticLog.automaticSession(this,obdConnectionAttempts,
    obdConnectionSuccesses,obdReconnects,obdQueryFailures,obdSpeedSamples,reason);
   obdLastError="OBD2 · "+reason;
@@ -1049,6 +1051,8 @@ public final class RideService extends Service implements LocationListener {
  }}
  @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p))handler.post(()->{if(!running)return;status="GPS 복귀 · 좌표 대기";notifySafely(status);});} @Override public void onStatusChanged(String p,int s,Bundle b){}
  void stopWith(String message,boolean completed){
+  if((running||autoArmed)&&RideBikeBinding.valid(pendingBikeId))
+   ConnectionEventLog.categorizeStop(this,pendingBikeId,message);
   RideCaptureHealth.failedIfActive(this,message);
   status=message;cleanup(completed);stopSelf();
  }

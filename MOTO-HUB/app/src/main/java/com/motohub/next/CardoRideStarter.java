@@ -28,6 +28,8 @@ final class CardoRideStarter {
 
  static void cardoEvent(Context c,String mac,boolean connected){
   if(!CardoAutoRidePrefs.matches(c,mac))return;
+  ConnectionEventLog.record(c,CardoAutoRidePrefs.bikeId(c),
+   connected?ConnectionEventLog.Event.CARDO_CONNECTED:ConnectionEventLog.Event.CARDO_DISCONNECTED);
   if(!connected)CardoAutoRidePrefs.noteDisconnect(c,mac);
   else CardoAutoRidePrefs.notePresence(c,mac,true);
   // Update the already-running FGS directly. Android can reject starting a
@@ -45,9 +47,13 @@ final class CardoRideStarter {
    return;
   }
   // Do not consume the debounce slot until permissions and FGS conditions pass.
-  if(!eligible(c)){CardoAutoRidePrefs.status(c,"권한/GPS 설정 필요 · 알림에서 확인");notifyTap(c);return;}
+  if(!eligible(c)){
+   ConnectionEventLog.record(c,CardoAutoRidePrefs.bikeId(c),ConnectionEventLog.Event.PERMISSION_BLOCKED);
+   CardoAutoRidePrefs.status(c,"권한/GPS 설정 필요 · 알림에서 확인");notifyTap(c);return;
+  }
   if(Build.VERSION.SDK_INT>=29&&!MainActivity.obdVisible&&
      c.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+   ConnectionEventLog.record(c,CardoAutoRidePrefs.bikeId(c),ConnectionEventLog.Event.BACKGROUND_BLOCKED);
    CardoAutoRidePrefs.status(c,"백그라운드 위치 허용 안 됨 · 알림에서 시작");
    notifyTap(c);return;
   }
@@ -55,6 +61,7 @@ final class CardoRideStarter {
   if(!CardoAutoRidePrefs.claim(c,mac,inRide))return;
   if(!start(c)){
    CardoAutoRidePrefs.releaseClaim(c,mac);
+   ConnectionEventLog.record(c,CardoAutoRidePrefs.bikeId(c),ConnectionEventLog.Event.ANDROID_BLOCKED);
    CardoAutoRidePrefs.status(c,"Android 백그라운드 시작 제한 · 알림으로 시작");
    notifyTap(c);
   }

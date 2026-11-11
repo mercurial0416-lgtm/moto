@@ -31,6 +31,7 @@ final class ObdAutoRideProgress {
    }
   }
   e.putString("timeline",trace.toString()).apply();
+  ConnectionEventLog.fromAutoStage(c,bike,stage);
  }
  static String summary(Context c,String bike){
   if(!RideBikeBinding.valid(bike))return "바이크 선택 후 자동기록 확인";

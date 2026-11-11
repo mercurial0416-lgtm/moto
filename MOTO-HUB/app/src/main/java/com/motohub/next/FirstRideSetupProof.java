@@ -27,6 +27,23 @@ final class FirstRideSetupProof {
    return out.toString();
   }catch(Exception error){return "";}
  }
+ static String attemptReason(File track,boolean verified,int points,double gpsKm){
+  if(!verified||track==null||!track.isFile()||
+   !new File(track.getPath()+".done").isFile())
+   return "GPS 파일 저장 검증 실패 · 원본 복구 화면에서 확인";
+  if(points<2)return "실제 GPS 좌표가 2개 미만 · 위치 권한/수신 확인";
+  if(!Double.isFinite(gpsKm)||gpsKm<0)return "GPS 이동거리 계산 실패 · 위치 신호 검사";
+  if(gpsKm<0.10)return "GPS 이동거리 0.1km 미만 · 짧은 시험 주행";
+  return "GPS 경로·이동거리 정상 검증";
+ }
+ static void reportCompletion(Context c,String bike,File track,boolean fileVerified,int points,double km){
+  if(!RideBikeBinding.valid(bike))return;
+  String reason=attemptReason(track,fileVerified,points,km);
+  boolean accepted=fileVerified&&confirm(c,bike,track,points,km);
+  prefs(c,bike).edit().putString("attempt_fingerprint",fingerprint(c,bike))
+   .putString("attempt_reason",accepted?"GPS 경로·이동거리 정상 검증":reason)
+   .putLong("attempt_at",System.currentTimeMillis()).commit();
+ }
  static boolean confirm(Context c,String bike,File track,int points,double gpsKm){
   if(!RideBikeBinding.valid(bike)||track==null||!track.isFile()||
      !new File(track.getPath()+".done").isFile()||
@@ -47,10 +64,24 @@ final class FirstRideSetupProof {
  }
  static String summary(Context c,String bike){
   if(!RideBikeBinding.valid(bike))return "첫 주행 확인: 바이크 선택 필요";
-  if(!verified(c,bike))return "첫 주행 검증 전 · 자동기록으로 출발한 뒤 GPS 파일이 실제 저장되면 완료 표시";
+  if(!verified(c,bike)){
+   SharedPreferences past=prefs(c,bike);
+   String reason=past.getString("attempt_reason","");
+   String fingerprint=fingerprint(c,bike);
+   if(!reason.isEmpty()&&fingerprint.equals(past.getString("attempt_fingerprint","")))
+    return "첫 주행 검증 미완료 · "+reason+"\n정상 GPS 저장과 0.1km 이상 실제 이동 필요";
+   return "첫 주행 검증 전 · 자동기록 후 정상 GPS 저장과 0.1km 이상 실제 이동 필요";
+  }
   SharedPreferences p=prefs(c,bike);
   java.text.SimpleDateFormat fmt=new java.text.SimpleDateFormat("MM-dd HH:mm",Locale.KOREA);
-  return "첫 자동기록 검증 완료 · 실제 GPS 파일 저장 "+fmt.format(new java.util.Date(p.getLong("verifiedAt",0)))+
+  String result="첫 자동기록 검증 완료 · 실제 GPS 파일 저장 "+
+   fmt.format(new java.util.Date(p.getLong("verifiedAt",0)))+
    " · "+p.getInt("points",0)+"좌표 · "+String.format(Locale.KOREA,"%.2f",p.getFloat("gpsKm",0))+"km";
+  long last=p.getLong("attempt_at",0);
+  if(last>p.getLong("verifiedAt",0)){
+   String reason=p.getString("attempt_reason","");
+   if(!reason.isEmpty())result+="\n최근 검사: "+reason;
+  }
+  return result;
  }
 }
