@@ -148,7 +148,7 @@ public final class RideService extends Service implements LocationListener {
     status="OBD 속도 미수신 · 5분 한정 GPS 안전망 이동 감지";
     notifySafely(status);
    }catch(Exception error){
-    ConnectionEventLog.record(this,pendingBikeId,ConnectionEventLog.Event.GPS_PERMISSION_BLOCKED);
+    ConnectionEventLog.record(RideService.this,pendingBikeId,ConnectionEventLog.Event.GPS_PERMISSION_BLOCKED);
     cardoGpsProbeFailures=Math.min(8,cardoGpsProbeFailures+1);
     long delay=Math.min(60_000L,5_000L*(1L<<Math.min(4,cardoGpsProbeFailures-1)));
     cardoGpsRetryAt=now+delay;

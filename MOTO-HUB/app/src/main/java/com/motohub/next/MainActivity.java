@@ -276,10 +276,6 @@ public class MainActivity extends Activity {
   super.onWindowFocusChanged(focused);
   if(focused&&root!=null)root.postDelayed(this::showPendingRideSummary,200);
  }
- @Override protected void onPause(){
-  BikeObdSettingsUi.notePause(this);
-  super.onPause();
- }
  @Override protected void onResume(){super.onResume();obdVisible=true;
   refreshJsonImportAfterRecreation();
   odoSyncHandler.removeCallbacks(odoSyncTick);
@@ -2922,7 +2918,7 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   }
  }
  @Override protected void onDestroy(){obdVisible=false;odoSyncHandler.removeCallbacks(odoSyncTick);if(isFinishing())BackupPickerTransfer.cancelAll();if(developerObd!=null){developerObd.stop();developerObd=null;}super.onDestroy();}
- @Override protected void onPause(){odoSyncHandler.removeCallbacks(odoSyncTick);flushQuickFuelDraft();persistDraft();super.onPause();}
+ @Override protected void onPause(){BikeObdSettingsUi.notePause(this);odoSyncHandler.removeCallbacks(odoSyncTick);flushQuickFuelDraft();persistDraft();super.onPause();}
  @Override protected void onStop(){obdVisible=false;super.onStop();}
  void clearDraft(){formDirty=false;getSharedPreferences("draft",MODE_PRIVATE).edit().remove("active").apply();}
  void confirmDiscardDraft(){
