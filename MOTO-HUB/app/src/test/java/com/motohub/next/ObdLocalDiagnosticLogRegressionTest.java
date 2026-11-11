@@ -25,6 +25,16 @@ public class ObdLocalDiagnosticLogRegressionTest {
   assertTrue(summary.contains("\n속도 응답 14회"));
   assertFalse(summary.contains("\\n연결 시도"));
  }
+ @Test public void fuelSupportIsVisibleAndLegacyFourPidMaskLoads(){
+  ObdLocalDiagnosticLog.capability(context,ObdPidCapabilities.unknown());
+  assertTrue(ObdLocalDiagnosticLog.summary(context).contains("연료 확인 불가"));
+  context.getSharedPreferences("obd_diagnostics_local",0).edit()
+   .putString("capabilities","Y?NY").commit();
+  String old=ObdLocalDiagnosticLog.summary(context);
+  assertTrue(old.contains("속도 지원"));
+  assertTrue(old.contains("전압 지원"));
+  assertFalse(old.contains("연료 확인 불가"));
+ }
  @Test public void invalidLegacyRecordsDoNotConsumeRingCapacity(){
   StringBuilder old=new StringBuilder();
   for(int i=0;i<30;i++)old.append("untrusted raw bluetooth AA:BB:CC:DD:EE:FF\n");
