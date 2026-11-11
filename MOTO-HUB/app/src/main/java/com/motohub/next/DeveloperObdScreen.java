@@ -38,6 +38,9 @@ final class DeveloperObdScreen {
  private final TextView[] fields=new TextView[ObdReadOnlyProtocol.SENSOR_PIDS.length];
  private TextView status;
  private Dialog owner;
+ private android.widget.Button verifiedRegisterButton;
+ private BluetoothDevice verifiedRegisterDevice;
+ private String verifiedBikeId="";
  private volatile boolean stopped=true;
  private volatile BluetoothSocket socket;
  private Thread worker;
@@ -79,6 +82,16 @@ final class DeveloperObdScreen {
   activity.action(p,"페어링된 OBD 동글 선택 · 읽기 전용 검사",true,()->{
    results.setVisibility(android.view.View.VISIBLE);loadPaired();
   });
+  verifiedRegisterButton=activity.button("이 동글로 사용하기 · ECU 응답 확인",true,()->{
+   BluetoothDevice checked=verifiedRegisterDevice;
+   if(checked==null||activity.bike()==null||!verifiedBikeId.equals(activity.bike().optString("id"))){
+    activity.toast("바이크가 바뀌었어. 동글 검사를 다시 진행해.");return;
+   }
+   new BikeObdSettingsUi(activity).confirmDeviceRegistration(verifiedBikeId,
+    checked.getAddress(),checked.getName(),true);
+  });
+  verifiedRegisterButton.setVisibility(android.view.View.GONE);
+  p.addView(verifiedRegisterButton);
   activity.label(p,"값이 실제로 뜨면 통신 확인. 응답이 없으면 연결 실패 또는 ECU 미지원일 수 있어. 이 검사는 ECU를 수정하거나 고장코드를 지우지 않아.",12,activity.muted,false);
   activity.gap(p,12);
   activity.action(p,"지난 검사 결과",false,()->new AlertDialog.Builder(activity)
@@ -89,6 +102,7 @@ final class DeveloperObdScreen {
   owner.setOnDismissListener(done->{stop();if(activity.developerObd==this)activity.developerObd=null;});
  }
  void showQuickAdvanced(){
+  verifiedRegisterButton=null;verifiedRegisterDevice=null;verifiedBikeId="";
   if(RideService.running||RideService.autoArmed||RideService.saving())return;
   LinearLayout p=activity.page("OBD 연결 · 3단계");
   activity.label(p,"1  준비",16,activity.fg,true);
@@ -787,12 +801,16 @@ final class DeveloperObdScreen {
  }
  private synchronized void connect(BluetoothDevice device){
   stop();
+  verifiedRegisterDevice=null;verifiedBikeId="";
+  if(verifiedRegisterButton!=null)verifiedRegisterButton.setVisibility(android.view.View.GONE);
   if(worker!=null&&worker.isAlive()){setStatus("기존 연결을 종료 중입니다. 잠시 후 다시 선택해 주세요.");return;}
   if(!permissionGranted()){setStatus("Bluetooth 권한이 필요합니다.");return;}
   stopped=false;setStatus("연결 중…");
-  worker=new Thread(()->runConnection(device),"moto-obd-read-only");worker.setDaemon(true);worker.start();
+  String selectedBike=activity.bike()==null?"":activity.bike().optString("id");
+  worker=new Thread(()->runConnection(device,selectedBike),"moto-obd-read-only");
+  worker.setDaemon(true);worker.start();
  }
- private void runConnection(BluetoothDevice device){
+ private void runConnection(BluetoothDevice device,String selectedBike){
   long latencyMs=0,lastSampleAt=0;
   int received=0,failed=0;
   boolean connected=false;
@@ -834,7 +852,10 @@ final class DeveloperObdScreen {
         observedPid[i]=true;
         ObdLocalDiagnosticLog.observed(activity,pid);
        }
-       if(!loggedSensor){ObdLocalDiagnosticLog.record(activity,"SENSOR_OK");loggedSensor=true;}
+       if(!loggedSensor){
+        ObdLocalDiagnosticLog.record(activity,"SENSOR_OK");loggedSensor=true;
+        showVerifiedRegistration(device,selectedBike);
+       }
       }else failed++;
       updateField(i,result);
      }catch(InterruptedException interrupted){throw interrupted;}
@@ -864,6 +885,17 @@ final class DeveloperObdScreen {
     received==0?-1:latencyMs/received,lastSampleAt);
    closeSocket();stopped=true;
   }
+ }
+ private void showVerifiedRegistration(BluetoothDevice device,String bikeId){
+  if(!RideBikeBinding.valid(bikeId))return;
+  activity.runOnUiThread(()->{
+   if(stopped||verifiedRegisterButton==null||owner==null||
+      !owner.isShowing()||activity.dialog!=owner||
+      activity.bike()==null||!bikeId.equals(activity.bike().optString("id")))return;
+   verifiedRegisterDevice=device;verifiedBikeId=bikeId;
+   verifiedRegisterButton.setVisibility(android.view.View.VISIBLE);
+   setStatus("실제 ECU 센서 응답 확인 · 아래에서 이 동글을 바이크에 등록할 수 있어");
+  });
  }
  private String request(InputStream in,OutputStream out,String command,long timeoutMs)throws Exception{
   if(stopped)throw new java.io.IOException("연결이 종료됐습니다.");

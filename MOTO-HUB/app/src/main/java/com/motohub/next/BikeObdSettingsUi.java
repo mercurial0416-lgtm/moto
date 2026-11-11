@@ -194,7 +194,7 @@ final class BikeObdSettingsUi {
    }).setNegativeButton("취소",null).show();
  }
 
- private void confirmDeviceRegistration(String bikeId,String mac,String name,boolean ecuVerified){
+ void confirmDeviceRegistration(String bikeId,String mac,String name,boolean ecuVerified){
   if(a.readOnly||RideService.running||RideService.autoArmed||RideService.saving()||
      RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()){
    a.toast("연결 감지와 주행·복원 종료 후 동글을 바꿀 수 있어.");return;
