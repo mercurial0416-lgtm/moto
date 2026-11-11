@@ -131,6 +131,7 @@ public final class RideService extends Service implements LocationListener {
  final CardoGpsFallbackGate cardoGpsGate=new CardoGpsFallbackGate();
  final GpsStationaryEvidence gpsStationaryEvidence=new GpsStationaryEvidence();
  final java.util.ArrayDeque<Location> cardoGpsPreroll=new java.util.ArrayDeque<>();
+ boolean prerollReplaying=false;
  Location cardoGpsPrevious=null;
  // Do not power GPS during a healthy OBD wait. A lightweight 12-second
  // handler checks whether ECU speed has gone stale before opening GPS.
@@ -432,7 +433,7 @@ public final class RideService extends Service implements LocationListener {
     Sharing.stop();cardoSession=true;cardoConnected=true;
     cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
     cardoGpsProbeFailures=0;cardoGpsRetryAt=0;
-    cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();parkingIsolation.reset();autoGate.reset();
+    cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();prerollReplaying=false;gpsStationaryEvidence.reset();parkingIsolation.reset();autoGate.reset();
     prepareForeground(true);autoArmed=true;obdMonitor=null;activeAutoAdapterAddress="";
     RidePowerAudit.begin(this,pendingBikeId);
     obdLink="OBD 미등록 · GPS 단독 안전망";obdSpeedKmh=-1;obdLastSampleElapsed=0;
@@ -606,7 +607,9 @@ public final class RideService extends Service implements LocationListener {
    cardoGpsPreroll.clear();
    if(!preroll.isEmpty()&&gpsWriteHandler!=null)
     gpsWriteHandler.postAtFrontOfQueue(()->{
-     for(Location fix:preroll)if(running&&cardoGpsFallbackRecording)onLocationChanged(fix);
+     prerollReplaying=true;
+     try{for(Location fix:preroll)if(running&&cardoGpsFallbackRecording)onLocationChanged(fix);}
+     finally{prerollReplaying=false;}
     });
    handler.removeCallbacks(cardoGpsProbeWake);
    handler.removeCallbacks(cardoIdleStop);
@@ -944,7 +947,7 @@ public final class RideService extends Service implements LocationListener {
    return;
   }
   if(!running||output==null||!checkRuntimeStorage())return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
-  if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
+  if(location.isFromMockProvider()||age<0||age>(prerollReplaying?50_000_000_000L:30_000_000_000L)||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
   gpsStationaryEvidence.accept(location.getElapsedRealtimeNanos()/1_000_000L,
    location.getLatitude(),location.getLongitude(),location.getAccuracy());

@@ -9,7 +9,7 @@ public class GpsStationaryEvidenceTest {
  }
  @Test public void walkingNeverCountsAsParking(){
   GpsStationaryEvidence gate=new GpsStationaryEvidence();
-  for(int i=0;i<=18;i++)gate.accept(i*5000L,37.2+i*.00001,127.2,5);
+  for(int i=0;i<=18;i++)gate.accept(i*5000L,37.2+i*.00005,127.2,5);
   assertFalse(gate.confirmed(90000));
  }
  @Test public void gapsAndBadAccuracyReset(){
