@@ -80,7 +80,7 @@ final class BikeObdSettingsUi {
   boolean cardoHere=CardoAutoRidePrefs.forBike(a,bikeId);
   a.label(p,cardoHere?
    "켜짐 · "+CardoAutoRidePrefs.name(a)+" · "+CardoAutoRidePrefs.status(a):
-   "꺼짐 · 카르도 Freecom 2X 연결을 감지해 OBD와 GPS를 시작",14,a.muted,false);
+   "꺼짐 · 카르도 연결 후 OBD 또는 GPS 안전망으로 출발 감지",14,a.muted,false);
   a.action(p,cardoHere?"카르도 자동기록 장치 변경":"카르도 자동기록 켜기 · 기기 선택",
     false,()->pickCardo(bikeId));
   if(cardoHere){
@@ -110,7 +110,7 @@ final class BikeObdSettingsUi {
     new AlertDialog.Builder(a).setTitle(gpsBackup?"GPS 안전망 해제":"카르도 GPS 안전망 · 추가 배터리 사용")
      .setMessage(gpsBackup?
       "GPS 이동 감지를 끕니다. 기존 주행 기록과 정비 내역은 보존합니다.":
-      "카르도 연결 시 최장 5분간 GPS를 확인합니다. 실제 좌표를 3회 이상 검증하고 70m 이상 이동하면 OBD 속도 미지원 시에도 기록을 시작합니다. GPS 센서는 추가 전력을 사용하므로 기본적으로 꺼져 있습니다. 보행이나 다른 차량 이동을 바이크 주행이라고 오인할 수 있어 계기판 ODO에는 반영하지 않습니다.")
+      "카르도 GPS 안전망을 켜면 OBD 동글 없이도 최대 15분간 출발을 감시합니다. 출발 판정 전에 수신한 정확한 GPS 좌표도 약 45초 보존합니다. GPS 센서는 추가 전력을 사용하므로 기본적으로 꺼져 있습니다. 보행이나 다른 차량 이동을 바이크 주행이라고 오인할 수 있어 계기판 ODO에는 반영하지 않습니다.")
      .setNegativeButton("취소",null)
      .setPositiveButton(gpsBackup?"안전망 끄기":"동의하고 켜기",(dialog,which)->{
       BikeObdPreferences.setGpsFallbackEnabled(a,bikeId,!gpsBackup);
@@ -207,11 +207,11 @@ final class BikeObdSettingsUi {
      }
      new AlertDialog.Builder(a).setTitle("카르도 자동 라이딩 활성화")
       .setMessage((name==null?"선택 장치":name)+"\n"+mac+
-       "\n\n카르도가 휴대폰에 연결될 때만 OBD 연결을 짧게 시도하고 실제 ECU 속도 확인 시 GPS를 기록합니다. 5분간 주행을 감지하지 못하면 종료합니다. 기존 상시 OBD 반복 대기는 끕니다.\n\nAndroid 동반 기기로 승인하면 시스템 연결 감지가 더 안정적입니다. 백그라운드 GPS 실행이 Android 정책으로 막히면 알림을 눌러 시작해야 합니다.")
+       "\n\n카르도가 휴대폰에 연결될 때만 OBD 연결을 짧게 시도하고 실제 ECU 속도 확인 시 GPS를 기록합니다. OBD만 사용하면 최대 10분, GPS 안전망을 켜면 최대 15분 후 대기를 종료합니다. 기존 상시 OBD 반복 대기는 끕니다.\n\nAndroid 동반 기기로 승인하면 시스템 연결 감지가 더 안정적입니다. 백그라운드 GPS 실행이 Android 정책으로 막히면 알림을 눌러 시작해야 합니다.")
       .setNegativeButton("취소",null)
       .setPositiveButton("동의 · 카르도 등록",(dd,w)->{
        if(!CardoAutoRidePrefs.enable(a,bikeId,mac,name)){
-        a.toast("동글·바이크 설정 확인 필요");return;
+        a.toast("카르도 주소·바이크 설정 확인 필요");return;
        }
        a.toast("카르도 자동 감지 등록 · Android 동반 기기 승인 진행");
        CardoCompanionPairing.associate(a,mac);

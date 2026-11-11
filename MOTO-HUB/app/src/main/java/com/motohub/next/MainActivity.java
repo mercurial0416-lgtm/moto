@@ -276,6 +276,7 @@ public class MainActivity extends Activity {
   // Only an explicitly opted-in bike is rearmed after the user opens the app.
   // Android does not guarantee background re-start after process death/boot.
   if(!readOnly&&root!=null)root.postDelayed(this::resumeApprovedObdReady,1800L);
+  CardoPresenceReconciler.onForeground(this);
   AppUpdateNotice.checkOnResume(this);
  }
  /** Reload data when a JSON restore finishes after the Activity was recreated. */
