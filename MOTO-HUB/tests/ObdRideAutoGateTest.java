@@ -37,6 +37,14 @@ final class ObdRideAutoGateTest {
   eq(ObdRideAutoGate.Event.FINISH,g.accept(0,189_000));
   eq(ObdRideAutoGate.Event.NONE,g.accept(255,190_000));
   eq(ObdRideAutoGate.Event.NONE,g.accept(-1,191_000));
+  g.reset();
+  eq(ObdRideAutoGate.Event.NONE,g.accept(8,1000));
+  eq(ObdRideAutoGate.Event.NONE,g.accept(8,1000));
+  eq(ObdRideAutoGate.Event.NONE,g.accept(8,1200));
+  eq(ObdRideAutoGate.Event.NONE,g.accept(8,1300));
+  eq(ObdRideAutoGate.Event.START,g.accept(8,1600));
+  eq(ObdRideAutoGate.Event.NONE,g.accept(0,1700));
+  eq(ObdRideAutoGate.Event.NONE,g.accept(0,1700));
   System.out.println("OBD auto ride gating checks passed: "+n);
  }
 }

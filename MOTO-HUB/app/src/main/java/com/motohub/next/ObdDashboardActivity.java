@@ -28,7 +28,6 @@ public final class ObdDashboardActivity extends Activity {
  private static final String PREFS="obd_dashboard_preferences";
  private final Runnable update=new Runnable(){@Override public void run(){
   if(!visible)return;
-  if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){finish();return;}
   long now=android.os.SystemClock.elapsedRealtime();
   boolean speedFresh=RideService.autoArmed&&ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,now);
   speed.setText(speedFresh&&RideService.obdSpeedKmh>=0?RideService.obdSpeedKmh+"":"—");
@@ -81,7 +80,6 @@ public final class ObdDashboardActivity extends Activity {
   v.setPadding(0,compactMode?2:7,0,compactMode?10:24);base.addView(v);return v;
  }
  @Override public void onCreate(Bundle state){super.onCreate(state);
-  if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){finish();return;}
   compactMode=getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;
   ScrollView scroll=new ScrollView(this);
   scroll.setFillViewport(true);

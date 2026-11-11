@@ -69,6 +69,12 @@ final class BikeObdSettingsUi {
    });
 
   a.gap(p,12);
+  a.action(p,"OBD 읽기 전용 실시간 계기판",false,()->{
+   if(!RideService.autoArmed||!bikeId.equals(RideService.activeRideBikeId)){
+    a.toast("이 바이크의 OBD 자동 감지를 먼저 시작해 주세요.");return;
+   }
+   a.startActivity(new Intent(a,ObdDashboardActivity.class));
+  });
   a.label(p,"카르도 자동 라이딩 · 저전력",16,a.fg,true);
   boolean cardoHere=CardoAutoRidePrefs.forBike(a,bikeId);
   a.label(p,cardoHere?

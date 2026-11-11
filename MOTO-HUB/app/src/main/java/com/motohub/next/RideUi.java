@@ -384,7 +384,16 @@ final class RideUi {
         groupKey=session+"|"+bikeBinding+"|"+category;
       }catch(IOException corrupted){/* Damaged bike binding never silently joins a ride. */}
      }
-     entries.add(new HistoryEntry(file,label,status,savedMemo,groupKey));
+     String bikeSearch="";
+     try{
+      String assigned=RideBikeBinding.readStrict(file);
+      if(RideBikeBinding.valid(assigned)){
+       bikeSearch=assigned;
+       for(org.json.JSONObject candidate:a.items("vehicles"))
+        if(assigned.equals(candidate.optString("id"))){bikeSearch+=" "+candidate.optString("name","");break;}
+      }
+     }catch(IOException ignored){}
+     entries.add(new HistoryEntry(file,label,status,savedMemo+" "+category+" "+bikeSearch,groupKey));
     }
     if(!RideHistoryDistanceFilter.ALL.equals(distanceRange)){
      // Analyze GPS sections off the UI thread and compare session totals,

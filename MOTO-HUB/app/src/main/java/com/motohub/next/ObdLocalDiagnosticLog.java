@@ -10,6 +10,15 @@ import java.util.Locale;
 final class ObdLocalDiagnosticLog {
  private static final String PREFS="obd_diagnostics_local";
  private static final int MAX_ENTRIES=12;
+ private static SharedPreferences prefs(Context c){
+  String id="";
+  if(c instanceof MainActivity){
+   org.json.JSONObject bike=((MainActivity)c).bike();
+   if(bike!=null)id=bike.optString("id","");
+  }
+  if(!RideBikeBinding.valid(id))id=RideService.activeRideBikeId;
+  return c.getSharedPreferences(RideBikeBinding.valid(id)?PREFS+"_"+id:PREFS,0);
+ }
  private ObdLocalDiagnosticLog(){}
 
  static void capability(Context c,ObdPidCapabilities support){
@@ -20,7 +29,7 @@ final class ObdLocalDiagnosticLog {
    ObdPidCapabilities.Support value=support.forPid(pid);
    bitmap.append(value==ObdPidCapabilities.Support.YES?'Y':value==ObdPidCapabilities.Support.NO?'N':'?');
   }
-  c.getSharedPreferences(PREFS,0).edit().putString("capabilities",bitmap.toString())
+  prefs(c).edit().putString("capabilities",bitmap.toString())
    .putInt("observed_mask",0).putLong("capability_time",System.currentTimeMillis()).apply();
   record(c,"PID");
  }
@@ -33,7 +42,7 @@ final class ObdLocalDiagnosticLog {
  static void observed(Context c,String pid){
   int bit=bitForPid(pid);
   if(bit==0)return;
-  SharedPreferences preferences=c.getSharedPreferences(PREFS,0);
+  SharedPreferences preferences=prefs(c);
   int previous=preferences.getInt("observed_mask",0);
   if((previous&bit)==0)preferences.edit().putInt("observed_mask",previous|bit).apply();
  }
@@ -42,7 +51,7 @@ final class ObdLocalDiagnosticLog {
  static void automaticSession(Context c,int attempts,int successes,int reconnects,
                               int queryFailures,long speedSamples,String reason){
   String safe=ObdFailureGuide.classify(reason);
-  c.getSharedPreferences(PREFS,0).edit()
+  prefs(c).edit()
    .putLong("auto_at",System.currentTimeMillis())
    .putInt("auto_attempts",Math.max(0,Math.min(attempts,10_000)))
    .putInt("auto_successes",Math.max(0,Math.min(successes,10_000)))
@@ -55,7 +64,7 @@ final class ObdLocalDiagnosticLog {
  /** Store one bounded diagnostic summary at session end, never MAC, raw payload or coordinates. */
  static void probeMetrics(Context c,boolean connected,int validReplies,int failures,
                           long averageLatencyMs,long lastReceivedAt){
-  c.getSharedPreferences(PREFS,0).edit()
+  prefs(c).edit()
    .putLong("probe_at",System.currentTimeMillis())
    .putBoolean("probe_connected",connected)
    .putInt("probe_valid",Math.max(0,Math.min(validReplies,1_000_000)))
@@ -66,7 +75,7 @@ final class ObdLocalDiagnosticLog {
  }
  static void record(Context c,String code){
   if(!ObdDiagnosticEventPolicy.valid(code))return;
-  SharedPreferences p=c.getSharedPreferences(PREFS,0);
+  SharedPreferences p=prefs(c);
   String now=new SimpleDateFormat("MM-dd HH:mm",Locale.KOREA).format(new Date());
   String[] previous=p.getString("events","").split("\\n",-1);
   StringBuilder history=new StringBuilder(now).append(" · ").append(ObdDiagnosticEventPolicy.text(code));
@@ -82,7 +91,7 @@ final class ObdLocalDiagnosticLog {
   p.edit().putString("events",history.toString()).apply();
  }
  static String summary(Context c){
-  SharedPreferences p=c.getSharedPreferences(PREFS,0);
+  SharedPreferences p=prefs(c);
   String caps=p.getString("capabilities","");
   StringBuilder text=new StringBuilder("마지막 ECU PID 선언 목록 (실제 수신과 별개): ");
   if(caps!=null&&caps.matches("[YN?]{4,5}")){
@@ -144,5 +153,5 @@ final class ObdLocalDiagnosticLog {
   if(events!=null&&!events.isEmpty())text.append("\n\n최근 연결 점검\n").append(events);
   return text.toString();
  }
- static void clear(Context c){c.getSharedPreferences(PREFS,0).edit().clear().apply();}
+ static void clear(Context c){prefs(c).edit().clear().apply();}
 }

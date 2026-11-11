@@ -22,6 +22,15 @@ public class CardoGpsFallbackGateTest {
   assertFalse(g.accept(5000,25,5,5,false));
   assertTrue(g.accept(5000,25,5,5,false));
  }
+ @Test public void slowBikeLaunchNeedsAccurateLongMovement(){
+  CardoGpsFallbackGate g=new CardoGpsFallbackGate();
+  for(int i=0;i<5;i++)assertFalse(g.accept(7000,17,5,5,false));
+  assertTrue(g.accept(7000,17,5,5,false));
+ }
+ @Test public void lowSpeedPoorAccuracyDoesNotTrigger(){
+  CardoGpsFallbackGate g=new CardoGpsFallbackGate();
+  for(int i=0;i<12;i++)assertFalse(g.accept(7000,18,18,18,false));
+ }
  @Test public void implausibleGapResetsEvidence(){
   CardoGpsFallbackGate g=new CardoGpsFallbackGate();
   assertFalse(g.accept(5000,25,5,5,false));
