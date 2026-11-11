@@ -62,6 +62,11 @@ public final class RideService extends Service implements LocationListener {
   return s!=null&&running&&GpsSignalStatus.fresh(s.lastFixElapsed,SystemClock.elapsedRealtime());
  }
  static long gpsFixElapsed(){RideService s=instance;return s==null?0:s.lastFixElapsed;}
+ static float gpsAccuracyMeters(){
+  RideService s=instance;
+  Location fix=s==null?null:s.lastGood;
+  return fix!=null&&fix.hasAccuracy()&&gpsFresh()?fix.getAccuracy():Float.NaN;
+ }
  static boolean shareAllowed(){
   RideService s=instance;
   return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&
