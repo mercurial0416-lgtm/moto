@@ -20,7 +20,17 @@ final class ObdAutoRideProgress {
    .putString("stage",stage.name()).putLong("at",now);
   if(stage==Stage.SPEED)e.putLong("speedAt",now);
   if(stage==Stage.SAVED)e.putLong("savedAt",now);
-  e.apply();
+  String line=now+"|"+stage.name();
+  String old=prefs(c,bike).getString("timeline","");
+  StringBuilder trace=new StringBuilder(line);
+  int kept=1;
+  for(String prior:old.split("\\n")){
+   if(kept>=16)break;
+   if(prior.matches("[0-9]{12,14}\\|[A-Z_]+")){
+    trace.append('\n').append(prior);kept++;
+   }
+  }
+  e.putString("timeline",trace.toString()).apply();
  }
  static String summary(Context c,String bike){
   if(!RideBikeBinding.valid(bike))return "바이크 선택 후 자동기록 확인";
@@ -46,6 +56,25 @@ final class ObdAutoRideProgress {
   long saved=p.getLong("savedAt",0);
   if(saved>0&&saved<=System.currentTimeMillis()&&state!=Stage.SAVED)
    message+="\n마지막 자동저장: "+new SimpleDateFormat("MM-dd HH:mm",Locale.KOREA).format(new Date(saved));
+  String trace=p.getString("timeline","");
+  if(!trace.isEmpty()){
+   StringBuilder shown=new StringBuilder("\n최근 자동기록 단계 (최신순)");
+   int displayed=0;
+   for(String line:trace.split("\\n")){
+    if(++displayed>6)break;
+    String[] pieces=line.split("\\|",2);
+    if(pieces.length!=2)continue;
+    try{
+     long time=Long.parseLong(pieces[0]);
+     Stage stage=Stage.valueOf(pieces[1]);
+     if(time<=0||time>System.currentTimeMillis())continue;
+     shown.append("\n")
+      .append(new SimpleDateFormat("HH:mm:ss",Locale.KOREA).format(new Date(time)))
+      .append(" · ").append(stage.name());
+    }catch(Exception ignored){}
+   }
+   message+=shown;
+  }
   return message;
  }
 }

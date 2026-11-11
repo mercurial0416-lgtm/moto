@@ -242,7 +242,9 @@ public final class RideService extends Service implements LocationListener {
   }
  }};
  volatile boolean finishPending=false,autoFinishPending=false;
- final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)
+ final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;
+  if(autoArmed)RidePowerAudit.sample(RideService.this,pendingBikeId);
+  if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)
    &&!(cardoSession&&CardoAutoRidePrefs.forBike(RideService.this,pendingBikeId))
    &&(!BikeObdPreferences.autoRideEnabled(RideService.this,pendingBikeId)
        ||!BikeObdPreferences.address(RideService.this,pendingBikeId).equals(activeAutoAdapterAddress))){
@@ -415,6 +417,7 @@ public final class RideService extends Service implements LocationListener {
     cardoGpsProbeFailures=0;cardoGpsRetryAt=0;
     cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();parkingIsolation.reset();autoGate.reset();
     prepareForeground(true);autoArmed=true;obdMonitor=null;activeAutoAdapterAddress="";
+    RidePowerAudit.begin(this,pendingBikeId);
     obdLink="OBD 미등록 · GPS 단독 안전망";obdSpeedKmh=-1;obdLastSampleElapsed=0;
     ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.CONNECTING);
     handler.postDelayed(permissionCheck,5000L);
@@ -436,6 +439,7 @@ public final class RideService extends Service implements LocationListener {
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    parkingIsolation.reset();gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
+   RidePowerAudit.begin(this,pendingBikeId);
    ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.CONNECTING);
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;obdFuelPercent=Double.NaN;obdFuelAt=0;
    obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=1;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
@@ -759,6 +763,7 @@ public final class RideService extends Service implements LocationListener {
   // No guessing: do not finish or split a moving ride when Bluetooth fails.
   // Keep an already-running GPS session in the same foreground service until its
   // user explicitly ends it. Never auto-arm again or enable group sharing.
+  ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.FAILED);
   ObdLocalDiagnosticLog.automaticSession(this,obdConnectionAttempts,
    obdConnectionSuccesses,obdReconnects,obdQueryFailures,obdSpeedSamples,reason);
   obdLastError="OBD2 · "+reason;
@@ -1029,6 +1034,7 @@ public final class RideService extends Service implements LocationListener {
   return verified;
  }
  synchronized void cleanup(boolean completed){
+  RidePowerAudit.finish(this,pendingBikeId);
   // Stop the independent space watchdog before closing any GPS writer.
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(storageWatchdog);
   // Invalidate queued main-thread finalization callbacks after failures or process teardown.

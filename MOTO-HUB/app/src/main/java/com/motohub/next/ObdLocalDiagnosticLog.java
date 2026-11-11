@@ -17,7 +17,30 @@ final class ObdLocalDiagnosticLog {
    if(bike!=null)id=bike.optString("id","");
   }
   if(!RideBikeBinding.valid(id))id=RideService.activeRideBikeId;
-  return c.getSharedPreferences(RideBikeBinding.valid(id)?PREFS+"_"+id:PREFS,0);
+  if(!RideBikeBinding.valid(id))return c.getSharedPreferences(PREFS,0);
+  String mac=id.equals(RideService.activeRideBikeId)?
+    RideService.instance==null?"":RideService.instance.activeAutoAdapterAddress:"";
+  if(!BikeObdPreferences.validAddress(mac))mac=BikeObdPreferences.address(c,id);
+  if(!BikeObdPreferences.validAddress(mac))
+   return c.getSharedPreferences(PREFS+"_"+id+"_no_obd",0);
+  // A local random salt keeps MAC addresses out of preference names and logs;
+  // switching dongles never inherits another dongle's measured capabilities.
+  try{
+   SharedPreferences ns=c.getSharedPreferences("obd_diag_namespace_v601",0);
+   String salt=ns.getString("salt","");
+   if(salt.length()!=64){
+    byte[] bytes=new byte[32];new java.security.SecureRandom().nextBytes(bytes);
+    StringBuilder b=new StringBuilder();
+    for(byte v:bytes)b.append(String.format(java.util.Locale.ROOT,"%02x",v&255));
+    salt=b.toString();ns.edit().putString("salt",salt).commit();
+   }
+   java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256");
+   byte[] fingerprint=digest.digest((salt+"|"+id+"|"+mac.toUpperCase(Locale.ROOT))
+     .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+   StringBuilder hex=new StringBuilder();
+   for(int i=0;i<12;i++)hex.append(String.format(Locale.ROOT,"%02x",fingerprint[i]&255));
+   return c.getSharedPreferences(PREFS+"_"+id+"_"+hex,0);
+  }catch(Exception unavailable){return c.getSharedPreferences(PREFS+"_"+id+"_local",0);}
  }
  private ObdLocalDiagnosticLog(){}
 
@@ -93,7 +116,10 @@ final class ObdLocalDiagnosticLog {
  static String summary(Context c){
   SharedPreferences p=prefs(c);
   String caps=p.getString("capabilities","");
-  StringBuilder text=new StringBuilder("마지막 ECU PID 선언 목록 (실제 수신과 별개): ");
+  String scope=c instanceof MainActivity||RideBikeBinding.valid(RideService.activeRideBikeId)?
+   "진단 범위: 선택 바이크 + 현재 OBD 동글 (MAC 비저장)\n":"";
+
+  StringBuilder text=new StringBuilder(scope+"마지막 ECU PID 선언 목록 (실제 수신과 별개): ");
   if(caps!=null&&caps.matches("[YN?]{4,5}")){
    String[] names={"속도","RPM","수온","전압","연료"};
    for(int i=0;i<caps.length();i++){
