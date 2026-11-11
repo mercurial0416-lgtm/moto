@@ -9,9 +9,12 @@ javac -encoding UTF-8 -d "$TMP" \
   "$SRC/ObdSpeedResponsePolicy.java" \
   "$SRC/ObdPidCapabilities.java" \
   "$SRC/ObdSpeedSanityPolicy.java" \
+  "$SRC/ObdLatencyStats.java" \
   tests/ObdParkingIsolationTest.java \
   tests/ObdSpeedResponseRecoveryTest.java \
-  tests/ObdSpeedSanityPolicyTest.java
+  tests/ObdSpeedSanityPolicyTest.java \
+  tests/ObdLatencyStatsTest.java
 java -cp "$TMP" com.motohub.next.ObdParkingIsolationTest
 java -cp "$TMP" com.motohub.next.ObdSpeedResponseRecoveryTest
 java -cp "$TMP" com.motohub.next.ObdSpeedSanityPolicyTest
+java -cp "$TMP" com.motohub.next.ObdLatencyStatsTest
