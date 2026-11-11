@@ -2,7 +2,7 @@ package com.motohub.next;
 import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.content.pm.ServiceInfo;import android.location.*;import android.os.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.UUID;import android.bluetooth.*;
 /** User-started location FGS. Local recording with explicit group sharing. No boot restart, network or mock positions. */
 public final class RideService extends Service implements LocationListener {
- static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id",EXTRA_CARDO_TRIGGER="cardo_trigger",CARDO_DISCONNECTED="com.motohub.next.CARDO_DISCONNECTED",RESUME_INTERRUPTED="com.motohub.next.RESUME_INTERRUPTED",EXTRA_INTERRUPTED_NAME="interrupted_track_name";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;static volatile long liveMovingMillis=0,liveStationaryMillis=0,lastWidgetRefreshElapsed=0;
+ static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id",EXTRA_CARDO_TRIGGER="cardo_trigger",CARDO_DISCONNECTED="com.motohub.next.CARDO_DISCONNECTED",RESUME_INTERRUPTED="com.motohub.next.RESUME_INTERRUPTED",MANUAL_GPS_WHILE_ARMED="com.motohub.next.MANUAL_GPS_WHILE_ARMED",EXTRA_INTERRUPTED_NAME="interrupted_track_name";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;static volatile long liveMovingMillis=0,liveStationaryMillis=0,lastWidgetRefreshElapsed=0;
  // Volatile display data only: neither ECU samples nor Bluetooth address are uploaded/stored.
  static volatile int obdSpeedKmh=-1,obdReconnects=0;
  static volatile long obdAverageLatencyMs=-1;
@@ -333,6 +333,35 @@ public final class RideService extends Service implements LocationListener {
    return START_NOT_STICKY;
   }
   try{
+   if(MANUAL_GPS_WHILE_ARMED.equals(action)){
+    // Explicit user rescue while automatic OBD/Cardo is armed, not another
+    // auto-trigger. Never overwrite, delete or claim an existing GPS track.
+    if(running||!autoArmed||autoFinishPending||finishPending)return START_NOT_STICKY;
+    if(!RideBikeBinding.valid(pendingBikeId)||!pendingBikeId.equals(activeRideBikeId)){
+     status="자동 감지 바이크 식별 불일치 · GPS 시작하지 않음";
+     notifySafely(status);return START_NOT_STICKY;
+    }
+    try{
+     prepareForeground(false);
+     if(manager!=null&&cardoGpsProbeRegistered){
+      try{manager.removeUpdates(this);}catch(RuntimeException ignored){}
+      cardoGpsProbeRegistered=false;
+     }
+     cardoGpsPreroll.clear();cardoGpsPrevious=null;cardoGpsGate.reset();
+     cardoGpsFallbackRecording=false;handler.removeCallbacks(cardoGpsStopWatch);
+     openRideTrack();
+     requestGpsUpdatesChecked();
+     handler.removeCallbacks(cardoIdleStop);
+     handler.removeCallbacks(cardoGpsProbeWake);
+     status="사용자가 GPS 기록 수동 시작 · OBD 자동 감지 유지";
+     ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.GPS);
+     notifySafely(status);
+    }catch(Exception error){
+     stopWith("수동 GPS 기록 시작 실패 · 원본 보존: "+
+      (error.getMessage()==null?"설정 확인":error.getMessage()),false);
+    }
+    return START_NOT_STICKY;
+   }
    if(RESUME_INTERRUPTED.equals(action)){
     if(running||autoArmed)return START_NOT_STICKY;
     try{

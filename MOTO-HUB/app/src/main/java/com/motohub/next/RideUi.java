@@ -168,7 +168,7 @@ final class RideUi {
   // Primary action always finishes GPS if GPS is live. Never accidentally
   // label OBD-only disarm as the main "ride finish" control.
   Button start=a.button(RideService.running?"라이딩 저장 후 종료":
-   RideService.autoArmed?"OBD 자동 감지 중지":"GPS 기록 시작",true,()->{
+   RideService.autoArmed?"지금 GPS 기록 시작 · 자동감지 기다리지 않기":"GPS 기록 시작",true,()->{
    if(RideService.running){
     MotoDialog.confirm(a,
       RideService.autoArmed?"자동 라이딩 기록 종료":"라이딩 기록 종료",
@@ -182,11 +182,14 @@ final class RideUi {
     return;
    }
    if(RideService.autoArmed){
-    MotoDialog.confirm(a,"OBD2 자동 출발 감지를 중지할까요?",
-      "아직 시작하지 않은 GPS 기록은 없습니다. 감지를 중지하고 기존 주행 기록은 보존합니다.",
-      "감지 중지","취소",()->{
-       a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));
-       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
+    MotoDialog.confirm(a,"지금 GPS 기록을 시작할까?",
+      "OBD나 카르도가 자동 출발을 못 알아챌 때 사용하는 수동 대체 방식이야. " +
+      "현재 자동 감시는 유지하고 GPS 원본은 새 파일로 기록해. 실제 좌표가 들어와야 기록으로 인정해.",
+      "GPS 기록 시작","취소",()->{
+       if(!RideService.autoArmed||RideService.running||RideService.saving())return;
+       a.startService(new Intent(a,RideService.class).setAction(RideService.MANUAL_GPS_WHILE_ARMED));
+       a.toast("GPS 시작 요청 전송 · 실제 첫 좌표가 수신되는지 확인해.");
+       a.root.postDelayed(()->{if(!a.isFinishing()&&!a.isDestroyed())a.render();},1100);
       },null);
     return;
    }
@@ -196,8 +199,18 @@ final class RideUi {
   start.setBackground(a.shape(RideService.running?0xffc94b44:a.accent,0,18));
   start.setMinHeight(a.dp(60));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);
   start.setContentDescription(RideService.running?"현재 GPS 기록을 저장 후 종료":
-    RideService.autoArmed?"OBD 자동 출발 감지만 중지":"GPS 기록 시작, 사용자 동의 필요");
+    RideService.autoArmed?"자동 감지 대기 중 수동 GPS 경로 기록 시작":"GPS 기록 시작, 사용자 동의 필요");
   ExperienceUi.dock(a,start);
+  if(RideService.autoArmed&&!RideService.running){
+   a.label(hero,"자동 출발 감지를 시작했다고 GPS 파일이 생기는 건 아니야. " +
+    "바이크가 움직여도 주행 기록이 안 잡히면 위 GPS 시작 버튼을 사용해.",13,a.muted,false);
+   a.action(hero,"자동 감지만 종료 · 기록 없음",false,()->MotoDialog.confirm(a,
+    "자동 감지 중지","자동 감지만 중지하고 이미 저장된 GPS 파일은 보존해.",
+    "감지 중지","취소",()->{
+     a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));
+     a.root.postDelayed(()->{if(!a.isFinishing()&&!a.isDestroyed())a.render();},900);
+    },null));
+  }
   if(RideService.autoArmed&&RideService.running){
    a.gap(hero,8);
    Button disarm=a.button("OBD만 중지 · GPS 기록은 계속",false,()->{
