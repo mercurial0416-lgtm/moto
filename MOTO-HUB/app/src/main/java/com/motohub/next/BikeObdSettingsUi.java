@@ -159,6 +159,16 @@ final class BikeObdSettingsUi {
    .setMessage(ConnectionEventLog.summary(a,bikeId)+"\n\n"+
     ObdAutoRideProgress.summary(a,bikeId))
    .setPositiveButton("닫기",null).show());
+  a.action(p,"진단 결과 복사 · MAC/좌표 제외",false,()->{
+   try{
+    android.content.ClipboardManager clipboard=(android.content.ClipboardManager)
+     a.getSystemService(Context.CLIPBOARD_SERVICE);
+    if(clipboard==null){a.toast("클립보드를 사용할 수 없어.");return;}
+    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("MOTO HUB 연결 진단",
+      SafeConnectionDiagnosticReport.create(a,bikeId)));
+    a.toast("연결 진단 복사 완료 · 위치좌표와 Bluetooth MAC은 제외했어. 붙여넣기 전에 내용을 확인해.");
+   }catch(RuntimeException error){a.toast("진단 복사에 실패했어. 앱 권한을 확인해.");}
+  });
   a.action(p,"자동기록 없이 연결 테스트",true,()->showSafeConnectionTest(bikeId));
   a.action(p,"블루투스 페어링 설정 열기",false,()->openBluetoothSettings());
   a.action(p,"연결 문제 진단 · 지금 해결하기",false,()->showConnectionHelp(bikeId));
