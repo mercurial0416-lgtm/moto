@@ -57,28 +57,6 @@ final class BikeObdSettingsUi {
    active?"GPS가 기록 중인지 라이딩 화면과 알림에서 확인해.":
    "블루투스에 기기가 등록돼 있어도 ECU에 연결됐다는 뜻은 아니야.",true);
 
-  a.gap(p,12);
-  a.label(p,"설정 순서",16,a.fg,true);
-  step(p,"01","바이크",bike.optString("name","내 바이크")+" 선택됨",
-   "이 화면에서 설정한 연결은 이 바이크에만 적용돼.",true);
-  step(p,"02","OBD 동글",obd?
-   liveObd?"실제 ECU 속도 수신 확인":"등록 완료 · 실제 ECU 연결은 미확인":
-   "미등록 · 카르도+GPS만 쓴다면 건너뛰어도 돼",
-   obd?"키 ON 상태에서 읽기 전용 연결 검사로 확인할 수 있어.":
-   "동글 장착 → 바이크 키 ON → 휴대폰 Bluetooth 페어링 → 앱에 등록.",obd);
-  step(p,"03","카르도",cardo?
-   CardoAutoRidePrefs.recentlyConnected(a)?"최근 연결 감지 · 자동기록 장치 등록됨":
-   "등록됨 · 다음 Bluetooth 연결 대기":
-   "미등록 · OBD 상시 대기만 사용한다면 생략 가능",
-   "Freecom 2X 전원 ON → 갤럭시에서 연결 → 앱에 기기 등록.",cardo);
-  step(p,"04","자동기록",gpsRecording?"GPS 기록 중":active?"출발 감시 작동 중":
-   armed?"카르도 연결 감지 사용 · 실제 자동시작은 미확인":
-   obdOnly?"OBD 상시 대기 동의 저장됨":"아직 자동기록 방법을 선택하지 않았어",
-   cardo?(fallback?"GPS 안전망도 켜짐 · OBD 응답이 없으면 GPS 이동을 검증.":
-     "GPS 안전망은 꺼져 있어. OBD가 응답하지 않으면 자동시작이 안 될 수 있어."):
-    "카르도 방식은 배터리 부담이 적어. OBD 상시 대기는 지속 알림·전력을 사용해.",
-   active||armed||obdOnly);
-
   a.gap(p,14);
   a.label(p,"지금 할 일",17,a.fg,true);
   if(anotherBikeActive){
@@ -112,6 +90,28 @@ final class BikeObdSettingsUi {
   }else{
    a.action(p,"OBD 자동 감지 다시 시작",true,()->beginAuto(bikeId));
   }
+
+  a.gap(p,12);
+  a.label(p,"설정 순서",16,a.fg,true);
+  step(p,"01","바이크",bike.optString("name","내 바이크")+" 선택됨",
+   "이 화면에서 설정한 연결은 이 바이크에만 적용돼.",true);
+  step(p,"02","OBD 동글",obd?
+   liveObd?"실제 ECU 속도 수신 확인":"등록 완료 · 실제 ECU 연결은 미확인":
+   "미등록 · 카르도+GPS만 쓴다면 건너뛰어도 돼",
+   obd?"키 ON 상태에서 읽기 전용 연결 검사로 확인할 수 있어.":
+   "동글 장착 → 바이크 키 ON → 휴대폰 Bluetooth 페어링 → 앱에 등록.",obd);
+  step(p,"03","카르도",cardo?
+   CardoAutoRidePrefs.recentlyConnected(a)?"최근 연결 감지 · 자동기록 장치 등록됨":
+   "등록됨 · 다음 Bluetooth 연결 대기":
+   "미등록 · OBD 상시 대기만 사용한다면 생략 가능",
+   "Freecom 2X 전원 ON → 갤럭시에서 연결 → 앱에 기기 등록.",cardo);
+  step(p,"04","자동기록",gpsRecording?"GPS 기록 중":active?"출발 감시 작동 중":
+   armed?"카르도 연결 감지 사용 · 실제 자동시작은 미확인":
+   obdOnly?"OBD 상시 대기 동의 저장됨":"아직 자동기록 방법을 선택하지 않았어",
+   cardo?(fallback?"GPS 안전망도 켜짐 · OBD 응답이 없으면 GPS 이동을 검증.":
+     "GPS 안전망은 꺼져 있어. OBD가 응답하지 않으면 자동시작이 안 될 수 있어."):
+    "카르도 방식은 배터리 부담이 적어. OBD 상시 대기는 지속 알림·전력을 사용해.",
+   active||armed||obdOnly);
 
   a.gap(p,12);
   a.action(p,"블루투스 페어링 설정 열기",false,()->openBluetoothSettings());
@@ -200,7 +200,8 @@ final class BikeObdSettingsUi {
   String address=BikeObdPreferences.address(a,bikeId);
   String adapter=BikeObdPreferences.deviceName(a,bikeId);
   List<String> selected=BikeObdPreferences.selectedPids(a,bikeId);
-  LinearLayout p=a.page("바이크 설정 · OBD");
+  LinearLayout p=a.page("고급 연결 · OBD / 카르도");
+  a.action(p,"← 쉬운 연결 화면으로 돌아가기",false,()->open(bikeId));
   a.label(p,name,23,a.fg,true);
   a.label(p,"이 바이크에서 사용할 진단 동글과 표시 센서를 설정합니다. 다른 바이크의 설정과 섞이지 않습니다.",14,a.muted,false);
   a.gap(p,12);
