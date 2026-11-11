@@ -151,6 +151,8 @@ final class BikeObdSettingsUi {
     mode==ConnectionSetupMode.Mode.CARDO_GPS?cardo&&fallback:cardo&&obd));
 
   a.gap(p,12);
+  if(!BikeObdPreferences.address(a,bikeId).isEmpty())
+   a.label(p,ObdLocalDiagnosticLog.recentManualSummary(a),13,a.muted,false);
   a.label(p,FirstRideSetupProof.summary(a,bikeId),13,a.muted,false);
   a.action(p,"블루투스 페어링 설정 열기",false,()->openBluetoothSettings());
   a.action(p,"연결 문제 진단 · 지금 해결하기",false,()->showConnectionHelp(bikeId));

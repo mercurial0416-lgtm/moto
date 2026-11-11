@@ -67,7 +67,10 @@ final class ObdLocalDiagnosticLog {
   if(bit==0)return;
   SharedPreferences preferences=prefs(c);
   int previous=preferences.getInt("observed_mask",0);
-  if((previous&bit)==0)preferences.edit().putInt("observed_mask",previous|bit).apply();
+  SharedPreferences.Editor write=preferences.edit().putInt("observed_mask",previous|bit);
+  if("010D".equals(pid))write.putLong("speed_observed_at",System.currentTimeMillis());
+  else write.putLong("sensor_observed_at",System.currentTimeMillis());
+  write.apply();
  }
  /** End-of-session auto OBD report: bounded counters and one allowlisted diagnosis.
   * Never store adapter MAC, connection address, raw ECU response or GPX coordinates. */
@@ -178,6 +181,23 @@ final class ObdLocalDiagnosticLog {
   String events=p.getString("events","");
   if(events!=null&&!events.isEmpty())text.append("\n\n최근 연결 점검\n").append(events);
   return text.toString();
+ }
+ static String recentManualSummary(Context c){
+  SharedPreferences p=prefs(c);
+  long now=System.currentTimeMillis(),last=p.getLong("probe_last_received",0);
+  int valid=p.getInt("probe_valid",0);
+  if(last<=0||last>now||valid==0)return "최근 ECU 센서 검사 성공 내역 없음 · 페어링만으로 성공 처리하지 않음";
+  String when=new SimpleDateFormat("MM-dd HH:mm",Locale.KOREA).format(new Date(last));
+  long speed=p.getLong("speed_observed_at",0);
+  String caps=p.getString("capabilities","");
+  String speedStatus=speed>0&&speed<=now&&
+    speed>=p.getLong("capability_time",0)?
+     "속도 PID 010D: 실제 응답 확인 · "+new SimpleDateFormat("MM-dd HH:mm",Locale.KOREA).format(new Date(speed)):
+     caps.startsWith("N")?
+     "속도 PID 010D: 목록상 미지원 · 실측은 아직 확인되지 않음":
+     "속도 PID 010D: 실제 값 수신 미확인";
+  return "최근 실제 ECU 센서 응답: "+when+" · "+valid+"회\n"+speedStatus+
+    "\n※ 정차 중 속도 0km/h도 정상 응답이며, 기록된 결과는 현재 연결을 의미하지 않아.";
  }
  static void clear(Context c){prefs(c).edit().clear().apply();}
 }
