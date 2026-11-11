@@ -20,7 +20,11 @@ final class ObdParkingIsolation {
  private boolean confirmedAtLoss;
 
  void onSpeed(int speedKmh,long now) {
-  if(speedKmh<0||speedKmh>200||now<0)return;
+  if(speedKmh<0||speedKmh>200||now<0||
+     (lastSpeedAt>=0&&now<=lastSpeedAt))return;
+  // Two zero-speed samples separated by a long radio outage are not
+  // independent confirmation of parking. Preserve walking isolation.
+  if(lastSpeedAt>=0&&now-lastSpeedAt>FRESH_SPEED_MS)lowSpeedSamples=0;
   // Only a fresh ECU speed response proves that the OBD link is live again.
   parkingLossAt=-1;confirmedAtLoss=false;
   lastSpeed=speedKmh;
