@@ -28,6 +28,8 @@ final class CardoRideStarter {
 
  static void cardoEvent(Context c,String mac,boolean connected){
   if(!CardoAutoRidePrefs.matches(c,mac))return;
+  boolean duplicate=CardoAutoRidePrefs.duplicatePresence(c,mac,connected);
+  if(duplicate)return;
   ConnectionEventLog.record(c,CardoAutoRidePrefs.bikeId(c),
    connected?ConnectionEventLog.Event.CARDO_CONNECTED:ConnectionEventLog.Event.CARDO_DISCONNECTED);
   if(!connected)CardoAutoRidePrefs.noteDisconnect(c,mac);
@@ -57,6 +59,11 @@ final class CardoRideStarter {
    CardoAutoRidePrefs.status(c,"백그라운드 위치 허용 안 됨 · 알림에서 시작");
    notifyTap(c);return;
   }
+  String bike=CardoAutoRidePrefs.bikeId(c);
+  if(!CardoStartHandshake.automaticAllowed(c,bike)){
+   CardoAutoRidePrefs.status(c,"자동 시작 제한/응답 대기 · 앱의 시작 알림으로 재시도");
+   notifyTap(c);return;
+  }
   boolean inRide=RideService.autoArmed||RideService.running;
   if(!CardoAutoRidePrefs.claim(c,mac,inRide))return;
   if(!start(c)){
@@ -77,18 +84,22 @@ final class CardoRideStarter {
      BikeObdPreferences.gpsFallbackEnabled(c,bike))obd="";
   if(!CardoAutoRidePrefs.forBike(c,bike)||
      (!BikeObdPreferences.validAddress(obd)&&!BikeObdPreferences.gpsFallbackEnabled(c,bike)))return false;
+  String token=CardoStartHandshake.request(c,bike);
+  if(token.isEmpty())return false;
   try{
    Intent i=new Intent(c,RideService.class).setAction(RideService.AUTO_ARM)
      .putExtra(RideService.EXTRA_BIKE_ID,bike)
      .putExtra(RideService.EXTRA_DEVICE,obd)
-     .putExtra(RideService.EXTRA_CARDO_TRIGGER,true);
+     .putExtra(RideService.EXTRA_CARDO_TRIGGER,true)
+     .putExtra(CardoStartHandshake.EXTRA_TOKEN,token);
    if(Build.VERSION.SDK_INT>=26)c.startForegroundService(i);
    else c.startService(i);
-   CardoAutoRidePrefs.status(c,BikeObdPreferences.validAddress(obd)?
-    "카르도 감지 → OBD 연결 시도 중":"카르도 감지 → GPS 안전망 출발 판정 대기");
-   cancelTap(c);
+   // startForegroundService only submits a request; RideService must ACK.
+   CardoAutoRidePrefs.status(c,"서비스 시작 요청 전송됨 · 실제 감시 준비 확인 중");
    return true;
-  }catch(RuntimeException ex){return false;}
+  }catch(RuntimeException ex){
+   CardoStartHandshake.rejected(c,bike,token);return false;
+  }
  }
  static void startFromTap(MainActivity a){startFromTap(a,false);}
  static void startFromTap(MainActivity a,boolean fromNotification){
@@ -99,8 +110,11 @@ final class CardoRideStarter {
   }
   if(!eligible(a)){a.toast("정확한 위치·주변 기기·알림 권한 및 GPS 확인");return;}
   if(RideService.autoArmed||RideService.running){a.toast("OBD 자동 감지가 이미 진행 중");cancelTap(a);return;}
+  if(CardoStartHandshake.pending(a,CardoAutoRidePrefs.bikeId(a))){
+   a.toast("서비스 준비 응답을 기다리는 중 · GPS 기록 시작 전");return;
+  }
   if(!start(a))a.toast("자동기록 시작 제한 · 연결 도우미에서 권한과 방식 확인");
-  else a.toast("카르도 자동 라이딩 연결 시작 · 출발하면 GPS 기록");
+  else a.toast("Android에 시작 요청 전송 · 실제 감시 준비 여부는 연결 상태에서 확인");
  }
  static void notifyTap(Context c){
   if(Build.VERSION.SDK_INT>=33&&c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;

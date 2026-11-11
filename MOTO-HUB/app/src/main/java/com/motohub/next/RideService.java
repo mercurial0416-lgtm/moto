@@ -125,6 +125,7 @@ public final class RideService extends Service implements LocationListener {
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="",activeAutoAdapterAddress="";ObdAutoSpeedMonitor obdMonitor;
  boolean cardoSession=false,cardoConnected=false,requestedCardoStart=false;
+ String pendingCardoToken="";
  boolean cardoGpsFallbackRecording=false,cardoGpsProbeRegistered=false;
  int cardoGpsProbeFailures=0;
  long cardoGpsRetryAt=0;
@@ -353,6 +354,8 @@ public final class RideService extends Service implements LocationListener {
     if(!RideBikeBinding.valid(pendingBikeId)){stopWith("등록된 바이크를 선택한 뒤 OBD 기록을 켜 주세요.",false);return START_NOT_STICKY;}
     activeRideBikeId=pendingBikeId;
     requestedCardoStart=intent.getBooleanExtra(EXTRA_CARDO_TRIGGER,false);
+    pendingCardoToken=requestedCardoStart?
+     intent.getStringExtra(CardoStartHandshake.EXTRA_TOKEN):"";
     armAutomaticRide(intent.getStringExtra(EXTRA_DEVICE));return START_NOT_STICKY;
    }
    if(running||autoArmed)return START_NOT_STICKY;
@@ -443,6 +446,7 @@ public final class RideService extends Service implements LocationListener {
     handler.postDelayed(cardoGpsProbeWake,1000L);
     handler.postDelayed(cardoIdleStop,CardoStandbyPolicy.idleWindowMs(true));
     status="카르도 연결 · GPS 이동 검증 대기 (OBD 없이)";notifySafely(status);
+    CardoStartHandshake.armed(this,pendingBikeId,pendingCardoToken,true);
     return;
    }
    BluetoothDevice paired=null;
@@ -581,6 +585,7 @@ public final class RideService extends Service implements LocationListener {
    ref[0]=reader;obdMonitor=reader;
    ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    reader.start();handler.postDelayed(permissionCheck,5000);
+   if(cardoSession)CardoStartHandshake.armed(this,pendingBikeId,pendingCardoToken,false);
    if(cardoSession){handler.removeCallbacks(cardoIdleStop);handler.postDelayed(cardoIdleStop,CardoStandbyPolicy.idleWindowMs(
     BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)));}
    if(cardoSession&&BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)){
@@ -589,7 +594,10 @@ public final class RideService extends Service implements LocationListener {
     status="OBD 속도 우선 대기 · 미수신 시만 GPS 안전망 준비";
     notifySafely(status);
    }
-  }catch(Exception e){stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);}
+  }catch(Exception e){
+   CardoStartHandshake.rejected(this,pendingBikeId,pendingCardoToken);
+   stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);
+  }
  }
  private void startCardoGpsFallbackRide(){
   if(!cardoSession||!autoArmed||running||autoFinishPending||finishPending||
@@ -1076,6 +1084,9 @@ public final class RideService extends Service implements LocationListener {
   return verified;
  }
  synchronized void cleanup(boolean completed){
+  CardoStartHandshake.rejected(this,pendingBikeId,pendingCardoToken);
+  CardoStartHandshake.stopped(this,pendingBikeId,pendingCardoToken);
+  pendingCardoToken="";
   RidePowerAudit.finish(this,pendingBikeId);
   // Stop the independent space watchdog before closing any GPS writer.
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(storageWatchdog);

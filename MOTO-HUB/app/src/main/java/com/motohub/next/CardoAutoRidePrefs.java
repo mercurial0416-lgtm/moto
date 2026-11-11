@@ -45,6 +45,9 @@ final class CardoAutoRidePrefs {
     .putString("mac",mac.toUpperCase(Locale.ROOT))
     .putString("name",safe).putLong("triggerAt",0).putBoolean("connected",false).remove("presenceAt").commit();
   if(saved){
+   if(RideBikeBinding.valid(oldBike)&&(!oldBike.equals(bikeId)||headsetChanged))
+    CardoStartHandshake.clear(c,oldBike);
+   CardoStartHandshake.clear(c,bikeId);
    if(RideBikeBinding.valid(oldBike)&&
       (headsetChanged||!oldBike.equals(bikeId)))
     BikeObdPreferences.setGpsFallbackEnabled(c,oldBike,false);
@@ -57,8 +60,10 @@ final class CardoAutoRidePrefs {
   // Stop Android companion observation BEFORE clearing the MAC it needs.
   if(enabled(c))CardoCompanionPairing.stopObserving(c);
   String oldBike=bikeId(c);
-  if(RideBikeBinding.valid(oldBike))
+  if(RideBikeBinding.valid(oldBike)){
    BikeObdPreferences.setGpsFallbackEnabled(c,oldBike,false);
+   CardoStartHandshake.clear(c,oldBike);
+  }
   p(c).edit().clear().commit();
   CardoRideStarter.cancelTap(c);
  }
@@ -67,6 +72,13 @@ final class CardoAutoRidePrefs {
  }
  /** A real headset disconnect ends the prior trigger window.
   * A quick helmet restart must be eligible again rather than blocked for 90s. */
+ static synchronized boolean duplicatePresence(Context c,String mac,boolean connected){
+  if(!matches(c,mac))return false;
+  SharedPreferences p=p(c);
+  long at=p.getLong("presenceAt",0),now=SystemClock.elapsedRealtime();
+  return at>0&&now>=at&&now-at<3_000L&&
+   p.getBoolean("connected",false)==connected;
+ }
  static synchronized void noteDisconnect(Context c,String mac){notePresence(c,mac,false);}
  static synchronized void notePresence(Context c,String mac,boolean connected){
   if(!matches(c,mac))return;
