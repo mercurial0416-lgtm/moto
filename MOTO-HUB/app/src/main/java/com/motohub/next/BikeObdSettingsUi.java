@@ -39,6 +39,7 @@ final class BikeObdSettingsUi {
   boolean liveObd=sameBike&&RideService.autoArmed&&RideService.obdSpeedKmh>=0&&
    ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime());
   boolean active=sameBike&&(RideService.autoArmed||RideService.running);
+  boolean anotherBikeActive=!sameBike&&(RideService.autoArmed||RideService.running);
   boolean gpsRecording=sameBike&&RideService.running&&RideService.gpsFresh();
   boolean armed=cardo&&(obd||fallback);
   boolean permissions=setupPermissionsOk();
@@ -80,7 +81,10 @@ final class BikeObdSettingsUi {
 
   a.gap(p,14);
   a.label(p,"지금 할 일",17,a.fg,true);
-  if(!permissions){
+  if(anotherBikeActive){
+   a.label(p,"다른 바이크의 라이딩이 진행 중이야. 그 기록을 종료한 뒤 연결을 바꿔.",13,a.muted,false);
+   a.action(p,"진행 중인 기록 상태 확인",true,()->showConnectionStatus(RideService.activeRideBikeId));
+  }else if(!permissions){
    a.label(p,"위치·주변 기기·알림 권한과 GPS를 확인해. 권한이 없으면 자동시작이 막힐 수 있어.",13,a.muted,false);
    a.action(p,"필수 권한 확인하기",true,()->showPermissionHelp());
   }else if(active){
@@ -371,8 +375,12 @@ final class BikeObdSettingsUi {
     .setItems(names,(d,index)->{
      BluetoothDevice selected=bonded.get(index);
      String mac=selected.getAddress(),name=selected.getName();
-     if(!BikeObdPreferences.validAddress(mac)||mac.equalsIgnoreCase(BikeObdPreferences.address(a,bikeId))){
-      a.toast("OBD 동글과 같은 주소는 카르도로 등록할 수 없습니다.");return;
+     String lowered=name==null?"":name.toLowerCase(java.util.Locale.ROOT);
+     if(!BikeObdPreferences.validAddress(mac)||
+        mac.equalsIgnoreCase(BikeObdPreferences.address(a,bikeId))||
+        lowered.contains("obd")||lowered.contains("vgate")||
+        lowered.contains("elm327")||lowered.contains("icar")){
+      a.toast("OBD 동글은 카르도가 아니야. Freecom 2X 기기를 골라.");return;
      }
      new AlertDialog.Builder(a).setTitle("카르도 자동 라이딩 활성화")
       .setMessage((name==null?"선택 장치":name)+
@@ -384,7 +392,8 @@ final class BikeObdSettingsUi {
        if(!CardoAutoRidePrefs.enable(a,bikeId,mac,name)){
         a.toast("카르도 주소·바이크 설정 확인 필요");return;
        }
-       a.toast("카르도 등록 완료 · 시스템 연결 감지 승인 후 설정 화면에서 상태 확인");
+       a.toast("카르도 등록됨. 시스템 연결 감지를 승인하면 자동 출발을 감지할 수 있어.");
+       open(bikeId);
        CardoCompanionPairing.associate(a,mac);
       }).show();
     }).setNegativeButton("취소",null).show();
@@ -521,6 +530,10 @@ final class BikeObdSettingsUi {
      BluetoothDevice chosen=list.get(index);
      String address=chosen.getAddress();
      String name=chosen.getName();
+     String lower=name==null?"":name.toLowerCase(java.util.Locale.ROOT);
+     if(lower.contains("cardo")||lower.contains("freecom")||lower.contains("packtalk")){
+      a.toast("이건 카르도야. OBD 동글을 선택해.");return;
+     }
      new AlertDialog.Builder(a).setTitle("이 바이크에 OBD 동글 등록")
       .setMessage((name==null?"OBD2 동글":name)+"\n"+address+
        "\n\n연결 주소를 이 바이크에만 저장합니다. 실제 ECU 연결·자동 감지는 시작하지 않습니다.")
