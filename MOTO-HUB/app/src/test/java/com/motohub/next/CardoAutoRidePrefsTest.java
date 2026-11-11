@@ -67,6 +67,26 @@ public class CardoAutoRidePrefsTest {
   CardoAutoRidePrefs.noteDisconnect(c,OBD);
   assertTrue(c.getSharedPreferences("cardo_autoride_v595",0).contains("triggerAt"));
  }
+
+ @Test public void switchingBikeWithSameCardoRevokesOldGpsConsent(){
+  BikeObdPreferences.setDevice(c,A,OBD,"OBD A");
+  BikeObdPreferences.setDevice(c,B,"22:33:44:55:66:77","OBD B");
+  assertTrue(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom"));
+  BikeObdPreferences.setGpsFallbackEnabled(c,A,true);
+  assertTrue(BikeObdPreferences.gpsFallbackEnabled(c,A));
+  assertTrue(CardoAutoRidePrefs.enable(c,B,CARDO,"Freecom"));
+  assertFalse(BikeObdPreferences.gpsFallbackEnabled(c,A));
+  assertFalse(c.getSharedPreferences("bike_obd_preferences",0).getBoolean(A+".gpsFallback",true));
+  assertTrue(CardoAutoRidePrefs.forBike(c,B));
+  assertFalse(BikeObdPreferences.gpsFallbackEnabled(c,B));
+ }
+ @Test public void disablingRemovesFormerBikeGpsFallbackFlag(){
+  BikeObdPreferences.setDevice(c,A,OBD,"OBD A");
+  assertTrue(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom"));
+  BikeObdPreferences.setGpsFallbackEnabled(c,A,true);
+  CardoAutoRidePrefs.disable(c);
+  assertFalse(c.getSharedPreferences("bike_obd_preferences",0).getBoolean(A+".gpsFallback",true));
+ }
  @Test public void disablingIsScopedAndDoesNotTouchGarageOdo(){
   BikeObdPreferences.setDevice(c,A,OBD,"iCar Pro");
   assertTrue(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom"));
