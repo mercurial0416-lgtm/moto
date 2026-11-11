@@ -134,7 +134,18 @@ final class HubScreens {
   if(click!=null){row.setClickable(true);row.setFocusable(true);row.setContentDescription(title+", "+detail+", "+value);row.setOnClickListener(v->click.run());}
   host.addView(row);
  }
- void bikePicker(){JSONObject b=a.bike();if(b==null)return;Button picker=a.button(b.optString("name")+"  ▾",false,this::chooseBike);picker.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);a.content.addView(picker,new LinearLayout.LayoutParams(-1,-2));a.gap(a.content,12);}
+ void bikePicker(){
+  JSONObject b=a.bike();if(b==null)return;
+  LinearLayout row=new LinearLayout(a);row.setOrientation(LinearLayout.HORIZONTAL);
+  Button bike=a.button(b.optString("name","내 바이크")+" · 바이크 설정  ›",true,this::manageBike);
+  bike.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+  bike.setContentDescription(b.optString("name","내 바이크")+" 바이크 설정과 OBD 연결 열기");
+  row.addView(bike,new LinearLayout.LayoutParams(0,-2,1));
+  Button change=a.button("변경 ▾",false,this::chooseBike);
+  LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(a.dp(93),-2);
+  lp.leftMargin=a.dp(8);row.addView(change,lp);
+  a.content.addView(row,new LinearLayout.LayoutParams(-1,-2));a.gap(a.content,12);
+ }
  void chooseBike(){List<JSONObject> list=a.items("vehicles");list.sort((x,y)->Integer.compare(GarageBikeStatus.rank(x.optString("soldDate")),GarageBikeStatus.rank(y.optString("soldDate"))));String[] options=new String[list.size()+1];for(int i=0;i<list.size();i++)options[i]=GarageBikeStatus.label(list.get(i).optString("name"),list.get(i).optString("soldDate"));options[list.size()]="＋ 바이크 추가";new AlertDialog.Builder(a).setTitle("내 바이크").setItems(options,(d,n)->{if(n==list.size()){a.edit("vehicles",null);return;}a.selected=list.get(n).optString("id");a.getSharedPreferences("garage_ui",0).edit().putString("selected_bike",a.selected).apply();a.render();}).show();}
  // Signature screen: one strong garage hero, then one-tap actions and clear records.
  void home(){new GarageHomeUi(a).render();}
