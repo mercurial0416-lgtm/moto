@@ -8,7 +8,12 @@ monitor=(src/'ObdAutoSpeedMonitor.java').read_text()
 policy=(src/'ObdConnectionPolicy.java').read_text()
 checks={
  'restart prompt is opt-in': 'showInterruptedRidePrompt()' in main and 'new Thread(' in main and '중단된 라이딩 기록 발견' in main,
- 'no location service auto-start in prompt': 'startService(' not in main.split('void showInterruptedRidePrompt(){')[1].split('@Override protected void onResume')[0],
+ 'no location service auto-start in prompt': (
+   '.setNeutralButton("GPS 이어 기록"' in main and
+   'RideResumePolicy.eligible(filename,file.lastModified(),System.currentTimeMillis())' in main and
+   'new Intent(this,RideService.class).setAction(RideService.RESUME_INTERRUPTED)' in main and
+   'showInterruptedRidePrompt()' in main and
+   'startForegroundService(resume)' in main.split('.setNeutralButton("GPS 이어 기록"')[1].split('.setPositiveButton("기록 확인"')[0]),
  'requires manual restoration': 'TrackRecovery.recover(f)' in ui and '복구 없이 분석' in ui,
  'GPS record survives OBD disconnect': 'gpsOnlyAfterObd=true' in service and 'GPS 단독 기록 유지' in service,
  'OS never restarts ride service': 'START_NOT_STICKY' in service,

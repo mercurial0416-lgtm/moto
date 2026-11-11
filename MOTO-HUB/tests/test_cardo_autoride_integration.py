@@ -36,7 +36,9 @@ checks={
  "consent cannot trigger for arbitrary bike": "CardoAutoRidePrefs.forBike(this,pendingBikeId)" in service,
  "reboot does not silently start GPS": "startForegroundService" not in read("BootRideReminder.java"),
  "idle cutoff persists if backup/restore rejects a GPS start": 
-   "openRideTrack();requestGpsUpdatesChecked();\n    if(cardoSession)handler.removeCallbacks(cardoIdleStop);" in service,
+   "openRideTrack();requestGpsUpdatesChecked();" in service and
+   "if(cardoSession)flushActualGpsPreroll(15_000L);" in service and
+   "if(cardoSession)handler.removeCallbacks(cardoIdleStop);" in service,
  "rapid helmet OFF/ON can retrigger": "CardoAutoRidePrefs.noteDisconnect(c,mac);" in starter,
  "new OBD hardware revokes old helmet consent":
    "CardoAutoRidePrefs.disable(context);" in read("BikeObdPreferences.java"),
