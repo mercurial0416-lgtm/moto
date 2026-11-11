@@ -63,7 +63,8 @@ final class CardoRideStarter {
   if(!eligible(c)||RideService.running||RideService.autoArmed)return false;
   String bike=CardoAutoRidePrefs.bikeId(c);
   String obd=BikeObdPreferences.address(c,bike);
-  if(!CardoAutoRidePrefs.forBike(c,bike)||!BikeObdPreferences.validAddress(obd))return false;
+  if(!CardoAutoRidePrefs.forBike(c,bike)||
+     (!BikeObdPreferences.validAddress(obd)&&!BikeObdPreferences.gpsFallbackEnabled(c,bike)))return false;
   try{
    Intent i=new Intent(c,RideService.class).setAction(RideService.AUTO_ARM)
      .putExtra(RideService.EXTRA_BIKE_ID,bike)

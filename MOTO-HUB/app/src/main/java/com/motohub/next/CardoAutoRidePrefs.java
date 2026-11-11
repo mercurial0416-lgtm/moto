@@ -22,8 +22,8 @@ final class CardoAutoRidePrefs {
  static boolean forBike(Context c,String bike){
   if(!enabled(c)||!RideBikeBinding.valid(bike)||!bike.equals(bikeId(c)))return false;
   String obd=BikeObdPreferences.address(c,bike),cardo=address(c);
-  return BikeObdPreferences.validAddress(cardo)&&BikeObdPreferences.validAddress(obd)&&
-    !cardo.equalsIgnoreCase(obd);
+  return BikeObdPreferences.validAddress(cardo)&&
+    (!BikeObdPreferences.validAddress(obd)||!cardo.equalsIgnoreCase(obd));
  }
  static boolean matches(Context c,String mac){
   return enabled(c)&&BikeObdPreferences.validAddress(mac)&&
@@ -31,7 +31,6 @@ final class CardoAutoRidePrefs {
  }
  static synchronized boolean enable(Context c,String bikeId,String mac,String name){
   if(!RideBikeBinding.valid(bikeId)||!BikeObdPreferences.validAddress(mac)||
-     !BikeObdPreferences.validAddress(BikeObdPreferences.address(c,bikeId))||
      mac.equalsIgnoreCase(BikeObdPreferences.address(c,bikeId)))return false;
   String safe=name==null?"Cardo":name.trim();
   if(safe.length()>64)safe=safe.substring(0,64);

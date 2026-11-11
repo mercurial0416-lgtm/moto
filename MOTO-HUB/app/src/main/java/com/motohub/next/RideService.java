@@ -392,14 +392,33 @@ public final class RideService extends Service implements LocationListener {
    boolean bikeApproved=BikeObdPreferences.autoRideEnabled(this,pendingBikeId)
      &&address!=null&&address.equalsIgnoreCase(BikeObdPreferences.address(this,pendingBikeId));
    boolean cardoApproved=requestedCardoStart&&CardoAutoRidePrefs.forBike(this,pendingBikeId)
-     &&address!=null&&address.equalsIgnoreCase(BikeObdPreferences.address(this,pendingBikeId));
+     &&((BikeObdPreferences.validAddress(address)&&address.equalsIgnoreCase(BikeObdPreferences.address(this,pendingBikeId)))
+       ||(!BikeObdPreferences.validAddress(address)&&BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)));
    if(!developerApproved&&!bikeApproved&&!cardoApproved)
-    throw new SecurityException("바이크 설정에서 이 동글의 OBD 자동 라이딩을 먼저 동의해 주세요.");
-   if(address==null||!BluetoothAdapter.checkBluetoothAddress(address))throw new IllegalArgumentException("OBD2 어댑터를 다시 선택해 주세요.");
+    throw new SecurityException("바이크 설정에서 자동 라이딩을 먼저 동의해 주세요.");
+   boolean cardoGpsOnly=cardoApproved&&!BikeObdPreferences.validAddress(address)&&
+     BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId);
+   if(!cardoGpsOnly&&(address==null||!BluetoothAdapter.checkBluetoothAddress(address)))
+    throw new IllegalArgumentException("OBD2 어댑터를 다시 선택해 주세요.");
    if(Build.VERSION.SDK_INT>=31&&checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("Bluetooth 연결 권한이 필요합니다.");
    BluetoothManager bluetooth=getSystemService(BluetoothManager.class);
    BluetoothAdapter adapter=bluetooth==null?null:bluetooth.getAdapter();
    if(adapter==null||!adapter.isEnabled())throw new IllegalStateException("Bluetooth를 켜 주세요.");
+   if(cardoGpsOnly){
+    // Cardo + GPS fallback was explicitly permitted; no invented ECU data.
+    Sharing.stop();cardoSession=true;cardoConnected=true;
+    cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
+    cardoGpsProbeFailures=0;cardoGpsRetryAt=0;
+    cardoGpsPrevious=null;cardoGpsGate.reset();parkingIsolation.reset();autoGate.reset();
+    prepareForeground(true);autoArmed=true;obdMonitor=null;activeAutoAdapterAddress="";
+    obdLink="OBD 미등록 · GPS 단독 안전망";obdSpeedKmh=-1;obdLastSampleElapsed=0;
+    ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.CONNECTING);
+    handler.postDelayed(permissionCheck,5000L);
+    handler.postDelayed(cardoGpsProbeWake,1000L);
+    handler.postDelayed(cardoIdleStop,CardoStandbyPolicy.idleWindowMs(true));
+    status="카르도 연결 · GPS 이동 검증 대기 (OBD 없이)";notifySafely(status);
+    return;
+   }
    BluetoothDevice paired=null;
    for(BluetoothDevice d:adapter.getBondedDevices())if(address.equals(d.getAddress())){paired=d;break;}
    if(paired==null)throw new SecurityException("이미 페어링된 OBD2 장치만 사용할 수 있습니다.");
@@ -533,7 +552,8 @@ public final class RideService extends Service implements LocationListener {
    ref[0]=reader;obdMonitor=reader;
    ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    reader.start();handler.postDelayed(permissionCheck,5000);
-   if(cardoSession){handler.removeCallbacks(cardoIdleStop);handler.postDelayed(cardoIdleStop,300_000L);}
+   if(cardoSession){handler.removeCallbacks(cardoIdleStop);handler.postDelayed(cardoIdleStop,CardoStandbyPolicy.idleWindowMs(
+    BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)));}
    if(cardoSession&&BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)){
     handler.removeCallbacks(cardoGpsProbeWake);
     handler.postDelayed(cardoGpsProbeWake,5_000L);
@@ -686,7 +706,8 @@ public final class RideService extends Service implements LocationListener {
     return;
    }
    handler.removeCallbacks(cardoIdleStop);
-   handler.postDelayed(cardoIdleStop,300_000L);
+   handler.postDelayed(cardoIdleStop,CardoStandbyPolicy.idleWindowMs(
+    BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)));
   }
   if(finishPending){
    finishPending=false;
