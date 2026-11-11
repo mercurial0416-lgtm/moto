@@ -13,7 +13,7 @@ checks={
  "Cardo GPS-only explicitly opted in":'cardoGpsOnly=cardoApproved' in ride and 'BikeObdPreferences.gpsFallbackEnabled' in ride and 'gpsFallbackEnabled(c,bike)' in start,
  "Cardo registration no longer requires an OBD":'!BikeObdPreferences.validAddress(obd)||!cardo.equalsIgnoreCase(obd)' in cardo,
  "finite battery-conscious standby":'CardoStandbyPolicy.idleWindowMs' in ride and '900_000L' in read("CardoStandbyPolicy.java"),
- "missed Cardo event reconciled without scan":'getProfileProxy' in read("CardoPresenceReconciler.java") and 'CardoPresenceReconciler.onForeground(this)' in main and 'startDiscovery(' not in read("CardoPresenceReconciler.java"),
+ "missed Cardo event reconciled without scan":'CardoConnectionProbe.probe' in read("CardoPresenceReconciler.java") and 'getProfileProxy' in read("CardoConnectionProbe.java") and 'CardoPresenceReconciler.onForeground(this)' in main and 'startDiscovery(' not in read("CardoPresenceReconciler.java"),
  "pre-trigger real GPS points written first":'postAtFrontOfQueue' in ride and 'flushActualGpsPreroll(45_000L)' in ride and 'flushActualGpsPreroll(15_000L)' in ride and 'prerollReplaying?50_000_000_000L' in ride,
  "GPS fix freshness not mistaken for parking":'gpsStationaryEvidence.confirmed(now)' in ride and 'GpsSignalStatus.fresh(lastFixElapsed,now)' not in ride,
  "OBD stationary evidence is fresh":'ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now)' in ride,
