@@ -36,25 +36,32 @@ final class CardoAutoRidePrefs {
   String safe=name==null?"Cardo":name.trim();
   if(safe.length()>64)safe=safe.substring(0,64);
   if(safe.isEmpty())safe="Cardo";
-  // An old Android association must not keep observing a replaced headset.
-  if(enabled(c)&&!mac.equalsIgnoreCase(address(c))){
-   CardoCompanionPairing.stopObserving(c);
-   String oldBike=bikeId(c);
-   if(RideBikeBinding.valid(oldBike))
-    BikeObdPreferences.setGpsFallbackEnabled(c,oldBike,false);
-  }
+  // When changing either headset OR bike, revoke consent tied to the old bike.
+  // Keep the existing settings if the new preference write fails.
+  String oldBike=enabled(c)?bikeId(c):"";
+  boolean headsetChanged=enabled(c)&&!mac.equalsIgnoreCase(address(c));
+  if(headsetChanged)CardoCompanionPairing.stopObserving(c);
   boolean saved=p(c).edit()
     .putBoolean("enabled",true).putString("bike",bikeId)
     .putString("mac",mac.toUpperCase(Locale.ROOT))
     .putString("name",safe).putLong("triggerAt",0).putBoolean("connected",false).remove("presenceAt").commit();
-  if(saved)BikeObdPreferences.setAutoRideEnabled(c,bikeId,false);
+  if(saved){
+   if(RideBikeBinding.valid(oldBike)&&
+      (headsetChanged||!oldBike.equals(bikeId)))
+    BikeObdPreferences.setGpsFallbackEnabled(c,oldBike,false);
+   BikeObdPreferences.setAutoRideEnabled(c,bikeId,false);
+   CardoRideStarter.cancelTap(c); // Old permission/start notifications are invalid.
+  }
   return saved;
  }
  static synchronized void disable(Context c){
+  // Stop Android companion observation BEFORE clearing the MAC it needs.
+  if(enabled(c))CardoCompanionPairing.stopObserving(c);
   String oldBike=bikeId(c);
   if(RideBikeBinding.valid(oldBike))
    BikeObdPreferences.setGpsFallbackEnabled(c,oldBike,false);
   p(c).edit().clear().commit();
+  CardoRideStarter.cancelTap(c);
  }
  static synchronized void clearBike(Context c,String bike){
   if(bike!=null&&bike.equals(bikeId(c))){CardoCompanionPairing.stopObserving(c);disable(c);}

@@ -33,6 +33,21 @@ public final class ObdParkingIsolationTest {
   check(!p.onLinkLoss(20000),"stale ECU zero must never be called a verified stop");
   check(p.holdGps(),"stopped bike must not be charged for phone walk");
   p.reset();
+  // Repeated callbacks in the same monotonic millisecond are NOT two samples.
+  p.onSpeed(0,1000);
+  p.onSpeed(0,1000);
+  check(!p.observedParking(1000),"duplicate timestamp must not confirm parked");
+  p.onSpeed(0,2000);
+  check(p.observedParking(2000),"independent recent zero confirms parked");
+  // A delayed old speed frame must not release a parked-phone GPS hold.
+  p.onSpeed(35,1500);
+  check(p.holdGps()&&p.observedParking(2000),"out-of-order speed must be ignored");
+  // A 20-second radio hole means old zero may not count with new zero.
+  p.onSpeed(0,22001);
+  check(!p.observedParking(22001),"old zero cannot cross link outage");
+  p.onSpeed(0,23001);
+  check(p.observedParking(23001),"fresh second zero may confirm");
+  p.reset();
   check(!p.holdGps()&&!p.dueAfterLost(500000),"reset must clear old session state");
   System.out.println("PASS ObdParkingIsolationTest: 13 assertions");
  }

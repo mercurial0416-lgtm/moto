@@ -10,7 +10,10 @@ final class ObdSpeedResponsePolicy {
  }
  static long pollDelayMs(int speed){
   // A slower stationary poll saves radio/CPU work; moving samples stay responsive.
-  return speed<=0||speed>255?4_000L:1_100L;
+  // A corrupt/missing sample must be retried promptly: six invalid replies
+  // used to take up to 24 seconds before recovery was even attempted.
+  // Only a VERIFIED stationary zero is polled slowly for battery savings.
+  return speed==0?4_000L:1_100L;
  }
  private ObdSpeedResponsePolicy(){}
 }

@@ -39,8 +39,17 @@ final class ObdAutoSpeedMonitor {
  ObdAutoSpeedMonitor(BluetoothDevice device,Listener listener,boolean persistentStandby){
   this.device=device;this.listener=listener;this.persistentStandby=persistentStandby;
  }
- void start(){worker=new Thread(this::readLoop,"moto-obd-autoride");worker.setDaemon(true);worker.start();}
- void stop(){stopped=true;closeSocket();}
+ synchronized void start(){
+  // Duplicate UI/service events must not spawn competing readers of one RFCOMM socket.
+  if(worker!=null||stopped)return;
+  worker=new Thread(this::readLoop,"moto-obd-autoride");
+  worker.setDaemon(true);worker.start();
+ }
+ synchronized void stop(){
+  stopped=true;
+  closeSocket();
+  if(worker!=null)worker.interrupt(); // Do not wait for an old retry backoff.
+ }
  private void closeSocket(){BluetoothSocket s=socket;socket=null;if(s!=null)try{s.close();}catch(Exception ignored){}}
  private void readLoop(){
   String reason="OBD2 연결이 종료됐습니다.";
