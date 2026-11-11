@@ -5,6 +5,7 @@ final class ObdRideAutoGate {
  enum Event { NONE, START, FINISH }
  static final int START_KMH=7, KEEP_MOVING_KMH=4, FINISH_KMH=2;
  static final int REQUIRED_MOVING_SAMPLES=3;
+ static final long MIN_SAMPLE_SPACING_MS=250L;
  static final long STOP_AFTER_MS=180_000L;
  /** Safer user-facing default groups traffic and longer short stops; user can select 3/5/10 min. */
  static final long USER_DEFAULT_STOP_AFTER_MS=600_000L;
@@ -23,7 +24,8 @@ final class ObdRideAutoGate {
  private long lastSample=-1;
 
  Event accept(int speedKmh,long elapsedMs){
-  if(elapsedMs<0||lastSample>elapsedMs)return Event.NONE;
+  // A duplicate/stale frame can never count as another independent start sample.
+  if(elapsedMs<0||(lastSample>=0&&elapsedMs-lastSample<MIN_SAMPLE_SPACING_MS))return Event.NONE;
   if(lastSample>=0&&elapsedMs-lastSample>(recording?15_000:5_500)){movingSamples=0;stationarySince=-1;}
   lastSample=elapsedMs;
   if(speedKmh<0||speedKmh>200){movingSamples=0;stationarySince=-1;return Event.NONE;}

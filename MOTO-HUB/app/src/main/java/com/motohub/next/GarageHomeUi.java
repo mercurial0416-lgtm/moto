@@ -109,7 +109,11 @@ final class GarageHomeUi {
   LinearLayout bar=new LinearLayout(a);bar.setGravity(Gravity.CENTER_VERTICAL);
   TextView type=a.text("MY MOTORCYCLE",10,soft,true);type.setLetterSpacing(.16f);bar.addView(type,new LinearLayout.LayoutParams(0,-2,1));
   TextView change=a.text("선택  ▾",13,orange,true);change.setGravity(Gravity.CENTER);change.setMinHeight(a.dp(48));change.setMinWidth(a.dp(64));change.setContentDescription("바이크 선택 또는 추가");change.setClickable(true);change.setFocusable(true);change.setOnClickListener(v->new HubScreens(a).chooseBike());bar.addView(change);identity.addView(bar);
-  TextView name=a.text(bike.optString("name","내 바이크"),28,light,true);identity.addView(name);stage.addView(identity);
+  TextView name=a.text(bike.optString("name","내 바이크")+"  ›",28,light,true);
+  name.setContentDescription(bike.optString("name","내 바이크")+" 바이크 설정 열기");
+  name.setMinHeight(a.dp(50));name.setClickable(true);name.setFocusable(true);
+  name.setOnClickListener(v->new HubScreens(a).manageBike());
+  identity.addView(name);stage.addView(identity);
   FrameLayout photoArea=new FrameLayout(a);photoArea.setBackgroundColor(0xFF0D2C22);ImageView image=new ImageView(a);image.setScaleType(ImageView.ScaleType.FIT_CENTER);
   TextView credit=a.text("",10,0xFFF0F7F0,false);boolean own=loadBikePhoto(image,bike,credit);photoArea.addView(image,new FrameLayout.LayoutParams(-1,-1));
   credit.setText(own?"내 바이크 사진":"기본 일러스트 · 사진을 등록해 보세요");credit.setMaxLines(2);credit.setPadding(a.dp(8),a.dp(4),a.dp(8),a.dp(4));credit.setBackground(a.shape(0xB30B1713,0,6));FrameLayout.LayoutParams creditLp=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.END);creditLp.setMargins(a.dp(12),0,a.dp(12),a.dp(8));photoArea.addView(credit,creditLp);
@@ -198,6 +202,8 @@ final class GarageHomeUi {
   welcome.addView(a.text("나만의 차고를\n만들어 보세요",32,light,true));
   ImageView visual=new ImageView(a);visual.setImageResource(R.drawable.garage_bike_outline);visual.setScaleType(ImageView.ScaleType.FIT_CENTER);welcome.addView(visual,new LinearLayout.LayoutParams(-1,a.dp(190)));
   welcome.addView(a.text("주행거리, 주유비, 정비 일정을 한곳에.\n첫 바이크를 등록하면 시작됩니다.",15,soft,false));a.content.addView(welcome);a.gap(a.content,14);
+  if(a.getPackageName().contains(".obdpreview"))
+   a.note("이 APK는 별도 테스트판이야. 기존 v605 등 다른 버전의 바이크·OBD 연결 설정이나 GPS 기록이 자동으로 이동하지 않아. 여기에도 바이크와 OBD/카르도를 다시 설정해야 자동기록을 시도할 수 있어.");
   a.action(a.content,"백업에서 내 기록 가져오기",false,()->new HubScreens(a).basicBackup());
   ExperienceUi.dock(a,a.button("첫 바이크 등록",true,()->a.edit("vehicles",null)));
  }

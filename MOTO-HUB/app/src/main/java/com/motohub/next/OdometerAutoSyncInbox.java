@@ -52,6 +52,8 @@ final class OdometerAutoSyncInbox {
  }
  static synchronized boolean enable(Context c,String bikeId,double checkedDashboardKm){
   if(!RideBikeBinding.valid(bikeId)||!OdoAutoSyncPolicy.sane(checkedDashboardKm))return false;
+  if(RideService.running||RideService.autoArmed||RideService.saving()||
+     RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting())return false;
   migrateLegacy(c);
   List<String> ids=bikeIds(c);if(!ids.contains(bikeId))ids.add(bikeId);
   return p(c).edit().putString("bikeIds",String.join(",",ids))
@@ -78,7 +80,9 @@ final class OdometerAutoSyncInbox {
   p(c).edit().putString("bikeIds",String.join(",",ids)).commit();
  }
  static synchronized boolean rebaseline(Context c,String bikeId,double confirmedDashboardKm,double garageKm){
-  if(!enabled(c,bikeId)||!OdoAutoSyncPolicy.sane(confirmedDashboardKm)
+  if(RideService.running||RideService.autoArmed||RideService.saving()||
+     RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()||
+     !enabled(c,bikeId)||!OdoAutoSyncPolicy.sane(confirmedDashboardKm)
     ||!OdoAutoSyncPolicy.sane(garageKm)||confirmedDashboardKm<garageKm
     ||confirmedDashboardKm-garageKm>=2000)return false;
   return p(c).edit().putString(k(bikeId,"baseline"),Double.toString(confirmedDashboardKm))
@@ -116,6 +120,11 @@ final class OdometerAutoSyncInbox {
    .putLong(k(bikeId,"lastAt"),now)
    .putString(k(bikeId,"pending"),Double.toString(Math.max(previousPending,actual)))
    .remove(k(bikeId,"lastNote")).commit();
+ }
+ /** Wall-clock receipt of the sample behind pending() (0 means no trustworthy timestamp). */
+ static synchronized long pendingReceivedAt(Context c,String bikeId){
+  if(!enabled(c,bikeId))return 0L;
+  return p(c).getLong(k(bikeId,"lastAt"),0L);
  }
  static synchronized double pending(Context c,String bikeId){
   if(!enabled(c,bikeId))return Double.NaN;

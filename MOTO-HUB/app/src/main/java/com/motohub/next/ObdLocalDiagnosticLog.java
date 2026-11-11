@@ -10,6 +10,38 @@ import java.util.Locale;
 final class ObdLocalDiagnosticLog {
  private static final String PREFS="obd_diagnostics_local";
  private static final int MAX_ENTRIES=12;
+ private static SharedPreferences prefs(Context c){
+  String id="";
+  if(c instanceof MainActivity){
+   org.json.JSONObject bike=((MainActivity)c).bike();
+   if(bike!=null)id=bike.optString("id","");
+  }
+  if(!RideBikeBinding.valid(id))id=RideService.activeRideBikeId;
+  if(!RideBikeBinding.valid(id))return c.getSharedPreferences(PREFS,0);
+  String mac=id.equals(RideService.activeRideBikeId)?
+    RideService.instance==null?"":RideService.instance.activeAutoAdapterAddress:"";
+  if(!BikeObdPreferences.validAddress(mac))mac=BikeObdPreferences.address(c,id);
+  if(!BikeObdPreferences.validAddress(mac))
+   return c.getSharedPreferences(PREFS+"_"+id+"_no_obd",0);
+  // A local random salt keeps MAC addresses out of preference names and logs;
+  // switching dongles never inherits another dongle's measured capabilities.
+  try{
+   SharedPreferences ns=c.getSharedPreferences("obd_diag_namespace_v601",0);
+   String salt=ns.getString("salt","");
+   if(salt.length()!=64){
+    byte[] bytes=new byte[32];new java.security.SecureRandom().nextBytes(bytes);
+    StringBuilder b=new StringBuilder();
+    for(byte v:bytes)b.append(String.format(java.util.Locale.ROOT,"%02x",v&255));
+    salt=b.toString();ns.edit().putString("salt",salt).commit();
+   }
+   java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256");
+   byte[] fingerprint=digest.digest((salt+"|"+id+"|"+mac.toUpperCase(Locale.ROOT))
+     .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+   StringBuilder hex=new StringBuilder();
+   for(int i=0;i<12;i++)hex.append(String.format(Locale.ROOT,"%02x",fingerprint[i]&255));
+   return c.getSharedPreferences(PREFS+"_"+id+"_"+hex,0);
+  }catch(Exception unavailable){return c.getSharedPreferences(PREFS+"_"+id+"_local",0);}
+ }
  private ObdLocalDiagnosticLog(){}
 
  static void capability(Context c,ObdPidCapabilities support){
@@ -20,7 +52,7 @@ final class ObdLocalDiagnosticLog {
    ObdPidCapabilities.Support value=support.forPid(pid);
    bitmap.append(value==ObdPidCapabilities.Support.YES?'Y':value==ObdPidCapabilities.Support.NO?'N':'?');
   }
-  c.getSharedPreferences(PREFS,0).edit().putString("capabilities",bitmap.toString())
+  prefs(c).edit().putString("capabilities",bitmap.toString())
    .putInt("observed_mask",0).putLong("capability_time",System.currentTimeMillis()).apply();
   record(c,"PID");
  }
@@ -33,16 +65,19 @@ final class ObdLocalDiagnosticLog {
  static void observed(Context c,String pid){
   int bit=bitForPid(pid);
   if(bit==0)return;
-  SharedPreferences preferences=c.getSharedPreferences(PREFS,0);
+  SharedPreferences preferences=prefs(c);
   int previous=preferences.getInt("observed_mask",0);
-  if((previous&bit)==0)preferences.edit().putInt("observed_mask",previous|bit).apply();
+  SharedPreferences.Editor write=preferences.edit().putInt("observed_mask",previous|bit);
+  if("010D".equals(pid))write.putLong("speed_observed_at",System.currentTimeMillis());
+  else write.putLong("sensor_observed_at",System.currentTimeMillis());
+  write.apply();
  }
  /** End-of-session auto OBD report: bounded counters and one allowlisted diagnosis.
   * Never store adapter MAC, connection address, raw ECU response or GPX coordinates. */
  static void automaticSession(Context c,int attempts,int successes,int reconnects,
                               int queryFailures,long speedSamples,String reason){
   String safe=ObdFailureGuide.classify(reason);
-  c.getSharedPreferences(PREFS,0).edit()
+  prefs(c).edit()
    .putLong("auto_at",System.currentTimeMillis())
    .putInt("auto_attempts",Math.max(0,Math.min(attempts,10_000)))
    .putInt("auto_successes",Math.max(0,Math.min(successes,10_000)))
@@ -55,7 +90,7 @@ final class ObdLocalDiagnosticLog {
  /** Store one bounded diagnostic summary at session end, never MAC, raw payload or coordinates. */
  static void probeMetrics(Context c,boolean connected,int validReplies,int failures,
                           long averageLatencyMs,long lastReceivedAt){
-  c.getSharedPreferences(PREFS,0).edit()
+  prefs(c).edit()
    .putLong("probe_at",System.currentTimeMillis())
    .putBoolean("probe_connected",connected)
    .putInt("probe_valid",Math.max(0,Math.min(validReplies,1_000_000)))
@@ -66,7 +101,7 @@ final class ObdLocalDiagnosticLog {
  }
  static void record(Context c,String code){
   if(!ObdDiagnosticEventPolicy.valid(code))return;
-  SharedPreferences p=c.getSharedPreferences(PREFS,0);
+  SharedPreferences p=prefs(c);
   String now=new SimpleDateFormat("MM-dd HH:mm",Locale.KOREA).format(new Date());
   String[] previous=p.getString("events","").split("\\n",-1);
   StringBuilder history=new StringBuilder(now).append(" · ").append(ObdDiagnosticEventPolicy.text(code));
@@ -82,9 +117,12 @@ final class ObdLocalDiagnosticLog {
   p.edit().putString("events",history.toString()).apply();
  }
  static String summary(Context c){
-  SharedPreferences p=c.getSharedPreferences(PREFS,0);
+  SharedPreferences p=prefs(c);
   String caps=p.getString("capabilities","");
-  StringBuilder text=new StringBuilder("마지막 ECU PID 선언 목록 (실제 수신과 별개): ");
+  String scope=c instanceof MainActivity||RideBikeBinding.valid(RideService.activeRideBikeId)?
+   "진단 범위: 선택 바이크 + 현재 OBD 동글 (MAC 비저장)\n":"";
+
+  StringBuilder text=new StringBuilder(scope+"마지막 ECU PID 선언 목록 (실제 수신과 별개): ");
   if(caps!=null&&caps.matches("[YN?]{4,5}")){
    String[] names={"속도","RPM","수온","전압","연료"};
    for(int i=0;i<caps.length();i++){
@@ -144,5 +182,22 @@ final class ObdLocalDiagnosticLog {
   if(events!=null&&!events.isEmpty())text.append("\n\n최근 연결 점검\n").append(events);
   return text.toString();
  }
- static void clear(Context c){c.getSharedPreferences(PREFS,0).edit().clear().apply();}
+ static String recentManualSummary(Context c){
+  SharedPreferences p=prefs(c);
+  long now=System.currentTimeMillis(),last=p.getLong("probe_last_received",0);
+  int valid=p.getInt("probe_valid",0);
+  if(last<=0||last>now||valid==0)return "최근 ECU 센서 검사 성공 내역 없음 · 페어링만으로 성공 처리하지 않음";
+  String when=new SimpleDateFormat("MM-dd HH:mm",Locale.KOREA).format(new Date(last));
+  long speed=p.getLong("speed_observed_at",0);
+  String caps=p.getString("capabilities","");
+  String speedStatus=speed>0&&speed<=now&&
+    speed>=p.getLong("capability_time",0)?
+     "속도 PID 010D: 실제 응답 확인 · "+new SimpleDateFormat("MM-dd HH:mm",Locale.KOREA).format(new Date(speed)):
+     caps.startsWith("N")?
+     "속도 PID 010D: 목록상 미지원 · 실측은 아직 확인되지 않음":
+     "속도 PID 010D: 실제 값 수신 미확인";
+  return "최근 실제 ECU 센서 응답: "+when+" · "+valid+"회\n"+speedStatus+
+    "\n※ 정차 중 속도 0km/h도 정상 응답이며, 기록된 결과는 현재 연결을 의미하지 않아.";
+ }
+ static void clear(Context c){prefs(c).edit().clear().apply();}
 }

@@ -38,6 +38,9 @@ final class DeveloperObdScreen {
  private final TextView[] fields=new TextView[ObdReadOnlyProtocol.SENSOR_PIDS.length];
  private TextView status;
  private Dialog owner;
+ private android.widget.Button verifiedRegisterButton;
+ private String verifiedRegisterMac="",verifiedRegisterName="";
+ private String verifiedBikeId="";
  private volatile boolean stopped=true;
  private volatile BluetoothSocket socket;
  private Thread worker;
@@ -48,16 +51,59 @@ final class DeveloperObdScreen {
   if(RideService.running||RideService.autoArmed||RideService.saving()||RestoreRideGate.isRestoring()){
    a.toast("라이딩·복원을 종료한 뒤 정차 상태에서 OBD를 확인해 주세요.");return;
   }
-  new AlertDialog.Builder(a).setTitle("OBD 연결 검사")
-   .setMessage("정차 상태에서만 진행해 주세요. 페어링된 ELM327 Bluetooth Classic 동글을 선택해 표준 센서를 읽습니다. ECU 설정 변경·고장코드 삭제·자동 출발은 하지 않습니다. KTM 390 DUKE 실차 호환성은 아직 확인되지 않았습니다.")
-   .setNegativeButton("취소",null)
-   .setPositiveButton("읽기 전용 검사 시작",(d,w)->{
-    if(a.developerObd!=null)a.developerObd.stop();
-    a.developerObd=new DeveloperObdScreen(a);
-    a.developerObd.showQuick();
-   }).show();
+  // The screen itself explains the safety boundary; don't stack an extra
+  // confirmation dialog before the user has even chosen a device.
+  if(a.developerObd!=null)a.developerObd.stop();
+  a.developerObd=new DeveloperObdScreen(a);
+  a.developerObd.showQuick();
  }
  void showQuick(){
+  if(RideService.running||RideService.autoArmed||RideService.saving()||RestoreRideGate.isRestoring()){
+   activity.toast("정차 후 자동 감지를 종료하고 검사해 주세요.");return;
+  }
+  LinearLayout p=activity.page("OBD 연결 검사");
+  activity.label(p,"연결 확인은 딱 2단계",22,activity.fg,true);
+  activity.label(p,"1. 바이크를 정차하고 진단 동글을 장착한 뒤 키 ON (필요하면 시동 ON)\n2. 갤럭시에서 Bluetooth 페어링 후 아래 검사 버튼을 눌러.",14,activity.muted,false);
+  activity.action(p,"갤럭시 Bluetooth 페어링",false,this::openBluetoothSettings);
+  activity.gap(p,10);
+  activity.label(p,"실제 ECU 데이터 확인",17,activity.fg,true);
+  status=activity.text("검사 전 · 페어링만으로는 ECU 연결을 확인할 수 없어",14,activity.muted,true);
+  p.addView(status);
+  activity.gap(p,8);
+  LinearLayout results=activity.col();
+  results.setVisibility(android.view.View.GONE);
+  results.setPadding(activity.dp(14),activity.dp(12),activity.dp(14),activity.dp(12));
+  results.setBackground(activity.shape(activity.panel,activity.line,16));
+  for(int i=0;i<fields.length;i++){
+   fields[i]=activity.text(ObdReadOnlyProtocol.SENSOR_NAMES[i]+": —",15,activity.fg,false);
+   fields[i].setMinHeight(activity.dp(36));results.addView(fields[i]);
+  }
+  p.addView(results);
+  activity.action(p,"페어링된 OBD 동글 선택 · 읽기 전용 검사",true,()->{
+   results.setVisibility(android.view.View.VISIBLE);loadPaired();
+  });
+  verifiedRegisterButton=activity.button("이 동글로 사용하기 · ECU 응답 확인",true,()->{
+   String checked=verifiedRegisterMac;
+   if(!BikeObdPreferences.validAddress(checked)||activity.bike()==null||
+      !verifiedBikeId.equals(activity.bike().optString("id"))){
+    activity.toast("바이크가 바뀌었어. 동글 검사를 다시 진행해.");return;
+   }
+   new BikeObdSettingsUi(activity).confirmDeviceRegistration(verifiedBikeId,
+    checked,verifiedRegisterName,true);
+  });
+  verifiedRegisterButton.setVisibility(android.view.View.GONE);
+  p.addView(verifiedRegisterButton);
+  activity.label(p,"값이 실제로 뜨면 통신 확인. 응답이 없으면 연결 실패 또는 ECU 미지원일 수 있어. 이 검사는 ECU를 수정하거나 고장코드를 지우지 않아.",12,activity.muted,false);
+  activity.gap(p,12);
+  activity.action(p,"지난 검사 결과",false,()->new AlertDialog.Builder(activity)
+   .setTitle("OBD 연결 검사 결과").setMessage(ObdLocalDiagnosticLog.summary(activity))
+   .setPositiveButton("닫기",null).show());
+  activity.action(p,"고급 PID/ODO 검사",false,this::showQuickAdvanced);
+  activity.show();owner=activity.dialog;activity.developerObd=this;
+  owner.setOnDismissListener(done->{stop();if(activity.developerObd==this)activity.developerObd=null;});
+ }
+ void showQuickAdvanced(){
+  verifiedRegisterButton=null;verifiedRegisterMac="";verifiedRegisterName="";verifiedBikeId="";
   if(RideService.running||RideService.autoArmed||RideService.saving())return;
   LinearLayout p=activity.page("OBD 연결 · 3단계");
   activity.label(p,"1  준비",16,activity.fg,true);
@@ -657,7 +703,7 @@ final class DeveloperObdScreen {
    }
    if(!stopped)setStatus("ODO 미수신 · 01A0 지원: "+support+
     "\n01A6: "+ObdOdometer.responseSummary(standard)+
-    "\n22 F4 A6: "+ObdOdometer.responseSummary(uds)+
+    "\n22 F4 A6: "+ObdOdometer.responseSummary(uds)+" · "+ObdOdometer.udsDiagnosis(uds)+
     "\nECU 7E0: "+ObdOdometer.responseSummary(physical)+
     "\n앱 km 변경 없음 · 원시 응답 화면을 캡처해 분석할 수 있습니다.");
   }catch(Exception e){if(!stopped)setStatus("ODO 조회 실패: "+e.getClass().getSimpleName()+" · 기록 변경 없음");}
@@ -756,12 +802,16 @@ final class DeveloperObdScreen {
  }
  private synchronized void connect(BluetoothDevice device){
   stop();
+  verifiedRegisterMac="";verifiedRegisterName="";verifiedBikeId="";
+  if(verifiedRegisterButton!=null)verifiedRegisterButton.setVisibility(android.view.View.GONE);
   if(worker!=null&&worker.isAlive()){setStatus("기존 연결을 종료 중입니다. 잠시 후 다시 선택해 주세요.");return;}
   if(!permissionGranted()){setStatus("Bluetooth 권한이 필요합니다.");return;}
   stopped=false;setStatus("연결 중…");
-  worker=new Thread(()->runConnection(device),"moto-obd-read-only");worker.setDaemon(true);worker.start();
+  String selectedBike=activity.bike()==null?"":activity.bike().optString("id");
+  worker=new Thread(()->runConnection(device,selectedBike),"moto-obd-read-only");
+  worker.setDaemon(true);worker.start();
  }
- private void runConnection(BluetoothDevice device){
+ private void runConnection(BluetoothDevice device,String selectedBike){
   long latencyMs=0,lastSampleAt=0;
   int received=0,failed=0;
   boolean connected=false;
@@ -803,7 +853,10 @@ final class DeveloperObdScreen {
         observedPid[i]=true;
         ObdLocalDiagnosticLog.observed(activity,pid);
        }
-       if(!loggedSensor){ObdLocalDiagnosticLog.record(activity,"SENSOR_OK");loggedSensor=true;}
+       if(!loggedSensor){
+        ObdLocalDiagnosticLog.record(activity,"SENSOR_OK");loggedSensor=true;
+        showVerifiedRegistration(device,selectedBike);
+       }
       }else failed++;
       updateField(i,result);
      }catch(InterruptedException interrupted){throw interrupted;}
@@ -833,6 +886,23 @@ final class DeveloperObdScreen {
     received==0?-1:latencyMs/received,lastSampleAt);
    closeSocket();stopped=true;
   }
+ }
+ private void showVerifiedRegistration(BluetoothDevice device,String bikeId){
+  if(!RideBikeBinding.valid(bikeId))return;
+  if(Build.VERSION.SDK_INT>=31&&activity.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    !=PackageManager.PERMISSION_GRANTED)return;
+  final String address,name;
+  try{address=device.getAddress();name=device.getName();}
+  catch(SecurityException revoked){return;}
+  if(!BikeObdPreferences.validAddress(address))return;
+  activity.runOnUiThread(()->{
+   if(stopped||verifiedRegisterButton==null||owner==null||
+      !owner.isShowing()||activity.dialog!=owner||
+      activity.bike()==null||!bikeId.equals(activity.bike().optString("id")))return;
+   verifiedRegisterMac=address;verifiedRegisterName=name;verifiedBikeId=bikeId;
+   verifiedRegisterButton.setVisibility(android.view.View.VISIBLE);
+   setStatus("실제 ECU 센서 응답 확인 · 아래에서 이 동글을 바이크에 등록할 수 있어");
+  });
  }
  private String request(InputStream in,OutputStream out,String command,long timeoutMs)throws Exception{
   if(stopped)throw new java.io.IOException("연결이 종료됐습니다.");

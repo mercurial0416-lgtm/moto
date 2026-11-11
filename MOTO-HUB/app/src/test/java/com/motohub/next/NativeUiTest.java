@@ -8,21 +8,34 @@ public class NativeUiTest {
  @Before public void start(){a=Robolectric.buildActivity(MainActivity.class).setup().get();}
  @After public void finish(){if(a!=null){a.close();a.finish();}}
  View find(View v,String text){if(v instanceof Button&&((Button)v).getText().toString().equals(text))return v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View r=find(g.getChildAt(i),text);if(r!=null)return r;}}return null;}
- void save(){
+ void save(){save(true);}
+ void save(boolean expectValidSave){
   View b=find(a.dialog.getWindow().getDecorView(),"저장");assertNotNull(b);b.performClick();
-  // Form writes now commit on a worker; wait for a real atomic save and UI post.
+  if(!expectValidSave){
+   // Validation failure intentionally leaves the form open; no disk write is started.
+   Shadows.shadowOf(Looper.getMainLooper()).idle();
+   return;
+  }
+  // A worker ends RestoreRideGate BEFORE posting its UI commit. Waiting only
+  // for isFormWriting()==false races the actual db update and randomly reports
+  // zero vehicles despite a successful atomic disk save.
   for(int i=0;i<250;i++){
    Shadows.shadowOf(Looper.getMainLooper()).idle();
-   if(!RestoreRideGate.isFormWriting()){Shadows.shadowOf(Looper.getMainLooper()).idle();return;}
-   try{Thread.sleep(20);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();fail("Interrupted while saving");}
+   if(!RestoreRideGate.isFormWriting()&&a.dialog==null){
+    Shadows.shadowOf(Looper.getMainLooper()).idle();
+    return;
+   }
+   try{Thread.sleep(20);}catch(InterruptedException interrupted){
+    Thread.currentThread().interrupt();fail("Interrupted while saving");
+   }
   }
-  fail("Form atomic write did not finish");
+  fail("Form atomic write and UI commit did not both finish");
  }
  void field(String name,String value){a.draftFields.get(name).setText(value);}
  void bike(){a.edit("vehicles",null);assertEquals("",a.draftFields.get("name").getText().toString());assertEquals("",a.draftFields.get("year").getText().toString());field("name","TEST · My Bike");field("year","2024");field("odo","12450");save();assertEquals(1,a.arr("vehicles").length());}
  @Test public void emptyLaunchAndNavigation(){assertEquals(0,a.arr("vehicles").length());for(String tab:a.tabs){a.navigate(tab);assertTrue(a.content.getChildCount()>0);}a.navigate("더보기");a.back();assertEquals("차고",a.tab);a.back();assertEquals("홈",a.tab);}
  @Test public void formsPersistAcrossActivityRestart()throws Exception{bike();a.edit("services",null);field("cost","55000");field("nextKm","15000");save();a.edit("expenses",null);field("amount","23000");field("liters","11");a.fullTankBox.setChecked(true);save();a.edit("listings",null);field("model","TEST · Saved motorcycle");field("year","2024");field("price","5300000");save();assertEquals(1,a.arr("services").length());assertTrue(a.arr("expenses").getJSONObject(0).getBoolean("fullTank"));a.finish();a=Robolectric.buildActivity(MainActivity.class).setup().get();assertEquals(1,a.arr("listings").length());assertEquals(1,a.arr("services").length());assertEquals(1,a.arr("expenses").length());}
- @Test public void invalidPriceDoesNotSave(){a.edit("listings",null);field("model","TEST invalid");field("price","0");save();assertEquals(0,a.arr("listings").length());assertTrue(a.dialog.isShowing());}
+ @Test public void invalidPriceDoesNotSave(){a.edit("listings",null);field("model","TEST invalid");field("price","0");save(false);assertEquals(0,a.arr("listings").length());assertTrue(a.dialog.isShowing());}
  @Test public void draftSurvivesFormClose(){bike();a.edit("services",null);field("cost","77000");a.close();assertTrue(a.getSharedPreferences("draft",0).contains("active"));a.resumeDraft();assertEquals("77000",a.draftFields.get("cost").getText().toString());assertEquals(0,a.arr("services").length());}
  void awaitVehicleCount(int count)throws Exception{
   // JSON restore now commits on a worker. Pump the UI queue until the real

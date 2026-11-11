@@ -31,11 +31,12 @@ final class ServiceStatusUi {
    a.action(target,"정비주기 등록",true,()->new QuickEntryUi(a).maintenance());return;
   }
   a.action(target,"정비주기 추가",false,()->new QuickEntryUi(a).maintenance());
+  final HybridOdometerEstimate.Reading gpsEstimate=HybridOdometerEstimate.snapshot(a,bike.optString("id"));
   LinearLayout cards=a.col();target.addView(cards);final int[] shown={0};
   Button more=a.button("",false,()->{});more.setTag("maintenance-more");
   Runnable nextPage=()->{
    int end=Math.min(entries.size(),shown[0]+8);
-   while(shown[0]<end)cards.addView(scheduleCard(entries.get(shown[0]++),bike));
+   while(shown[0]<end)cards.addView(scheduleCard(entries.get(shown[0]++),bike,gpsEstimate));
    more.setVisibility(shown[0]<entries.size()?View.VISIBLE:View.GONE);more.setText("정비 "+(entries.size()-shown[0])+"개 더 보기");
   };
   more.setOnClickListener(v->nextPage.run());target.addView(more);nextPage.run();
@@ -47,7 +48,7 @@ final class ServiceStatusUi {
    a.action(target,"엔진오일 + 오일필터 함께 완료",false,()->completeOilPair(bike,engineOil,oilFilter));
   a.label(target,"정비 알림은 저장된 계기판과 예정일 기준입니다. GPS 거리로 계기판을 자동 변경하지 않습니다.",12,a.muted,false);
  }
- View scheduleCard(JSONObject item,JSONObject bike){
+ View scheduleCard(JSONObject item,JSONObject bike,HybridOdometerEstimate.Reading gpsEstimate){
   MaintenancePlanner.Status state=status(item,bike);boolean overdue=state==MaintenancePlanner.Status.OVERDUE;
   String caption=overdue?"점검 필요":state==MaintenancePlanner.Status.SOON?"곧 정비":state==MaintenancePlanner.Status.NONE?"일정 확인":"정비 예정";
   int tone=overdue?(a.dark?0xFFFFB4A9:0xFF9B2C2C):a.accent;
@@ -57,6 +58,14 @@ final class ServiceStatusUi {
   String remaining=MaintenanceNoticeText.detail(day,next,a.today(),current);
   if(Double.isFinite(next)&&next>0&&Double.isFinite(current))remaining=a.num(Math.abs(next-current))+" km "+(next<=current?"초과":"남음");
   TextView distance=a.text(remaining.isEmpty()?"예정 정보 확인":remaining,24,a.fg,true);card.addView(distance);a.gap(card,5);
+  // GPS-only distance may omit rides. It is a comparison label, not a
+  // substitute for physical odometer maintenance due dates or alerts.
+  if(gpsEstimate!=null&&gpsEstimate.valid&&next>0&&gpsEstimate.estimatedKm>current+0.1){
+   card.addView(a.text("GPS 기록 추정 참고: "+
+    ServiceDueSummary.caption(day,next,a.today(),gpsEstimate.estimatedKm)+
+    " · 미기록 주행 제외 · 계기판 기준 알림 변경 없음",12,a.muted,false));
+   a.gap(card,5);
+  }
   String goal=(next>0?"목표 "+a.num(next)+" km":"날짜 기준 정비")+(!day.isEmpty()?" · "+MaintenanceNoticeText.detail(day,0,a.today(),current):"");
   card.addView(a.text(goal,13,a.muted,false));a.gap(card,12);
   a.pair(card,"완료",()->complete(item),"주기 조정",()->new QuickEntryUi(a).maintenance(item.optString("type")));

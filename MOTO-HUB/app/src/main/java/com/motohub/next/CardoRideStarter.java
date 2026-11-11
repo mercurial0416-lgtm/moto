@@ -28,6 +28,10 @@ final class CardoRideStarter {
 
  static void cardoEvent(Context c,String mac,boolean connected){
   if(!CardoAutoRidePrefs.matches(c,mac))return;
+  boolean duplicate=CardoAutoRidePrefs.duplicatePresence(c,mac,connected);
+  if(duplicate)return;
+  ConnectionEventLog.record(c,CardoAutoRidePrefs.bikeId(c),
+   connected?ConnectionEventLog.Event.CARDO_CONNECTED:ConnectionEventLog.Event.CARDO_DISCONNECTED);
   if(!connected)CardoAutoRidePrefs.noteDisconnect(c,mac);
   else CardoAutoRidePrefs.notePresence(c,mac,true);
   // Update the already-running FGS directly. Android can reject starting a
@@ -45,16 +49,26 @@ final class CardoRideStarter {
    return;
   }
   // Do not consume the debounce slot until permissions and FGS conditions pass.
-  if(!eligible(c)){CardoAutoRidePrefs.status(c,"권한/GPS 설정 필요 · 알림에서 확인");notifyTap(c);return;}
+  if(!eligible(c)){
+   ConnectionEventLog.record(c,CardoAutoRidePrefs.bikeId(c),ConnectionEventLog.Event.PERMISSION_BLOCKED);
+   CardoAutoRidePrefs.status(c,"권한/GPS 설정 필요 · 알림에서 확인");notifyTap(c);return;
+  }
   if(Build.VERSION.SDK_INT>=29&&!MainActivity.obdVisible&&
      c.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+   ConnectionEventLog.record(c,CardoAutoRidePrefs.bikeId(c),ConnectionEventLog.Event.BACKGROUND_BLOCKED);
    CardoAutoRidePrefs.status(c,"백그라운드 위치 허용 안 됨 · 알림에서 시작");
+   notifyTap(c);return;
+  }
+  String bike=CardoAutoRidePrefs.bikeId(c);
+  if(!CardoStartHandshake.automaticAllowed(c,bike)){
+   CardoAutoRidePrefs.status(c,"자동 시작 제한/응답 대기 · 앱의 시작 알림으로 재시도");
    notifyTap(c);return;
   }
   boolean inRide=RideService.autoArmed||RideService.running;
   if(!CardoAutoRidePrefs.claim(c,mac,inRide))return;
   if(!start(c)){
    CardoAutoRidePrefs.releaseClaim(c,mac);
+   ConnectionEventLog.record(c,CardoAutoRidePrefs.bikeId(c),ConnectionEventLog.Event.ANDROID_BLOCKED);
    CardoAutoRidePrefs.status(c,"Android 백그라운드 시작 제한 · 알림으로 시작");
    notifyTap(c);
   }
@@ -63,18 +77,29 @@ final class CardoRideStarter {
   if(!eligible(c)||RideService.running||RideService.autoArmed)return false;
   String bike=CardoAutoRidePrefs.bikeId(c);
   String obd=BikeObdPreferences.address(c,bike);
-  if(!CardoAutoRidePrefs.forBike(c,bike)||!BikeObdPreferences.validAddress(obd))return false;
+  // Only explicitly selected GPS-only mode bypasses a physically registered
+  // adapter. Migrated legacy setups retain their original OBD-first behavior.
+  if(ConnectionSetupMode.explicit(c,bike)&&
+     ConnectionSetupMode.get(c,bike)==ConnectionSetupMode.Mode.CARDO_GPS&&
+     BikeObdPreferences.gpsFallbackEnabled(c,bike))obd="";
+  if(!CardoAutoRidePrefs.forBike(c,bike)||
+     (!BikeObdPreferences.validAddress(obd)&&!BikeObdPreferences.gpsFallbackEnabled(c,bike)))return false;
+  String token=CardoStartHandshake.request(c,bike);
+  if(token.isEmpty())return false;
   try{
    Intent i=new Intent(c,RideService.class).setAction(RideService.AUTO_ARM)
      .putExtra(RideService.EXTRA_BIKE_ID,bike)
      .putExtra(RideService.EXTRA_DEVICE,obd)
-     .putExtra(RideService.EXTRA_CARDO_TRIGGER,true);
+     .putExtra(RideService.EXTRA_CARDO_TRIGGER,true)
+     .putExtra(CardoStartHandshake.EXTRA_TOKEN,token);
    if(Build.VERSION.SDK_INT>=26)c.startForegroundService(i);
    else c.startService(i);
-   CardoAutoRidePrefs.status(c,"카르도 감지 → OBD 연결 시도 중");
-   cancelTap(c);
+   // startForegroundService only submits a request; RideService must ACK.
+   CardoAutoRidePrefs.status(c,"서비스 시작 요청 전송됨 · 실제 감시 준비 확인 중");
    return true;
-  }catch(RuntimeException ex){return false;}
+  }catch(RuntimeException ex){
+   CardoStartHandshake.rejected(c,bike,token);return false;
+  }
  }
  static void startFromTap(MainActivity a){startFromTap(a,false);}
  static void startFromTap(MainActivity a,boolean fromNotification){
@@ -85,8 +110,11 @@ final class CardoRideStarter {
   }
   if(!eligible(a)){a.toast("정확한 위치·주변 기기·알림 권한 및 GPS 확인");return;}
   if(RideService.autoArmed||RideService.running){a.toast("OBD 자동 감지가 이미 진행 중");cancelTap(a);return;}
-  if(!start(a))a.toast("OBD 시작 제한 · 차고에서 연결 설정을 확인해 주세요");
-  else a.toast("카르도 자동 라이딩 연결 시작 · 출발하면 GPS 기록");
+  if(CardoStartHandshake.pending(a,CardoAutoRidePrefs.bikeId(a))){
+   a.toast("서비스 준비 응답을 기다리는 중 · GPS 기록 시작 전");return;
+  }
+  if(!start(a))a.toast("자동기록 시작 제한 · 연결 도우미에서 권한과 방식 확인");
+  else a.toast("Android에 시작 요청 전송 · 실제 감시 준비 여부는 연결 상태에서 확인");
  }
  static void notifyTap(Context c){
   if(Build.VERSION.SDK_INT>=33&&c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
@@ -98,7 +126,7 @@ final class CardoRideStarter {
   PendingIntent action=PendingIntent.getActivity(c,595,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   Notification notice=new Notification.Builder(c,CHANNEL)
     .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-    .setContentTitle("카르도 연결 감지 · OBD 라이딩 시작")
+    .setContentTitle("카르도 연결 감지 · 자동기록 시작")
     .setContentText("Android 백그라운드 시작 제한 · 눌러서 자동기록 대기")
     .setVisibility(Notification.VISIBILITY_PRIVATE)
     .setAutoCancel(true).setContentIntent(action).build();

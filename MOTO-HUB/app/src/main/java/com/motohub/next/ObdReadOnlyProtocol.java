@@ -29,6 +29,29 @@ final class ObdReadOnlyProtocol {
   if("0131".equals(pid))return pid+"\r"; // standard distance since DTC clear
   throw new IllegalArgumentException("읽기 전용으로 허용되지 않은 요청입니다.");
  }
+ /** Diagnostic only: distinguish noisy adapters from disagreeing ECU responders.
+  * Return no responder identifier for a single normal ECU speed frame. */
+ static String speedReplyDiagnosis(String raw){
+  if(raw==null||raw.length()>2048)return "";
+  Matcher match=Pattern.compile("(?i)(?:^|[\\r\\n])\\s*([0-9a-f]{3}|[0-9a-f]{8})[ \\t]+(?:[0-9a-f]{2}[ \\t]+)?41[ \\t]*0D[ \\t]*([0-9a-f]{2})(?![0-9a-f])")
+   .matcher(raw);
+  java.util.Map<String,Integer> values=new java.util.LinkedHashMap<>();
+  while(match.find()){
+   String id=match.group(1).toUpperCase(Locale.ROOT);
+   int value=Integer.parseInt(match.group(2),16);
+   if(values.containsKey(id)&&values.get(id)!=value)
+    return "동일 ECU 응답 불일치 · 데이터 사용 보류";
+   values.put(id,value);
+  }
+  if(values.size()<2)return "";
+  Integer agreed=null;
+  for(int speed:values.values()){
+   if(agreed!=null&&agreed!=speed)
+    return "복수 ECU 속도 응답 불일치 ("+values.size()+"개) · 자동 기록 보류";
+   agreed=speed;
+  }
+  return "복수 ECU 속도 응답 일치 ("+values.size()+"개) · 참고";
+ }
  /** A mixed ECU reply is invalid: never let a corrupted speed arm GPS recording. */
  static int speedKmh(String raw){
   int[] bytes=responseBytes("010D",raw);

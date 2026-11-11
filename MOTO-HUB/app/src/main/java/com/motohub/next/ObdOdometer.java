@@ -66,6 +66,16 @@ final class ObdOdometer {
   return first==null?Double.NaN:first;
  }
 
+ /** Explicitly label a UDS negative response; it is NOT proof that an ODO exists. */
+ static String udsDiagnosis(String raw){
+  if(raw==null)return "응답 없음";
+  String compact=raw.toUpperCase(Locale.ROOT).replaceAll("[^0-9A-F]","");
+  if(compact.contains("7F2231"))return "UDS NRC 0x31 · 해당 DID 범위 미지원 가능";
+  if(compact.contains("7F2211"))return "UDS NRC 0x11 · 서비스 미지원";
+  if(compact.contains("7F2222"))return "UDS NRC 0x22 · 현재 조건에서 조회 불가";
+  if(compact.contains("7F2278"))return "UDS NRC 0x78 · 응답 대기/미완료";
+  return Double.isFinite(parseUdsKm(raw))?"UDS 누적거리 후보 수신 · 계기판 검증 필요":"UDS 누적거리 미확인";
+ }
  static String responseSummary(String raw) {
   if(raw==null||raw.trim().isEmpty())return "무응답";
   String s=raw.replaceAll("[\r\n\t]+"," ").trim();

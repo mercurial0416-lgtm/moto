@@ -2,7 +2,7 @@ package com.motohub.next;
 import android.app.*;import android.content.*;import android.content.pm.PackageManager;import android.content.pm.ServiceInfo;import android.location.*;import android.os.*;import java.io.*;import java.nio.charset.StandardCharsets;import java.util.UUID;import android.bluetooth.*;
 /** User-started location FGS. Local recording with explicit group sharing. No boot restart, network or mock positions. */
 public final class RideService extends Service implements LocationListener {
- static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id",EXTRA_CARDO_TRIGGER="cardo_trigger",CARDO_DISCONNECTED="com.motohub.next.CARDO_DISCONNECTED";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;static volatile long liveMovingMillis=0,liveStationaryMillis=0,lastWidgetRefreshElapsed=0;
+ static final String STOP="com.motohub.next.STOP_RIDE",AUTO_ARM="com.motohub.next.AUTO_RIDE_ARM",AUTO_DISARM="com.motohub.next.AUTO_RIDE_DISARM",EXTRA_DEVICE="device_address",EXTRA_BIKE_ID="ride_bike_id",EXTRA_CARDO_TRIGGER="cardo_trigger",CARDO_DISCONNECTED="com.motohub.next.CARDO_DISCONNECTED",RESUME_INTERRUPTED="com.motohub.next.RESUME_INTERRUPTED",MANUAL_GPS_WHILE_ARMED="com.motohub.next.MANUAL_GPS_WHILE_ARMED",EXTRA_INTERRUPTED_NAME="interrupted_track_name";static volatile boolean autoArmed=false;static volatile boolean running=false;static volatile String status="기록 꺼짐",active="";static volatile int count=0;static volatile long startedAt=0,startedElapsed=0,lastMotionElapsed=0;static volatile boolean stopSuggestionShown=false;static volatile double liveDistanceKm=0,liveSpeedKmh=0,livePeakKmh=0;static volatile long liveMovingMillis=0,liveStationaryMillis=0,lastWidgetRefreshElapsed=0;
  // Volatile display data only: neither ECU samples nor Bluetooth address are uploaded/stored.
  static volatile int obdSpeedKmh=-1,obdReconnects=0;
  static volatile long obdAverageLatencyMs=-1;
@@ -62,6 +62,12 @@ public final class RideService extends Service implements LocationListener {
   return s!=null&&running&&GpsSignalStatus.fresh(s.lastFixElapsed,SystemClock.elapsedRealtime());
  }
  static long gpsFixElapsed(){RideService s=instance;return s==null?0:s.lastFixElapsed;}
+ static boolean gpsParkingHeld(){RideService s=instance;return s!=null&&running&&s.gpsObdParkingHold;}
+ static float gpsAccuracyMeters(){
+  RideService s=instance;
+  Location fix=s==null?null:s.lastGood;
+  return fix!=null&&fix.hasAccuracy()&&gpsFresh()?fix.getAccuracy():Float.NaN;
+ }
  static boolean shareAllowed(){
   RideService s=instance;
   return s!=null&&running&&s.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED&&
@@ -119,23 +125,35 @@ public final class RideService extends Service implements LocationListener {
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="",activeAutoAdapterAddress="";ObdAutoSpeedMonitor obdMonitor;
  boolean cardoSession=false,cardoConnected=false,requestedCardoStart=false;
+ String pendingCardoToken="";
  boolean cardoGpsFallbackRecording=false,cardoGpsProbeRegistered=false;
+ int cardoGpsProbeFailures=0;
+ long cardoGpsRetryAt=0;
  final CardoGpsFallbackGate cardoGpsGate=new CardoGpsFallbackGate();
+ final GpsStationaryEvidence gpsStationaryEvidence=new GpsStationaryEvidence();
+ final java.util.concurrent.ConcurrentLinkedDeque<Location> cardoGpsPreroll=new java.util.concurrent.ConcurrentLinkedDeque<>();
+ boolean prerollReplaying=false;
  Location cardoGpsPrevious=null;
  // Do not power GPS during a healthy OBD wait. A lightweight 12-second
  // handler checks whether ECU speed has gone stale before opening GPS.
  final Runnable cardoGpsProbeWake=new Runnable(){public void run(){
   if(!cardoSession||!autoArmed||running||autoFinishPending||
      !BikeObdPreferences.gpsFallbackEnabled(RideService.this,pendingBikeId))return;
-  if(!ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,SystemClock.elapsedRealtime())
-     &&!cardoGpsProbeRegistered){
+  long now=SystemClock.elapsedRealtime();
+  if(!ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now)
+     &&!cardoGpsProbeRegistered&&now>=cardoGpsRetryAt){
    try{
     requestGpsUpdatesChecked();
     cardoGpsProbeRegistered=true;
+    cardoGpsProbeFailures=0;cardoGpsRetryAt=0;
     status="OBD 속도 미수신 · 5분 한정 GPS 안전망 이동 감지";
     notifySafely(status);
    }catch(Exception error){
-    status="GPS 안전망 위치 사용 제한 · OBD 연결은 계속 대기";
+    ConnectionEventLog.record(RideService.this,pendingBikeId,ConnectionEventLog.Event.GPS_PERMISSION_BLOCKED);
+    cardoGpsProbeFailures=Math.min(8,cardoGpsProbeFailures+1);
+    long delay=Math.min(60_000L,5_000L*(1L<<Math.min(4,cardoGpsProbeFailures-1)));
+    cardoGpsRetryAt=now+delay;
+    status="GPS 안전망 위치 제한 · "+(delay/1000)+"초 뒤 재시도 · OBD 대기 유지";
     notifySafely(status);
    }
   }
@@ -147,8 +165,9 @@ public final class RideService extends Service implements LocationListener {
   if(!cardoGpsFallbackRecording||!running||autoFinishPending)return;
   long now=SystemClock.elapsedRealtime();
   long idleLimit=cardoConnected?600_000L:300_000L;
-  boolean stationaryGps=GpsSignalStatus.fresh(lastFixElapsed,now);
+  boolean stationaryGps=gpsStationaryEvidence.confirmed(now);
   boolean stationaryEcu=obdSpeedKmh>=0&&obdSpeedKmh<=2&&
+    ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now)&&
     parkingIsolation.observedParking(now);
   if((stationaryGps||stationaryEcu)&&lastMotionElapsed>0&&
      now>=lastMotionElapsed&&now-lastMotionElapsed>=idleLimit){
@@ -226,7 +245,9 @@ public final class RideService extends Service implements LocationListener {
   }
  }};
  volatile boolean finishPending=false,autoFinishPending=false;
- final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)
+ final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;
+  if(autoArmed)RidePowerAudit.sample(RideService.this,pendingBikeId);
+  if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)
    &&!(cardoSession&&CardoAutoRidePrefs.forBike(RideService.this,pendingBikeId))
    &&(!BikeObdPreferences.autoRideEnabled(RideService.this,pendingBikeId)
        ||!BikeObdPreferences.address(RideService.this,pendingBikeId).equals(activeAutoAdapterAddress))){
@@ -312,12 +333,58 @@ public final class RideService extends Service implements LocationListener {
    return START_NOT_STICKY;
   }
   try{
+   if(MANUAL_GPS_WHILE_ARMED.equals(action)){
+    // Explicit user rescue while automatic OBD/Cardo is armed, not another
+    // auto-trigger. Never overwrite, delete or claim an existing GPS track.
+    if(running||!autoArmed||autoFinishPending||finishPending)return START_NOT_STICKY;
+    if(!RideBikeBinding.valid(pendingBikeId)||!pendingBikeId.equals(activeRideBikeId)){
+     status="자동 감지 바이크 식별 불일치 · GPS 시작하지 않음";
+     notifySafely(status);return START_NOT_STICKY;
+    }
+    try{
+     prepareForeground(false);
+     if(manager!=null&&cardoGpsProbeRegistered){
+      try{manager.removeUpdates(this);}catch(RuntimeException ignored){}
+      cardoGpsProbeRegistered=false;
+     }
+     cardoGpsPreroll.clear();cardoGpsPrevious=null;cardoGpsGate.reset();
+     cardoGpsFallbackRecording=false;handler.removeCallbacks(cardoGpsStopWatch);
+     openRideTrack();
+     requestGpsUpdatesChecked();
+     handler.removeCallbacks(cardoIdleStop);
+     handler.removeCallbacks(cardoGpsProbeWake);
+     status="사용자가 GPS 기록 수동 시작 · OBD 자동 감지 유지";
+     ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.GPS);
+     notifySafely(status);
+    }catch(Exception error){
+     stopWith("수동 GPS 기록 시작 실패 · 원본 보존: "+
+      (error.getMessage()==null?"설정 확인":error.getMessage()),false);
+    }
+    return START_NOT_STICKY;
+   }
+   if(RESUME_INTERRUPTED.equals(action)){
+    if(running||autoArmed)return START_NOT_STICKY;
+    try{
+     File old=RideResumePolicy.source(getFilesDir(),intent.getStringExtra(EXTRA_INTERRUPTED_NAME),System.currentTimeMillis());
+     String uuid=RideActiveSessionPolicy.session(old.getName());
+     pendingBikeId=RideBikeBinding.readStrict(old);
+     activeRideBikeId=RideBikeBinding.valid(pendingBikeId)?pendingBikeId:"";
+     prepareForeground(false);openRideTrack(uuid);requestGpsUpdatesChecked();
+     handler.postDelayed(permissionCheck,5000L);
+     status="중단 이전 원본 보존 · 같은 세션으로 새 GPS 구간 기록";
+     notifySafely(status);
+    }catch(Exception error){stopWith("GPS 이어 기록 실패 · 원본 보존: "+
+     (error.getMessage()==null?"확인 필요":error.getMessage()),false);}
+    return START_NOT_STICKY;
+   }
    if(AUTO_ARM.equals(action)){
     if(running||autoArmed)return START_NOT_STICKY;
     pendingBikeId=intent.getStringExtra(EXTRA_BIKE_ID);
     if(!RideBikeBinding.valid(pendingBikeId)){stopWith("등록된 바이크를 선택한 뒤 OBD 기록을 켜 주세요.",false);return START_NOT_STICKY;}
     activeRideBikeId=pendingBikeId;
     requestedCardoStart=intent.getBooleanExtra(EXTRA_CARDO_TRIGGER,false);
+    pendingCardoToken=requestedCardoStart?
+     intent.getStringExtra(CardoStartHandshake.EXTRA_TOKEN):"";
     armAutomaticRide(intent.getStringExtra(EXTRA_DEVICE));return START_NOT_STICKY;
    }
    if(running||autoArmed)return START_NOT_STICKY;
@@ -353,15 +420,18 @@ public final class RideService extends Service implements LocationListener {
   else if(Build.VERSION.SDK_INT>=29)startForeground(404,n,ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
   else startForeground(404,n);
  }
- private synchronized void openRideTrack()throws Exception{
+ private synchronized void openRideTrack()throws Exception{openRideTrack(null);}
+ private synchronized void openRideTrack(String priorSession)throws Exception{
   // Must be checked here as well as the UI: OBD auto-start has no foreground confirmation screen.
   GpsStorageSpacePolicy.require(getFilesDir());
-  activeRideSession=UUID.randomUUID().toString();
+  activeRideSession=RideResumePolicy.validSession(priorSession)?priorSession:UUID.randomUUID().toString();
   track=new File(TrackFile.directory(getFilesDir()),System.currentTimeMillis()+"-"+activeRideSession+".track");
+  if(!track.createNewFile())throw new IOException("이미 같은 이름의 GPS 기록이 있습니다 · 원본 보호");
   output=new FileOutputStream(track);
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
   catch(IOException error){output.close();output=null;track.delete();throw error;}
   count=0;segmentPoints=0;completedSegments=0;lastTime=0;lastFixElapsed=0;lastGood=null;gpsSync.reset();
+  gpsStationaryEvidence.reset();
   lastStorageCheckElapsed=-60_000L;lowStorageWarned=false;
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);gpsSyncScheduled=false;
   startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;liveMovingMillis=0;liveStationaryMillis=0;lastWidgetRefreshElapsed=0;gpsOnlyAfterObd=false;
@@ -379,14 +449,35 @@ public final class RideService extends Service implements LocationListener {
    boolean bikeApproved=BikeObdPreferences.autoRideEnabled(this,pendingBikeId)
      &&address!=null&&address.equalsIgnoreCase(BikeObdPreferences.address(this,pendingBikeId));
    boolean cardoApproved=requestedCardoStart&&CardoAutoRidePrefs.forBike(this,pendingBikeId)
-     &&address!=null&&address.equalsIgnoreCase(BikeObdPreferences.address(this,pendingBikeId));
+     &&((BikeObdPreferences.validAddress(address)&&address.equalsIgnoreCase(BikeObdPreferences.address(this,pendingBikeId)))
+       ||(!BikeObdPreferences.validAddress(address)&&BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)));
    if(!developerApproved&&!bikeApproved&&!cardoApproved)
-    throw new SecurityException("바이크 설정에서 이 동글의 OBD 자동 라이딩을 먼저 동의해 주세요.");
-   if(address==null||!BluetoothAdapter.checkBluetoothAddress(address))throw new IllegalArgumentException("OBD2 어댑터를 다시 선택해 주세요.");
+    throw new SecurityException("바이크 설정에서 자동 라이딩을 먼저 동의해 주세요.");
+   boolean cardoGpsOnly=cardoApproved&&!BikeObdPreferences.validAddress(address)&&
+     BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId);
+   if(!cardoGpsOnly&&(address==null||!BluetoothAdapter.checkBluetoothAddress(address)))
+    throw new IllegalArgumentException("OBD2 어댑터를 다시 선택해 주세요.");
    if(Build.VERSION.SDK_INT>=31&&checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("Bluetooth 연결 권한이 필요합니다.");
    BluetoothManager bluetooth=getSystemService(BluetoothManager.class);
    BluetoothAdapter adapter=bluetooth==null?null:bluetooth.getAdapter();
    if(adapter==null||!adapter.isEnabled())throw new IllegalStateException("Bluetooth를 켜 주세요.");
+   if(cardoGpsOnly){
+    // Cardo + GPS fallback was explicitly permitted; no invented ECU data.
+    Sharing.stop();cardoSession=true;cardoConnected=true;
+    cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
+    cardoGpsProbeFailures=0;cardoGpsRetryAt=0;
+    cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();prerollReplaying=false;gpsStationaryEvidence.reset();parkingIsolation.reset();autoGate.reset();
+    prepareForeground(true);autoArmed=true;obdMonitor=null;activeAutoAdapterAddress="";
+    RidePowerAudit.begin(this,pendingBikeId);
+    obdLink="OBD 미등록 · GPS 단독 안전망";obdSpeedKmh=-1;obdLastSampleElapsed=0;
+    ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.CARDO_GPS);
+    handler.postDelayed(permissionCheck,5000L);
+    handler.postDelayed(cardoGpsProbeWake,1000L);
+    handler.postDelayed(cardoIdleStop,CardoStandbyPolicy.idleWindowMs(true));
+    status="카르도 연결 · GPS 이동 검증 대기 (OBD 없이)";notifySafely(status);
+    CardoStartHandshake.armed(this,pendingBikeId,pendingCardoToken,true);
+    return;
+   }
    BluetoothDevice paired=null;
    for(BluetoothDevice d:adapter.getBondedDevices())if(address.equals(d.getAddress())){paired=d;break;}
    if(paired==null)throw new SecurityException("이미 페어링된 OBD2 장치만 사용할 수 있습니다.");
@@ -394,11 +485,14 @@ public final class RideService extends Service implements LocationListener {
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
    cardoSession=cardoApproved;cardoConnected=cardoApproved;
    cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
-   cardoGpsPrevious=null;cardoGpsGate.reset();
+   cardoGpsProbeFailures=0;cardoGpsRetryAt=0;
+   cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    parkingIsolation.reset();gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
+   RidePowerAudit.begin(this,pendingBikeId);
+   ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.CONNECTING);
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;obdFuelPercent=Double.NaN;obdFuelAt=0;
    obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=1;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
    obdPidSupport="표준 지원 PID 확인 중 · ODO 미검증";
@@ -429,8 +523,13 @@ public final class RideService extends Service implements LocationListener {
       obdAverageLatencyMs=averageMs;obdQueryFailures=failures;
      }});
     }
-    @Override public void speed(int kmh){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
-     long elapsed=SystemClock.elapsedRealtime();
+    @Override public void speed(int kmh){
+     // Preserve the worker's receipt time; a busy UI looper must not make old
+     // speed data look fresh or count delayed callbacks as a new acceleration.
+     final long receivedAt=SystemClock.elapsedRealtime();
+     handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
+     if(!ObdTelemetryFreshness.speedFresh(receivedAt,SystemClock.elapsedRealtime()))return;
+     long elapsed=receivedAt;
       if(!speedSanity.accept(kmh,elapsed)){
        autoGate.connectionLost();obdLastError="OBD2 속도 급변값 무시 · 자동 출발 보류";
        return;
@@ -441,6 +540,8 @@ public final class RideService extends Service implements LocationListener {
       if(cardoSession&&cardoGpsProbeRegistered&&!running){
        if(manager!=null)try{manager.removeUpdates(RideService.this);}catch(Exception ignored){}
        cardoGpsProbeRegistered=false;cardoGpsPrevious=null;cardoGpsGate.reset();
+       // Keep a bounded recent prefix until a verified ECU-speed start.
+       // It is not permitted to become motorcycle ODO or maintenance km.
       }
        boolean heldBefore=gpsObdParkingHold;
        parkingIsolation.onSpeed(kmh,elapsed);
@@ -454,8 +555,11 @@ public final class RideService extends Service implements LocationListener {
          gpsObdHoldStarted=-1;
         }
        }
-      if(obdSpeedSamples==1)ObdLocalDiagnosticLog.record(RideService.this,"SENSOR_OK");
-      handleAutoSpeed(kmh);
+      if(obdSpeedSamples==1){
+       ObdLocalDiagnosticLog.record(RideService.this,"SENSOR_OK");
+       ObdAutoRideProgress.stage(RideService.this,pendingBikeId,ObdAutoRideProgress.Stage.SPEED);
+      }
+      handleAutoSpeed(kmh,elapsed);
     }});}
     @Override public void telemetry(String pid,double value){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
      long now=SystemClock.elapsedRealtime();
@@ -479,6 +583,7 @@ public final class RideService extends Service implements LocationListener {
      parkingIsolation.onLinkConnected();
      obdLink="연결됨 · 차량 데이터 읽기 전용";MotoWidgetProvider.refresh(RideService.this);
       ObdLocalDiagnosticLog.record(RideService.this,"BT_OK");obdConnectionSuccesses++;
+      ObdAutoRideProgress.stage(RideService.this,pendingBikeId,ObdAutoRideProgress.Stage.CONNECTED);
      if(!running)status="OBD2 연결됨 · 출발 대기";
     }});}
     @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
@@ -495,6 +600,7 @@ public final class RideService extends Service implements LocationListener {
       handler.removeCallbacks(finishParkedObdLoss);
       handler.postDelayed(finishParkedObdLoss,Math.max(1,remaining));
      }
+     ObdAutoRideProgress.stage(RideService.this,pendingBikeId,ObdAutoRideProgress.Stage.RETRYING);
      obdReconnects=attempt;speedSanity.reset();ObdLocalDiagnosticLog.record(RideService.this,"RECONNECT");obdSpeedKmh=-1;obdLastSampleElapsed=0;
      obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;
      obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
@@ -508,14 +614,19 @@ public final class RideService extends Service implements LocationListener {
    ref[0]=reader;obdMonitor=reader;
    ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    reader.start();handler.postDelayed(permissionCheck,5000);
-   if(cardoSession){handler.removeCallbacks(cardoIdleStop);handler.postDelayed(cardoIdleStop,300_000L);}
+   if(cardoSession)CardoStartHandshake.armed(this,pendingBikeId,pendingCardoToken,false);
+   if(cardoSession){handler.removeCallbacks(cardoIdleStop);handler.postDelayed(cardoIdleStop,CardoStandbyPolicy.idleWindowMs(
+    BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)));}
    if(cardoSession&&BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)){
     handler.removeCallbacks(cardoGpsProbeWake);
     handler.postDelayed(cardoGpsProbeWake,5_000L);
     status="OBD 속도 우선 대기 · 미수신 시만 GPS 안전망 준비";
     notifySafely(status);
    }
-  }catch(Exception e){stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);}
+  }catch(Exception e){
+   CardoStartHandshake.rejected(this,pendingBikeId,pendingCardoToken);
+   stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);
+  }
  }
  private void startCardoGpsFallbackRide(){
   if(!cardoSession||!autoArmed||running||autoFinishPending||finishPending||
@@ -531,20 +642,40 @@ public final class RideService extends Service implements LocationListener {
    openRideTrack();
    if(!cardoGpsProbeRegistered)requestGpsUpdatesChecked();
    cardoGpsFallbackRecording=true;
+   flushActualGpsPreroll(45_000L);
    handler.removeCallbacks(cardoGpsProbeWake);
    handler.removeCallbacks(cardoIdleStop);
    handler.removeCallbacks(cardoGpsStopWatch);
    handler.postDelayed(cardoGpsStopWatch,30_000L);
    status="OBD 속도 미수신 · GPS 이동 검증 후 로컬 기록 중";
    ObdLocalDiagnosticLog.record(this,"GPS_STARTED");
+   ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.GPS);
    notifySafely(status);
   }catch(Exception e){
    stopWith("GPS 안전망 기록 시작 실패 · 원본 보존: "+e.getMessage(),false);
   }finally{RestoreRideGate.endRideStart();}
  }
- private void handleAutoSpeed(int speedKmh){
+ /** Replays real, timestamped GPS fixes on the ordered disk thread.
+  * No interpolated coordinates and no old phone-walking history. */
+ private void flushActualGpsPreroll(long maxAgeMs){
+  if(gpsWriteHandler==null)return;
+  long now=SystemClock.elapsedRealtimeNanos()/1_000_000L;
+  final java.util.ArrayList<Location> real=new java.util.ArrayList<>();
+  for(Location fix:cardoGpsPreroll){
+   long age=now-fix.getElapsedRealtimeNanos()/1_000_000L;
+   if(age>=0&&age<=maxAgeMs)real.add(new Location(fix));
+  }
+  cardoGpsPreroll.clear();
+  if(real.isEmpty())return;
+  gpsWriteHandler.postAtFrontOfQueue(()->{
+   prerollReplaying=true;
+   try{for(Location fix:real)if(running)onLocationChanged(fix);}
+   finally{prerollReplaying=false;}
+  });
+ }
+ private void handleAutoSpeed(int speedKmh,long receivedAt){
   if(!autoArmed||autoFinishPending||finishPending)return;
-  long now=SystemClock.elapsedRealtime();
+  long now=receivedAt;
   ObdRideAutoGate.Event event=autoGate.accept(speedKmh,now);
   obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
   if(event==ObdRideAutoGate.Event.START){
@@ -562,8 +693,12 @@ public final class RideService extends Service implements LocationListener {
     // Re-check after obtaining the process-wide write/start reservation.
     if(!autoArmed||running||autoFinishPending)return;
     openRideTrack();requestGpsUpdatesChecked();
+    // The GPS probe may already have measured the initial road segment
+    // before the ECU delivered three independent speed samples.
+    if(cardoSession)flushActualGpsPreroll(15_000L);
     if(cardoSession)handler.removeCallbacks(cardoIdleStop);
     status="OBD2 출발 감지 · GPS 기록 중";ObdLocalDiagnosticLog.record(this,"GPS_STARTED");
+    ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.GPS);
    }catch(Exception e){stopWith("GPS 자동 기록 시작 실패: "+e.getMessage(),false);return;}
    finally{RestoreRideGate.endRideStart();}
   }else if(event==ObdRideAutoGate.Event.FINISH){finishAutoTrack();}
@@ -627,22 +762,30 @@ public final class RideService extends Service implements LocationListener {
   HandlerThread worker=gpsIoThread;
   if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
    boolean verified=closeTrack(true);
+   RideSessionVerification.Result whole=verified?
+    RideSessionVerification.verify(getFilesDir(),savedTrack,completedSegments,count,liveDistanceKm):
+    RideSessionVerification.fail("마지막 GPS 구간 검증 실패 · 원본 보존");
    RideCaptureHealth.finished(getApplicationContext(),verified,count);
    if(verified)RideCompletionInbox.record(getApplicationContext(),savedTrack);
    // Reconcile previous sections in the derived GPS ledger, never the vehicle ODO.
    if(verified&&completedSegments>0)new Thread(()->{
     try{RideMileageEstimate.rebuild(getApplicationContext());}catch(IOException ignored){}
    },"moto-rollover-distance-reconcile").start();
-   handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,verified);});
+   handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,verified,whole);});
   })){
-   completeAutoTrack(savedTrack,closeTrack(true));
+   // If the GPS disk worker is unavailable, preserve the original and don't
+   // assert the session is proven without a full readback.
+   completeAutoTrack(savedTrack,closeTrack(true),
+    RideSessionVerification.fail("GPS 검증 스레드 이용 불가 · 전체 구간 미확인"));
   }
  }
- private void completeAutoTrack(File savedTrack,boolean verified){
+ private void completeAutoTrack(File savedTrack,boolean verified,RideSessionVerification.Result whole){
+  // Mark setup verified only after all parts of one session were read back.
+  FirstRideSetupProof.reportSessionCompletion(this,pendingBikeId,savedTrack,verified,count,liveDistanceKm,whole);
   autoFinishPending=false;running=false;
   // Reset recording after the stored ride; new movement can start a new track.
   autoGate.reset();parkingIsolation.reset();
-  cardoGpsFallbackRecording=false;cardoGpsPrevious=null;cardoGpsGate.reset();
+  cardoGpsFallbackRecording=false;cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();
   handler.removeCallbacks(cardoGpsStopWatch);
   synchronized(this){gpsObdParkingHold=false;gpsObdHoldStarted=-1;gpsObdResumeSplit=false;}
   if(cardoSession){
@@ -659,7 +802,8 @@ public final class RideService extends Service implements LocationListener {
     return;
    }
    handler.removeCallbacks(cardoIdleStop);
-   handler.postDelayed(cardoIdleStop,300_000L);
+   handler.postDelayed(cardoIdleStop,CardoStandbyPolicy.idleWindowMs(
+    BikeObdPreferences.gpsFallbackEnabled(this,pendingBikeId)));
   }
   if(finishPending){
    finishPending=false;
@@ -676,6 +820,7 @@ public final class RideService extends Service implements LocationListener {
    return;
   }
   status=verified?"자동 라이딩 저장 완료 · 다음 출발 감지 대기":"자동 라이딩 저장 검증 실패 · 기록을 복구 화면에서 확인해 주세요";
+  ObdAutoRideProgress.stage(this,pendingBikeId,verified?ObdAutoRideProgress.Stage.SAVED:ObdAutoRideProgress.Stage.FAILED);
   if(verified&&savedTrack!=null&&savedTrack.isFile()&&count>=2){
    new Thread(()->{try{RideInsights.Result summary=RideInsights.analyze(savedTrack);
     handler.post(()->{if(autoArmed&&!running){status=String.format(java.util.Locale.KOREA,
@@ -699,6 +844,8 @@ public final class RideService extends Service implements LocationListener {
   // No guessing: do not finish or split a moving ride when Bluetooth fails.
   // Keep an already-running GPS session in the same foreground service until its
   // user explicitly ends it. Never auto-arm again or enable group sharing.
+  ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.FAILED);
+  ConnectionEventLog.record(this,pendingBikeId,ConnectionEventLog.Event.OBD_LOST);
   ObdLocalDiagnosticLog.automaticSession(this,obdConnectionAttempts,
    obdConnectionSuccesses,obdReconnects,obdQueryFailures,obdSpeedSamples,reason);
   obdLastError="OBD2 · "+reason;
@@ -847,6 +994,11 @@ public final class RideService extends Service implements LocationListener {
     cardoGpsGate.reset();cardoGpsPrevious=null;return;
    }
    Location old=cardoGpsPrevious;cardoGpsPrevious=new Location(location);
+   cardoGpsPreroll.addLast(new Location(location));
+   long newest=location.getElapsedRealtimeNanos()/1_000_000L;
+   while(!cardoGpsPreroll.isEmpty()&&(cardoGpsPreroll.size()>20||
+     newest-cardoGpsPreroll.peekFirst().getElapsedRealtimeNanos()/1_000_000L>45_000L))
+    cardoGpsPreroll.removeFirst();
    if(old!=null){
     long gapMs=(location.getElapsedRealtimeNanos()-old.getElapsedRealtimeNanos())/1_000_000L;
     float metres=location.distanceTo(old);
@@ -857,8 +1009,10 @@ public final class RideService extends Service implements LocationListener {
    return;
   }
   if(!running||output==null||!checkRuntimeStorage())return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
-  if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
+  if(location.isFromMockProvider()||age<0||age>(prerollReplaying?50_000_000_000L:30_000_000_000L)||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
+  gpsStationaryEvidence.accept(location.getElapsedRealtimeNanos()/1_000_000L,
+   location.getLatitude(),location.getLongitude(),location.getAccuracy());
   try{
    // Never bridge an OBD-stationary gap (or walking) as traveled motorcycle km.
    if(gpsObdResumeSplit){
@@ -939,6 +1093,8 @@ public final class RideService extends Service implements LocationListener {
  }}
  @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p))handler.post(()->{if(!running)return;status="GPS 복귀 · 좌표 대기";notifySafely(status);});} @Override public void onStatusChanged(String p,int s,Bundle b){}
  void stopWith(String message,boolean completed){
+  if((running||autoArmed)&&RideBikeBinding.valid(pendingBikeId))
+   ConnectionEventLog.categorizeStop(this,pendingBikeId,message);
   RideCaptureHealth.failedIfActive(this,message);
   status=message;cleanup(completed);stopSelf();
  }
@@ -962,6 +1118,10 @@ public final class RideService extends Service implements LocationListener {
   return verified;
  }
  synchronized void cleanup(boolean completed){
+  CardoStartHandshake.rejected(this,pendingBikeId,pendingCardoToken);
+  CardoStartHandshake.stopped(this,pendingBikeId,pendingCardoToken);
+  pendingCardoToken="";
+  RidePowerAudit.finish(this,pendingBikeId);
   // Stop the independent space watchdog before closing any GPS writer.
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(storageWatchdog);
   // Invalidate queued main-thread finalization callbacks after failures or process teardown.
@@ -971,7 +1131,7 @@ public final class RideService extends Service implements LocationListener {
   handler.removeCallbacks(cardoGpsProbeWake);
   cardoSession=false;cardoConnected=false;requestedCardoStart=false;
   cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
-  cardoGpsPrevious=null;cardoGpsGate.reset();parkingIsolation.reset();
+  cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();parkingIsolation.reset();
   gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
   Sharing.stop();autoArmed=false;activeRideBikeId="";activeAutoAdapterAddress="";obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";

@@ -22,7 +22,18 @@ public final class CardoBluetoothReceiver extends BroadcastReceiver {
    if(device==null)return;
    String address=device.getAddress();
    if(!CardoAutoRidePrefs.matches(c,address))return;
-   CardoRideStarter.cardoEvent(c,address,BluetoothDevice.ACTION_ACL_CONNECTED.equals(action));
+   if(BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)){
+    CardoRideStarter.cardoEvent(c,address,true);
+   }else{
+    // A transient ACL down can race A2DP/Headset profile changes.
+    // A current connected audio profile is stronger evidence than this event.
+    Context app=c.getApplicationContext();
+    CardoConnectionProbe.probe(app,address,result->{
+     if(!CardoAutoRidePrefs.matches(app,address))return;
+     if(result!=CardoConnectionProbe.Status.CONNECTED)
+      CardoRideStarter.cardoEvent(app,address,false);
+    });
+   }
   }catch(SecurityException ignored){}
  }
 }

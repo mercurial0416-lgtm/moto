@@ -14,6 +14,7 @@ final class ObdMileageUiState {
   return Source.UNAVAILABLE;
  }
  static final long RECENT_COUNTER_MS=20L*60_000L;
+ static final long RECENT_ECU_MS=30L*60_000L;
  static boolean recentCounter(long receivedAt,long now){
   return receivedAt>0&&now>=receivedAt&&now-receivedAt<=RECENT_COUNTER_MS;
  }
@@ -25,13 +26,18 @@ final class ObdMileageUiState {
   double ecu=OdometerAutoSyncInbox.pending(c,bikeId);
   DtcOdoBridge.Reading dtc=DtcOdoBridge.snapshot(c,bikeId);
   HybridOdometerEstimate.Reading gps=HybridOdometerEstimate.snapshot(c,bikeId);
-  boolean dtcRecent=dtc.valid&&recentCounter(dtc.lastAt,System.currentTimeMillis());
-  Source selected=choose(OdoAutoSyncPolicy.sane(ecu),dtcRecent,gps.valid);
+  long now=System.currentTimeMillis();
+  long ecuAt=OdometerAutoSyncInbox.pendingReceivedAt(c,bikeId);
+  boolean ecuRecent=OdoAutoSyncPolicy.sane(ecu)&&recentCounter(ecuAt,now)
+    &&now-ecuAt<=RECENT_ECU_MS;
+  boolean dtcRecent=dtc.valid&&recentCounter(dtc.lastAt,now);
+  Source selected=choose(ecuRecent,dtcRecent,gps.valid);
   switch(selected){
    case ECU_VERIFIED:return "ECU 실제 ODO 검증값 "+km(ecu)+" · 차고 확인 대기";
    case PID_0131_ESTIMATE:return "PID 0131 추정 "+km(dtc.estimatedKm);
    case GPS_ESTIMATE:return "GPS 주행거리 추정 "+km(gps.estimatedKm)+(dtc.valid&&!dtcRecent?" · 0131 장시간 미수신":"");
-   default:return dtc.valid?"PID 0131 마지막 확인 "+km(dtc.estimatedKm)+" · 20분 이상 미수신 (현재값 미확인)":"자동 연동값 없음 · 계기판 기준값 등록 필요";
+   default:if(OdoAutoSyncPolicy.sane(ecu))return "ECU ODO 마지막 확인 "+km(ecu)+" · 수신 30분 초과 (현재값 아님)";
+    return dtc.valid?"PID 0131 마지막 확인 "+km(dtc.estimatedKm)+" · 20분 이상 미수신 (현재값 미확인)":"자동 연동값 없음 · 계기판 기준값 등록 필요";
   }
  }
  static String details(Context c,String bikeId,double garageKm){
@@ -40,6 +46,11 @@ final class ObdMileageUiState {
     "계기판 직접 확인 기록: "+km(garageKm):
     "계기판 직접 확인 기록 없음";
   String real=OdometerAutoSyncInbox.display(c,bikeId);
+  long ecuAt=OdometerAutoSyncInbox.pendingReceivedAt(c,bikeId);
+  if(OdoAutoSyncPolicy.sane(OdometerAutoSyncInbox.pending(c,bikeId)))
+   real+=recentCounter(ecuAt,System.currentTimeMillis())&&
+    System.currentTimeMillis()-ecuAt<=RECENT_ECU_MS?
+    " · 최근 ECU 수신":" · 오래된 ECU 값, 현재 ODO 아님";
   DtcOdoBridge.Reading dtc=DtcOdoBridge.snapshot(c,bikeId);
   String dtcLine=dtc.enabled?DtcOdoBridge.label(c,bikeId):
     "PID 0131 보조: 기준값 미설정";

@@ -15,9 +15,14 @@ final class CardoGpsFallbackGate {
    reset();return false;
   }
   double kmh=distanceMetres*3600.0/gapMs;
-  if(kmh<12||kmh>160){reset();return false;}
+  if(kmh<8||kmh>160){reset();return false;}
+  // Low-speed launches need longer, GPS-accurate evidence so a walking phone
+  // or a stationary jitter cluster cannot easily trigger a motorcycle ride.
+  if(kmh<12&&(previousAccuracy>10||accuracy>10)){reset();return false;}
   segments++;metres+=distanceMetres;spanMs+=gapMs;
-  if(segments>=3&&metres>=70&&spanMs>=10000){reset();return true;}
+  boolean lowSpeed=kmh<12;
+  if(segments>=(lowSpeed?5:3)&&metres>=(lowSpeed?95:70)&&
+     spanMs>=(lowSpeed?30_000:10_000)){reset();return true;}
   return false;
  }
 }

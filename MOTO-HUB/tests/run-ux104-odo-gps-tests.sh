@@ -18,7 +18,8 @@ developer=(p/"DeveloperObdScreen.java").read_text()
 assert 'odoSupport=capabilities.forPid("01A6")' in monitor
 assert 'ObdOdoPollPolicy.shouldProbe' in monitor
 policy=(p/"ObdOdoPollPolicy.java").read_text()
-assert 'speedKmh==0&&speedPolls>=8' in policy and '!directProbeAttempted' in policy
+assert 'if(speedKmh!=0)return false;' in policy and '!directProbeAttempted&&speedPolls>=8' in policy
+assert 'if(support==ObdPidCapabilities.Support.NO)return false;' in policy
 assert 'listener.allowOdometer()' in monitor
 assert 'OdoAutoSyncPolicy.consistent(a,b)' in monitor
 assert 'listener.odometer(verified)' in monitor

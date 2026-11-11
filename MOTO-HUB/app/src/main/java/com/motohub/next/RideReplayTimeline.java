@@ -40,6 +40,20 @@ final class RideReplayTimeline {
   return low;
  }
 
+ /** Read-only recorded-time cursor: never writes synthesized GPS points. */
+ static long targetTime(List<Long> times,int progress){
+  if(times==null||times.isEmpty())return 0;
+  long first=times.get(0),last=times.get(times.size()-1);
+  if(first<=0||last<first)return 0;
+  int at=Math.max(0,Math.min(MAX_PROGRESS,progress));
+  return first+(long)((last-first)*(at/(double)MAX_PROGRESS));
+ }
+ /** Never interpolate a GPS outage or an unrelated segmented track. */
+ static double fraction(long previous,long next,long target,boolean sameSection){
+  if(!sameSection||previous<=0||next<=previous||
+    next-previous>RideMotionGate.MAX_CONTINUOUS_FIX_MS)return 0;
+  return Math.max(0.0,Math.min(1.0,(target-previous)/(double)(next-previous)));
+ }
  /** Replay preserves relative recorded intervals, compressed to an accessible 30-180 second preview. */
  static long durationMs(List<Long> times){
   if(times==null||times.size()<2)return 30_000;

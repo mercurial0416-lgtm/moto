@@ -27,7 +27,9 @@ public final class RideMapActivity extends Activity {
  private List<Long> replayTimes=Collections.emptyList();
  private List<Integer> replaySections=Collections.emptyList();
  private final Handler replayHandler=new Handler(Looper.getMainLooper());
- private boolean replayPlaying=false;
+ private boolean replayPlaying=false,replayFollow=true;
+ private double replayRate=1.0;
+ private Button replaySpeedButton,replayFollowButton;
  private long replayStartedElapsed=0,replayRemainingDurationMs=30_000;
  private int replayStartProgress=0;
  private final Runnable replayTick=new Runnable(){@Override public void run(){
@@ -45,7 +47,19 @@ public final class RideMapActivity extends Activity {
  private void moveReplayMarker(int progress){
   int index=RideReplayTimeline.indexAt(replayTimes,progress);
   if(!alive||replayMarker==null||index<0||index>=replayPoints.size()||map==null)return;
-  replayMarker.setPosition(replayPoints.get(index));
+  GeoPoint position=replayPoints.get(index);
+  if(index+1<replayPoints.size()){
+   double alpha=RideReplayTimeline.fraction(replayTimes.get(index),
+    replayTimes.get(index+1),RideReplayTimeline.targetTime(replayTimes,progress),
+    replaySections.get(index).equals(replaySections.get(index+1)));
+   if(alpha>0){
+    GeoPoint next=replayPoints.get(index+1);
+    position=new GeoPoint(position.getLatitude()+(next.getLatitude()-position.getLatitude())*alpha,
+     position.getLongitude()+(next.getLongitude()-position.getLongitude())*alpha);
+   }
+  }
+  replayMarker.setPosition(position);
+  if(replayFollow&&replayPlaying)map.getController().setCenter(position);
   if(replayStatus!=null){
    String time=new java.text.SimpleDateFormat("HH:mm:ss",Locale.KOREA).format(new Date(replayTimes.get(index)));
    replayStatus.setText("기록 시각 "+time+" · "+(index+1)+"/"+replayPoints.size()+" 지점"+
@@ -112,10 +126,27 @@ public final class RideMapActivity extends Activity {
    if(replaySeek.getProgress()>=RideReplayTimeline.MAX_PROGRESS)replaySeek.setProgress(0);
    replayStartProgress=replaySeek.getProgress();
    long fullDuration=RideReplayTimeline.durationMs(replayTimes);
-   replayRemainingDurationMs=Math.max(1,fullDuration*(RideReplayTimeline.MAX_PROGRESS-replayStartProgress)/RideReplayTimeline.MAX_PROGRESS);
+   replayRemainingDurationMs=Math.max(1,(long)(fullDuration*(RideReplayTimeline.MAX_PROGRESS-replayStartProgress)/(double)RideReplayTimeline.MAX_PROGRESS/replayRate));
    replayStartedElapsed=SystemClock.elapsedRealtime();
    replayPlaying=true;replayButton.setText("❚❚ 일시정지");replayHandler.post(replayTick);
   });playback.addView(replayButton);
+  replaySpeedButton=new Button(this);replaySpeedButton.setText("재생 속도 1배");
+  replaySpeedButton.setOnClickListener(v->{
+   double[] speeds={0.5,1,2,4};int selected=1;
+   for(int i=0;i<speeds.length;i++)if(Math.abs(replayRate-speeds[i])<0.01){selected=i;break;}
+   boolean resume=replayPlaying;
+   if(resume)pauseReplay();
+   replayRate=speeds[(selected+1)%speeds.length];
+   replaySpeedButton.setText("재생 속도 "+replayRate+"배");
+   if(resume)replayButton.performClick();
+  });
+  playback.addView(replaySpeedButton);
+  replayFollowButton=new Button(this);replayFollowButton.setText("카메라 추적 켜짐");
+  replayFollowButton.setOnClickListener(v->{
+   replayFollow=!replayFollow;
+   replayFollowButton.setText(replayFollow?"카메라 추적 켜짐":"카메라 추적 꺼짐");
+  });
+  playback.addView(replayFollowButton);
   replaySeek=new SeekBar(this);replaySeek.setMax(RideReplayTimeline.MAX_PROGRESS);replaySeek.setEnabled(false);
   replaySeek.setContentDescription("저장된 GPS 경로 재생 위치");
   replaySeek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
@@ -176,8 +207,8 @@ public final class RideMapActivity extends Activity {
     if(total<2)throw new IllegalArgumentException("좌표가 부족합니다");
     int step=Math.max(1,(total+1999)/2000);
     final int[] index={0},sectionId={-1};
-    final boolean[] hasLast={false},needNewSection={true};
-    final double[] prevLat={0},prevLon={0},prevAccuracy={0};
+    final boolean[] hasLast={false},hasPreviousPrevious={false},needNewSection={true};
+    final double[] prevLat={0},prevLon={0},prevAccuracy={0},olderLat={0},olderLon={0};
     final long[] prevTime={0};
     final ArrayList<ArrayList<GeoPoint>> sections=new ArrayList<>();
     final ArrayList<GeoPoint> route=new ArrayList<>();
@@ -189,13 +220,18 @@ public final class RideMapActivity extends Activity {
     TrackFile.read(track,(lat,lon,accuracy,time)->{
      int i=index[0]++;
      if(!MapPathContinuity.validFix(lat,lon,accuracy)){
-      hasLast[0]=false;needNewSection[0]=true;return;
+      hasLast[0]=false;hasPreviousPrevious[0]=false;needNewSection[0]=true;return;
      }
-     if(hasLast[0]&&!MapPathContinuity.validLink(prevLat[0],prevLon[0],prevAccuracy[0],prevTime[0],
-                                                   lat,lon,accuracy,time))
-      needNewSection[0]=true;
-     prevLat[0]=lat;prevLon[0]=lon;prevAccuracy[0]=accuracy;prevTime[0]=time;hasLast[0]=true;
-     if(i%step!=0&&i!=total-1)return;
+     boolean connected=hasLast[0]&&MapPathContinuity.validLink(
+       prevLat[0],prevLon[0],prevAccuracy[0],prevTime[0],lat,lon,accuracy,time);
+      boolean corner=connected&&hasPreviousPrevious[0]&&
+       MapPathDetailPolicy.corner(olderLat[0],olderLon[0],prevLat[0],prevLon[0],lat,lon,accuracy);
+      if(hasLast[0]&&!connected)needNewSection[0]=true;
+      hasPreviousPrevious[0]=connected;
+      olderLat[0]=prevLat[0];olderLon[0]=prevLon[0];
+      prevLat[0]=lat;prevLon[0]=lon;prevAccuracy[0]=accuracy;prevTime[0]=time;hasLast[0]=true;
+      if(i%step!=0&&i!=total-1&&!needNewSection[0]&&!corner)return;
+      if(route.size()>=2600&&i!=total-1)return;
      if(needNewSection[0]||sectionId[0]<0){
       if(sections.size()>=350)return;
       sections.add(new ArrayList<>());sectionId[0]++;needNewSection[0]=false;
@@ -255,7 +291,7 @@ public final class RideMapActivity extends Activity {
      double north=-90,south=90,east=-180,west=180;for(GeoPoint p:route){north=Math.max(north,p.getLatitude());south=Math.min(south,p.getLatitude());east=Math.max(east,p.getLongitude());west=Math.min(west,p.getLongitude());}
      if(north-south<.0005){north+=.002;south-=.002;}if(east-west<.0005){east+=.002;west-=.002;}
      map.zoomToBoundingBox(new BoundingBox(north,east,south,west),true,72);
-     caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\nGPS 공백 "+info.gpsGaps+"구간 · 품질 "+info.gpsQuality());
+     caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\n"+info.distanceReliability()+" · 품질 "+info.gpsQuality()+"\n최고속도: "+info.peakReliability());
      map.invalidate();
     });
    }catch(Exception e){runOnUiThread(()->{if(alive&&caption!=null){

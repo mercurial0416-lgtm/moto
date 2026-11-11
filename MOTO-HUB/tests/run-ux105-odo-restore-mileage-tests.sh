@@ -16,7 +16,7 @@ ride=(base/"RideService.java").read_text()
 odo=(base/"OdometerAutoSyncInbox.java").read_text()
 dev=(base/"DeveloperObdScreen.java").read_text()
 gps=(base/"RideMileageEstimate.java").read_text()
-auto=ride.split("private void handleAutoSpeed(int speedKmh)",1)[1].split("private void finishUserRideAsync()",1)[0]
+auto=ride.split("private void handleAutoSpeed(int speedKmh,long receivedAt)",1)[1].split("private void finishUserRideAsync()",1)[0]
 assert 'if(!RestoreRideGate.beginRideStart())' in auto
 assert 'autoGate.reset();' in auto
 assert 'finally{RestoreRideGate.endRideStart();}' in auto

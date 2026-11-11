@@ -20,9 +20,12 @@ public class CardoAutoRidePrefsTest {
   c.getSharedPreferences("cardo_autoride_v595",0).edit().clear().commit();
   BikeObdPreferences.clearBike(c,A);BikeObdPreferences.clearBike(c,B);
  }
- @Test public void cannotEnableWithoutRegisteredBikeObd(){
-  assertFalse(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom 2X"));
-  assertFalse(CardoAutoRidePrefs.enabled(c));
+ @Test public void cardoCanBeRegisteredWithoutObdButGpsFallbackIsOptIn(){
+  assertTrue(CardoAutoRidePrefs.enable(c,A,CARDO,"Freecom 2X"));
+  assertTrue(CardoAutoRidePrefs.forBike(c,A));
+  assertFalse(BikeObdPreferences.gpsFallbackEnabled(c,A));
+  BikeObdPreferences.setGpsFallbackEnabled(c,A,true);
+  assertTrue(BikeObdPreferences.gpsFallbackEnabled(c,A));
  }
  @Test public void exactAddressMatchAndBikeIsolation(){
   BikeObdPreferences.setDevice(c,A,OBD,"iCar Pro BT3");

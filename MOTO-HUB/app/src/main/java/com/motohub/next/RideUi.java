@@ -65,6 +65,18 @@ final class RideUi {
   String workspace=a.getSharedPreferences("ride_display",0).getString("workspace","ride");
   ExperienceUi.switcher(a,"주행하기","라이딩 기록",!"history".equals(workspace),()->switchWorkspace("ride"),()->switchWorkspace("history"));
   if("history".equals(workspace)){renderHistoryWorkspace();return;}
+  if(!RideService.running&&!RideService.autoArmed&&a.bike()!=null){
+   String bikeId=a.bike().optString("id");
+   ConnectionSetupMode.Mode mode=ConnectionSetupMode.get(a,bikeId);
+   String warning=RideMissingRecordingGuide.probableReason(mode,
+     BikeObdPreferences.validAddress(BikeObdPreferences.address(a,bikeId)),
+     CardoAutoRidePrefs.forBike(a,bikeId),
+     BikeObdPreferences.gpsFallbackEnabled(a,bikeId),
+     BikeObdPreferences.autoRideEnabled(a,bikeId),false);
+   a.label(a.content,"자동기록 상태: "+warning,13,a.muted,false);
+   a.action(a.content,"이 바이크 OBD · 자동기록 설정",false,
+    ()->new BikeObdSettingsUi(a).open(bikeId));
+  }
   final boolean saving=RideService.saving();
   final boolean focus=RideService.running&&a.getSharedPreferences("ride_display",0).getBoolean("focus",false);
   LinearLayout hero=a.col();hero.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(16));
@@ -125,9 +137,15 @@ final class RideUi {
     }
     if(!RideService.running){a.renderPreservingPosition();return;}
      String liveStatus=recordingFeedback();
-     gpsHealth.setText(liveStatus);
+     gpsHealth.setText(RideService.gpsParkingHeld()?"주차 후보 · 휴대폰 도보 GPS 제외 · 자동저장 대기":liveStatus);
      gpsHealth.setTextColor(RideService.count==0?a.accent:a.muted);
-     sub.setText(RideService.count+"개 위치 기록 · "+(RideService.gpsFresh()?"GPS 수신 정상":"GPS 신호 대기/확인 필요"));
+     float gpsAccuracy=RideService.gpsAccuracyMeters();
+     boolean freshGps=RideService.gpsFresh();
+     sub.setText(RideService.count+"개 위치 기록 · "+(freshGps?"GPS 수신 정상":"GPS 신호 공백")+
+      (freshGps&&Float.isFinite(gpsAccuracy)?
+       String.format(Locale.KOREA," · 정확도 ±%.0fm",gpsAccuracy):"")+
+      (RideService.gpsFixElapsed()>0?
+       " · 마지막 수신 "+Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.gpsFixElapsed())/1000)+"초 전":" · 첫 수신 대기"));
     long seconds=Math.max(0,(android.os.SystemClock.elapsedRealtime()-RideService.startedElapsed)/1000);
     // Gauge cards are invisible in navigation-first focus mode; GPS is still recorded.
     if(!focus){
@@ -162,7 +180,7 @@ final class RideUi {
   // Primary action always finishes GPS if GPS is live. Never accidentally
   // label OBD-only disarm as the main "ride finish" control.
   Button start=a.button(RideService.running?"라이딩 저장 후 종료":
-   RideService.autoArmed?"OBD 자동 감지 중지":"GPS 기록 시작",true,()->{
+   RideService.autoArmed?"지금 GPS 기록 시작 · 자동감지 기다리지 않기":"GPS 기록 시작",true,()->{
    if(RideService.running){
     MotoDialog.confirm(a,
       RideService.autoArmed?"자동 라이딩 기록 종료":"라이딩 기록 종료",
@@ -176,11 +194,14 @@ final class RideUi {
     return;
    }
    if(RideService.autoArmed){
-    MotoDialog.confirm(a,"OBD2 자동 출발 감지를 중지할까요?",
-      "아직 시작하지 않은 GPS 기록은 없습니다. 감지를 중지하고 기존 주행 기록은 보존합니다.",
-      "감지 중지","취소",()->{
-       a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));
-       a.root.postDelayed(()->{if(!a.isFinishing())a.render();},900);
+    MotoDialog.confirm(a,"지금 GPS 기록을 시작할까?",
+      "OBD나 카르도가 자동 출발을 못 알아챌 때 사용하는 수동 대체 방식이야. " +
+      "현재 자동 감시는 유지하고 GPS 원본은 새 파일로 기록해. 실제 좌표가 들어와야 기록으로 인정해.",
+      "GPS 기록 시작","취소",()->{
+       if(!RideService.autoArmed||RideService.running||RideService.saving())return;
+       a.startService(new Intent(a,RideService.class).setAction(RideService.MANUAL_GPS_WHILE_ARMED));
+       a.toast("GPS 시작 요청 전송 · 실제 첫 좌표가 수신되는지 확인해.");
+       a.root.postDelayed(()->{if(!a.isFinishing()&&!a.isDestroyed())a.render();},1100);
       },null);
     return;
    }
@@ -190,8 +211,18 @@ final class RideUi {
   start.setBackground(a.shape(RideService.running?0xffc94b44:a.accent,0,18));
   start.setMinHeight(a.dp(60));start.setEnabled(!saving);start.setAlpha(saving?0.6f:1.0f);
   start.setContentDescription(RideService.running?"현재 GPS 기록을 저장 후 종료":
-    RideService.autoArmed?"OBD 자동 출발 감지만 중지":"GPS 기록 시작, 사용자 동의 필요");
+    RideService.autoArmed?"자동 감지 대기 중 수동 GPS 경로 기록 시작":"GPS 기록 시작, 사용자 동의 필요");
   ExperienceUi.dock(a,start);
+  if(RideService.autoArmed&&!RideService.running){
+   a.label(hero,"자동 출발 감지를 시작했다고 GPS 파일이 생기는 건 아니야. " +
+    "바이크가 움직여도 주행 기록이 안 잡히면 위 GPS 시작 버튼을 사용해.",13,a.muted,false);
+   a.action(hero,"자동 감지만 종료 · 기록 없음",false,()->MotoDialog.confirm(a,
+    "자동 감지 중지","자동 감지만 중지하고 이미 저장된 GPS 파일은 보존해.",
+    "감지 중지","취소",()->{
+     a.startService(new Intent(a,RideService.class).setAction(RideService.AUTO_DISARM));
+     a.root.postDelayed(()->{if(!a.isFinishing()&&!a.isDestroyed())a.render();},900);
+    },null));
+  }
   if(RideService.autoArmed&&RideService.running){
    a.gap(hero,8);
    Button disarm=a.button("OBD만 중지 · GPS 기록은 계속",false,()->{
@@ -384,7 +415,16 @@ final class RideUi {
         groupKey=session+"|"+bikeBinding+"|"+category;
       }catch(IOException corrupted){/* Damaged bike binding never silently joins a ride. */}
      }
-     entries.add(new HistoryEntry(file,label,status,savedMemo,groupKey));
+     String bikeSearch="";
+     try{
+      String assigned=RideBikeBinding.readStrict(file);
+      if(RideBikeBinding.valid(assigned)){
+       bikeSearch=assigned;
+       for(org.json.JSONObject candidate:a.items("vehicles"))
+        if(assigned.equals(candidate.optString("id"))){bikeSearch+=" "+candidate.optString("name","");break;}
+      }
+     }catch(IOException ignored){}
+     entries.add(new HistoryEntry(file,label,status,savedMemo+" "+category+" "+bikeSearch,groupKey));
     }
     if(!RideHistoryDistanceFilter.ALL.equals(distanceRange)){
      // Analyze GPS sections off the UI thread and compare session totals,
