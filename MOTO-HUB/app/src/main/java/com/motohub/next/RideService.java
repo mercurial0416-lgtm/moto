@@ -62,6 +62,7 @@ public final class RideService extends Service implements LocationListener {
   return s!=null&&running&&GpsSignalStatus.fresh(s.lastFixElapsed,SystemClock.elapsedRealtime());
  }
  static long gpsFixElapsed(){RideService s=instance;return s==null?0:s.lastFixElapsed;}
+ static boolean gpsParkingHeld(){RideService s=instance;return s!=null&&running&&s.gpsObdParkingHold;}
  static float gpsAccuracyMeters(){
   RideService s=instance;
   Location fix=s==null?null:s.lastGood;
@@ -411,6 +412,7 @@ public final class RideService extends Service implements LocationListener {
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    parkingIsolation.reset();gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
+   ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.CONNECTING);
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;obdFuelPercent=Double.NaN;obdFuelAt=0;
    obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=1;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
    obdPidSupport="표준 지원 PID 확인 중 · ODO 미검증";
@@ -471,8 +473,11 @@ public final class RideService extends Service implements LocationListener {
          gpsObdHoldStarted=-1;
         }
        }
-      if(obdSpeedSamples==1)ObdLocalDiagnosticLog.record(RideService.this,"SENSOR_OK");
-      handleAutoSpeed(kmh);
+      if(obdSpeedSamples==1){
+       ObdLocalDiagnosticLog.record(RideService.this,"SENSOR_OK");
+       ObdAutoRideProgress.stage(RideService.this,pendingBikeId,ObdAutoRideProgress.Stage.SPEED);
+      }
+      handleAutoSpeed(kmh,elapsed);
     }});}
     @Override public void telemetry(String pid,double value){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
      long now=SystemClock.elapsedRealtime();
@@ -496,6 +501,7 @@ public final class RideService extends Service implements LocationListener {
      parkingIsolation.onLinkConnected();
      obdLink="연결됨 · 차량 데이터 읽기 전용";MotoWidgetProvider.refresh(RideService.this);
       ObdLocalDiagnosticLog.record(RideService.this,"BT_OK");obdConnectionSuccesses++;
+      ObdAutoRideProgress.stage(RideService.this,pendingBikeId,ObdAutoRideProgress.Stage.CONNECTED);
      if(!running)status="OBD2 연결됨 · 출발 대기";
     }});}
     @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
@@ -512,6 +518,7 @@ public final class RideService extends Service implements LocationListener {
       handler.removeCallbacks(finishParkedObdLoss);
       handler.postDelayed(finishParkedObdLoss,Math.max(1,remaining));
      }
+     ObdAutoRideProgress.stage(RideService.this,pendingBikeId,ObdAutoRideProgress.Stage.RETRYING);
      obdReconnects=attempt;speedSanity.reset();ObdLocalDiagnosticLog.record(RideService.this,"RECONNECT");obdSpeedKmh=-1;obdLastSampleElapsed=0;
      obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;
      obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
@@ -554,14 +561,15 @@ public final class RideService extends Service implements LocationListener {
    handler.postDelayed(cardoGpsStopWatch,30_000L);
    status="OBD 속도 미수신 · GPS 이동 검증 후 로컬 기록 중";
    ObdLocalDiagnosticLog.record(this,"GPS_STARTED");
+   ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.GPS);
    notifySafely(status);
   }catch(Exception e){
    stopWith("GPS 안전망 기록 시작 실패 · 원본 보존: "+e.getMessage(),false);
   }finally{RestoreRideGate.endRideStart();}
  }
- private void handleAutoSpeed(int speedKmh){
+ private void handleAutoSpeed(int speedKmh,long receivedAt){
   if(!autoArmed||autoFinishPending||finishPending)return;
-  long now=SystemClock.elapsedRealtime();
+  long now=receivedAt;
   ObdRideAutoGate.Event event=autoGate.accept(speedKmh,now);
   obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
   if(event==ObdRideAutoGate.Event.START){
@@ -693,6 +701,7 @@ public final class RideService extends Service implements LocationListener {
    return;
   }
   status=verified?"자동 라이딩 저장 완료 · 다음 출발 감지 대기":"자동 라이딩 저장 검증 실패 · 기록을 복구 화면에서 확인해 주세요";
+  ObdAutoRideProgress.stage(this,pendingBikeId,verified?ObdAutoRideProgress.Stage.SAVED:ObdAutoRideProgress.Stage.FAILED);
   if(verified&&savedTrack!=null&&savedTrack.isFile()&&count>=2){
    new Thread(()->{try{RideInsights.Result summary=RideInsights.analyze(savedTrack);
     handler.post(()->{if(autoArmed&&!running){status=String.format(java.util.Locale.KOREA,
