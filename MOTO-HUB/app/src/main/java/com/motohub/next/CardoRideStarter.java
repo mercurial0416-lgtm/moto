@@ -63,6 +63,11 @@ final class CardoRideStarter {
   if(!eligible(c)||RideService.running||RideService.autoArmed)return false;
   String bike=CardoAutoRidePrefs.bikeId(c);
   String obd=BikeObdPreferences.address(c,bike);
+  // Only explicitly selected GPS-only mode bypasses a physically registered
+  // adapter. Migrated legacy setups retain their original OBD-first behavior.
+  if(ConnectionSetupMode.explicit(c,bike)&&
+     ConnectionSetupMode.get(c,bike)==ConnectionSetupMode.Mode.CARDO_GPS&&
+     BikeObdPreferences.gpsFallbackEnabled(c,bike))obd="";
   if(!CardoAutoRidePrefs.forBike(c,bike)||
      (!BikeObdPreferences.validAddress(obd)&&!BikeObdPreferences.gpsFallbackEnabled(c,bike)))return false;
   try{
