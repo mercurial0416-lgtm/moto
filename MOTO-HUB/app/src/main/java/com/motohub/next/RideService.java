@@ -736,6 +736,9 @@ public final class RideService extends Service implements LocationListener {
   }
  }
  private void completeAutoTrack(File savedTrack,boolean verified){
+  // Never claim first setup success from Bluetooth pairing, a foreground
+  // service start, a test notification, or a file that wasn't verified.
+  if(verified)FirstRideSetupProof.confirm(this,pendingBikeId,savedTrack,count,liveDistanceKm);
   autoFinishPending=false;running=false;
   // Reset recording after the stored ride; new movement can start a new track.
   autoGate.reset();parkingIsolation.reset();
