@@ -505,7 +505,9 @@ public final class RideService extends Service implements LocationListener {
       // Do not touch GPS if a real track is being recorded.
       if(cardoSession&&cardoGpsProbeRegistered&&!running){
        if(manager!=null)try{manager.removeUpdates(RideService.this);}catch(Exception ignored){}
-       cardoGpsProbeRegistered=false;cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();
+       cardoGpsProbeRegistered=false;cardoGpsPrevious=null;cardoGpsGate.reset();
+       // Keep a bounded recent prefix until a verified ECU-speed start.
+       // It is not permitted to become motorcycle ODO or maintenance km.
       }
        boolean heldBefore=gpsObdParkingHold;
        parkingIsolation.onSpeed(kmh,elapsed);
@@ -602,15 +604,7 @@ public final class RideService extends Service implements LocationListener {
    openRideTrack();
    if(!cardoGpsProbeRegistered)requestGpsUpdatesChecked();
    cardoGpsFallbackRecording=true;
-   // Flush the real, accurate pre-trigger locations before any live callbacks.
-   final java.util.ArrayList<Location> preroll=new java.util.ArrayList<>(cardoGpsPreroll);
-   cardoGpsPreroll.clear();
-   if(!preroll.isEmpty()&&gpsWriteHandler!=null)
-    gpsWriteHandler.postAtFrontOfQueue(()->{
-     prerollReplaying=true;
-     try{for(Location fix:preroll)if(running&&cardoGpsFallbackRecording)onLocationChanged(fix);}
-     finally{prerollReplaying=false;}
-    });
+   flushActualGpsPreroll(45_000L);
    handler.removeCallbacks(cardoGpsProbeWake);
    handler.removeCallbacks(cardoIdleStop);
    handler.removeCallbacks(cardoGpsStopWatch);
@@ -622,6 +616,24 @@ public final class RideService extends Service implements LocationListener {
   }catch(Exception e){
    stopWith("GPS 안전망 기록 시작 실패 · 원본 보존: "+e.getMessage(),false);
   }finally{RestoreRideGate.endRideStart();}
+ }
+ /** Replays real, timestamped GPS fixes on the ordered disk thread.
+  * No interpolated coordinates and no old phone-walking history. */
+ private void flushActualGpsPreroll(long maxAgeMs){
+  if(gpsWriteHandler==null)return;
+  long now=SystemClock.elapsedRealtimeNanos()/1_000_000L;
+  final java.util.ArrayList<Location> real=new java.util.ArrayList<>();
+  for(Location fix:cardoGpsPreroll){
+   long age=now-fix.getElapsedRealtimeNanos()/1_000_000L;
+   if(age>=0&&age<=maxAgeMs)real.add(new Location(fix));
+  }
+  cardoGpsPreroll.clear();
+  if(real.isEmpty())return;
+  gpsWriteHandler.postAtFrontOfQueue(()->{
+   prerollReplaying=true;
+   try{for(Location fix:real)if(running)onLocationChanged(fix);}
+   finally{prerollReplaying=false;}
+  });
  }
  private void handleAutoSpeed(int speedKmh,long receivedAt){
   if(!autoArmed||autoFinishPending||finishPending)return;
@@ -643,6 +655,9 @@ public final class RideService extends Service implements LocationListener {
     // Re-check after obtaining the process-wide write/start reservation.
     if(!autoArmed||running||autoFinishPending)return;
     openRideTrack();requestGpsUpdatesChecked();
+    // The GPS probe may already have measured the initial road segment
+    // before the ECU delivered three independent speed samples.
+    if(cardoSession)flushActualGpsPreroll(15_000L);
     if(cardoSession)handler.removeCallbacks(cardoIdleStop);
     status="OBD2 출발 감지 · GPS 기록 중";ObdLocalDiagnosticLog.record(this,"GPS_STARTED");
     ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.GPS);
