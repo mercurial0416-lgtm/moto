@@ -14,7 +14,7 @@ final class ObdLocalDiagnosticLog {
 
  static void capability(Context c,ObdPidCapabilities support){
   if(support==null)return;
-  String[] pids={"010D","010C","0105","0142"};
+  String[] pids={"010D","010C","0105","0142","012F"};
   StringBuilder bitmap=new StringBuilder();
   for(String pid:pids){
    ObdPidCapabilities.Support value=support.forPid(pid);
@@ -85,9 +85,9 @@ final class ObdLocalDiagnosticLog {
   SharedPreferences p=c.getSharedPreferences(PREFS,0);
   String caps=p.getString("capabilities","");
   StringBuilder text=new StringBuilder("마지막 ECU PID 선언 목록 (실제 수신과 별개): ");
-  if(caps!=null&&caps.matches("[YN?]{4}")){
-   String[] names={"속도","RPM","수온","전압"};
-   for(int i=0;i<4;i++){
+  if(caps!=null&&caps.matches("[YN?]{4,5}")){
+   String[] names={"속도","RPM","수온","전압","연료"};
+   for(int i=0;i<caps.length();i++){
     if(i>0)text.append(" · ");
     text.append(names[i]).append(" ").append(caps.charAt(i)=='Y'?"지원":caps.charAt(i)=='N'?"미지원":"확인 불가");
    }
