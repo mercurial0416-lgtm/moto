@@ -18,7 +18,7 @@ checks={
  "permissions are deferred until selected devices": ui.index('wantsObd&&!obd')<ui.index('else if(!permissions)'),
  "live probe is foreground only": 'private void startLiveStatus' in ui and 'owner.isShowing()' in ui and 'getProfileProxy' in probe and 'closeProfileProxy' in probe,
  "troubleshooter routes to concrete action": 'ConnectionIssueGuide.diagnose' in ui and 'resolveConnectionIssue' in ui and 'case ECU_NO_REPLY' in ui,
- "GPS verification is based on validated disk track": 'FirstRideSetupProof.confirm(this,pendingBikeId,savedTrack,count,liveDistanceKm)' in ride and '.done' in proof and 'gpsKm>=0.10' in proof,
+ "GPS verification is based on validated disk track": 'FirstRideSetupProof.reportCompletion(this,pendingBikeId,savedTrack,verified,count,liveDistanceKm)' in ride and '.done' in proof and 'gpsKm>=0.10' in proof,
  "GPS ODO remains separate": 'OdometerAutoSyncInbox.enable' not in proof and 'setAutoRideEnabled' not in proof,
 }
 for k,v in checks.items():print(("PASS" if v else "FAIL")+": "+k)

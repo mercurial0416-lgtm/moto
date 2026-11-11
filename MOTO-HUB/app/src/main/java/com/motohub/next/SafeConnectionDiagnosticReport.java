@@ -35,8 +35,10 @@ final class SafeConnectionDiagnosticReport {
   boolean gps=location!=null&&location.isProviderEnabled(LocationManager.GPS_PROVIDER);
   StringBuilder out=new StringBuilder("MOTO HUB 연결 진단 · v604\n");
   out.append("기록 방식: ").append(mode.label).append('\n');
-  out.append("OBD 동글: ").append(BikeObdPreferences.validAddress(BikeObdPreferences.address(c,bike))?"등록됨":"미등록").append('\n');
-  out.append("카르도: ").append(CardoAutoRidePrefs.forBike(c,bike)?"등록됨":"미등록").append('\n');
+  out.append("OBD 동글: ").append(BikeObdPreferences.validAddress(BikeObdPreferences.address(c,bike))?
+    "등록됨 · "+redact(BikeObdPreferences.deviceName(c,bike)):"미등록").append('\n');
+  out.append("카르도: ").append(CardoAutoRidePrefs.forBike(c,bike)?
+    "등록됨 · "+redact(CardoAutoRidePrefs.name(c)):"미등록").append('\n');
   out.append("카르도 최근 연결 이벤트: ").append(CardoAutoRidePrefs.recentlyConnected(c)?"있음 · 현재 연결과 별개":"없음").append('\n');
   out.append("GPS 안전망 동의: ").append(BikeObdPreferences.gpsFallbackEnabled(c,bike)?"켜짐":"꺼짐").append('\n');
   out.append("주변 기기 권한: ").append(bt?"허용":"미허용").append('\n');
