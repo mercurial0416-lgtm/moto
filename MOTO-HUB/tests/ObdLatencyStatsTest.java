@@ -18,6 +18,10 @@ public final class ObdLatencyStatsTest {
   x.success("0105",0);x.success("0142",300);
   check(x.summary().contains("수온 평균 0ms"),"zero ms allowed");
   check(x.summary().contains("전압 평균 300ms"),"voltage stats");
+  x.success("012F",810);
+  check(x.summary().contains("연료 평균 810ms"),"fuel PID query delay is visible");
+  x.failure("012F");
+  check(x.summary().contains("연료 평균 810ms / 실패 1회"),"fuel query errors are visible");
   x.success("0142",35_000);
   check(x.summary().contains("전압 평균 300ms"),"absurd duration ignored");
   System.out.println("PASS ObdLatencyStatsTest "+checks);
