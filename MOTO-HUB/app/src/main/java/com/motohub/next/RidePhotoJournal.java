@@ -3,6 +3,7 @@ package com.motohub.next;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.net.Uri;
 import java.io.*;
 import java.nio.file.*;
@@ -23,7 +24,14 @@ final class RidePhotoJournal {
    throw new IOException("완료된 GPS 원본에서만 사진을 저장할 수 있어요.");
   File photo=new File(filesDir,photoName(track.getName()));
   if(Files.isSymbolicLink(photo.toPath()))throw new IOException("안전하지 않은 사진 경로");
-  return photo;
+  if(photo.isFile())return photo;
+  java.util.List<File> siblings=RideSegmentGroup.members(filesDir,track.getName());
+  for(File member:siblings){
+   File existing=new File(filesDir,photoName(member.getName()));
+   if(Files.isSymbolicLink(existing.toPath()))throw new IOException("안전하지 않은 사진 경로");
+   if(existing.isFile())return existing;
+  }
+  return siblings.isEmpty()?photo:new File(filesDir,photoName(siblings.get(0).getName()));
  }
  static Bitmap readPreview(File file,int maxDimension)throws IOException{
   if(file==null||!file.isFile()||Files.isSymbolicLink(file.toPath())||file.length()>MAX_PHOTO_BYTES)
@@ -62,6 +70,26 @@ final class RidePhotoJournal {
   BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=sample;
   Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,options);
   if(bitmap==null)throw new IOException("사진을 열 수 없어요.");
+  int exifOrientation=android.media.ExifInterface.ORIENTATION_NORMAL;
+  try(ByteArrayInputStream originalStream=new ByteArrayInputStream(bytes)){
+   exifOrientation=new android.media.ExifInterface(originalStream).getAttributeInt(
+    android.media.ExifInterface.TAG_ORIENTATION,android.media.ExifInterface.ORIENTATION_NORMAL);
+  }catch(Exception ignored){}
+  Matrix transform=new Matrix();
+  switch(exifOrientation){
+   case android.media.ExifInterface.ORIENTATION_ROTATE_90:transform.setRotate(90);break;
+   case android.media.ExifInterface.ORIENTATION_ROTATE_180:transform.setRotate(180);break;
+   case android.media.ExifInterface.ORIENTATION_ROTATE_270:transform.setRotate(270);break;
+   case android.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL:transform.setScale(-1,1);break;
+   case android.media.ExifInterface.ORIENTATION_FLIP_VERTICAL:transform.setScale(1,-1);break;
+   case android.media.ExifInterface.ORIENTATION_TRANSPOSE:transform.setRotate(90);transform.postScale(-1,1);break;
+   case android.media.ExifInterface.ORIENTATION_TRANSVERSE:transform.setRotate(270);transform.postScale(-1,1);break;
+   default:break;
+  }
+  if(!transform.isIdentity()){
+   Bitmap corrected=Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),transform,true);
+   if(corrected!=bitmap){bitmap.recycle();bitmap=corrected;}
+  }
   File temporary=new File(filesDir,target.getName()+".writing");
   try{
    if(Files.isSymbolicLink(temporary.toPath()))throw new IOException("안전하지 않은 사진 임시 파일");
