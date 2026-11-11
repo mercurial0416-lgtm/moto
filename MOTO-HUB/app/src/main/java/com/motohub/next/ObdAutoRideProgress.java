@@ -8,7 +8,7 @@ import java.util.Locale;
 
 /** Coordinate-free, per-bike checkpoint of each automatically armed ride. */
 final class ObdAutoRideProgress {
- enum Stage { CONNECTING, CONNECTED, SPEED, GPS, SAVED, RETRYING, STOPPED, FAILED }
+ enum Stage { CONNECTING, CONNECTED, CARDO_GPS, SPEED, GPS, SAVED, RETRYING, STOPPED, FAILED }
  private ObdAutoRideProgress(){}
  private static SharedPreferences prefs(Context c,String bike){
   return c.getSharedPreferences("obd_auto_progress_v600_"+bike,0);
@@ -43,6 +43,7 @@ final class ObdAutoRideProgress {
   switch(state){
    case CONNECTING:message="OBD Bluetooth 연결 중";break;
    case CONNECTED:message="Bluetooth 연결됨 · ECU 속도 대기";break;
+   case CARDO_GPS:message="카르도 연결됨 · OBD 없는 GPS 안전망 대기";break;
    case SPEED:message="ECU 속도 수신됨 · 자동출발 확인";break;
    case GPS:message="GPS 자동 기록 시작";break;
    case SAVED:message="GPS 경로 검증·저장 완료";break;

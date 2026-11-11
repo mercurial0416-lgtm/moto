@@ -28,8 +28,8 @@ final class RidePowerAudit {
  static void begin(Context c,String bike){
   if(!RideBikeBinding.valid(bike))return;
   SharedPreferences p=prefs(c,bike);
-  if(p.getBoolean("active",false)&&
-    SystemClock.elapsedRealtime()-p.getLong("startElapsed",0)<60_000L)return;
+  long current=SystemClock.elapsedRealtime(),old=p.getLong("startElapsed",0);
+  if(p.getBoolean("active",false)&&old>0&&current>=old&&current-old<60_000L)return;
   p.edit().putBoolean("active",true).putInt("startPercent",battery(c))
    .putInt("lastPercent",battery(c)).putLong("startElapsed",SystemClock.elapsedRealtime())
    .putLong("lastSample",SystemClock.elapsedRealtime())

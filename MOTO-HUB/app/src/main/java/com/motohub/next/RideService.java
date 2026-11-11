@@ -130,7 +130,7 @@ public final class RideService extends Service implements LocationListener {
  long cardoGpsRetryAt=0;
  final CardoGpsFallbackGate cardoGpsGate=new CardoGpsFallbackGate();
  final GpsStationaryEvidence gpsStationaryEvidence=new GpsStationaryEvidence();
- final java.util.ArrayDeque<Location> cardoGpsPreroll=new java.util.ArrayDeque<>();
+ final java.util.concurrent.ConcurrentLinkedDeque<Location> cardoGpsPreroll=new java.util.concurrent.ConcurrentLinkedDeque<>();
  boolean prerollReplaying=false;
  Location cardoGpsPrevious=null;
  // Do not power GPS during a healthy OBD wait. A lightweight 12-second
@@ -437,7 +437,7 @@ public final class RideService extends Service implements LocationListener {
     prepareForeground(true);autoArmed=true;obdMonitor=null;activeAutoAdapterAddress="";
     RidePowerAudit.begin(this,pendingBikeId);
     obdLink="OBD 미등록 · GPS 단독 안전망";obdSpeedKmh=-1;obdLastSampleElapsed=0;
-    ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.CONNECTING);
+    ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.CARDO_GPS);
     handler.postDelayed(permissionCheck,5000L);
     handler.postDelayed(cardoGpsProbeWake,1000L);
     handler.postDelayed(cardoIdleStop,CardoStandbyPolicy.idleWindowMs(true));
