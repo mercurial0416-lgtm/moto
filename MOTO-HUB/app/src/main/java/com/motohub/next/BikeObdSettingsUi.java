@@ -47,6 +47,7 @@ final class BikeObdSettingsUi {
   });
   a.action(p,address.isEmpty()?"이 바이크의 OBD 동글 등록":"이 바이크의 OBD 동글 변경",true,()->pick(bikeId));
   a.gap(p,12);
+  a.label(p,"마지막 자동기록 진행: "+ObdAutoRideProgress.summary(a,bikeId),13,a.muted,false);
   a.label(p,"라이딩 기록 자동 연동",16,a.fg,true);
   boolean autoEnabled=BikeObdPreferences.autoRideEnabled(a,bikeId);
   a.label(p,autoEnabled?(RideService.autoArmed&&bikeId.equals(RideService.activeRideBikeId)?
