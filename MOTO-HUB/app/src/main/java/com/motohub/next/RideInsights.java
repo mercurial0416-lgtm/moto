@@ -10,6 +10,7 @@ public final class RideInsights {
   public final int points, discarded, gpsGaps, restStops;
   public final double distanceKm, averageKmh, movingAverageKmh, peakKmh, peakLatitude, peakLongitude;
   public final long startedAt, endedAt, durationMillis, movingMillis, gpsObservedMillis;
+  public final boolean peakCorroborated;
   Result(int count,int bad,double distance,double maximum,long start,long end,long moving){
    this(count,bad,distance,maximum,start,end,moving,0);
   }
@@ -18,6 +19,11 @@ public final class RideInsights {
   }
   Result(int count,int bad,double distance,double maximum,long start,long end,long moving,long observed,
          double peakLat,double peakLon,int gaps,int rests){
+   this(count,bad,distance,maximum,start,end,moving,observed,peakLat,peakLon,gaps,rests,false);
+  }
+  Result(int count,int bad,double distance,double maximum,long start,long end,long moving,long observed,
+         double peakLat,double peakLon,int gaps,int rests,boolean corroborated){
+   peakCorroborated=corroborated;
    points=count;discarded=bad;gpsGaps=gaps;restStops=rests;
    distanceKm=distance;peakKmh=maximum;peakLatitude=peakLat;peakLongitude=peakLon;startedAt=start;endedAt=end;
    durationMillis=Math.max(0,end-start);movingMillis=Math.max(0,Math.min(moving,durationMillis));
@@ -33,6 +39,15 @@ public final class RideInsights {
    return (coverage>=85&&good>=90&&gpsGaps==0?"높음":
      coverage>=60&&good>=75?"보통":"낮음")+
      " · GPS 수신률 "+coverage+"% · 유효 좌표 약 "+good+"%";
+  }
+  public String peakReliability(){
+   return peakKmh<=0?"속도 미측정":
+    peakCorroborated?"인접 GPS 속도 확인":"단일 GPS 구간 최고속도 · 미검증 참고값";
+  }
+  public String distanceReliability(){
+   int coverage=gpsCoveragePercent();
+   return coverage>=85&&gpsGaps==0?"관측률 높음 · 기록된 거리 기준":
+    "GPS 공백 "+gpsGaps+"구간 · 미수신 구간 실제 이동거리는 제외";
   }
   public String stationaryConfidence(){return gpsCoveragePercent()>=85&&gpsGaps==0?
     "GPS 관측 기반 정차 추정 · 신호대기와 휴식 구분 불가":
@@ -51,6 +66,7 @@ public final class RideInsights {
   final int[] count={0},bad={0},gaps={0},rests={0};final long[] start={0},end={0},last={0},lastObserved={0},observed={0},stopLast={0},stopRun={0};final boolean[] gapPending={false};
   final double[] lat={0},lon={0},previousAccuracy={0},km={0},max={0},peakLat={Double.NaN},peakLon={Double.NaN},stopLat={0},stopLon={0},stopAccuracy={0};
   final long[] moving={0};final boolean[] have={false},restCounted={false};
+  final double[] lastSegmentSpeed={Double.NaN};final boolean[] peakConfirmed={false};
   TrackFile.read(track,(x,y,accuracy,t)->{
    count[0]++;if(start[0]==0)start[0]=t;end[0]=t;
    if(accuracy>40){bad[0]++;have[0]=false;gapPending[0]=lastObserved[0]>0;stopLast[0]=0;stopRun[0]=0;restCounted[0]=false;return;}
@@ -83,18 +99,24 @@ public final class RideInsights {
     if(RideMotionGate.countDistance(delta,metres,previousAccuracy[0],accuracy)){
      double speed=metres*3600.0/delta;
      km[0]+=metres/1000.0;
-     if(speed>max[0]){max[0]=speed;peakLat[0]=x;peakLon[0]=y;}
+     if(speed>max[0]){
+      peakConfirmed[0]=Double.isFinite(lastSegmentSpeed[0])&&
+       Math.abs(speed-lastSegmentSpeed[0])<=Math.max(15,speed*.35);
+      max[0]=speed;peakLat[0]=x;peakLon[0]=y;
+     }else if(speed>=max[0]*.7)peakConfirmed[0]=true;
+     lastSegmentSpeed[0]=speed;
      if(speed>=3)moving[0]+=delta;
     }else if(delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS){
      bad[0]++; // Discard impossible spikes without poisoning the last reliable location.
      return;
     }
     // On a long GPS outage, restart measurement here; never bridge the missing segment.
+    if(delta>RideMotionGate.MAX_CONTINUOUS_FIX_MS)lastSegmentSpeed[0]=Double.NaN;
    }
    // Rest streak is separately bounded to consecutive fixes, never across a GPS gap.
    lat[0]=x;lon[0]=y;last[0]=t;previousAccuracy[0]=accuracy;have[0]=true;
   },digest);
   return new Result(count[0],bad[0],km[0],max[0],start[0],end[0],moving[0],observed[0],
-   peakLat[0],peakLon[0],gaps[0],rests[0]);
+   peakLat[0],peakLon[0],gaps[0],rests[0],peakConfirmed[0]);
  }
 }

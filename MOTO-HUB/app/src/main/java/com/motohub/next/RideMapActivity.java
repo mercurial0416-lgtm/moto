@@ -291,7 +291,7 @@ public final class RideMapActivity extends Activity {
      double north=-90,south=90,east=-180,west=180;for(GeoPoint p:route){north=Math.max(north,p.getLatitude());south=Math.min(south,p.getLatitude());east=Math.max(east,p.getLongitude());west=Math.min(west,p.getLongitude());}
      if(north-south<.0005){north+=.002;south-=.002;}if(east-west<.0005){east+=.002;west-=.002;}
      map.zoomToBoundingBox(new BoundingBox(north,east,south,west),true,72);
-     caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\nGPS 공백 "+info.gpsGaps+"구간 · 품질 "+info.gpsQuality());
+     caption.setText(info.distanceLabel()+" · "+info.points+"개 좌표 · "+String.format(java.util.Locale.KOREA,"평균 %.0f km/h",info.averageKmh)+"\n"+info.distanceReliability()+" · 품질 "+info.gpsQuality()+"\n최고속도: "+info.peakReliability());
      map.invalidate();
     });
    }catch(Exception e){runOnUiThread(()->{if(alive&&caption!=null){
