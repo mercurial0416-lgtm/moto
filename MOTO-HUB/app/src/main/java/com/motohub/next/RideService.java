@@ -129,6 +129,8 @@ public final class RideService extends Service implements LocationListener {
  int cardoGpsProbeFailures=0;
  long cardoGpsRetryAt=0;
  final CardoGpsFallbackGate cardoGpsGate=new CardoGpsFallbackGate();
+ final GpsStationaryEvidence gpsStationaryEvidence=new GpsStationaryEvidence();
+ final java.util.ArrayDeque<Location> cardoGpsPreroll=new java.util.ArrayDeque<>();
  Location cardoGpsPrevious=null;
  // Do not power GPS during a healthy OBD wait. A lightweight 12-second
  // handler checks whether ECU speed has gone stale before opening GPS.
@@ -160,8 +162,9 @@ public final class RideService extends Service implements LocationListener {
   if(!cardoGpsFallbackRecording||!running||autoFinishPending)return;
   long now=SystemClock.elapsedRealtime();
   long idleLimit=cardoConnected?600_000L:300_000L;
-  boolean stationaryGps=GpsSignalStatus.fresh(lastFixElapsed,now);
+  boolean stationaryGps=gpsStationaryEvidence.confirmed(now);
   boolean stationaryEcu=obdSpeedKmh>=0&&obdSpeedKmh<=2&&
+    ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now)&&
     parkingIsolation.observedParking(now);
   if((stationaryGps||stationaryEcu)&&lastMotionElapsed>0&&
      now>=lastMotionElapsed&&now-lastMotionElapsed>=idleLimit){
@@ -375,6 +378,7 @@ public final class RideService extends Service implements LocationListener {
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
   catch(IOException error){output.close();output=null;track.delete();throw error;}
   count=0;segmentPoints=0;completedSegments=0;lastTime=0;lastFixElapsed=0;lastGood=null;gpsSync.reset();
+  gpsStationaryEvidence.reset();
   lastStorageCheckElapsed=-60_000L;lowStorageWarned=false;
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);gpsSyncScheduled=false;
   startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;liveMovingMillis=0;liveStationaryMillis=0;lastWidgetRefreshElapsed=0;gpsOnlyAfterObd=false;
@@ -409,7 +413,7 @@ public final class RideService extends Service implements LocationListener {
     Sharing.stop();cardoSession=true;cardoConnected=true;
     cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
     cardoGpsProbeFailures=0;cardoGpsRetryAt=0;
-    cardoGpsPrevious=null;cardoGpsGate.reset();parkingIsolation.reset();autoGate.reset();
+    cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();parkingIsolation.reset();autoGate.reset();
     prepareForeground(true);autoArmed=true;obdMonitor=null;activeAutoAdapterAddress="";
     obdLink="OBD 미등록 · GPS 단독 안전망";obdSpeedKmh=-1;obdLastSampleElapsed=0;
     ObdAutoRideProgress.stage(this,pendingBikeId,ObdAutoRideProgress.Stage.CONNECTING);
@@ -427,7 +431,7 @@ public final class RideService extends Service implements LocationListener {
    cardoSession=cardoApproved;cardoConnected=cardoApproved;
    cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
    cardoGpsProbeFailures=0;cardoGpsRetryAt=0;
-   cardoGpsPrevious=null;cardoGpsGate.reset();
+   cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    parkingIsolation.reset();gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
@@ -479,7 +483,7 @@ public final class RideService extends Service implements LocationListener {
       // Do not touch GPS if a real track is being recorded.
       if(cardoSession&&cardoGpsProbeRegistered&&!running){
        if(manager!=null)try{manager.removeUpdates(RideService.this);}catch(Exception ignored){}
-       cardoGpsProbeRegistered=false;cardoGpsPrevious=null;cardoGpsGate.reset();
+       cardoGpsProbeRegistered=false;cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();
       }
        boolean heldBefore=gpsObdParkingHold;
        parkingIsolation.onSpeed(kmh,elapsed);
@@ -576,6 +580,13 @@ public final class RideService extends Service implements LocationListener {
    openRideTrack();
    if(!cardoGpsProbeRegistered)requestGpsUpdatesChecked();
    cardoGpsFallbackRecording=true;
+   // Flush the real, accurate pre-trigger locations before any live callbacks.
+   final java.util.ArrayList<Location> preroll=new java.util.ArrayList<>(cardoGpsPreroll);
+   cardoGpsPreroll.clear();
+   if(!preroll.isEmpty()&&gpsWriteHandler!=null)
+    gpsWriteHandler.postAtFrontOfQueue(()->{
+     for(Location fix:preroll)if(running&&cardoGpsFallbackRecording)onLocationChanged(fix);
+    });
    handler.removeCallbacks(cardoGpsProbeWake);
    handler.removeCallbacks(cardoIdleStop);
    handler.removeCallbacks(cardoGpsStopWatch);
@@ -689,7 +700,7 @@ public final class RideService extends Service implements LocationListener {
   autoFinishPending=false;running=false;
   // Reset recording after the stored ride; new movement can start a new track.
   autoGate.reset();parkingIsolation.reset();
-  cardoGpsFallbackRecording=false;cardoGpsPrevious=null;cardoGpsGate.reset();
+  cardoGpsFallbackRecording=false;cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();
   handler.removeCallbacks(cardoGpsStopWatch);
   synchronized(this){gpsObdParkingHold=false;gpsObdHoldStarted=-1;gpsObdResumeSplit=false;}
   if(cardoSession){
@@ -896,6 +907,11 @@ public final class RideService extends Service implements LocationListener {
     cardoGpsGate.reset();cardoGpsPrevious=null;return;
    }
    Location old=cardoGpsPrevious;cardoGpsPrevious=new Location(location);
+   cardoGpsPreroll.addLast(new Location(location));
+   long newest=location.getElapsedRealtimeNanos()/1_000_000L;
+   while(!cardoGpsPreroll.isEmpty()&&(cardoGpsPreroll.size()>20||
+     newest-cardoGpsPreroll.peekFirst().getElapsedRealtimeNanos()/1_000_000L>45_000L))
+    cardoGpsPreroll.removeFirst();
    if(old!=null){
     long gapMs=(location.getElapsedRealtimeNanos()-old.getElapsedRealtimeNanos())/1_000_000L;
     float metres=location.distanceTo(old);
@@ -908,6 +924,8 @@ public final class RideService extends Service implements LocationListener {
   if(!running||output==null||!checkRuntimeStorage())return;if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}long age=SystemClock.elapsedRealtimeNanos()-location.getElapsedRealtimeNanos();
   if(location.isFromMockProvider()||age<0||age>30_000_000_000L||!location.hasAccuracy()||!TrackFile.valid(location.getLatitude(),location.getLongitude(),location.getAccuracy(),location.getTime())||!GpsFixPolicy.acceptTime(location.getTime(),System.currentTimeMillis(),lastTime))return;
   if(lastGood!=null){long delta=location.getTime()-lastGood.getTime();if(delta>0&&delta<=RideMotionGate.MAX_CONTINUOUS_FIX_MS&&location.distanceTo(lastGood)*3600.0/delta>250)return;} // Discard implausible continuous GPS spikes; keep first point after a gap.
+  gpsStationaryEvidence.accept(location.getElapsedRealtimeNanos()/1_000_000L,
+   location.getLatitude(),location.getLongitude(),location.getAccuracy());
   try{
    // Never bridge an OBD-stationary gap (or walking) as traveled motorcycle km.
    if(gpsObdResumeSplit){
@@ -1020,7 +1038,7 @@ public final class RideService extends Service implements LocationListener {
   handler.removeCallbacks(cardoGpsProbeWake);
   cardoSession=false;cardoConnected=false;requestedCardoStart=false;
   cardoGpsFallbackRecording=false;cardoGpsProbeRegistered=false;
-  cardoGpsPrevious=null;cardoGpsGate.reset();parkingIsolation.reset();
+  cardoGpsPrevious=null;cardoGpsGate.reset();cardoGpsPreroll.clear();gpsStationaryEvidence.reset();parkingIsolation.reset();
   gpsObdParkingHold=false;gpsObdResumeSplit=false;gpsObdHoldStarted=-1;
   Sharing.stop();autoArmed=false;activeRideBikeId="";activeAutoAdapterAddress="";obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
