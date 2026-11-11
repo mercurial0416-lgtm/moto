@@ -24,6 +24,8 @@ final class CardoStartHandshake {
   CardoAutoRidePrefs.status(c,"서비스 시작 확인 안 됨 · 알림에서 다시 시작");
   CardoAutoRidePrefs.releaseClaim(c,CardoAutoRidePrefs.address(c));
   ConnectionEventLog.record(c,bike,ConnectionEventLog.Event.ANDROID_BLOCKED);
+  if(CardoAutoRidePrefs.forBike(c,bike)&&CardoAutoRidePrefs.recentlyConnected(c))
+   CardoRideStarter.notifyTap(c);
  }
  static boolean pending(Context c,String bike){
   if(!RideBikeBinding.valid(bike))return false;
@@ -63,12 +65,19 @@ final class CardoStartHandshake {
   CardoAutoRidePrefs.status(c,"자동 시작 거절됨 · 카르도 상태와 권한 확인 후 알림에서 재시작");
   CardoAutoRidePrefs.releaseClaim(c,CardoAutoRidePrefs.address(c));
   ConnectionEventLog.record(c,bike,ConnectionEventLog.Event.ANDROID_BLOCKED);
+  if(CardoAutoRidePrefs.forBike(c,bike)&&CardoAutoRidePrefs.recentlyConnected(c))
+   CardoRideStarter.notifyTap(c);
  }
  static void stopped(Context c,String bike,String token){
   if(token==null||token.isEmpty()||!RideBikeBinding.valid(bike))return;
   SharedPreferences p=prefs(c,bike);
   if(token.equals(p.getString("token",""))&&"armed".equals(p.getString("state","")))
    p.edit().putString("state","stopped").commit();
+ }
+ static boolean needsManualRecovery(Context c,String bike){
+  if(!RideBikeBinding.valid(bike)||pending(c,bike))return false;
+  String state=prefs(c,bike).getString("state","");
+  return "failed".equals(state)||"timeout".equals(state);
  }
  static String summary(Context c,String bike){
   if(!RideBikeBinding.valid(bike))return "바이크 선택 필요";

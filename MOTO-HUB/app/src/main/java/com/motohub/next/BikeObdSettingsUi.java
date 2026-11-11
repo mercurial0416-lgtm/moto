@@ -139,6 +139,11 @@ final class BikeObdSettingsUi {
    }catch(RuntimeException error){a.toast("진단 복사에 실패했어. 앱 권한을 확인해.");}
   });
   a.action(p,"자동기록 없이 연결 테스트",true,()->showSafeConnectionTest(bikeId));
+  a.action(p,"실차 검증 체크리스트 · 상태 확인",false,()->new AlertDialog.Builder(a)
+   .setTitle("듀크390 · Freecom 2X 실차 검증")
+   .setMessage(RideHardwareVerification.checklist(a,bikeId))
+   .setPositiveButton("닫기",null)
+   .setNeutralButton("기록 없는 연결 검사",(d,w)->showSafeConnectionTest(bikeId)).show());
   a.action(p,"블루투스 페어링 설정 열기",false,()->openBluetoothSettings());
   a.action(p,"연결 문제 진단 · 지금 해결하기",false,()->showConnectionHelp(bikeId));
   a.divider(p);
@@ -249,6 +254,10 @@ final class BikeObdSettingsUi {
   }else if(!permissions){
    a.label(p,"기기 설정은 끝났어. 자동기록 시작에 필요한 권한만 확인하면 돼.",13,a.muted,false);
    a.action(p,"자동기록 권한 확인하기",true,this::showPermissionHelp);
+  }else if(mode.needsCardo()&&CardoStartHandshake.needsManualRecovery(a,bikeId)){
+   a.label(p,"최근 Android 자동시작 확인 실패 · 권한과 카르도 연결 확인 후 명시적으로 재시도해.",13,a.muted,false);
+   a.action(p,"자동 시작 다시 요청 · 기록 시작 아님",true,()->CardoRideStarter.startFromTap(a,false));
+   a.action(p,"실패 원인 및 권한 확인",false,()->showConnectionHelp(bikeId));
   }else if(active){
    a.label(p,gpsRecording?"GPS 경로가 저장 중이야. 주행 중 설정은 변경하지 마.":
     "현재 출발 감지 상태를 확인할 수 있어. ECU 데이터가 실제 수신 중인지 구별해.",13,a.muted,false);
