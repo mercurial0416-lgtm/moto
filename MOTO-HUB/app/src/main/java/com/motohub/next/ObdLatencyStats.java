@@ -2,8 +2,8 @@ package com.motohub.next;
 
 /** Session-only bounded read-only OBD query latency; never stores Bluetooth IDs or ECU values. */
 final class ObdLatencyStats {
- private static final String[] PIDS={"010D","010C","0105","0142"};
- private static final String[] NAMES={"속도","RPM","수온","전압"};
+ private static final String[] PIDS={"010D","010C","0105","0142","012F"};
+ private static final String[] NAMES={"속도","RPM","수온","전압","연료"};
  private static final int WINDOW=8;
  private final long[][] values=new long[PIDS.length][WINDOW];
  private final int[] count=new int[PIDS.length],failures=new int[PIDS.length];
