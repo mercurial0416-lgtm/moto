@@ -14,7 +14,7 @@ checks={
  "Cardo registration no longer requires an OBD":'!BikeObdPreferences.validAddress(obd)||!cardo.equalsIgnoreCase(obd)' in cardo,
  "finite battery-conscious standby":'CardoStandbyPolicy.idleWindowMs' in ride and '900_000L' in read("CardoStandbyPolicy.java"),
  "missed Cardo event reconciled without scan":'getProfileProxy' in read("CardoPresenceReconciler.java") and 'CardoPresenceReconciler.onForeground(this)' in main and 'startDiscovery(' not in read("CardoPresenceReconciler.java"),
- "pre-trigger real GPS points written first":'postAtFrontOfQueue' in ride and 'new java.util.ArrayList<>(cardoGpsPreroll)' in ride and 'prerollReplaying?50_000_000_000L' in ride,
+ "pre-trigger real GPS points written first":'postAtFrontOfQueue' in ride and 'flushActualGpsPreroll(45_000L)' in ride and 'flushActualGpsPreroll(15_000L)' in ride and 'prerollReplaying?50_000_000_000L' in ride,
  "GPS fix freshness not mistaken for parking":'gpsStationaryEvidence.confirmed(now)' in ride and 'GpsSignalStatus.fresh(lastFixElapsed,now)' not in ride,
  "OBD stationary evidence is fresh":'ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now)' in ride,
  "crash continuation never overwrites old track":'RideResumePolicy.source' in ride and 'track.createNewFile()' in ride and '.setNeutralButton("GPS 이어 기록"' in main,
