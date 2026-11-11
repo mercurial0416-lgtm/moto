@@ -116,7 +116,7 @@ final class BikeObdSettingsUi {
    "이 화면에서 설정한 연결은 이 바이크에만 적용돼.",true);
   step(p,"02","OBD 동글",!wantsObd?"이번 방식에 필요 없음 · 건너뛰기":obd?
    liveObd?"실제 ECU 속도 수신 확인":"등록 완료 · 실제 ECU 연결은 미확인":
-   "미등록 · 카르도+GPS만 쓴다면 건너뛰어도 돼",
+   "미등록 · 현재 선택 방식에서는 먼저 등록 필요",
    obd?"키 ON 상태에서 읽기 전용 연결 검사로 확인할 수 있어.":
    "동글 장착 → 바이크 키 ON → 휴대폰 Bluetooth 페어링 → 앱에 등록.",!wantsObd||obd);
   step(p,"03","카르도",!wantsCardo?"이번 방식에 필요 없음 · 건너뛰기":cardo?
@@ -306,9 +306,12 @@ final class BikeObdSettingsUi {
   boolean same=bikeId.equals(RideService.activeRideBikeId);
   BluetoothManager bm=a.getSystemService(BluetoothManager.class);
   BluetoothAdapter adapter=bm==null?null:bm.getAdapter();
-  boolean bluetooth=adapter!=null&&adapter.isEnabled();
   boolean btPermission=Build.VERSION.SDK_INT<31||
     a.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)==PackageManager.PERMISSION_GRANTED;
+  boolean bluetooth=false;
+  if(adapter!=null&&btPermission){
+   try{bluetooth=adapter.isEnabled();}catch(SecurityException missingPermission){bluetooth=false;}
+  }
   boolean locationPermission=a.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;
   boolean notifications=Build.VERSION.SDK_INT<33||
     a.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED;

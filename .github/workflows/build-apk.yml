@@ -58,7 +58,7 @@ jobs:
           # Runner-provided Gradle passed the isolated OBD preview build.
           # The project wrapper URL currently redirects to HTTP 504.
           command -v gradle
-          gradle :app:assembleDebug :app:assembleObdPreview :app:assembleRelease :app:lintDebug :app:testDebugUnitTest -PmotoReleaseCode=602 -PmotoObdSideBySide=true -PmotoObdPreviewTag=602 --no-daemon
+          gradle :app:assembleDebug :app:assembleObdPreview :app:assembleRelease :app:lintDebug :app:testDebugUnitTest -PmotoReleaseCode=603 -PmotoObdSideBySide=true -PmotoObdPreviewTag=603 --no-daemon
           mkdir -p app/build/outputs/sign-tools
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" app/build/outputs/sign-tools/
           cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" app/build/outputs/sign-tools/
@@ -66,13 +66,13 @@ jobs:
         working-directory: MOTO-HUB
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/signature.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionCode='602'" > app/build/outputs/apk/debug/version-check.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk | grep "versionCode='603'" > app/build/outputs/apk/debug/version-check.txt
           sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/SHA256.txt
           PREVIEW="app/build/outputs/apk/obdPreview/app-obdPreview.apk"
           test -s "$PREVIEW"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$PREVIEW" > app/build/outputs/apk/obdPreview/signature.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$PREVIEW" | grep "versionCode='602'" > app/build/outputs/apk/obdPreview/version-check.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$PREVIEW" | grep "package: name='com.motohub.next.obdpreview602'" > app/build/outputs/apk/obdPreview/package-check.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$PREVIEW" | grep "versionCode='603'" > app/build/outputs/apk/obdPreview/version-check.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$PREVIEW" | grep "package: name='com.motohub.next.obdpreview603'" > app/build/outputs/apk/obdPreview/package-check.txt
           sha256sum "$PREVIEW" > app/build/outputs/apk/obdPreview/SHA256.txt
       - name: Upload APK and reports
         if: always()

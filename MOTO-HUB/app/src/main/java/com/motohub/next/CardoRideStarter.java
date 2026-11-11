@@ -77,7 +77,8 @@ final class CardoRideStarter {
      .putExtra(RideService.EXTRA_CARDO_TRIGGER,true);
    if(Build.VERSION.SDK_INT>=26)c.startForegroundService(i);
    else c.startService(i);
-   CardoAutoRidePrefs.status(c,"카르도 감지 → OBD 연결 시도 중");
+   CardoAutoRidePrefs.status(c,BikeObdPreferences.validAddress(obd)?
+    "카르도 감지 → OBD 연결 시도 중":"카르도 감지 → GPS 안전망 출발 판정 대기");
    cancelTap(c);
    return true;
   }catch(RuntimeException ex){return false;}
@@ -91,7 +92,7 @@ final class CardoRideStarter {
   }
   if(!eligible(a)){a.toast("정확한 위치·주변 기기·알림 권한 및 GPS 확인");return;}
   if(RideService.autoArmed||RideService.running){a.toast("OBD 자동 감지가 이미 진행 중");cancelTap(a);return;}
-  if(!start(a))a.toast("OBD 시작 제한 · 차고에서 연결 설정을 확인해 주세요");
+  if(!start(a))a.toast("자동기록 시작 제한 · 연결 도우미에서 권한과 방식 확인");
   else a.toast("카르도 자동 라이딩 연결 시작 · 출발하면 GPS 기록");
  }
  static void notifyTap(Context c){
@@ -104,7 +105,7 @@ final class CardoRideStarter {
   PendingIntent action=PendingIntent.getActivity(c,595,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
   Notification notice=new Notification.Builder(c,CHANNEL)
     .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-    .setContentTitle("카르도 연결 감지 · OBD 라이딩 시작")
+    .setContentTitle("카르도 연결 감지 · 자동기록 시작")
     .setContentText("Android 백그라운드 시작 제한 · 눌러서 자동기록 대기")
     .setVisibility(Notification.VISIBILITY_PRIVATE)
     .setAutoCancel(true).setContentIntent(action).build();
