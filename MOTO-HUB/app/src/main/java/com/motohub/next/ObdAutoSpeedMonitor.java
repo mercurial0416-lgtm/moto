@@ -90,7 +90,16 @@ final class ObdAutoSpeedMonitor {
  private void pollConnection()throws Exception{
   BluetoothSocket s=device.createRfcommSocketToServiceRecord(SPP);socket=s;
   if(stopped)return;
-  s.connect();if(stopped)return;
+  // Android RFCOMM has no connect timeout. Closing the socket cancels a
+  // wedged handshake without leaving the foreground watcher stuck forever.
+  final java.util.concurrent.atomic.AtomicBoolean connected=new java.util.concurrent.atomic.AtomicBoolean(false);
+  Thread connectGuard=new Thread(()->{
+   try{Thread.sleep(12_000L);}catch(InterruptedException cancelled){return;}
+   if(!connected.get()&&!stopped&&socket==s)try{s.close();}catch(Exception ignored){}
+  },"moto-obd-connect-deadline");
+  connectGuard.setDaemon(true);connectGuard.start();
+  try{s.connect();connected.set(true);}finally{connectGuard.interrupt();}
+  if(stopped)return;
   InputStream in=s.getInputStream();OutputStream out=s.getOutputStream();
   for(String setup:new String[]{"ATZ\r","ATE0\r","ATL0\r","ATS0\r","ATSP0\r"}){
    query(in,out,setup,4000);if(stopped)return;
@@ -119,7 +128,9 @@ final class ObdAutoSpeedMonitor {
   ObdAuxSensorPolicy auxiliary=new ObdAuxSensorPolicy();
   final ObdPidCapabilities.Support odoSupport=capabilities.forPid("01A6");
   if(listener.allowOdometer()&&odoSupport!=ObdPidCapabilities.Support.YES)
-   listener.odometerStatus("ECU ODO 지원 목록 미확인 · 정차 상태에서 1회 직접 확인 예정");
+   listener.odometerStatus(odoSupport==ObdPidCapabilities.Support.NO?
+    "ECU ODO PID 01A6 미지원 · GPS 추정만 사용":
+    "ECU ODO 지원 목록 미확인 · 정차 상태에서 1회 직접 확인 예정");
   ObdLatencyStats latency=new ObdLatencyStats();
   while(!stopped){
    long started=System.nanoTime();
@@ -156,13 +167,14 @@ final class ObdAutoSpeedMonitor {
     catch(Exception e){listener.odometerStatus("ODO 응답 실패 · 기존 계기판 km 유지");}
    }
    // Rotate low-rate supported sensors without ever requesting a write-capable PID.
-   if(!stopped&&++samples%4==0){
-    String pid=new String[]{"010C","0105","0142","012F"}[(samples/4-1)%4];
+   if(!stopped&&++samples%6==0&&speed>=0&&
+      latency.speedAverageMs()>=0&&latency.speedAverageMs()<=1200){
+    String pid=new String[]{"010C","0105","0142","012F"}[(samples/6-1)%4];
     if((!"012F".equals(pid)||capabilities.forPid(pid)==ObdPidCapabilities.Support.YES)&&
       capabilities.forPid(pid)!=ObdPidCapabilities.Support.NO&&auxiliary.mayPoll(pid,System.nanoTime())){
      long startedAt=System.nanoTime();
      try{
-      double value=ObdSensorReading.number(pid,query(in,out,ObdReadOnlyProtocol.query(pid),2500));
+      double value=ObdSensorReading.number(pid,query(in,out,ObdReadOnlyProtocol.query(pid),1100));
       latency.success(pid,(System.nanoTime()-startedAt)/1_000_000L);
       if(ObdSensorReading.valid(pid,value)){
        auxiliary.succeeded(pid,System.nanoTime());
@@ -219,10 +231,18 @@ final class ObdAutoSpeedMonitor {
   int cleared=0;while(in.available()>0&&cleared++<1024)in.read();
   out.write(command.getBytes(StandardCharsets.US_ASCII));out.flush();
   StringBuilder response=new StringBuilder();long until=System.nanoTime()+timeoutMs*1_000_000L;
+  byte[] chunk=new byte[256];
   while(!stopped&&System.nanoTime()<until&&response.length()<2048){
-   if(in.available()==0){Thread.sleep(30);continue;}
-   int c=in.read();if(c<0)throw new IOException("OBD2 stream closed");
-   if(c=='>')return response.toString();response.append((char)c);
+   int available=in.available();
+   if(available==0){Thread.sleep(30);continue;}
+   int count=in.read(chunk,0,Math.min(chunk.length,available));
+   if(count<0)throw new IOException("OBD2 stream closed");
+   for(int i=0;i<count;i++){
+    int value=chunk[i]&255;
+    if(value=='>')return response.toString();
+    if(response.length()>=2048)throw new IOException("OBD2 응답 용량 초과");
+    response.append((char)value);
+   }
   }
   if(stopped)throw new IOException("OBD2 감지가 종료됐습니다.");
   // An ELM reply without the terminating prompt is incomplete, even with bytes received.

@@ -120,6 +120,8 @@ public final class RideService extends Service implements LocationListener {
  String pendingBikeId="",activeAutoAdapterAddress="";ObdAutoSpeedMonitor obdMonitor;
  boolean cardoSession=false,cardoConnected=false,requestedCardoStart=false;
  boolean cardoGpsFallbackRecording=false,cardoGpsProbeRegistered=false;
+ int cardoGpsProbeFailures=0;
+ long cardoGpsRetryAt=0;
  final CardoGpsFallbackGate cardoGpsGate=new CardoGpsFallbackGate();
  Location cardoGpsPrevious=null;
  // Do not power GPS during a healthy OBD wait. A lightweight 12-second
@@ -127,15 +129,20 @@ public final class RideService extends Service implements LocationListener {
  final Runnable cardoGpsProbeWake=new Runnable(){public void run(){
   if(!cardoSession||!autoArmed||running||autoFinishPending||
      !BikeObdPreferences.gpsFallbackEnabled(RideService.this,pendingBikeId))return;
-  if(!ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,SystemClock.elapsedRealtime())
-     &&!cardoGpsProbeRegistered){
+  long now=SystemClock.elapsedRealtime();
+  if(!ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now)
+     &&!cardoGpsProbeRegistered&&now>=cardoGpsRetryAt){
    try{
     requestGpsUpdatesChecked();
     cardoGpsProbeRegistered=true;
+    cardoGpsProbeFailures=0;cardoGpsRetryAt=0;
     status="OBD 속도 미수신 · 5분 한정 GPS 안전망 이동 감지";
     notifySafely(status);
    }catch(Exception error){
-    status="GPS 안전망 위치 사용 제한 · OBD 연결은 계속 대기";
+    cardoGpsProbeFailures=Math.min(8,cardoGpsProbeFailures+1);
+    long delay=Math.min(60_000L,5_000L*(1L<<Math.min(4,cardoGpsProbeFailures-1)));
+    cardoGpsRetryAt=now+delay;
+    status="GPS 안전망 위치 제한 · "+(delay/1000)+"초 뒤 재시도 · OBD 대기 유지";
     notifySafely(status);
    }
   }
@@ -429,8 +436,13 @@ public final class RideService extends Service implements LocationListener {
       obdAverageLatencyMs=averageMs;obdQueryFailures=failures;
      }});
     }
-    @Override public void speed(int kmh){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
-     long elapsed=SystemClock.elapsedRealtime();
+    @Override public void speed(int kmh){
+     // Preserve the worker's receipt time; a busy UI looper must not make old
+     // speed data look fresh or count delayed callbacks as a new acceleration.
+     final long receivedAt=SystemClock.elapsedRealtime();
+     handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
+     if(!ObdTelemetryFreshness.speedFresh(receivedAt,SystemClock.elapsedRealtime()))return;
+     long elapsed=receivedAt;
       if(!speedSanity.accept(kmh,elapsed)){
        autoGate.connectionLost();obdLastError="OBD2 속도 급변값 무시 · 자동 출발 보류";
        return;
