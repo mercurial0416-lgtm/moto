@@ -202,6 +202,8 @@ final class GarageHomeUi {
   welcome.addView(a.text("나만의 차고를\n만들어 보세요",32,light,true));
   ImageView visual=new ImageView(a);visual.setImageResource(R.drawable.garage_bike_outline);visual.setScaleType(ImageView.ScaleType.FIT_CENTER);welcome.addView(visual,new LinearLayout.LayoutParams(-1,a.dp(190)));
   welcome.addView(a.text("주행거리, 주유비, 정비 일정을 한곳에.\n첫 바이크를 등록하면 시작됩니다.",15,soft,false));a.content.addView(welcome);a.gap(a.content,14);
+  if(a.getPackageName().contains(".obdpreview"))
+   a.note("이 APK는 별도 테스트판이야. 기존 v605 등 다른 버전의 바이크·OBD 연결 설정이나 GPS 기록이 자동으로 이동하지 않아. 여기에도 바이크와 OBD/카르도를 다시 설정해야 자동기록을 시도할 수 있어.");
   a.action(a.content,"백업에서 내 기록 가져오기",false,()->new HubScreens(a).basicBackup());
   ExperienceUi.dock(a,a.button("첫 바이크 등록",true,()->a.edit("vehicles",null)));
  }

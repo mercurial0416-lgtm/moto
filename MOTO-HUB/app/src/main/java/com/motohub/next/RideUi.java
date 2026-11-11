@@ -65,6 +65,18 @@ final class RideUi {
   String workspace=a.getSharedPreferences("ride_display",0).getString("workspace","ride");
   ExperienceUi.switcher(a,"주행하기","라이딩 기록",!"history".equals(workspace),()->switchWorkspace("ride"),()->switchWorkspace("history"));
   if("history".equals(workspace)){renderHistoryWorkspace();return;}
+  if(!RideService.running&&!RideService.autoArmed&&a.bike()!=null){
+   String bikeId=a.bike().optString("id");
+   ConnectionSetupMode.Mode mode=ConnectionSetupMode.get(a,bikeId);
+   String warning=RideMissingRecordingGuide.probableReason(mode,
+     BikeObdPreferences.validAddress(BikeObdPreferences.address(a,bikeId)),
+     CardoAutoRidePrefs.forBike(a,bikeId),
+     BikeObdPreferences.gpsFallbackEnabled(a,bikeId),
+     BikeObdPreferences.autoRideEnabled(a,bikeId),false);
+   a.label(a.content,"자동기록 상태: "+warning,13,a.muted,false);
+   a.action(a.content,"이 바이크 OBD · 자동기록 설정",false,
+    ()->new BikeObdSettingsUi(a).open(bikeId));
+  }
   final boolean saving=RideService.saving();
   final boolean focus=RideService.running&&a.getSharedPreferences("ride_display",0).getBoolean("focus",false);
   LinearLayout hero=a.col();hero.setPadding(a.dp(12),a.dp(12),a.dp(12),a.dp(16));

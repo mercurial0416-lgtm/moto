@@ -123,6 +123,20 @@ final class BikeObdSettingsUi {
   if(!BikeObdPreferences.address(a,bikeId).isEmpty())
    a.label(p,ObdLocalDiagnosticLog.recentManualSummary(a),13,a.muted,false);
   a.label(p,FirstRideSetupProof.summary(a,bikeId),13,a.muted,false);
+  a.action(p,"오늘 주행 기록이 안 됐을 때 · 원인 확인",true,()->new AlertDialog.Builder(a)
+   .setTitle("자동주행 기록 실패 진단")
+   .setMessage(RideMissingRecordingGuide.summary(a,bikeId))
+   .setNegativeButton("닫기",null)
+   .setPositiveButton("진단 내용 복사",(d,w)->{
+    try{
+     android.content.ClipboardManager clipboard=(android.content.ClipboardManager)a.getSystemService(Context.CLIPBOARD_SERVICE);
+     if(clipboard!=null){
+      clipboard.setPrimaryClip(android.content.ClipData.newPlainText("MOTO HUB 자동기록 진단",
+       SafeConnectionDiagnosticReport.redact(RideMissingRecordingGuide.summary(a,bikeId))));
+      a.toast("진단 복사 완료 · 개인 정보 확인 후 공유해.");
+     }
+    }catch(RuntimeException e){a.toast("복사할 수 없어. 진단 화면에서 내용을 확인해.");}
+   }).show());
   a.action(p,"자동연결·기록 실패 이력",false,()->new AlertDialog.Builder(a)
    .setTitle("자동기록 단계와 실패 이력")
    .setMessage(ConnectionEventLog.summary(a,bikeId)+"\n\n"+
