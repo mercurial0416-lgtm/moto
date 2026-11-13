@@ -19,6 +19,7 @@ assert 'else{stopWith("GPS가 꺼져 자동 출발 감지를 중지했습니다.
 disconnect=s.split('private void onObdDisconnected(String reason){',1)[1].split('Notification notification(',1)[0]
 assert 'if(running){' in disconnect and 'gpsOnlyAfterObd=true;' in disconnect
 assert 'notifySafely(status)' in disconnect, 'disconnection notification is guarded from device errors'
-assert 'GPS 단독 기록 유지' in disconnect
+assert 'OBD 연결 끊김 · GPS 계속 기록' in disconnect
+assert 'gpsOnlyAfterObd=true' in disconnect
 print("PASS OBD disarm preserves active GPS session without silently completing GPS track")
 PY
