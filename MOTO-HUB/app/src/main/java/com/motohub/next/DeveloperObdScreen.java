@@ -102,8 +102,8 @@ final class DeveloperObdScreen {
    (RideService.running?"GPS 기록 중":"OBD 출발 감지 대기"):
    "꺼짐 · OBD를 연결해 자동 감지를 켜야 시작됨"),14,activity.fg,true);
   activity.label(p,"최근 기록 서비스: "+RideService.status+
-   "\\nOBD 연결: "+RideService.obdLink+
-   "\\n마지막 오류: "+RideService.obdLastError,12,activity.muted,false);
+   "\nOBD 연결: "+RideService.obdLink+
+   "\n마지막 오류: "+RideService.obdLastError,12,activity.muted,false);
   activity.label(p,"페어링된 ELM327 호환 Bluetooth Classic(SPP) 어댑터로 표준 OBD-II 센서만 조회합니다. 바이크 ECU가 지원하는 항목만 표시됩니다. 순정 계기판 Bluetooth 연결과는 별개입니다.",14,activity.muted,false);
   activity.label(p,"ECU 설정 변경 · 고장코드 삭제 · 출력 제어 없음. 주행 중 조작하지 마세요. 장치 연결은 사용자 선택 시에만 시작되고 원격 전송은 없습니다. 자동 라이딩 도중 일시적 연결 실패 시 최대 8회 재접속하며 앱 재시작 후에는 재연결하지 않습니다.",14,activity.muted,false);
   activity.gap(p,10);
@@ -168,7 +168,9 @@ final class DeveloperObdScreen {
   if(!remembered.isEmpty()){
    activity.action(p,"최근 OBD2 장치로 빠르게 연결",true,this::connectRememberedAuto);
    activity.action(p,"기억한 OBD2 장치 삭제",false,()->{
-    activity.getSharedPreferences("developer_experiments",0).edit().remove(adapterKey()).apply();
+    android.content.SharedPreferences.Editor editor=activity.getSharedPreferences("developer_experiments",0).edit().remove(adapterKey());
+    if(activity.items("vehicles").size()==1)editor.remove(PREFERRED_ADAPTER);
+    editor.apply();
     setStatus("기억한 장치를 삭제했습니다. 다음부터 다시 선택해 주세요.");
    });
   }
