@@ -39,7 +39,9 @@ final class ObdHandsFreeSession {
      RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()||!enabled(a))return;
   SharedPreferences prefs=a.getSharedPreferences(PREFS,0);
   String bike=prefs.getString(BIKE,""),device=prefs.getString(DEVICE,"");
-  JSONObject registered=Store.find(a.db,"vehicles",bike);
+  JSONObject registered=null;
+  for(JSONObject vehicle:a.items("vehicles"))
+   if(bike.equals(vehicle.optString("id"))){registered=vehicle;break;}
   if(!RideBikeBinding.valid(bike)||registered==null||GarageBikeStatus.sold(registered.optString("soldDate"))||
      device==null||!BluetoothAdapter.checkBluetoothAddress(device))return;
   if(a.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED ||
