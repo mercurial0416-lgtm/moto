@@ -18,7 +18,7 @@ service=(base/'RideService.java').read_text()
 ride=(base/'RideUi.java').read_text()
 gallery=(base/'MotorcyclePhotoGallery.java').read_text()
 photo=(base/'MotorcyclePhoto.java').read_text()
-assert 'if(STOP.equals(action)){\n   finishUserRideAsync();' in service
+assert 'if(STOP.equals(action)){' in service and 'if(running||autoFinishPending)finishUserRideAsync();' in service and 'disarmAutoByUser(' in service
 assert 'if(autoFinishPending){' in service and 'finishPending=true;Sharing.stop();return;' in service
 assert 'if(finishPending){' in service and 'stopWith(verified?' in service
 assert 'finishPending=true;\n  Sharing.stop();' in service
