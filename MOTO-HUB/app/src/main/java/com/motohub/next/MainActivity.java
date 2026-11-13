@@ -266,6 +266,7 @@ public class MainActivity extends Activity {
   if(root!=null&&"라이딩".equals(tab)&&dialog==null&&rideStateSignature()!=lastRenderedRideState)renderPreservingPosition();
   if(!readOnly)DailyMaintenanceJob.schedule(this);
   MotoWidgetProvider.refresh(this);
+  ObdHandsFreeSession.resumeWhenVisible(this);
   if(!RideService.running&&!RideService.autoArmed&&!readOnly&&!"라이딩".equals(tab))showInterruptedRidePrompt();
   AppUpdateNotice.checkOnResume(this);
  }
