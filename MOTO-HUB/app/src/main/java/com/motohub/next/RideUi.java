@@ -180,6 +180,11 @@ final class RideUi {
    hero.addView(disarm);
   }
   a.content.addView(hero);a.gap(a.content,12);
+  if(!RideService.running&&!RideService.autoArmed&&a.bike()!=null){
+   a.label(a.content,"OBD 자동 기록: 꺼짐 · 바이크 설정에서 감지를 직접 켜야 자동 출발합니다.",12,a.muted,false);
+   a.action(a.content,"선택한 바이크 OBD 설정",false,()->new HubScreens(a).manageBike());
+   a.gap(a.content,8);
+  }
   // The navigation provider is a compact utility row, not a second hero card.
   NavigationChoice chosen=NavigationApps.preferred(a);
   LinearLayout navRow=new LinearLayout(a);navRow.setGravity(Gravity.CENTER_VERTICAL);
