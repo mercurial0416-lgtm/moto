@@ -89,14 +89,14 @@ final class DeveloperObdScreen {
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
  }
  void show(){
-  JSONObject selected=activity.bike();
-  if(bikeId.isEmpty()||selected==null||!bikeId.equals(selected.optString("id"))){
+  JSONObject configuredBike=activity.bike();
+  if(bikeId.isEmpty()||configuredBike==null||!bikeId.equals(configuredBike.optString("id"))){
    activity.toast("OBD 설정할 바이크를 먼저 선택해 주세요.");return;
   }
-  if(GarageBikeStatus.sold(selected.optString("soldDate"))){
+  if(GarageBikeStatus.sold(configuredBike.optString("soldDate"))){
    activity.toast("판매 완료한 바이크에는 OBD 자동 기록을 시작할 수 없습니다.");return;
   }
-  LinearLayout p=activity.page(selected.optString("name","내 바이크")+" · OBD 설정");
+  LinearLayout p=activity.page(configuredBike.optString("name","내 바이크")+" · OBD 설정");
   activity.label(p,"이 바이크 전용 OBD · GPS 자동 기록",16,activity.accent,true);
   activity.label(p,"자동 기록 상태: "+(RideService.autoArmed?
    (RideService.running?"GPS 기록 중":"OBD 출발 감지 대기"):
