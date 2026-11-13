@@ -10,7 +10,7 @@ checks={
  'restart prompt is opt-in': 'showInterruptedRidePrompt()' in main and 'new Thread(' in main and '중단된 라이딩 기록 발견' in main,
  'no location service auto-start in prompt': 'startService(' not in main.split('void showInterruptedRidePrompt(){')[1].split('@Override protected void onResume')[0],
  'requires manual restoration': 'TrackRecovery.recover(f)' in ui and '복구 없이 분석' in ui,
- 'GPS record survives OBD disconnect': 'gpsOnlyAfterObd=true' in service and 'GPS 단독 기록 유지' in service,
+ 'GPS record survives OBD disconnect': 'gpsOnlyAfterObd=true' in service and 'OBD 연결 끊김 · GPS 계속 기록' in service,
  'OS never restarts ride service': 'START_NOT_STICKY' in service,
  'notification throttle does not alter GPS points': 'notificationRate.shouldNotify(SystemClock.elapsedRealtime())' in service and 'output.getFD().sync()' in service,
  'read-only PID queries': 'ObdReadOnlyProtocol.query("010D")' in monitor and 'ObdReadOnlyProtocol.query(pid)' in monitor,
