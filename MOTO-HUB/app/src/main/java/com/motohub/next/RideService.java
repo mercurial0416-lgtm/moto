@@ -542,6 +542,19 @@ public final class RideService extends Service implements LocationListener {
   autoGate.connectionLost();obdStationaryRemainingMs=-1;obdMonitor=null;
   Sharing.stop();MotoWidgetProvider.refresh(this);
   if(!autoArmed)return;
+  if(ObdSpeedSupportFailure.confirmedUnsupported(reason)){
+   // An explicit ECU "no PID 010D" cannot be solved by polling Bluetooth forever.
+   // Stop the auto mode, preserve any GPS track, and keep a diagnostic breadcrumb.
+   ObdHandsFreeSession.disable(this);
+   autoArmed=false;selectedAutoDevice=null;
+   handler.removeCallbacks(reconnectObd);
+   String alert="OBD 속도 PID 010D 미지원 · 자동 출발 불가 · 수동 GPS 기록 이용";
+   if(running){
+    gpsOnlyAfterObd=true;status=alert+" · 기존 GPS 기록 유지";
+    notifySafely(status);
+   }else stopWith(alert,false);
+   return;
+  }
   if(running){
    // Preserve the already-open track; only GPS-verified stationary fallback may save it.
    gpsOnlyAfterObd=true;
