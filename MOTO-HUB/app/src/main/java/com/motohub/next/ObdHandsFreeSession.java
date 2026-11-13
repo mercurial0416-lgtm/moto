@@ -23,6 +23,9 @@ final class ObdHandsFreeSession {
  static String bikeId(Context c){
   return c.getSharedPreferences(PREFS,0).getString(BIKE,"");
  }
+ static String deviceAddress(Context c){
+  return c.getSharedPreferences(PREFS,0).getString(DEVICE,"");
+ }
  static boolean enable(Context c,String bikeId,String address){
   if(!RideBikeBinding.valid(bikeId)||address==null||!BluetoothAdapter.checkBluetoothAddress(address))
    return false;
