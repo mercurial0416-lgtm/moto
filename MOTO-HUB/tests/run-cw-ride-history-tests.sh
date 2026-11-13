@@ -24,6 +24,8 @@ assert 'rideHistoryPeriod=RideHistoryPeriod.restore(' in main
 assert 'out.putString("rideHistoryPeriod",rideHistoryPeriod)' in main
 assert 'TrackFile.discardEmptySession(track)' in service
 assert 'Sharing.start(' not in ui
-assert 'if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))' in service
+assert 'if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))' not in service
+assert 'if(pendingBikeId==null||pendingBikeId.trim().isEmpty())' in service
+assert 'AUTO_ARM.equals(action)' in service
 print('PASS: period UI, search debounce, zero-byte GPS cleanup and safety wiring')
 PY

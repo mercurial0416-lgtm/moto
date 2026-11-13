@@ -14,7 +14,7 @@ r=(root/'RideService.java').read_text();a=(root/'MainActivity.java').read_text()
 u=(root/'RideUi.java').read_text();d=(root/'DeveloperObdScreen.java').read_text()
 checks={
  'GPS ride start carries consent-fixed bike': 'putExtra(RideService.EXTRA_BIKE_ID,fixedBikeId)' in u and 'a.approvedRideBikeId.equals(liveBike)' in u,
- 'OBD auto ride carries chosen bike': 'putExtra(RideService.EXTRA_BIKE_ID,activity.bike()' in d,
+ 'OBD auto ride carries chosen bike': 'putExtra(RideService.EXTRA_BIKE_ID,bikeId)' in d and '!bikeId.equals(stillSelected.optString("id"))' in d,
  'ride start stores local binding': 'RideBikeBinding.write(track,pendingBikeId)' in r,
  'history shows bike label': '연결된 바이크:' in a,
  'applied ODO verifies bike association': 'latestRideBike=RideBikeBinding.readStrict(track)' in a,

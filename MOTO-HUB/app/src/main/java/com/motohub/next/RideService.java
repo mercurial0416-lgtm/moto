@@ -115,14 +115,11 @@ public final class RideService extends Service implements LocationListener {
   }
  }};
  volatile boolean finishPending=false,autoFinishPending=false;
- final Runnable permissionCheck=new Runnable(){public void run(){if(!running&&!autoArmed)return;if(autoArmed&&!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)){
-    // Turning off developer experiments revokes OBD permission, not consent to a
-    // separately running GPS ride. The GPS track must stay recoverable/active.
-    ObdAutoSpeedMonitor monitor=obdMonitor;
-    if(monitor!=null)monitor.stop();
-    onObdDisconnected("개발자 모드가 종료되어 자동 감지를 중지했습니다.");
-    if(!running)return;
-   }if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}if(autoArmed&&(manager==null||!manager.isProviderEnabled(LocationManager.GPS_PROVIDER))){
+ final Runnable permissionCheck=new Runnable(){public void run(){
+   if(!running&&!autoArmed)return;
+   // OBD auto detection was explicitly armed from the selected bike. It no longer
+   // depends on an unrelated developer-mode toggle while the FGS is active.
+   if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}if(autoArmed&&(manager==null||!manager.isProviderEnabled(LocationManager.GPS_PROVIDER))){
      // A GPS toggle must never close a track already being written by an OBD-
      // armed session. Stop only automatic detection; preserve manual GPS intent.
      if(GpsProviderLossPolicy.onLoss(running,autoArmed)==GpsProviderLossPolicy.Action.KEEP_ACTIVE_TRACK){
@@ -239,7 +236,7 @@ public final class RideService extends Service implements LocationListener {
  }
  private void armAutomaticRide(String address){
   try{
-   if(!getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))throw new SecurityException("개발자 모드를 활성화해 주세요.");
+   if(pendingBikeId==null||pendingBikeId.trim().isEmpty())throw new SecurityException("먼저 기록할 바이크를 선택해 주세요.");
    if(address==null||!BluetoothAdapter.checkBluetoothAddress(address))throw new IllegalArgumentException("OBD2 어댑터를 다시 선택해 주세요.");
    if(Build.VERSION.SDK_INT>=31&&checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("Bluetooth 연결 권한이 필요합니다.");
    BluetoothManager bluetooth=getSystemService(BluetoothManager.class);
@@ -250,7 +247,8 @@ public final class RideService extends Service implements LocationListener {
    if(paired==null)throw new SecurityException("이미 페어링된 OBD2 장치만 사용할 수 있습니다.");
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
-   autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
+   autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong(
+    BikeObdPreferences.stopAfterKey(pendingBikeId),ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;obdFuelPercent=Double.NaN;obdFuelAt=0;
    obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=1;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;

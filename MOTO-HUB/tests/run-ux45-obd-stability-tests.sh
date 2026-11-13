@@ -44,7 +44,7 @@ checks={
  "dashboard advisory reads":'ObdGaugeWarnings.advisory(' in dash,
  "privacy policy excludes identifiers":'GPS 37.' not in policy,
  "do not auto-edit ODO":'target.put("odo"' not in service,
- "GPS ride still user opted":'getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)' in dev,
+ "GPS ride still user opted":'.setPositiveButton("동의하고 자동 감지 시작"' in dev and 'setAction(RideService.AUTO_ARM)' in dev,
 }
 for label,valid in checks.items():assert valid,label
 print(f"PASS UX45 OBD safety/source guards: {len(checks)}")
