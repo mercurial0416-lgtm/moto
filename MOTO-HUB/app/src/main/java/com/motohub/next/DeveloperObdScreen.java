@@ -98,8 +98,10 @@ final class DeveloperObdScreen {
   }
   LinearLayout p=activity.page(configuredBike.optString("name","내 바이크")+" · OBD 설정");
   activity.label(p,"이 바이크 전용 OBD · GPS 자동 기록",16,activity.accent,true);
-  activity.label(p,"자동 기록 상태: "+(RideService.autoArmed?
-   (RideService.running?"GPS 기록 중":"자동 감지 유지 · 연결/재시도 상태는 아래에서 확인"):
+  boolean thisBikeArmed=RideService.autoArmed&&bikeId.equals(ObdHandsFreeSession.bikeId(activity));
+  activity.label(p,"자동 기록 상태: "+(thisBikeArmed?
+   (RideService.running?"이 바이크 GPS 기록 중":"이 바이크 자동 감지 유지 · 아래 연결 상태 확인"):
+   RideService.autoArmed?"다른 바이크의 자동 감지 작동 중 · 먼저 종료 필요":
    ObdHandsFreeSession.enabled(activity)&&bikeId.equals(ObdHandsFreeSession.bikeId(activity))?
    "이전에 활성화됨 · 앱을 열면 복구 시도":"꺼짐 · 아래에서 최초 1회 켜기"),14,activity.fg,true);
   activity.label(p,"최근 기록 서비스: "+RideService.status+

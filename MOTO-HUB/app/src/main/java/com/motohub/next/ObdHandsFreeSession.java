@@ -57,7 +57,7 @@ final class ObdHandsFreeSession {
   android.app.NotificationManager notifications=a.getSystemService(android.app.NotificationManager.class);
   if(notifications==null||!notifications.areNotificationsEnabled())return;
   long now=SystemClock.elapsedRealtime(),last=prefs.getLong(ATTEMPT,0);
-  if(last>0&&now>=last&&now-last<60_000L)return;
+  if(!ObdHandsFreePolicy.visibleResumeDue(now,last))return;
   prefs.edit().putLong(ATTEMPT,now).apply();
   Intent start=new Intent(a,RideService.class).setAction(RideService.AUTO_ARM)
     .putExtra(RideService.EXTRA_DEVICE,device).putExtra(RideService.EXTRA_BIKE_ID,bike);

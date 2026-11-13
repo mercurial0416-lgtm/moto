@@ -439,9 +439,15 @@ final class HubScreens {
    a.developerObd=new DeveloperObdScreen(a);
    a.developerObd.show();
   });
-  a.label(p,RideService.autoArmed?
-   "OBD 자동 출발 감지 켜짐 · 알림에서 연결 및 GPS 상태 확인":
-   "OBD 자동 감지 꺼짐 · 위 설정에서 동글을 연결하고 감지를 시작해야 GPS 자동 기록 가능",
+  String currentBikeId=b.optString("id");
+  boolean thisBikeArmed=RideService.autoArmed&&currentBikeId.equals(ObdHandsFreeSession.bikeId(a));
+  a.label(p,thisBikeArmed?
+   "이 바이크 OBD 자동 감지 켜짐 · 알림에서 연결 상태 확인":
+   RideService.autoArmed?
+   "다른 바이크의 OBD 자동 감지 중 · 충돌 방지를 위해 중지 후 전환 필요":
+   ObdHandsFreeSession.enabled(a)&&currentBikeId.equals(ObdHandsFreeSession.bikeId(a))?
+   "이 바이크 자동 감지 승인됨 · 앱에서 재연결 대기":
+   "이 바이크 자동 감지 꺼짐 · 위 OBD 설정에서 최초 1회 활성화",
    12,a.muted,false);
   a.label(p,"차량 라이프로그",15,a.fg,true);
   a.action(p,"라이딩 · 주유 · 정비 통합 타임라인",false,()->new MotoTimelineUi(a).open());

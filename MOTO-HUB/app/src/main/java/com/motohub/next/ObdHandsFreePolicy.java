@@ -3,6 +3,13 @@ package com.motohub.next;
 /** Pure safety decisions for a user-authorized, continuing hands-free OBD session. */
 final class ObdHandsFreePolicy {
  private ObdHandsFreePolicy(){}
+ /** Visible-app only: retry a failed restart sooner without spamming repeated
+  * Activity resume callbacks. A monotonic clock reset signals phone reboot. */
+ static boolean visibleResumeDue(long nowElapsed,long previousAttemptElapsed){
+  if(nowElapsed<0)return false;
+  return previousAttemptElapsed<=0||nowElapsed<previousAttemptElapsed
+    ||nowElapsed-previousAttemptElapsed>=15_000L;
+ }
  /** After the inner reader exhausts its bounded retries, avoid tight Bluetooth polling. */
  static long reconnectCooldownMs(int exhaustedRounds) {
   if(exhaustedRounds<=1)return 30_000L;

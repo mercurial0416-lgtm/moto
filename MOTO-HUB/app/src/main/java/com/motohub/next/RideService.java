@@ -86,7 +86,8 @@ public final class RideService extends Service implements LocationListener {
  }
  final RideNotificationRate notificationRate=new RideNotificationRate();
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
- String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;BluetoothDevice selectedAutoDevice;int obdReconnectRounds=0;
+ String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;BluetoothDevice selectedAutoDevice;
+ int obdReconnectRounds=0,obdValidSamplesThisConnection=0;
  final Runnable reconnectObd=new Runnable(){@Override public void run(){
   if(!autoArmed||selectedAutoDevice==null||obdMonitor!=null)return;
   if(saving()){handler.postDelayed(this,15_000L);return;}
@@ -184,8 +185,10 @@ public final class RideService extends Service implements LocationListener {
   if(intent==null){stopWith("GPS 서비스가 중단됐습니다.",false);return START_NOT_STICKY;}
   String action=intent.getAction();
   if(STOP.equals(action)){
-   // Explicit STOP also revokes persistent hands-free consent.
+   // Explicit STOP also revokes persistent consent even if the service restarted
+   // without an active monitor after process death.
    if(autoArmed)disarmAutoByUser("사용자가 자동 라이딩을 종료했습니다.");
+   else ObdHandsFreeSession.disable(this);
    if(running||autoFinishPending)finishUserRideAsync();
    else if(!autoArmed)stopSelf();
    return START_NOT_STICKY;
@@ -331,7 +334,8 @@ public final class RideService extends Service implements LocationListener {
        return;
       }
       obdSpeedKmh=kmh;obdSpeedSamples++;obdLastSampleElapsed=elapsed;
-      if(obdSpeedSamples>=30)obdReconnectRounds=0;
+      obdValidSamplesThisConnection=ObdReconnectHealthPolicy.acceptValidSpeed(obdValidSamplesThisConnection);
+      if(ObdReconnectHealthPolicy.stable(obdValidSamplesThisConnection))obdReconnectRounds=0;
       gpsOnlyAfterObd=false;
       if(obdSpeedSamples==1)ObdLocalDiagnosticLog.record(RideService.this,"SENSOR_OK");
       handleAutoSpeed(kmh);
@@ -355,16 +359,21 @@ public final class RideService extends Service implements LocationListener {
      if(autoArmed&&obdMonitor==ref[0])obdAuxDiagnostics=summary;
     });}
     @Override public void connected(){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
-     obdLink="연결됨 · 차량 데이터 읽기 전용";MotoWidgetProvider.refresh(RideService.this);
+     obdLink="연결됨 · 차량 데이터 읽기 전용";
+     obdValidSamplesThisConnection=0;
+     MotoWidgetProvider.refresh(RideService.this);
       ObdLocalDiagnosticLog.record(RideService.this,"BT_OK");obdConnectionSuccesses++;
      if(!running)status="OBD2 연결됨 · 출발 대기";
     }});}
     @Override public void reconnecting(int attempt,int max){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
      obdLink="연결 재시도 "+attempt+"/"+max;obdConnectionAttempts++;MotoWidgetProvider.refresh(RideService.this);
-     obdReconnects=attempt;speedSanity.reset();ObdLocalDiagnosticLog.record(RideService.this,"RECONNECT");obdSpeedKmh=-1;obdLastSampleElapsed=0;
+     obdReconnects=attempt;obdValidSamplesThisConnection=0;
+     speedSanity.reset();ObdLocalDiagnosticLog.record(RideService.this,"RECONNECT");obdSpeedKmh=-1;obdLastSampleElapsed=0;
      obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;
      obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
-     autoGate.connectionLost();obdStationaryRemainingMs=-1;liveSpeedKmh=0;
+     // OBD loss must never overwrite GPS-measured speed: false zeroes can trigger
+     // a parked-ride finish during an active trip.
+     autoGate.connectionLost();obdStationaryRemainingMs=-1;
      status="OBD2 신호 손실 · "+obdLink+(running?" · GPS 기록 유지":"");
      notifySafely(status);
     }});}
@@ -482,8 +491,15 @@ public final class RideService extends Service implements LocationListener {
    if(verified)DailyMaintenanceJob.checkSoon(this);
    return;
   }
-  status=verified?"자동 라이딩 저장 완료 · 다음 출발 감지 대기":"자동 라이딩 저장 검증 실패 · 기록을 복구 화면에서 확인해 주세요";
-  if(verified&&savedTrack!=null&&savedTrack.isFile()&&count>=2){
+  if(!verified){
+   // Do not silently open another auto track after a failed verified write.
+   // An unfinished nonempty .track stays recoverable, and the rider must review it.
+   ObdHandsFreeSession.disable(this);
+   stopWith("자동 저장 검증 실패 · 복구 화면에서 기록을 확인하고 자동 감지를 다시 켜세요",false);
+   return;
+  }
+  status="자동 라이딩 저장 완료 · 다음 출발 감지 대기";
+  if(savedTrack!=null&&savedTrack.isFile()&&count>=2){
    new Thread(()->{try{RideInsights.Result summary=RideInsights.analyze(savedTrack);
     handler.post(()->{if(autoArmed&&!running){status=String.format(java.util.Locale.KOREA,
      "라이딩 저장 · %.1f km · %.0f km/h 최고 · 다시 출발 대기\n%s",summary.distanceKm,summary.peakKmh,RideDistanceReviewPolicy.suggestion(summary.distanceKm,true));
@@ -518,6 +534,7 @@ public final class RideService extends Service implements LocationListener {
   ObdLocalDiagnosticLog.automaticSession(this,obdConnectionAttempts,
    obdConnectionSuccesses,obdReconnects,obdQueryFailures,obdSpeedSamples,reason);
   obdLastError="OBD2 · "+reason;
+  obdValidSamplesThisConnection=0;
   obdLink="재연결 대기 · "+ObdFailureGuide.classify(reason);
   speedSanity.reset();obdSpeedKmh=-1;obdLastSampleElapsed=0;
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
@@ -525,6 +542,19 @@ public final class RideService extends Service implements LocationListener {
   autoGate.connectionLost();obdStationaryRemainingMs=-1;obdMonitor=null;
   Sharing.stop();MotoWidgetProvider.refresh(this);
   if(!autoArmed)return;
+  if(ObdSpeedSupportFailure.confirmedUnsupported(reason)){
+   // An explicit ECU "no PID 010D" cannot be solved by polling Bluetooth forever.
+   // Stop the auto mode, preserve any GPS track, and keep a diagnostic breadcrumb.
+   ObdHandsFreeSession.disable(this);
+   autoArmed=false;selectedAutoDevice=null;
+   handler.removeCallbacks(reconnectObd);
+   String alert="OBD 속도 PID 010D 미지원 · 자동 출발 불가 · 수동 GPS 기록 이용";
+   if(running){
+    gpsOnlyAfterObd=true;status=alert+" · 기존 GPS 기록 유지";
+    notifySafely(status);
+   }else stopWith(alert,false);
+   return;
+  }
   if(running){
    // Preserve the already-open track; only GPS-verified stationary fallback may save it.
    gpsOnlyAfterObd=true;
