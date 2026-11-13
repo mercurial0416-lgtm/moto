@@ -15,7 +15,7 @@ checks={
  'home stop sends completed STOP command': 'if(!RideService.running&&!RideService.autoArmed)new RideUi(a).requestStart(true)' in home and 'setPositiveButton("저장하고 종료"' in ride and 'a.startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in ride,
  'ride tab stop sends completed STOP command': 'a.startService(new Intent(a,RideService.class).setAction(RideService.STOP))' in ride,
  'no direct stopService for ride anywhere': all(not re.search(r'\.stopService\(\s*new Intent\([^;]*RideService\.class',p.read_text()) for p in Path('app/src/main/java').rglob('*.java')),
- 'STOP is completed not interrupted': 'if(STOP.equals(action))' in service and 'finishUserRideAsync();return START_NOT_STICKY;' in service and 'boolean verified=closeTrack(true)' in service and 'if(AUTO_DISARM.equals(action))' in service,
+ 'STOP is completed not interrupted': 'if(STOP.equals(action))' in service and 'if(running||autoFinishPending)finishUserRideAsync();' in service and 'boolean verified=closeTrack(true)' in service and 'if(AUTO_DISARM.equals(action))' in service,
  'verified completed ride creates done marker': 'TrackCompletion.mark(track,segmentPoints)' in service and 'TrackCompletion.mark(previous,segmentPoints)' in service and 'TrackCompletion.java' in {p.name for p in Path('app/src/main/java/com/motohub/next').iterdir()},
  'unexpected destruction remains interrupted': 'cleanup(false);' in service and 'gpsIoThread.quitSafely()' in service and 'instance=null;super.onDestroy();' in service,
  'permission callback requires ride tab': 'rideStartConsent.mayContinue("라이딩".equals(tab),granted)' in activity,
