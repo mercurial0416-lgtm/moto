@@ -94,8 +94,9 @@ public final class RideService extends Service implements LocationListener {
   BluetoothAdapter adapter=manager==null?null:manager.getAdapter();
   if(adapter==null||!adapter.isEnabled()){
    obdLink="Bluetooth 꺼짐 · 자동 재연결 대기";
-   handler.postDelayed(this,ObdHandsFreePolicy.reconnectCooldownMs(4));
-   notifySafely(obdLink+" · 다시 켜면 재시도");
+   // Checking radio state is cheap; do not leave a just-reenabled phone asleep for five minutes.
+   handler.postDelayed(this,30_000L);
+   notifySafely(obdLink+" · 켜지면 자동 재연결");
    return;
   }
   startAutoMonitor(selectedAutoDevice);
@@ -271,10 +272,17 @@ public final class RideService extends Service implements LocationListener {
    if(Build.VERSION.SDK_INT>=31&&checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("Bluetooth 연결 권한이 필요합니다.");
    BluetoothManager bluetooth=getSystemService(BluetoothManager.class);
    BluetoothAdapter adapter=bluetooth==null?null:bluetooth.getAdapter();
-   if(adapter==null||!adapter.isEnabled())throw new IllegalStateException("Bluetooth를 켜 주세요.");
+   if(adapter==null)throw new IllegalStateException("휴대폰 Bluetooth를 사용할 수 없습니다.");
    BluetoothDevice paired=null;
-   for(BluetoothDevice d:adapter.getBondedDevices())if(address.equals(d.getAddress())){paired=d;break;}
-   if(paired==null)throw new SecurityException("이미 페어링된 OBD2 장치만 사용할 수 있습니다.");
+   if(adapter.isEnabled()){
+    for(BluetoothDevice d:adapter.getBondedDevices())if(address.equals(d.getAddress())){paired=d;break;}
+   }else if(ObdHandsFreeSession.enabled(this)&&
+       pendingBikeId.equals(ObdHandsFreeSession.bikeId(this))&&
+       address.equals(ObdHandsFreeSession.deviceAddress(this))){
+    // Only previously confirmed paired adapters can resume when phone BT is off.
+    paired=adapter.getRemoteDevice(address);
+   }
+   if(paired==null)throw new SecurityException("해당 바이크에 페어링해 둔 OBD 장치를 확인할 수 없습니다.");
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
    selectedAutoDevice=paired;obdReconnectRounds=0;handler.removeCallbacks(reconnectObd);
@@ -288,7 +296,13 @@ public final class RideService extends Service implements LocationListener {
    obdPidSupport="표준 지원 PID 확인 중 · ODO 미검증";
    obdAuxDiagnostics="센서 수신 기록 없음";obdStationaryRemainingMs=-1;
    obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;obdLastError="없음";
-   startAutoMonitor(paired);handler.postDelayed(permissionCheck,5000);
+   if(adapter.isEnabled())startAutoMonitor(paired);
+   else{
+    obdLink="Bluetooth 꺼짐 · 켜지면 자동 연결";
+    status="Bluetooth 켜짐 대기 · 다음 주행 자동 감지 유지";
+    handler.postDelayed(reconnectObd,30_000L);notifySafely(status);
+   }
+   handler.postDelayed(permissionCheck,5000);
   }catch(Exception e){stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);}
  }
  private void startAutoMonitor(BluetoothDevice paired){
