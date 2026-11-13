@@ -88,7 +88,8 @@ public final class RideService extends Service implements LocationListener {
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;BluetoothDevice selectedAutoDevice;int obdReconnectRounds=0;
  final Runnable reconnectObd=new Runnable(){@Override public void run(){
-  if(!autoArmed||selectedAutoDevice==null||obdMonitor!=null||saving())return;
+  if(!autoArmed||selectedAutoDevice==null||obdMonitor!=null)return;
+  if(saving()){handler.postDelayed(this,15_000L);return;}
   BluetoothManager manager=getSystemService(BluetoothManager.class);
   BluetoothAdapter adapter=manager==null?null:manager.getAdapter();
   if(adapter==null||!adapter.isEnabled()){
@@ -283,7 +284,7 @@ public final class RideService extends Service implements LocationListener {
     throw new IOException("자동 감지 설정을 보관하지 못했습니다.");
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;obdFuelPercent=Double.NaN;obdFuelAt=0;
-   obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=1;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
+   obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=0;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
    obdPidSupport="표준 지원 PID 확인 중 · ODO 미검증";
    obdAuxDiagnostics="센서 수신 기록 없음";obdStationaryRemainingMs=-1;
    obdRpmAt=0;obdCoolantAt=0;obdVoltageAt=0;obdFuelAt=0;obdFuelPercent=Double.NaN;obdLastError="없음";
