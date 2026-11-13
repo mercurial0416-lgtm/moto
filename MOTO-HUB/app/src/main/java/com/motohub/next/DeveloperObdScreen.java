@@ -99,13 +99,14 @@ final class DeveloperObdScreen {
   LinearLayout p=activity.page(configuredBike.optString("name","내 바이크")+" · OBD 설정");
   activity.label(p,"이 바이크 전용 OBD · GPS 자동 기록",16,activity.accent,true);
   activity.label(p,"자동 기록 상태: "+(RideService.autoArmed?
-   (RideService.running?"GPS 기록 중":"OBD 출발 감지 대기"):
-   "꺼짐 · OBD를 연결해 자동 감지를 켜야 시작됨"),14,activity.fg,true);
+   (RideService.running?"GPS 기록 중":"자동 감지 유지 · 연결/재시도 상태는 아래에서 확인"):
+   ObdHandsFreeSession.enabled(activity)&&bikeId.equals(ObdHandsFreeSession.bikeId(activity))?
+   "이전에 활성화됨 · 앱을 열면 복구 시도":"꺼짐 · 아래에서 최초 1회 켜기"),14,activity.fg,true);
   activity.label(p,"최근 기록 서비스: "+RideService.status+
    "\nOBD 연결: "+RideService.obdLink+
    "\n마지막 오류: "+RideService.obdLastError,12,activity.muted,false);
   activity.label(p,"페어링된 ELM327 호환 Bluetooth Classic(SPP) 어댑터로 표준 OBD-II 센서만 조회합니다. 바이크 ECU가 지원하는 항목만 표시됩니다. 순정 계기판 Bluetooth 연결과는 별개입니다.",14,activity.muted,false);
-  activity.label(p,"ECU 설정 변경 · 고장코드 삭제 · 출력 제어 없음. 주행 중 조작하지 마세요. 장치 연결은 사용자 선택 시에만 시작되고 원격 전송은 없습니다. 자동 라이딩 도중 일시적 연결 실패 시 최대 8회 재접속하며 앱 재시작 후에는 재연결하지 않습니다.",14,activity.muted,false);
+  activity.label(p,"ECU 설정 변경·고장코드 삭제·출력 제어 없음. 주행 중 조작하지 마세요. 최초 동의 후 자동 감지는 계속 유지되고, 동글 연결 실패 시 대기 후 다시 시도합니다. 휴대폰 재부팅·앱 강제 종료 후 자동 실행은 운영체제 제한을 받습니다.",14,activity.muted,false);
   activity.gap(p,10);
   activity.label(p,"첫 연결 · ① 진단 케이블과 동글 연결 → ② 바이크 시동 ON → ③ 갤럭시에서 Vgate BT3.0 페어링 → ④ 아래에서 센서 테스트",13,activity.fg,false);
   activity.action(p,"갤럭시 Bluetooth 설정 열기",false,this::openBluetoothSettings);
@@ -133,7 +134,7 @@ final class DeveloperObdScreen {
   });
   activity.gap(p,15);
   activity.label(p,"이 바이크 · OBD 자동 라이딩 기록",17,activity.accent,true);
-  activity.label(p,"OBD2에서 속도 7km/h 이상을 연속 3회 확인하면 GPS 경로 기록을 자동 시작합니다. 설정한 연속 정차 시간(기본 10분) 후 완료하고 다음 출발을 기다립니다. 블루투스가 끊겨도 진행 중인 GPS 기록은 수동 종료까지 유지합니다. 최초 활성화에는 별도 동의가 필요합니다.",13,activity.muted,false);
+  activity.label(p,"최초 1회 자동 모드를 켜면 화면이 꺼져도 OBD 연결을 반복 확인합니다. ECU 속도 7km/h 이상을 연속 3회 읽으면 GPS를 자동 시작하고 정차 시간(기본 10분) 이후 자동 저장합니다. 연결이 끊겨도 GPS 기록을 유지하며, 정확한 GPS가 장시간 정차를 확인하면 자동 저장합니다. 휴대폰 재부팅 후에는 알림에서 앱을 다시 열어야 할 수 있습니다.",13,activity.muted,false);
   activity.action(p,"정차 종료 시간 설정 (3·5·10분)",false,()->{
    if(RideService.autoArmed||RideService.running){setStatus("기록 중에는 정차 시간을 변경할 수 없습니다.");return;}
    long value=activity.getSharedPreferences("developer_experiments",0).getLong(stopAfterKey(),ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS);
@@ -153,7 +154,7 @@ final class DeveloperObdScreen {
    .setPositiveButton("확인",null).show());
   android.os.PowerManager pm=(android.os.PowerManager)activity.getSystemService(Context.POWER_SERVICE);
   boolean unrestricted=pm!=null&&pm.isIgnoringBatteryOptimizations(activity.getPackageName());
-  activity.label(p,"배터리 제한: "+(unrestricted?"앱 최적화 예외 설정됨":"절전 제한 가능 · 직접 확인 필요"),13,activity.muted,false);
+  activity.label(p,"배터리 제한: "+(unrestricted?"앱 최적화 예외 설정됨":"백그라운드 제한 가능 · 기기 설정 확인 필요"),13,activity.muted,false);
   activity.action(p,"Android 배터리 제한 설정 확인",false,()->{
    new AlertDialog.Builder(activity).setTitle("화면 꺼짐·절전 상태 안내")
     .setMessage("GPS 라이딩은 포그라운드 서비스의 지속 알림을 사용합니다. 기기 절전 제한, 권한 철회, 앱 강제 종료 또는 재부팅 후 자동 복구는 보장하지 않습니다. 배터리 설정에서 MOTO HUB의 제한 상태를 직접 확인할 수 있습니다. 위치 공유 권한은 별도로 유지됩니다.")
@@ -163,7 +164,7 @@ final class DeveloperObdScreen {
     }).show();
   });
   activity.label(p,"주차·배터리 주의: 일부 OBD 동글은 시동 OFF 후에도 전력을 사용할 수 있어요. 장기 주차 시 동글 분리 또는 대기전류 실측을 권장합니다. 시트 잠금장치와 배선이 눌리지 않는지도 확인하세요.",13,activity.muted,false);
-  activity.label(p,"자동 감지를 켜는 동안 알림이 계속 표시됩니다. GPS 기록은 이 휴대폰에만 저장하고 친구·그룹 위치 공유는 시작하지 않습니다. 앱 종료/폰 재부팅 뒤 새로 자동 실행하지 않습니다. 같은 기록 세션 중에는 연결을 최대 8회 재시도합니다.",13,activity.muted,false);
+  activity.label(p,"자동 감지를 켜 두면 상시 알림과 OBD 재접속 대기가 유지되어 배터리가 소모될 수 있습니다. GPS 데이터는 휴대폰에만 저장합니다. 한 번의 연결에서 최대 8회 재시도 후에도 실패하면 30초~5분 간격으로 연결을 다시 시도합니다. 휴대폰 재부팅 후에는 재개 알림을 확인하세요.",13,activity.muted,false);
   String remembered=rememberedAdapter();
   if(!remembered.isEmpty()){
    activity.action(p,"최근 OBD2 장치로 빠르게 연결",true,this::connectRememberedAuto);
@@ -181,7 +182,7 @@ final class DeveloperObdScreen {
    }
    loadPairedAuto();
   });
-  activity.action(p,"OBD2 자동 라이딩 감지 켜기 · 장치 선택",true,this::loadPairedAuto);
+  activity.action(p,"한 번 켜기 · 이후 시동/출발/정차 자동 기록",true,this::loadPairedAuto);
   activity.action(p,"OBD2 자동 라이딩 감지 끄기",false,()->{
    activity.startService(new Intent(activity,RideService.class).setAction(RideService.AUTO_DISARM));
    setStatus("자동 감지 중지 요청 · 기존 라이딩 기록은 유지됩니다.");
@@ -480,8 +481,8 @@ final class DeveloperObdScreen {
   }
   final boolean[] remember={true};
   new AlertDialog.Builder(activity).setTitle("OBD2 자동 라이딩 기록을 켤까요?")
-   .setMessage("이 장치가 연결된 동안 속도 7km/h 이상을 연속 3회 감지하면 GPS 경로를 이 휴대폰에 자동 저장합니다. 설정한 정차 시간 후 종료하며 다음 출발을 다시 감지합니다. 백그라운드 위치 사용과 지속 알림이 필요합니다. 그룹 공유는 켜지지 않습니다. 재연결에 최종 실패하면 진행 중인 GPS 주행은 유지되며 알림에서 직접 종료합니다. 원할 때 알림에서 중지하세요. 실험 기능이므로 실제 듀크 390 동작은 아직 검증되지 않았습니다.")
-   .setMultiChoiceItems(new String[]{"이 바이크에 OBD 장치를 기억하기 (다음 장치 선택 생략)"},remember,(dialog,index,selected)->remember[index]=selected)
+   .setMessage("최초 한 번 동의하면 이 바이크의 OBD 연결을 지속적으로 감시합니다. 속도 7km/h 이상 연속 3회 감지 시 GPS 경로를 시작하고, 정차를 확인하면 저장한 다음 재대기합니다. 연결이 끊어져도 30초~5분 간격으로 반복 재접속하며, 라이딩 중에는 GPS를 유지합니다. 상시 알림과 배터리 사용이 발생합니다. 앱 강제 종료/폰 재부팅 후에는 안드로이드 제한으로 즉시 복구되지 않을 수 있으며, 앱을 다시 열면 복구를 시도합니다. 친구에게 위치를 자동 공유하지 않고 ECU를 수정하지 않습니다. 실차 호환성은 미검증입니다.")
+   .setMultiChoiceItems(new String[]{"이 바이크에 OBD 장치 기억하기"},remember,(dialog,index,selected)->remember[index]=selected)
    .setNegativeButton("취소",null).setPositiveButton("동의하고 자동 감지 시작",(d,w)->{
     JSONObject stillSelected=activity.bike();
     if(stillSelected==null||!bikeId.equals(stillSelected.optString("id"))){
