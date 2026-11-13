@@ -18,8 +18,13 @@ disarm=service.split('private void disarmAutoByUser(')[1].split('private void on
 assert 'if(!autoArmed){' in auto and 'stopWith(verified?' in auto, "Stop orphan OBD foreground service after finalizing"
 assert 'if(autoFinishPending){' in disarm and 'GPS 저장 완료 확인 중' in disarm, "Explicit disarm must wait for GPS save"
 assert disarm.index('if(autoFinishPending){')<disarm.index('if(running){'), "Check pending close first"
-assert 'stopWith(' not in disconnect, "Unexpected OBD loss must not interrupt or close an existing GPS track"
-assert 'handler.postDelayed(reconnectObd,backoff)' in disconnect, "OBD loss must schedule bounded reconnect"
+# An unequivocal no-speed-PID error disarms *only the idle monitor*; an
+# in-progress GPS track is explicitly retained. Ordinary link loss only retries.
+assert 'if(ObdSpeedSupportFailure.confirmedUnsupported(reason))' in disconnect
+assert 'if(running){\n    gpsOnlyAfterObd=true;status=alert+" · 기존 GPS 기록 유지";' in disconnect
+assert '}else stopWith(alert,false);' in disconnect
+assert 'stopWith(' not in disconnect.split('long backoff=',1)[1], "Transient OBD loss must never stop GPS"
+assert 'handler.postDelayed(reconnectObd,backoff)' in disconnect, "Transient OBD loss must schedule bounded reconnect"
 assert 'if(finishPending){' in auto and auto.index('if(finishPending){')<auto.index('if(!autoArmed){'), "User STOP takes priority"
 assert 'LocalBackupFilePolicy.readBounded(file)' in backup, 'restore reads must check and limit actual bytes'
 assert backup.count('LocalBackupFilePolicy.safeFolder(folder)')>=3
