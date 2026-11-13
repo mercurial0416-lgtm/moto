@@ -511,7 +511,10 @@ public final class RideService extends Service implements LocationListener {
   autoGate.connectionLost();obdStationaryRemainingMs=-1;obdMonitor=null;
   Sharing.stop();MotoWidgetProvider.refresh(this);
   if(!autoArmed)return;
-  if(running)gpsOnlyAfterObd=true;
+  if(running){
+   // Preserve the already-open track; only GPS-verified stationary fallback may save it.
+   gpsOnlyAfterObd=true;
+  }
   long backoff=ObdHandsFreePolicy.reconnectCooldownMs(++obdReconnectRounds);
   handler.removeCallbacks(reconnectObd);handler.postDelayed(reconnectObd,backoff);
   status=autoFinishPending?"GPS 자동 저장 중 · OBD 재연결 예약":
