@@ -433,6 +433,16 @@ final class HubScreens {
   boolean sold=GarageBikeStatus.sold(b.optString("soldDate"));
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
   a.action(p,"바이크 정보 수정",true,()->a.edit("vehicles",b));
+  a.label(p,"이 바이크 연결 설정",15,a.fg,true);
+  a.action(p,"OBD2 설정 · 자동 라이딩 기록",true,()->{
+   if(a.developerObd!=null)a.developerObd.stop();
+   a.developerObd=new DeveloperObdScreen(a);
+   a.developerObd.show();
+  });
+  a.label(p,RideService.autoArmed?
+   "OBD 자동 출발 감지 켜짐 · 알림에서 연결 및 GPS 상태 확인":
+   "OBD 자동 감지 꺼짐 · 위 설정에서 동글을 연결하고 감지를 시작해야 GPS 자동 기록 가능",
+   12,a.muted,false);
   a.label(p,"차량 라이프로그",15,a.fg,true);
   a.action(p,"라이딩 · 주유 · 정비 통합 타임라인",false,()->new MotoTimelineUi(a).open());
   a.action(p,"판매·정비 이력 PDF · 직접 저장",false,()->a.exportOwnershipPdf(b.optString("id")));
