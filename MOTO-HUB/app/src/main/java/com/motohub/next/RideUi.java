@@ -181,7 +181,14 @@ final class RideUi {
   }
   a.content.addView(hero);a.gap(a.content,12);
   if(!RideService.running&&!RideService.autoArmed&&a.bike()!=null){
-   a.label(a.content,"OBD 자동 기록: 꺼짐 · 바이크 설정에서 감지를 직접 켜야 자동 출발합니다.",12,a.muted,false);
+   String bikeId=a.bike().optString("id");
+   boolean consentedForBike=ObdHandsFreeSession.enabled(a)&&bikeId.equals(ObdHandsFreeSession.bikeId(a));
+   String hint=consentedForBike?
+    "OBD 자동 모드 승인됨 · 현재 감지는 중지됨 · 바이크 OBD 설정에서 연결 오류 확인":
+    ObdHandsFreeSession.enabled(a)?
+    "다른 바이크의 OBD 자동 모드 승인됨 · 선택한 바이크 설정 확인":
+    "OBD 자동 기록 꺼짐 · 바이크 OBD 설정에서 최초 1회 활성화";
+   a.label(a.content,hint,12,a.muted,false);
    a.action(a.content,"선택한 바이크 OBD 설정",false,()->new HubScreens(a).manageBike());
    a.gap(a.content,8);
   }
