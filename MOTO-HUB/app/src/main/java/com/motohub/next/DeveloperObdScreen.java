@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Developer-only, explicitly started, local Bluetooth SPP telemetry; never changes ECU settings. */
+/** User-initiated, per-bike Bluetooth SPP telemetry; never changes ECU settings. */
 final class DeveloperObdScreen {
  static final int CONNECT_PERMISSION_REQUEST=88;
  static final int AUTO_CONNECT_PERMISSION_REQUEST=89;
@@ -34,6 +34,9 @@ final class DeveloperObdScreen {
  private static final String PREFERRED_ADAPTER="obd_remembered_device";
  static final UUID SPP=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
  private final MainActivity activity;
+ private final String bikeId;
+ private String adapterKey(){return BikeObdPreferences.adapterKey(bikeId);}
+ private String stopAfterKey(){return BikeObdPreferences.stopAfterKey(bikeId);}
  private final String[] values=new String[ObdReadOnlyProtocol.SENSOR_PIDS.length];
  private final TextView[] fields=new TextView[ObdReadOnlyProtocol.SENSOR_PIDS.length];
  private TextView status;
@@ -41,7 +44,7 @@ final class DeveloperObdScreen {
  private volatile boolean stopped=true;
  private volatile BluetoothSocket socket;
  private Thread worker;
- DeveloperObdScreen(MainActivity activity){this.activity=activity;}
+ DeveloperObdScreen(MainActivity activity){this.activity=activity;JSONObject bike=activity.bike();this.bikeId=bike==null?"":bike.optString("id");}
  /** A short, opt-in first-connection flow. Reuses the existing read-only SPP engine. */
  static void launchQuick(MainActivity a){
   if(RideService.running||RideService.autoArmed||RideService.saving()||RestoreRideGate.isRestoring()){
@@ -86,9 +89,21 @@ final class DeveloperObdScreen {
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
  }
  void show(){
-  if(!activity.getSharedPreferences("developer_experiments",0).getBoolean("enabled",false))return;
-  LinearLayout p=activity.page("개발자 · OBD2 실험실");
-  activity.label(p,"실험 기능 · KTM 390 DUKE 호환성 미검증",16,activity.accent,true);
+  JSONObject selected=activity.bike();
+  if(bikeId.isEmpty()||selected==null||!bikeId.equals(selected.optString("id"))){
+   activity.toast("OBD 설정할 바이크를 먼저 선택해 주세요.");return;
+  }
+  if(GarageBikeStatus.sold(selected.optString("soldDate"))){
+   activity.toast("판매 완료한 바이크에는 OBD 자동 기록을 시작할 수 없습니다.");return;
+  }
+  LinearLayout p=activity.page(selected.optString("name","내 바이크")+" · OBD 설정");
+  activity.label(p,"이 바이크 전용 OBD · GPS 자동 기록",16,activity.accent,true);
+  activity.label(p,"자동 기록 상태: "+(RideService.autoArmed?
+   (RideService.running?"GPS 기록 중":"OBD 출발 감지 대기"):
+   "꺼짐 · OBD를 연결해 자동 감지를 켜야 시작됨"),14,activity.fg,true);
+  activity.label(p,"최근 기록 서비스: "+RideService.status+
+   "\\nOBD 연결: "+RideService.obdLink+
+   "\\n마지막 오류: "+RideService.obdLastError,12,activity.muted,false);
   activity.label(p,"페어링된 ELM327 호환 Bluetooth Classic(SPP) 어댑터로 표준 OBD-II 센서만 조회합니다. 바이크 ECU가 지원하는 항목만 표시됩니다. 순정 계기판 Bluetooth 연결과는 별개입니다.",14,activity.muted,false);
   activity.label(p,"ECU 설정 변경 · 고장코드 삭제 · 출력 제어 없음. 주행 중 조작하지 마세요. 장치 연결은 사용자 선택 시에만 시작되고 원격 전송은 없습니다. 자동 라이딩 도중 일시적 연결 실패 시 최대 8회 재접속하며 앱 재시작 후에는 재연결하지 않습니다.",14,activity.muted,false);
   activity.gap(p,10);
@@ -117,16 +132,16 @@ final class DeveloperObdScreen {
      }).show()).show();
   });
   activity.gap(p,15);
-  activity.label(p,"자동 라이딩 기록 (개발자 모드 한정)",17,activity.accent,true);
+  activity.label(p,"이 바이크 · OBD 자동 라이딩 기록",17,activity.accent,true);
   activity.label(p,"OBD2에서 속도 7km/h 이상을 연속 3회 확인하면 GPS 경로 기록을 자동 시작합니다. 설정한 연속 정차 시간(기본 10분) 후 완료하고 다음 출발을 기다립니다. 블루투스가 끊겨도 진행 중인 GPS 기록은 수동 종료까지 유지합니다. 최초 활성화에는 별도 동의가 필요합니다.",13,activity.muted,false);
   activity.action(p,"정차 종료 시간 설정 (3·5·10분)",false,()->{
    if(RideService.autoArmed||RideService.running){setStatus("기록 중에는 정차 시간을 변경할 수 없습니다.");return;}
-   long value=activity.getSharedPreferences("developer_experiments",0).getLong("obd_stop_after_ms",ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS);
+   long value=activity.getSharedPreferences("developer_experiments",0).getLong(stopAfterKey(),ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS);
    long[] values={180_000L,300_000L,600_000L};int selected=2;
    for(int i=0;i<values.length;i++)if(value==values[i])selected=i;
    new AlertDialog.Builder(activity).setTitle("연속 정차 후 기록 종료")
     .setSingleChoiceItems(new String[]{"3분 (빠른 종료)","5분 (일반 휴식)","10분 (기본 · 신호대기/휴식 통합)"},selected,(d,i)->{
-     activity.getSharedPreferences("developer_experiments",0).edit().putLong("obd_stop_after_ms",values[i]).apply();
+     activity.getSharedPreferences("developer_experiments",0).edit().putLong(stopAfterKey(),values[i]).apply();
      setStatus("정차 종료 시간: "+(values[i]/60_000L)+"분 · 다음 자동 감지부터 적용");d.dismiss();
     }).setNegativeButton("취소",null).show();
   });
@@ -149,11 +164,11 @@ final class DeveloperObdScreen {
   });
   activity.label(p,"주차·배터리 주의: 일부 OBD 동글은 시동 OFF 후에도 전력을 사용할 수 있어요. 장기 주차 시 동글 분리 또는 대기전류 실측을 권장합니다. 시트 잠금장치와 배선이 눌리지 않는지도 확인하세요.",13,activity.muted,false);
   activity.label(p,"자동 감지를 켜는 동안 알림이 계속 표시됩니다. GPS 기록은 이 휴대폰에만 저장하고 친구·그룹 위치 공유는 시작하지 않습니다. 앱 종료/폰 재부팅 뒤 새로 자동 실행하지 않습니다. 같은 기록 세션 중에는 연결을 최대 8회 재시도합니다.",13,activity.muted,false);
-  String remembered=activity.getSharedPreferences("developer_experiments",0).getString(PREFERRED_ADAPTER,"");
+  String remembered=rememberedAdapter();
   if(!remembered.isEmpty()){
    activity.action(p,"최근 OBD2 장치로 빠르게 연결",true,this::connectRememberedAuto);
    activity.action(p,"기억한 OBD2 장치 삭제",false,()->{
-    activity.getSharedPreferences("developer_experiments",0).edit().remove(PREFERRED_ADAPTER).apply();
+    activity.getSharedPreferences("developer_experiments",0).edit().remove(adapterKey()).apply();
     setStatus("기억한 장치를 삭제했습니다. 다음부터 다시 선택해 주세요.");
    });
   }
@@ -419,11 +434,19 @@ final class DeveloperObdScreen {
      })).show();
    }).show();
  }
+ private String rememberedAdapter(){
+  android.content.SharedPreferences preferences=activity.getSharedPreferences("developer_experiments",0);
+  String address=preferences.getString(adapterKey(),"");
+  // One-bike users can keep their previous manually remembered adapter.
+  if(address.isEmpty()&&activity.items("vehicles").size()==1)
+   return preferences.getString(PREFERRED_ADAPTER,"");
+  return address;
+ }
  private void connectRememberedAuto(){
   if(!permissionGranted()){
    activity.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},AUTO_CONNECT_PERMISSION_REQUEST);return;
   }
-  String address=activity.getSharedPreferences("developer_experiments",0).getString(PREFERRED_ADAPTER,"");
+  String address=rememberedAdapter();
   if(address.isEmpty()||!BluetoothAdapter.checkBluetoothAddress(address)){
    setStatus("기억한 OBD2 장치가 없습니다. 다시 선택해 주세요.");return;
   }
@@ -438,6 +461,10 @@ final class DeveloperObdScreen {
   }catch(SecurityException e){setStatus("Bluetooth 연결 권한이 필요합니다.");}
  }
  private void confirmAuto(BluetoothDevice device){
+  JSONObject currentBike=activity.bike();
+  if(currentBike==null||!bikeId.equals(currentBike.optString("id"))){
+   setStatus("바이크가 바뀌었습니다. OBD 설정을 다시 열어 주세요.");return;
+  }
   if(RideService.running||RideService.autoArmed){setStatus("먼저 기존 라이딩 또는 자동 감지를 중지해 주세요.");return;}
   if(activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
    setStatus("라이딩 탭에서 정확한 위치 권한을 허용한 뒤 다시 시도해 주세요.");return;
@@ -449,15 +476,19 @@ final class DeveloperObdScreen {
   if(location==null||!location.isProviderEnabled(LocationManager.GPS_PROVIDER)){
    setStatus("먼저 휴대폰 GPS를 켜 주세요.");return;
   }
-  final boolean[] remember={false};
+  final boolean[] remember={true};
   new AlertDialog.Builder(activity).setTitle("OBD2 자동 라이딩 기록을 켤까요?")
    .setMessage("이 장치가 연결된 동안 속도 7km/h 이상을 연속 3회 감지하면 GPS 경로를 이 휴대폰에 자동 저장합니다. 설정한 정차 시간 후 종료하며 다음 출발을 다시 감지합니다. 백그라운드 위치 사용과 지속 알림이 필요합니다. 그룹 공유는 켜지지 않습니다. 재연결에 최종 실패하면 진행 중인 GPS 주행은 유지되며 알림에서 직접 종료합니다. 원할 때 알림에서 중지하세요. 실험 기능이므로 실제 듀크 390 동작은 아직 검증되지 않았습니다.")
-   .setMultiChoiceItems(new String[]{"이 장치를 이 휴대폰에 기억하기 (다음 연결 선택만 생략)"},remember,(dialog,index,selected)->remember[index]=selected)
+   .setMultiChoiceItems(new String[]{"이 바이크에 OBD 장치를 기억하기 (다음 장치 선택 생략)"},remember,(dialog,index,selected)->remember[index]=selected)
    .setNegativeButton("취소",null).setPositiveButton("동의하고 자동 감지 시작",(d,w)->{
-    if(remember[0])activity.getSharedPreferences("developer_experiments",0).edit().putString(PREFERRED_ADAPTER,device.getAddress()).apply();
+    JSONObject stillSelected=activity.bike();
+    if(stillSelected==null||!bikeId.equals(stillSelected.optString("id"))){
+     setStatus("바이크 선택이 변경됐습니다. 감지 시작을 취소했어요.");return;
+    }
+    if(remember[0])activity.getSharedPreferences("developer_experiments",0).edit().putString(adapterKey(),device.getAddress()).apply();
     stop();
     Intent start=new Intent(activity,RideService.class).setAction(RideService.AUTO_ARM).putExtra(RideService.EXTRA_DEVICE,device.getAddress())
-     .putExtra(RideService.EXTRA_BIKE_ID,activity.bike()==null?"":activity.bike().optString("id"));
+     .putExtra(RideService.EXTRA_BIKE_ID,bikeId);
     activity.attempt(()->activity.startForegroundService(start));
     setStatus("OBD2 자동 감지 시작 요청 · 알림으로 상태 확인");
    }).show();
