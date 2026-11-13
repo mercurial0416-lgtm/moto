@@ -37,6 +37,8 @@ final class ObdHandsFreeSession {
  static void resumeWhenVisible(MainActivity a){
   if(a.isFinishing()||a.isDestroyed()||a.readOnly||RideService.running||RideService.autoArmed||
      RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()||!enabled(a))return;
+  // Interrupted GPS tracks must be reviewed before any new automatic track starts.
+  if(a.interruptedRecoveryPromptVisible||BootRidePolicy.hasRecoverable(a.getFilesDir()))return;
   SharedPreferences prefs=a.getSharedPreferences(PREFS,0);
   String bike=prefs.getString(BIKE,""),device=prefs.getString(DEVICE,"");
   JSONObject registered=null;
