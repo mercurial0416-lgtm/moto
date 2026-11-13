@@ -334,7 +334,8 @@ public final class RideService extends Service implements LocationListener {
        return;
       }
       obdSpeedKmh=kmh;obdSpeedSamples++;obdLastSampleElapsed=elapsed;
-      if(++obdValidSamplesThisConnection==30)obdReconnectRounds=0;
+      obdValidSamplesThisConnection=ObdReconnectHealthPolicy.acceptValidSpeed(obdValidSamplesThisConnection);
+      if(ObdReconnectHealthPolicy.stable(obdValidSamplesThisConnection))obdReconnectRounds=0;
       gpsOnlyAfterObd=false;
       if(obdSpeedSamples==1)ObdLocalDiagnosticLog.record(RideService.this,"SENSOR_OK");
       handleAutoSpeed(kmh);
