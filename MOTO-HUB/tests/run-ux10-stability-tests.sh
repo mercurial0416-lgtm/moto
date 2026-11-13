@@ -14,9 +14,12 @@ service=(src/'RideService.java').read_text()
 backup=(src/'LocalSafetyBackup.java').read_text()
 auto=service.split('private void completeAutoTrack(')[1].split('private void onObdDisconnected(')[0]
 disconnect=service.split('private void onObdDisconnected(')[1].split('Notification notification(')[0]
+disarm=service.split('private void disarmAutoByUser(')[1].split('private void onObdDisconnected(')[0]
 assert 'if(!autoArmed){' in auto and 'stopWith(verified?' in auto, "Stop orphan OBD foreground service after finalizing"
-assert 'if(autoFinishPending){' in disconnect and 'GPS 저장 검증 중' in disconnect, "Disconnect must not close a track while saving"
-assert disconnect.index('if(autoFinishPending){')<disconnect.index('if(running){'), "Check pending close first"
+assert 'if(autoFinishPending){' in disarm and 'GPS 저장 완료 확인 중' in disarm, "Explicit disarm must wait for GPS save"
+assert disarm.index('if(autoFinishPending){')<disarm.index('if(running){'), "Check pending close first"
+assert 'stopWith(' not in disconnect, "Unexpected OBD loss must not interrupt or close an existing GPS track"
+assert 'handler.postDelayed(reconnectObd,backoff)' in disconnect, "OBD loss must schedule bounded reconnect"
 assert 'if(finishPending){' in auto and auto.index('if(finishPending){')<auto.index('if(!autoArmed){'), "User STOP takes priority"
 assert 'LocalBackupFilePolicy.readBounded(file)' in backup, 'restore reads must check and limit actual bytes'
 assert backup.count('LocalBackupFilePolicy.safeFolder(folder)')>=3
