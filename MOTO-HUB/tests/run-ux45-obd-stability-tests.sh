@@ -28,7 +28,7 @@ checks={
  "one-sample speed filtering":'speedSanity.accept(kmh,elapsed)' in service,
  "sanity rejection resets auto start":'autoGate.connectionLost();obdLastError=' in service,
  "fresh samples guarded":'recording?15_000:5_500' in read("ObdRideAutoGate.java"),
- "disconnect resets speed filter":'speedSanity.reset();ObdLocalDiagnosticLog.record(this,"AUTO_OFF")' in service,
+ "disconnect resets speed filter":'speedSanity.reset();obdSpeedKmh=-1;obdLastSampleElapsed=0' in service and 'autoGate.connectionLost()' in service,
  "sensor state persisted locally":'ObdLocalDiagnosticLog.capability(RideService.this,capability)' in service,
  "manual probe saves verified capabilities":'ObdLocalDiagnosticLog.capability(activity,capabilities)' in dev,
  "user controlled local history":'지난 ECU 지원 항목 · 연결 테스트 기록' in dev and 'ObdLocalDiagnosticLog.clear(activity)' in dev,
