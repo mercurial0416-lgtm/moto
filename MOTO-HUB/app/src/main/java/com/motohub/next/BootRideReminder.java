@@ -33,6 +33,9 @@ public final class BootRideReminder extends BroadcastReceiver {
     if(Build.VERSION.SDK_INT>=33&&context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)return;
     NotificationManager manager=context.getSystemService(NotificationManager.class);
     if(manager==null||!manager.areNotificationsEnabled())return;
+    // Android does not permit us to silently launch a location FGS from boot.
+    // A clear tap-to-resume notification preserves the user's previous consent.
+    offerHandsFreeResume(context,manager);
     if(!BootRidePolicy.shouldOffer(true,true,BootRidePolicy.hasRecoverable(context.getFilesDir())))return;
     manager.createNotificationChannel(new NotificationChannel("ride_recovery","중단된 라이딩 복구",NotificationManager.IMPORTANCE_DEFAULT));
     Intent open=new Intent(context,MainActivity.class).putExtra(MotoWidgetProvider.EXTRA_TAB,"라이딩");
@@ -47,4 +50,17 @@ public final class BootRideReminder extends BroadcastReceiver {
    finally{result.finish();}
   },"moto-boot-ride-notice").start();
  }
+ private static void offerHandsFreeResume(Context context,NotificationManager manager){
+  if(!ObdHandsFreeSession.enabled(context)||ObdHandsFreeSession.bikeId(context).isEmpty())return;
+  manager.createNotificationChannel(new NotificationChannel("ride_resume","OBD 자동 기록 재개",NotificationManager.IMPORTANCE_DEFAULT));
+  Intent open=new Intent(context,MainActivity.class).putExtra(MotoWidgetProvider.EXTRA_TAB,"라이딩");
+  open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+  PendingIntent pending=PendingIntent.getActivity(context,407,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
+  Notification note=new Notification.Builder(context,"ride_resume")
+   .setSmallIcon(R.drawable.ic_notification).setContentTitle("OBD 자동 기록 재개")
+   .setContentText("휴대폰 재시작 후 MOTO HUB를 한 번 열어 감지를 다시 켜세요")
+   .setContentIntent(pending).setAutoCancel(true).setVisibility(Notification.VISIBILITY_PRIVATE).build();
+  manager.notify(407,note);
+ }
+
 }
