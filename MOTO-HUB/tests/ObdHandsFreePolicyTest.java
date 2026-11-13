@@ -7,6 +7,11 @@ public final class ObdHandsFreePolicyTest {
   expect(ObdHandsFreePolicy.reconnectCooldownMs(2)==60_000,"second retry round");
   expect(ObdHandsFreePolicy.reconnectCooldownMs(3)==120_000,"third retry round");
   expect(ObdHandsFreePolicy.reconnectCooldownMs(999)==300_000,"limit background polling");
+  expect(ObdHandsFreePolicy.visibleResumeDue(1000,0),"first start");
+  expect(!ObdHandsFreePolicy.visibleResumeDue(16000,5000),"activity double resume");
+  expect(ObdHandsFreePolicy.visibleResumeDue(20000,5000),"retry at 15 sec");
+  expect(ObdHandsFreePolicy.visibleResumeDue(400,800000),"allow retry after reboot elapsed clock reset");
+  expect(!ObdHandsFreePolicy.visibleResumeDue(-1,1),"invalid clock");
   long now=1_000_000L, started=100_000L,lastMotion=400_000L;
   expect(ObdHandsFreePolicy.finishAfterObdLoss(true,true,true,false,60,1.8,0,started,lastMotion,now,600_000),"stopped valid ride");
   expect(!ObdHandsFreePolicy.finishAfterObdLoss(true,true,false,false,60,1.8,0,started,lastMotion,now,600_000),"GPS outage never ends ride");
