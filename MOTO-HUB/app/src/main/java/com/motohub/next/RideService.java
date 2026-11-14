@@ -367,7 +367,7 @@ public final class RideService extends Service implements LocationListener {
       obdValidSamplesThisConnection=ObdReconnectHealthPolicy.acceptValidSpeed(obdValidSamplesThisConnection);
       if(ObdReconnectHealthPolicy.stable(obdValidSamplesThisConnection))obdReconnectRounds=0;
       gpsOnlyAfterObd=false;
-      if(obdSpeedSamples==1)ObdLocalDiagnosticLog.record(RideService.this,"SENSOR_OK");
+      if(obdValidSamplesThisConnection==1)ObdLocalDiagnosticLog.record(RideService.this,"SENSOR_OK");
       handleAutoSpeed(kmh);
     }});}
     @Override public void telemetry(String pid,double value){handler.post(()->{if(autoArmed&&obdMonitor==ref[0]){
