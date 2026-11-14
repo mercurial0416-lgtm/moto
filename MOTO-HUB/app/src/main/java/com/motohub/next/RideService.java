@@ -588,7 +588,9 @@ public final class RideService extends Service implements LocationListener {
    // Preserve the already-open track; only GPS-verified stationary fallback may save it.
    gpsOnlyAfterObd=true;
   }
-  long backoff=ObdHandsFreePolicy.reconnectCooldownMs(++obdReconnectRounds);
+  boolean powerSaving=getSharedPreferences("developer_experiments",0).getBoolean(
+   BikeObdPreferences.powerSaveKey(pendingBikeId),false);
+  long backoff=ObdPowerModePolicy.delayMs(++obdReconnectRounds,powerSaving,running);
   handler.removeCallbacks(reconnectObd);handler.postDelayed(reconnectObd,backoff);
   status=autoFinishPending?"GPS 자동 저장 중 · OBD 재연결 예약":
    running?"OBD 연결 끊김 · GPS 계속 기록 · 정차 확인 후 자동 저장":
