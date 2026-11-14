@@ -88,8 +88,12 @@ public final class RideService extends Service implements LocationListener {
  final RideNotificationRate autoNotificationRate=new RideNotificationRate();
  String pendingBikeId="";ObdAutoSpeedMonitor obdMonitor;BluetoothDevice selectedAutoDevice;
  int obdReconnectRounds=0,obdValidSamplesThisConnection=0;
+ boolean autoGpsPaused=false; // Foreground monitor is suspended, not permanently disarmed.
  final Runnable reconnectObd=new Runnable(){@Override public void run(){
-  if(!autoArmed||selectedAutoDevice==null||obdMonitor!=null)return;
+  if(!autoArmed||autoGpsPaused||selectedAutoDevice==null||obdMonitor!=null)return;
+  if(manager==null||!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)){
+   pauseObdForGpsOff();return;
+  }
   if(saving()){handler.postDelayed(this,15_000L);return;}
   BluetoothManager manager=getSystemService(BluetoothManager.class);
   BluetoothAdapter adapter=manager==null?null:manager.getAdapter();
@@ -136,18 +140,15 @@ public final class RideService extends Service implements LocationListener {
    if(!running&&!autoArmed)return;
    // OBD auto detection was explicitly armed from the selected bike. It no longer
    // depends on an unrelated developer-mode toggle while the FGS is active.
-   if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;}if(autoArmed&&(manager==null||!manager.isProviderEnabled(LocationManager.GPS_PROVIDER))){
-     // A GPS toggle must never close a track already being written by an OBD-
-     // armed session. Stop only automatic detection; preserve manual GPS intent.
-     if(GpsProviderLossPolicy.onLoss(running,autoArmed)==GpsProviderLossPolicy.Action.KEEP_ACTIVE_TRACK){
-      ObdAutoSpeedMonitor monitor=obdMonitor;
-      if(monitor!=null)monitor.stop();
-      onObdDisconnected("GPS가 꺼져 자동 감지를 중지했습니다.");
-      status="GPS 꺼짐 · 기존 라이딩 보존 · 다시 켜면 기록 재개";
-      NotificationManager notifications=getSystemService(NotificationManager.class);
-      notifySafely(status);
-     }else{stopWith("GPS가 꺼져 자동 출발 감지를 중지했습니다.",false);return;}
-    }long now=SystemClock.elapsedRealtime();
+   if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+    // Revocation is a fatal permission loss. Retain recoverable GPS tracks.
+    ObdHandsFreeSession.disable(this);
+    stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;
+   }
+   boolean gpsEnabled=manager!=null&&manager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+   if(autoArmed&&!gpsEnabled)pauseObdForGpsOff();
+   else if(autoArmed&&gpsEnabled&&autoGpsPaused)resumeObdAfterGpsOn();
+   long now=SystemClock.elapsedRealtime();
    if(autoArmed){
     if(!ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now))obdSpeedKmh=-1;
     if(!ObdTelemetryFreshness.fresh(obdRpmAt,now))obdRpm=Double.NaN;
@@ -272,6 +273,30 @@ public final class RideService extends Service implements LocationListener {
   }
   MotoWidgetProvider.refresh(this);
  }
+ /** Do not call onObdDisconnected repeatedly while Location is switched off:
+  * that previously reset the reconnect timer every five seconds forever. */
+ private void pauseObdForGpsOff(){
+  if(!autoArmed||autoGpsPaused)return;
+  autoGpsPaused=true;
+  handler.removeCallbacks(reconnectObd);
+  ObdAutoSpeedMonitor monitor=obdMonitor;obdMonitor=null;
+  if(monitor!=null)monitor.stop(); // Stale callbacks cannot affect the new reader.
+  obdSpeedKmh=-1;obdLastSampleElapsed=0;
+  autoGate.connectionLost();speedSanity.reset();
+  obdLink="GPS 꺼짐 · OBD 연결 일시 중단";
+  status=running?"GPS 꺼짐 · 기존 기록 보존 · 다시 켜면 OBD 복구":
+    "GPS 꺼짐 · 자동 감지 일시 중단 · 켜면 재개";
+  notifySafely(status);
+ }
+ private void resumeObdAfterGpsOn(){
+  if(!autoArmed||!autoGpsPaused)return;
+  autoGpsPaused=false;
+  status="GPS 켜짐 · OBD 자동 연결 복구 중";
+  obdLink="OBD 복구 대기";
+  handler.removeCallbacks(reconnectObd);
+  handler.post(reconnectObd);
+  notifySafely(status);
+ }
  private void armAutomaticRide(String address){
   try{
    if(pendingBikeId==null||pendingBikeId.trim().isEmpty())throw new SecurityException("먼저 기록할 바이크를 선택해 주세요.");
@@ -292,7 +317,7 @@ public final class RideService extends Service implements LocationListener {
    if(paired==null)throw new SecurityException("해당 바이크에 페어링해 둔 OBD 장치를 확인할 수 없습니다.");
    Sharing.stop(); // Automatic local rides must never inherit a group sharing session.
    prepareForeground(true);autoGate.reset();speedSanity.reset();autoNotificationRate.reset();
-   selectedAutoDevice=paired;obdReconnectRounds=0;handler.removeCallbacks(reconnectObd);
+   selectedAutoDevice=paired;obdReconnectRounds=0;autoGpsPaused=false;handler.removeCallbacks(reconnectObd);
    autoGate.setStopAfterMs(getSharedPreferences("developer_experiments",0).getLong(
     BikeObdPreferences.stopAfterKey(pendingBikeId),ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS));
    if(!ObdHandsFreeSession.enable(this,pendingBikeId,address))
@@ -313,7 +338,7 @@ public final class RideService extends Service implements LocationListener {
   }catch(Exception e){stopWith("자동 기록 시작 실패: "+(e.getMessage()==null?"연결을 확인해 주세요.":e.getMessage()),false);}
  }
  private void startAutoMonitor(BluetoothDevice paired){
-  if(!autoArmed||obdMonitor!=null)return;
+  if(!autoArmed||autoGpsPaused||obdMonitor!=null)return;
   obdLink="OBD 동글 자동 연결 시도";
   obdConnectionAttempts++;
   final ObdAutoSpeedMonitor[] ref=new ObdAutoSpeedMonitor[1];
@@ -515,7 +540,7 @@ public final class RideService extends Service implements LocationListener {
  private void disarmAutoByUser(String reason){
   ObdHandsFreeSession.disable(this);
   handler.removeCallbacks(reconnectObd);
-  autoArmed=false;selectedAutoDevice=null;obdReconnectRounds=0;
+  autoArmed=false;autoGpsPaused=false;selectedAutoDevice=null;obdReconnectRounds=0;
   ObdAutoSpeedMonitor old=obdMonitor;obdMonitor=null;
   if(old!=null)old.stop();
   autoGate.reset();speedSanity.reset();
@@ -726,7 +751,10 @@ public final class RideService extends Service implements LocationListener {
    status="GPS 일시 중단 · 켜면 기록 재개 (그룹 공유 중지)";notifySafely(status);
   });
  }}
- @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p))handler.post(()->{if(!running)return;status="GPS 복귀 · 좌표 대기";notifySafely(status);});} @Override public void onStatusChanged(String p,int s,Bundle b){}
+ @Override public void onProviderEnabled(String p){if(LocationManager.GPS_PROVIDER.equals(p))handler.post(()->{
+  if(autoArmed&&autoGpsPaused)resumeObdAfterGpsOn();
+  if(running){status="GPS 복귀 · 좌표 대기";notifySafely(status);}
+ });} @Override public void onStatusChanged(String p,int s,Bundle b){}
  void stopWith(String message,boolean completed){status=message;cleanup(completed);stopSelf();}
  private synchronized boolean closeTrack(boolean completed){
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);
@@ -753,7 +781,7 @@ public final class RideService extends Service implements LocationListener {
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(storageWatchdog);
   // Invalidate queued main-thread finalization callbacks after failures or process teardown.
   finishPending=false;autoFinishPending=false;
-  handler.removeCallbacks(reconnectObd);selectedAutoDevice=null;obdReconnectRounds=0;
+  handler.removeCallbacks(reconnectObd);selectedAutoDevice=null;obdReconnectRounds=0;autoGpsPaused=false;
   Sharing.stop();autoArmed=false;obdSpeedKmh=-1;obdLastSampleElapsed=0;obdLink="연결 안 됨";
   obdStationaryRemainingMs=-1;obdAuxDiagnostics="센서 수신 기록 없음";
   obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;
