@@ -189,7 +189,11 @@ final class RideUi {
     "다른 바이크의 OBD 자동 모드 승인됨 · 선택한 바이크 설정 확인":
     "OBD 자동 기록 꺼짐 · 바이크 OBD 설정에서 최초 1회 활성화";
    a.label(a.content,hint,12,a.muted,false);
-   a.action(a.content,"선택한 바이크 OBD 설정",false,()->new HubScreens(a).manageBike());
+   a.action(a.content,"자동 라이딩 · 1분 간편 설정",true,()->{
+    if(a.developerObd!=null)a.developerObd.stop();
+    a.developerObd=new DeveloperObdScreen(a);
+    a.developerObd.showSimple();
+   });
    a.gap(a.content,8);
   }
   // The navigation provider is a compact utility row, not a second hero card.
