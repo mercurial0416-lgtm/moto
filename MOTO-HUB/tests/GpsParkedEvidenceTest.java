@@ -8,7 +8,7 @@ public final class GpsParkedEvidenceTest {
   GpsParkedEvidence e=new GpsParkedEvidence();
   long since=100_000L,now=since;
   // Stationary positions every 5 seconds over three minutes.
-  for(int i=0;i<36;i++){now+=5_000L;e.observe(now,5_000L,0.2,5,5);}
+  for(int i=0;i<37;i++){now+=5_000L;e.observe(now,5_000L,0.2,5,5);}
   yes(e.sustained(now,180_000L),"continuous accurate stationary fixes enable parking");
   no(e.sustained(now,600_000L),"three minutes insufficient for ten-minute setting");
   no(e.sustained(now+16_000L,180_000L),"stale GPS cannot finish");
