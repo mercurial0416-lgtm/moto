@@ -81,6 +81,19 @@ final class DeveloperObdScreen {
     "자동 기록 꺼짐 · 한 번 켜면 이후 출발을 감지",15,activity.fg,true);
   activity.label(p,"시동·출발이 OBD에서 확인되면 GPS 기록을 시작하고, 정차가 확인되면 저장해. 실차 연결 결과에 따라 동작이 달라질 수 있어.",13,activity.muted,false);
   status=activity.text("준비: Bluetooth 동글을 바이크에 꽂고 휴대폰과 페어링해 줘.",14,activity.muted,true);p.addView(status);
+  TextView connection=activity.text("현재 연결: 확인 중",13,activity.muted,false);
+  p.addView(connection);
+  Runnable liveStatus=new Runnable(){@Override public void run(){
+   if(owner==null||!owner.isShowing()||activity.dialog!=owner||
+      !connection.isAttachedToWindow()||activity.isFinishing()||activity.isDestroyed())return;
+   String current=RideService.autoArmed?
+    "현재 연결: "+RideService.obdLink+(RideService.running?" · GPS 기록 중":" · 출발 대기")+
+     "\n최근 오류: "+RideService.obdLastError:
+    "현재 연결: 자동 감지 미실행";
+   connection.setText(current);
+   connection.postDelayed(this,3000L);
+  }};
+  connection.postDelayed(liveStatus,500L);
   if(!RideService.autoArmed&&!RideService.running){
    activity.action(p,enabled?"자동 감지 다시 시작":"자동 기록 켜기 · 1회 설정",true,this::quickStart);
   }
