@@ -113,6 +113,7 @@ public final class RideService extends Service implements LocationListener {
  long lastStorageCheckElapsed=-60_000L;
  boolean lowStorageWarned=false;
  final GpsSyncPolicy gpsSync=new GpsSyncPolicy();
+ final GpsParkedEvidence gpsParkedEvidence=new GpsParkedEvidence();
  final Runnable syncPendingGps=new Runnable(){@Override public void run(){
   synchronized(RideService.this){
    gpsSyncScheduled=false;
@@ -161,6 +162,7 @@ public final class RideService extends Service implements LocationListener {
     }
    }
    if(gpsLost){
+    gpsParkedEvidence.reset();
     if(Sharing.enabled)Sharing.stop();
     status="GPS 신호 대기 · 기록 유지 · 위치 공유 중지";
     notifySafely(status);
@@ -173,6 +175,7 @@ public final class RideService extends Service implements LocationListener {
    if(ObdHandsFreePolicy.finishAfterObdLoss(autoArmed,running,cleanGps,
        ObdTelemetryFreshness.speedFresh(obdLastSampleElapsed,now),count,liveDistanceKm,
        liveSpeedKmh,startedElapsed,lastMotionElapsed,now,autoGate.stopAfterMs())&&
+       gpsParkedEvidence.sustained(now,autoGate.stopAfterMs())&&
        !autoFinishPending&&!finishPending){
     autoGate.reset();
     status="OBD 신호 없음 · GPS로 정차 확인 · 자동 저장 중";
@@ -258,6 +261,7 @@ public final class RideService extends Service implements LocationListener {
   try{if(RideBikeBinding.valid(pendingBikeId))RideBikeBinding.write(track,pendingBikeId);}
   catch(IOException error){output.close();output=null;track.delete();throw error;}
   count=0;segmentPoints=0;completedSegments=0;lastTime=0;lastFixElapsed=0;lastGood=null;gpsSync.reset();
+  gpsParkedEvidence.reset();
   lastStorageCheckElapsed=-60_000L;lowStorageWarned=false;
   if(gpsWriteHandler!=null)gpsWriteHandler.removeCallbacks(syncPendingGps);gpsSyncScheduled=false;
   startedAt=System.currentTimeMillis();startedElapsed=SystemClock.elapsedRealtime();lastMotionElapsed=startedElapsed;stopSuggestionShown=false;liveDistanceKm=0;liveSpeedKmh=0;livePeakKmh=0;liveMovingMillis=0;liveStationaryMillis=0;lastWidgetRefreshElapsed=0;gpsOnlyAfterObd=false;
@@ -665,6 +669,10 @@ public final class RideService extends Service implements LocationListener {
    }
    lastTime=location.getTime();lastFixElapsed=SystemClock.elapsedRealtime();count++;segmentPoints++;
    if(lastGood!=null){long dt=location.getTime()-lastGood.getTime();float metres=location.distanceTo(lastGood);
+    // A GPS blackout followed by a single position must not close a moving ride.
+    if(autoArmed)gpsParkedEvidence.observe(lastFixElapsed,dt,metres,
+      lastGood.getAccuracy(),location.getAccuracy());
+    else gpsParkedEvidence.reset();
     // Estimate only GPS-observed time; long gaps, poor accuracy and spikes
     // are not silently counted as either moving or stopped.
     if(RideTimePolicy.eligible(dt,metres,lastGood.getAccuracy(),location.getAccuracy())){
@@ -681,7 +689,7 @@ public final class RideService extends Service implements LocationListener {
      }
      livePeakKmh=Math.max(livePeakKmh,measuredKmh);
     }else liveSpeedKmh=0; // A long GPS gap must never be treated as travelled distance.
-   }
+   }else gpsParkedEvidence.reset();
    lastGood=new Location(location);
    status=count+"개 좌표 · 마지막 "+java.time.Instant.ofEpochMilli(lastTime)+(location.getAccuracy()>40?" · 정확도 낮음":"");
   }catch(Exception e){
@@ -710,6 +718,7 @@ public final class RideService extends Service implements LocationListener {
   );
  }
  @Override public void onProviderDisabled(String provider){if(LocationManager.GPS_PROVIDER.equals(provider)){
+  gpsParkedEvidence.reset();
   // Security-critical: disable remote sharing synchronously, before any UI message is queued.
   Sharing.stop();
   handler.post(()->{if(!running)return;
@@ -736,6 +745,7 @@ public final class RideService extends Service implements LocationListener {
    }finally{output=null;}
   }
   active="";lastGood=null;lastFixElapsed=0;gpsOnlyAfterObd=false;
+  gpsParkedEvidence.reset();
   return verified;
  }
  synchronized void cleanup(boolean completed){
