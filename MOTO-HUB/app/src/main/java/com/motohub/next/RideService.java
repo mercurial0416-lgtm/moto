@@ -506,6 +506,7 @@ public final class RideService extends Service implements LocationListener {
  }
  private void completeAutoTrack(File savedTrack,boolean verified){
   autoFinishPending=false;running=false;
+  if(verified)ObdLocalDiagnosticLog.record(this,"GPS_SAVED");
   if(finishPending){
    finishPending=false;
    stopWith(verified?"자동 라이딩을 저장하고 종료했습니다.":"GPS 저장 검증 실패 · 원본 복구가 필요합니다.",false);
