@@ -77,7 +77,7 @@ final class ObdLocalDiagnosticLog {
     history.append('\n').append(item);
   }
   SharedPreferences.Editor editor=p.edit().putString("events",history.toString());
-  if("BT_OK".equals(code)||"SENSOR_OK".equals(code)||"GPS_STARTED".equals(code)||
+  if("AUTO_ON".equals(code)||"BT_OK".equals(code)||"SENSOR_OK".equals(code)||"GPS_STARTED".equals(code)||
       "GPS_SAVED".equals(code)||"AUTO_OFF".equals(code))
    editor.putLong("last_"+code,System.currentTimeMillis());
   editor.apply();
@@ -158,9 +158,12 @@ final class ObdLocalDiagnosticLog {
   android.app.NotificationManager notification=c.getSystemService(android.app.NotificationManager.class);
   boolean notifyAllowed=notification!=null&&notification.areNotificationsEnabled()&&
     (android.os.Build.VERSION.SDK_INT<33||c.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED);
+  long lastArmed=p.getLong("last_AUTO_ON",0);
+  long lastSensor=p.getLong("last_SENSOR_OK",0),lastRide=p.getLong("last_GPS_STARTED",0);
+  boolean sensorSinceArm=lastSensor>0&&(lastArmed<=0||lastSensor>=lastArmed);
+  boolean startedSinceArm=lastRide>0&&(lastArmed<=0||lastRide>=lastArmed);
   String explanation=ObdTroubleshootingPolicy.advice(ObdHandsFreeSession.enabled(c),RideService.autoArmed,
-    gpsEnabled,bluetoothOn,fine,notifyAllowed,p.getLong("last_SENSOR_OK",0)>0,
-    p.getLong("last_GPS_STARTED",0)>0);
+    gpsEnabled,bluetoothOn,fine,notifyAllowed,sensorSinceArm,startedSinceArm);
   StringBuilder b=new StringBuilder("자동 진단\n").append(explanation);
   b.append("\n\nGPS: ").append(gpsEnabled?"켜짐":"꺼짐")
    .append(" · 위치 권한: ").append(fine?"허용":"필요")
@@ -168,7 +171,7 @@ final class ObdLocalDiagnosticLog {
    .append(" · 알림: ").append(notifyAllowed?"허용":"필요")
    .append("\n자동 모드: ").append(ObdHandsFreeSession.enabled(c)?"설정 저장":"꺼짐")
    .append(" · 현재 감지: ").append(RideService.autoArmed?"작동 중":"중단/미실행");
-  for(String code:new String[]{"BT_OK","SENSOR_OK","GPS_STARTED","GPS_SAVED","AUTO_OFF"}){
+  for(String code:new String[]{"AUTO_ON","BT_OK","SENSOR_OK","GPS_STARTED","GPS_SAVED","AUTO_OFF"}){
    long ts=p.getLong("last_"+code,0);
    if(ts>0&&ts<=System.currentTimeMillis())
     b.append("\n").append(ObdDiagnosticEventPolicy.text(code)).append(": ")
