@@ -142,7 +142,7 @@ public final class RideService extends Service implements LocationListener {
    // depends on an unrelated developer-mode toggle while the FGS is active.
    if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
     // Revocation is a fatal permission loss. Retain recoverable GPS tracks.
-    ObdHandsFreeSession.disable(this);
+    ObdHandsFreeSession.disable(RideService.this);
     stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;
    }
    boolean gpsEnabled=manager!=null&&manager.isProviderEnabled(LocationManager.GPS_PROVIDER);
