@@ -142,7 +142,7 @@ public final class RideService extends Service implements LocationListener {
    // depends on an unrelated developer-mode toggle while the FGS is active.
    if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
     // Revocation is a fatal permission loss. Retain recoverable GPS tracks.
-    ObdHandsFreeSession.disable(RideService.this);
+    if(autoArmed)ObdHandsFreeSession.disable(RideService.this);
     stopWith("위치 권한이 해제되어 기록을 중지했습니다.",false);return;
    }
    boolean gpsEnabled=manager!=null&&manager.isProviderEnabled(LocationManager.GPS_PROVIDER);
@@ -323,6 +323,7 @@ public final class RideService extends Service implements LocationListener {
    if(!ObdHandsFreeSession.enable(this,pendingBikeId,address))
     throw new IOException("자동 감지 설정을 보관하지 못했습니다.");
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
+   ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;obdFuelPercent=Double.NaN;obdFuelAt=0;
    obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=0;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;
    obdPidSupport="표준 지원 PID 확인 중 · ODO 미검증";
@@ -409,7 +410,6 @@ public final class RideService extends Service implements LocationListener {
     @Override public void disconnected(String reason){handler.post(()->{if(autoArmed&&obdMonitor==ref[0])onObdDisconnected(reason);});}
    });
    ref[0]=reader;obdMonitor=reader;
-   ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    reader.start();
  }
  private void handleAutoSpeed(int speedKmh){
