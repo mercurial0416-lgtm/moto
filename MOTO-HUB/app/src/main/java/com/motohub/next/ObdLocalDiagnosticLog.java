@@ -76,7 +76,11 @@ final class ObdLocalDiagnosticLog {
    if(item.length()<=90&&item.matches("[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} · [가-힣0-9 ·]+"))
     history.append('\n').append(item);
   }
-  p.edit().putString("events",history.toString()).apply();
+  SharedPreferences.Editor editor=p.edit().putString("events",history.toString());
+  if("BT_OK".equals(code)||"SENSOR_OK".equals(code)||"GPS_STARTED".equals(code)||
+      "GPS_SAVED".equals(code)||"AUTO_OFF".equals(code))
+   editor.putLong("last_"+code,System.currentTimeMillis());
+  editor.apply();
  }
  static String summary(Context c){
   SharedPreferences p=c.getSharedPreferences(PREFS,0);
@@ -140,6 +144,40 @@ final class ObdLocalDiagnosticLog {
   String events=p.getString("events","");
   if(events!=null&&!events.isEmpty())text.append("\n\n최근 연결 점검\n").append(events);
   return text.toString();
+ }
+ /** Local diagnosis avoids storing MAC, exact GPS positions, or raw ECU payloads. */
+ static String readableTroubleshooting(Context c){
+  SharedPreferences p=c.getSharedPreferences(PREFS,0);
+  android.bluetooth.BluetoothManager bm=c.getSystemService(android.bluetooth.BluetoothManager.class);
+  android.bluetooth.BluetoothAdapter bt=bm==null?null:bm.getAdapter();
+  boolean bluetoothOn=false;
+  try{bluetoothOn=bt!=null&&bt.isEnabled();}catch(SecurityException ignored){}
+  android.location.LocationManager location=c.getSystemService(android.location.LocationManager.class);
+  boolean gpsEnabled=location!=null&&location.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);
+  boolean fine=c.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED;
+  android.app.NotificationManager notification=c.getSystemService(android.app.NotificationManager.class);
+  boolean notifyAllowed=notification!=null&&notification.areNotificationsEnabled()&&
+    (android.os.Build.VERSION.SDK_INT<33||c.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED);
+  String explanation=ObdTroubleshootingPolicy.advice(ObdHandsFreeSession.enabled(c),RideService.autoArmed,
+    gpsEnabled,bluetoothOn,fine,notifyAllowed,p.getLong("last_SENSOR_OK",0)>0,
+    p.getLong("last_GPS_STARTED",0)>0);
+  StringBuilder b=new StringBuilder("자동 진단\n").append(explanation);
+  b.append("\n\nGPS: ").append(gpsEnabled?"켜짐":"꺼짐")
+   .append(" · 위치 권한: ").append(fine?"허용":"필요")
+   .append("\nBluetooth: ").append(bluetoothOn?"켜짐":"꺼짐")
+   .append(" · 알림: ").append(notifyAllowed?"허용":"필요")
+   .append("\n자동 모드: ").append(ObdHandsFreeSession.enabled(c)?"설정 저장":"꺼짐")
+   .append(" · 현재 감지: ").append(RideService.autoArmed?"작동 중":"중단/미실행");
+  for(String code:new String[]{"BT_OK","SENSOR_OK","GPS_STARTED","GPS_SAVED","AUTO_OFF"}){
+   long ts=p.getLong("last_"+code,0);
+   if(ts>0&&ts<=System.currentTimeMillis())
+    b.append("\n").append(ObdDiagnosticEventPolicy.text(code)).append(": ")
+     .append(new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.KOREA).format(new Date(ts)));
+  }
+  if(RideService.autoArmed)b.append("\n\n현재 OBD: ").append(RideService.obdLink)
+   .append("\n최근 오류: ").append(RideService.obdLastError);
+  b.append("\n\n※ 과거 성공 기록은 오늘 주행 성공을 뜻하지 않아. 실차 수신·주행은 별도 확인해야 해.");
+  return b.toString();
  }
  static void clear(Context c){c.getSharedPreferences(PREFS,0).edit().clear().apply();}
 }
