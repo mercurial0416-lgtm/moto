@@ -434,10 +434,10 @@ final class HubScreens {
   if(sold)a.label(p,"판매 완료 · "+b.optString("soldDate")+" · 주유·정비 이력은 보존됩니다.",14,a.muted,false);
   a.action(p,"바이크 정보 수정",true,()->a.edit("vehicles",b));
   a.label(p,"이 바이크 연결 설정",15,a.fg,true);
-  a.action(p,"OBD2 설정 · 자동 라이딩 기록",true,()->{
+  a.action(p,"자동 라이딩 기록 · 간편 설정",true,()->{
    if(a.developerObd!=null)a.developerObd.stop();
    a.developerObd=new DeveloperObdScreen(a);
-   a.developerObd.show();
+   a.developerObd.showSimple();
   });
   String currentBikeId=b.optString("id");
   boolean thisBikeArmed=RideService.autoArmed&&currentBikeId.equals(ObdHandsFreeSession.bikeId(a));

@@ -2770,8 +2770,22 @@ getWindow().setStatusBarColor(dark?bg:panel);getWindow().setNavigationBarColor(p
   super.onRequestPermissionsResult(request,permissions,results);
   if(request==DeveloperObdScreen.CONNECT_PERMISSION_REQUEST||request==DeveloperObdScreen.AUTO_CONNECT_PERMISSION_REQUEST||request==DeveloperObdScreen.ODO_CONNECT_PERMISSION_REQUEST){
    if(developerObd!=null){
-    if(Build.VERSION.SDK_INT<31||checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)==android.content.pm.PackageManager.PERMISSION_GRANTED) {if(request==DeveloperObdScreen.AUTO_CONNECT_PERMISSION_REQUEST)developerObd.loadPairedAuto();else if(request==DeveloperObdScreen.ODO_CONNECT_PERMISSION_REQUEST)developerObd.loadPairedOdo();else developerObd.loadPaired();}
-    else toast("Bluetooth 연결 권한이 없어 OBD2 장치를 조회하지 않았어요.");
+    if(Build.VERSION.SDK_INT<31||checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT)==android.content.pm.PackageManager.PERMISSION_GRANTED) {
+     if(request==DeveloperObdScreen.AUTO_CONNECT_PERMISSION_REQUEST)developerObd.quickStart();
+     else if(request==DeveloperObdScreen.ODO_CONNECT_PERMISSION_REQUEST)developerObd.loadPairedOdo();
+     else developerObd.loadPaired();
+    }else toast("Bluetooth 연결 권한이 없어 OBD2 장치를 조회하지 않았어요.");
+   }
+   return;
+  }
+  if(request==DeveloperObdScreen.QUICK_LOCATION_PERMISSION_REQUEST||
+     request==DeveloperObdScreen.QUICK_NOTIFICATION_PERMISSION_REQUEST){
+   if(developerObd!=null){
+    boolean granted=request==DeveloperObdScreen.QUICK_LOCATION_PERMISSION_REQUEST?
+     checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED:
+     Build.VERSION.SDK_INT<33||checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED;
+    if(granted)developerObd.quickStart();
+    else toast("자동 라이딩 기록에 필요한 권한이 허용되지 않았어. 설정을 확인해 줘.");
    }
    return;
   }
