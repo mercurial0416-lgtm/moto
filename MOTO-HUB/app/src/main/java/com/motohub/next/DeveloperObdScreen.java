@@ -31,6 +31,8 @@ final class DeveloperObdScreen {
  static final int CONNECT_PERMISSION_REQUEST=88;
  static final int AUTO_CONNECT_PERMISSION_REQUEST=89;
  static final int ODO_CONNECT_PERMISSION_REQUEST=90;
+ static final int QUICK_LOCATION_PERMISSION_REQUEST=91;
+ static final int QUICK_NOTIFICATION_PERMISSION_REQUEST=92;
  private static final String PREFERRED_ADAPTER="obd_remembered_device";
  static final UUID SPP=UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
  private final MainActivity activity;
@@ -58,6 +60,99 @@ final class DeveloperObdScreen {
     a.developerObd=new DeveloperObdScreen(a);
     a.developerObd.showQuick();
    }).show();
+ }
+ /** Everyday screen: only start/stop, the one optional battery setting, and diagnosis.
+  * Advanced read-only ODO/PID controls remain available but are not prerequisites. */
+ void showSimple(){
+  JSONObject bike=activity.bike();
+  if(bike==null||!bikeId.equals(bike.optString("id"))||bikeId.isEmpty()){
+   activity.toast("먼저 내 바이크를 선택해 주세요.");return;
+  }
+  if(GarageBikeStatus.sold(bike.optString("soldDate"))){
+   activity.toast("판매한 바이크에는 자동 기록을 연결할 수 없어.");return;
+  }
+  LinearLayout p=activity.page("자동 라이딩 · 간편 설정");
+  activity.label(p,bike.optString("name","내 바이크"),22,activity.fg,true);
+  boolean enabled=ObdHandsFreeSession.enabled(activity)&&bikeId.equals(ObdHandsFreeSession.bikeId(activity));
+  boolean monitoring=RideService.autoArmed&&enabled;
+  activity.label(p,monitoring?
+    (RideService.running?"GPS 주행 기록 중":"자동 기록 감지 중 · 시동/출발 대기"):
+    enabled?"설정은 저장됨 · 지금 감지 중이지 않음":
+    "자동 기록 꺼짐 · 한 번 켜면 이후 출발을 감지",15,activity.fg,true);
+  activity.label(p,"시동·출발이 OBD에서 확인되면 GPS 기록을 시작하고, 정차가 확인되면 저장해. 실차 연결 결과에 따라 동작이 달라질 수 있어.",13,activity.muted,false);
+  status=activity.text("준비: Bluetooth 동글을 바이크에 꽂고 휴대폰과 페어링해 줘.",14,activity.muted,true);p.addView(status);
+  if(!RideService.autoArmed&&!RideService.running){
+   activity.action(p,enabled?"자동 감지 다시 시작":"자동 기록 켜기 · 1회 설정",true,this::quickStart);
+  }
+  if(enabled||RideService.autoArmed){
+   activity.action(p,"자동 기록 끄기",false,()->{
+    activity.startService(new Intent(activity,RideService.class).setAction(RideService.AUTO_DISARM));
+    setStatus("자동 기록 중지 요청 · 진행 중인 GPS 파일은 보존해.");
+   });
+  }
+  activity.action(p,"연결이 안 될 때 · Bluetooth 페어링",false,this::openBluetoothSettings);
+  activity.action(p,"왜 기록이 안 됐지? · 자동 진단",true,()->new AlertDialog.Builder(activity)
+   .setTitle("자동 라이딩 문제 진단")
+   .setMessage(ObdLocalDiagnosticLog.readableTroubleshooting(activity))
+   .setPositiveButton("확인",null).show());
+  boolean saving=activity.getSharedPreferences("developer_experiments",0)
+    .getBoolean(BikeObdPreferences.powerSaveKey(bikeId),false);
+  activity.action(p,saving?"주차 절전 모드: 켜짐 (변경)":"주차 절전 모드: 꺼짐 (변경)",false,()->{
+   boolean active=activity.getSharedPreferences("developer_experiments",0)
+     .getBoolean(BikeObdPreferences.powerSaveKey(bikeId),false);
+   new AlertDialog.Builder(activity).setTitle("주차 중 배터리 절약")
+    .setMessage("끄면 OBD 연결을 최대 5분 간격으로 재시도해 출발 감지를 우선해.\n\n켜면 장시간 연결 실패 후 주차 중 재시도를 최대 15분 간격으로 늦춰 휴대폰 소비를 줄여. 단, 그 사이 출발하면 주행 초반이 누락될 수 있어. 주행 기록 중에는 절전 지연을 적용하지 않아.")
+    .setNegativeButton("취소",null)
+    .setNeutralButton(active?"절전 끄기":"절전 켜기",(d,w)->{
+     activity.getSharedPreferences("developer_experiments",0).edit()
+      .putBoolean(BikeObdPreferences.powerSaveKey(bikeId),!active).apply();
+     setStatus(!active?"주차 절전 활성화 · 다음 출발 감지는 최대 15분 늦어질 수 있어":
+       "절전 해제 · 기본 연결 재시도 간격 적용");
+    }).show();
+  });
+  activity.action(p,"고급 설정 · 센서/ODO/정차 시간",false,()->{
+   activity.close();
+   activity.root.post(()->{
+    if(activity.isFinishing()||activity.isDestroyed())return;
+    activity.developerObd=new DeveloperObdScreen(activity);
+    activity.developerObd.show();
+   });
+  });
+  activity.label(p,"정차 종료 기본값 10분 · GPS 기록은 내 휴대폰에만 저장 · 친구 위치 공유 없음",12,activity.muted,false);
+  activity.label(p,"휴대폰 재부팅·앱 강제 중지 후 자동 실행은 안드로이드 제한으로 보장되지 않아. 이때 앱을 한 번 열면 복구를 시도해.",12,activity.muted,false);
+  activity.show();owner=activity.dialog;
+  owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
+ }
+ /** Sequential OS permission flow. No developer tab, separate sensor test, or ODO setup. */
+ void quickStart(){
+  if(owner==null||!owner.isShowing())return;
+  if(RideService.autoArmed||RideService.running){setStatus("이미 라이딩 또는 자동 감지가 작동 중이야.");return;}
+  if(!permissionGranted()){
+   activity.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT},AUTO_CONNECT_PERMISSION_REQUEST);
+   return;
+  }
+  if(activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
+   activity.requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},QUICK_LOCATION_PERMISSION_REQUEST);
+   return;
+  }
+  if(Build.VERSION.SDK_INT>=33&&
+      activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+   activity.requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},QUICK_NOTIFICATION_PERMISSION_REQUEST);
+   return;
+  }
+  LocationManager gps=activity.getSystemService(LocationManager.class);
+  if(gps==null||!gps.isProviderEnabled(LocationManager.GPS_PROVIDER)){
+   new AlertDialog.Builder(activity).setTitle("휴대폰 위치를 켜 줘")
+    .setMessage("자동 기록을 시작하려면 GPS를 켜야 해. 설정에서 위치를 켜고 이 화면으로 돌아와 다시 시작을 눌러 줘.")
+    .setNegativeButton("취소",null).setPositiveButton("위치 설정",(d,w)->{
+     try{activity.startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));}
+     catch(Exception e){setStatus("휴대폰 설정에서 위치를 직접 켜 줘.");}
+    }).show();
+   return;
+  }
+  String remembered=rememberedAdapter();
+  if(!remembered.isEmpty())connectRememberedAuto();
+  else loadPairedAuto();
  }
  void showQuick(){
   if(RideService.running||RideService.autoArmed||RideService.saving())return;
