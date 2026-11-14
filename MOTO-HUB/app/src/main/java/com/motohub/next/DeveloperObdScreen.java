@@ -463,6 +463,13 @@ final class DeveloperObdScreen {
    List<BluetoothDevice> devices=new ArrayList<>(bonded);
    devices.sort(Comparator.comparingInt((BluetoothDevice device)->ObdFirstConnectionGuide.adapterPriority(device.getName()))
     .thenComparing(device->{String name=device.getName();return name==null?"":name.toLowerCase(java.util.Locale.ROOT);}));
+   if(automatic){
+    List<BluetoothDevice> likely=new ArrayList<>();
+    for(BluetoothDevice device:devices)if(ObdFirstConnectionGuide.adapterPriority(device.getName())==0)likely.add(device);
+    // One unmistakable OBD candidate -> skip the phone/headset list.
+    // The explicit consent dialog still names the chosen device before connecting.
+    if(likely.size()==1){confirmAuto(likely.get(0));return;}
+   }
    String[] labels=new String[devices.size()];
    for(int i=0;i<devices.size();i++){String name=devices.get(i).getName();labels[i]=ObdFirstConnectionGuide.adapterLabel(name)+(name==null||name.trim().isEmpty()?"이름 없는 장치":name)+" · "+devices.get(i).getAddress();}
    new AlertDialog.Builder(activity).setTitle("OBD2 어댑터 선택")
@@ -557,7 +564,9 @@ final class DeveloperObdScreen {
    for(BluetoothDevice device:adapter.getBondedDevices())if(address.equals(device.getAddress())){
     confirmAuto(device);return; // Fresh explicit consent even for a remembered adapter.
    }
-   setStatus("기억한 장치가 페어링 목록에 없습니다. 다시 선택해 주세요.");
+   setStatus("이전에 기억한 동글이 없어. 다른 OBD 장치를 선택해 줘.");
+   activity.getSharedPreferences("developer_experiments",0).edit().remove(adapterKey()).apply();
+   loadPairedAuto();
   }catch(SecurityException e){setStatus("Bluetooth 연결 권한이 필요합니다.");}
  }
  private void confirmAuto(BluetoothDevice device){
@@ -577,7 +586,7 @@ final class DeveloperObdScreen {
    setStatus("먼저 휴대폰 GPS를 켜 주세요.");return;
   }
   new AlertDialog.Builder(activity).setTitle("OBD2 자동 라이딩 기록을 켤까요?")
-   .setMessage("최초 한 번 동의하면 이 바이크의 OBD 연결을 지속적으로 감시합니다. 속도 7km/h 이상 연속 3회 감지 시 GPS 경로를 시작하고, 정차를 확인하면 저장한 다음 재대기합니다. 연결이 끊어져도 30초~5분 간격으로 반복 재접속하며, 라이딩 중에는 GPS를 유지합니다. 상시 알림과 배터리 사용이 발생합니다. 앱 강제 종료/폰 재부팅 후에는 안드로이드 제한으로 즉시 복구되지 않을 수 있으며, 앱을 다시 열면 복구를 시도합니다. 친구에게 위치를 자동 공유하지 않고 ECU를 수정하지 않습니다. 실차 호환성은 미검증입니다.")
+   .setMessage("연결 장치: "+(device.getName()==null?"이름 없음":device.getName())+"\n\n최초 한 번 동의하면 이 바이크의 OBD 연결을 지속적으로 감시합니다. 속도 7km/h 이상 연속 3회 감지 시 GPS 경로를 시작하고, 정차를 확인하면 저장한 다음 재대기합니다. 연결이 끊어져도 30초~5분 간격으로 반복 재접속하며, 라이딩 중에는 GPS를 유지합니다. 상시 알림과 배터리 사용이 발생합니다. 앱 강제 종료/폰 재부팅 후에는 안드로이드 제한으로 즉시 복구되지 않을 수 있으며, 앱을 다시 열면 복구를 시도합니다. 친구에게 위치를 자동 공유하지 않고 ECU를 수정하지 않습니다. 실차 호환성은 미검증입니다.")
    .setNegativeButton("취소",null).setPositiveButton("동의하고 자동 감지 시작",(d,w)->{
     JSONObject stillSelected=activity.bike();
     if(stillSelected==null||!bikeId.equals(stillSelected.optString("id"))){
