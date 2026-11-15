@@ -7,10 +7,13 @@ javac -encoding UTF-8 -d "$out" \
  app/src/main/java/com/motohub/next/ObdHandsFreePolicy.java \
  app/src/main/java/com/motohub/next/ObdPowerModePolicy.java \
  app/src/main/java/com/motohub/next/ObdTroubleshootingPolicy.java \
+ app/src/main/java/com/motohub/next/ObdBikeReadinessPolicy.java \
+ tests/ObdBikeReadinessPolicyTest.java \
  tests/ObdPowerModePolicyTest.java \
  tests/ObdTroubleshootingPolicyTest.java
 java -cp "$out" com.motohub.next.ObdPowerModePolicyTest
 java -cp "$out" com.motohub.next.ObdTroubleshootingPolicyTest
+java -cp "$out" com.motohub.next.ObdBikeReadinessPolicyTest
 python3 - <<'PY'
 from pathlib import Path
 root=Path("app/src/main/java/com/motohub/next")
@@ -39,6 +42,19 @@ checks={
  "observed milestone local only":'last_GPS_STARTED' in log and 'getAddress()' not in log and 'getLatitude()' not in log,
  "missing ride actionable diagnosis":'ObdLocalDiagnosticLog.readableTroubleshooting(activity,bikeId)' in settings,
  "ODO not silently edited":'target.put("odo"' not in service,
+ "source current-bike status verified":'ObdBikeReadinessPolicy.status(enabled,RideService.autoArmed' in settings,
+ "speed freshness required to claim ready":'ObdTelemetryFreshness.speedFresh(' in settings,
+ "another bike cannot be disarmed from selected bike page":'if(!otherBikeRunning&&(enabled||monitoring))' in settings,
+ "ride page identifies different recorded bike":'anotherBikeActive=RideService.autoArmed' in ride,
+ "resume consent after system settings":'developerObd.onActivityResumed()' in activity and
+   'void onActivityResumed()' in settings,
+ "resume does not silently start monitoring":'quickStart(); // Still requires explicit per-bike device confirmation and consent.' in settings,
+ "GPS and Bluetooth settings continuations":'openBluetoothSettingsForSetup()' in settings and
+  'resumeSetupAfterDeviceSettings=true' in settings,
+ "GPS storage preflight":'GpsStorageSpacePolicy.require(activity.getFilesDir())' in settings,
+ "session history tagged by selected bike":'ObdLocalDiagnosticLog.beginBikeSession(this,pendingBikeId)' in service and
+  'last_auto_bike' in log,
+ "diagnostic hides other bike log":'다른 바이크의 과거 연결 이력' in log,
 }
 for title,ok in checks.items():
  assert ok,title
