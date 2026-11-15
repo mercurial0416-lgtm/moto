@@ -8,12 +8,19 @@ javac -encoding UTF-8 -d "$out" \
  app/src/main/java/com/motohub/next/ObdPowerModePolicy.java \
  app/src/main/java/com/motohub/next/ObdTroubleshootingPolicy.java \
  app/src/main/java/com/motohub/next/ObdBikeReadinessPolicy.java \
+ app/src/main/java/com/motohub/next/ObdAutoStartPreflight.java \
+ app/src/main/java/com/motohub/next/RideBikeBinding.java \
+ app/src/main/java/com/motohub/next/ObdBikeDiagnosticScope.java \
+ tests/ObdBikeDiagnosticScopeTest.java \
+ tests/ObdAutoStartPreflightTest.java \
  tests/ObdBikeReadinessPolicyTest.java \
  tests/ObdPowerModePolicyTest.java \
  tests/ObdTroubleshootingPolicyTest.java
 java -cp "$out" com.motohub.next.ObdPowerModePolicyTest
 java -cp "$out" com.motohub.next.ObdTroubleshootingPolicyTest
 java -cp "$out" com.motohub.next.ObdBikeReadinessPolicyTest
+java -cp "$out" com.motohub.next.ObdAutoStartPreflightTest
+java -cp "$out" com.motohub.next.ObdBikeDiagnosticScopeTest
 python3 - <<'PY'
 from pathlib import Path
 root=Path("app/src/main/java/com/motohub/next")
@@ -55,6 +62,20 @@ checks={
  "session history tagged by selected bike":'ObdLocalDiagnosticLog.beginBikeSession(this,pendingBikeId)' in service and
   'last_auto_bike' in log,
  "diagnostic hides other bike log":'다른 바이크의 과거 연결 이력' in log,
+ "GPS-only auto start provider preflight":'ObdAutoStartPreflight.decide(' in service and
+   'ObdAutoStartPreflight.Decision.WAIT_GPS' in service,
+ "disabled GPS cannot open empty track":'pauseObdForGpsOff();' in service and
+   'manager.isProviderEnabled(LocationManager.GPS_PROVIDER)' in service,
+ "failed auto GPS registration explicitly disarms":'GPS 자동 기록 시작 실패 · 감지 중지' in service and
+   'ObdHandsFreeSession.disable(this)' in service,
+ "first-time bike diagnosis still reveals phone permission states":'if(!hasBikeHistory)b.append(' in log and
+  'b.append("\\n\\nGPS: ")' in log,
+ "unrelated bike speed and event log omitted":'ObdBikeDiagnosticScope.key(selectedBikeId,"last_"+code)' in log and
+   'if(monitoringForBike)b.append(' in log,
+ "independent event histories":'ObdBikeDiagnosticScope.key(bikeId,"events")' in log and
+   'ObdBikeDiagnosticScope.shouldRecord(RideService.autoArmed,code)' in log,
+ "legacy logs migrated when bike changes":'ObdBikeDiagnosticScope.key(previous,"events")' in log and
+   'last_auto_bike' in log,
 }
 for title,ok in checks.items():
  assert ok,title
