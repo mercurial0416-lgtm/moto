@@ -68,24 +68,49 @@ final class ObdLocalDiagnosticLog {
   * Bluetooth identifiers or any GPS coordinates. */
  static void beginBikeSession(Context c,String bikeId){
   if(!RideBikeBinding.valid(bikeId))return;
-  c.getSharedPreferences(PREFS,0).edit().putString("last_auto_bike",bikeId).apply();
+  SharedPreferences p=c.getSharedPreferences(PREFS,0);
+  String previous=p.getString("last_auto_bike","");
+  SharedPreferences.Editor edit=p.edit();
+  // Preserve the last legacy global diagnostics when switching bikes.
+  // GPS tracks/vehicle odometers are stored elsewhere and are never touched.
+  if(RideBikeBinding.valid(previous)&&!p.contains(ObdBikeDiagnosticScope.key(previous,"events"))){
+   edit.putString(ObdBikeDiagnosticScope.key(previous,"events"),p.getString("events",""));
+   for(String code:new String[]{"AUTO_ON","BT_OK","SENSOR_OK","GPS_STARTED","GPS_SAVED","AUTO_OFF"}){
+    long observed=p.getLong("last_"+code,0);
+    if(observed>0)edit.putLong(ObdBikeDiagnosticScope.key(previous,"last_"+code),observed);
+   }
+  }
+  edit.putString("last_auto_bike",bikeId).commit();
+ }
+ private static String nextHistory(String previousHistory,String now,String label){
+  String[] previous=previousHistory.split("\\n",-1);
+  StringBuilder history=new StringBuilder(now).append(" · ").append(label);
+  int appended=1;
+  for(String item:previous)if(!item.isEmpty()&&appended++<MAX_ENTRIES){
+   // Reject unsanitized legacy lines rather than copying identifiers between bikes.
+   if(item.length()<=90&&item.matches("[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} · [가-힣0-9 ·]+"))
+    history.append('\n').append(item);
+  }
+  return history.toString();
  }
  static void record(Context c,String code){
   if(!ObdDiagnosticEventPolicy.valid(code))return;
   SharedPreferences p=c.getSharedPreferences(PREFS,0);
   String now=new SimpleDateFormat("MM-dd HH:mm",Locale.KOREA).format(new Date());
-  String[] previous=p.getString("events","").split("\\n",-1);
-  StringBuilder history=new StringBuilder(now).append(" · ").append(ObdDiagnosticEventPolicy.text(code));
-  int appended=1;
-  for(String item:previous)if(!item.isEmpty()&&appended++<MAX_ENTRIES){
-   // Discard unknown legacy/free-form records rather than persisting identifiers.
-   if(item.length()<=90&&item.matches("[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} · [가-힣0-9 ·]+"))
-    history.append('\n').append(item);
+  String label=ObdDiagnosticEventPolicy.text(code);
+  long timestamp=System.currentTimeMillis();
+  SharedPreferences.Editor editor=p.edit().putString("events",
+    nextHistory(p.getString("events",""),now,label));
+  boolean milestone="AUTO_ON".equals(code)||"BT_OK".equals(code)||"SENSOR_OK".equals(code)||
+   "GPS_STARTED".equals(code)||"GPS_SAVED".equals(code)||"AUTO_OFF".equals(code);
+  if(milestone)editor.putLong("last_"+code,timestamp);
+  String bikeId=p.getString("last_auto_bike","");
+  if(RideBikeBinding.valid(bikeId)&&
+     ObdBikeDiagnosticScope.shouldRecord(RideService.autoArmed,code)){
+   String key=ObdBikeDiagnosticScope.key(bikeId,"events");
+   editor.putString(key,nextHistory(p.getString(key,""),now,label));
+   if(milestone)editor.putLong(ObdBikeDiagnosticScope.key(bikeId,"last_"+code),timestamp);
   }
-  SharedPreferences.Editor editor=p.edit().putString("events",history.toString());
-  if("AUTO_ON".equals(code)||"BT_OK".equals(code)||"SENSOR_OK".equals(code)||"GPS_STARTED".equals(code)||
-      "GPS_SAVED".equals(code)||"AUTO_OFF".equals(code))
-   editor.putLong("last_"+code,System.currentTimeMillis());
   editor.apply();
  }
  static String summary(Context c){
@@ -158,8 +183,10 @@ final class ObdLocalDiagnosticLog {
  static String readableTroubleshooting(Context c,String selectedBikeId){
   SharedPreferences p=c.getSharedPreferences(PREFS,0);
   String observedBike=p.getString("last_auto_bike","");
-  boolean hasBikeHistory=RideBikeBinding.valid(selectedBikeId)&&selectedBikeId.equals(observedBike);
-  boolean selectedOwnsSession=RideBikeBinding.valid(selectedBikeId)&&
+  boolean validBike=RideBikeBinding.valid(selectedBikeId);
+  boolean scopedHistory=validBike&&p.contains(ObdBikeDiagnosticScope.key(selectedBikeId,"events"));
+  boolean hasBikeHistory=scopedHistory||(validBike&&selectedBikeId.equals(observedBike));
+  boolean selectedOwnsSession=validBike&&
     selectedBikeId.equals(ObdHandsFreeSession.bikeId(c));
   boolean enabledForBike=selectedOwnsSession&&ObdHandsFreeSession.enabled(c);
   boolean monitoringForBike=selectedOwnsSession&&RideService.autoArmed;
@@ -173,9 +200,12 @@ final class ObdLocalDiagnosticLog {
   android.app.NotificationManager notification=c.getSystemService(android.app.NotificationManager.class);
   boolean notifyAllowed=notification!=null&&notification.areNotificationsEnabled()&&
     (android.os.Build.VERSION.SDK_INT<33||c.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED);
-  long lastArmed=hasBikeHistory?p.getLong("last_AUTO_ON",0):0;
-  long lastSensor=hasBikeHistory?p.getLong("last_SENSOR_OK",0):0;
-  long lastRide=hasBikeHistory?p.getLong("last_GPS_STARTED",0):0;
+  long lastArmed=scopedHistory?p.getLong(ObdBikeDiagnosticScope.key(selectedBikeId,"last_AUTO_ON"),0):
+    hasBikeHistory?p.getLong("last_AUTO_ON",0):0;
+  long lastSensor=scopedHistory?p.getLong(ObdBikeDiagnosticScope.key(selectedBikeId,"last_SENSOR_OK"),0):
+    hasBikeHistory?p.getLong("last_SENSOR_OK",0):0;
+  long lastRide=scopedHistory?p.getLong(ObdBikeDiagnosticScope.key(selectedBikeId,"last_GPS_STARTED"),0):
+    hasBikeHistory?p.getLong("last_GPS_STARTED",0):0;
   boolean sensorSinceArm=lastSensor>0&&(lastArmed<=0||lastSensor>=lastArmed);
   boolean startedSinceArm=lastRide>0&&(lastArmed<=0||lastRide>=lastArmed);
   String explanation=ObdTroubleshootingPolicy.advice(enabledForBike,monitoringForBike,
@@ -192,11 +222,15 @@ final class ObdLocalDiagnosticLog {
    .append("\n이 바이크 자동 모드: ").append(enabledForBike?"설정 저장":"꺼짐")
    .append(" · 현재 감지: ").append(monitoringForBike?"작동 중":"중단/미실행");
   for(String code:new String[]{"AUTO_ON","BT_OK","SENSOR_OK","GPS_STARTED","GPS_SAVED","AUTO_OFF"}){
-   long ts=hasBikeHistory?p.getLong("last_"+code,0):0;
+   long ts=scopedHistory?p.getLong(ObdBikeDiagnosticScope.key(selectedBikeId,"last_"+code),0):
+     hasBikeHistory?p.getLong("last_"+code,0):0;
    if(ts>0&&ts<=System.currentTimeMillis())
     b.append("\n").append(ObdDiagnosticEventPolicy.text(code)).append(": ")
      .append(new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.KOREA).format(new Date(ts)));
   }
+  String localEvents=scopedHistory?p.getString(ObdBikeDiagnosticScope.key(selectedBikeId,"events"),""):
+    hasBikeHistory?p.getString("events",""):"";
+  if(!localEvents.isEmpty())b.append("\n\n이 바이크의 최근 연결 이력\n").append(localEvents);
   if(monitoringForBike)b.append("\n\n현재 OBD: ").append(RideService.obdLink)
    .append("\n최근 오류: ").append(RideService.obdLastError);
   b.append("\n\n※ 과거 성공 기록은 오늘 주행 성공을 뜻하지 않아. 실차 수신·주행은 별도 확인해야 해.");
