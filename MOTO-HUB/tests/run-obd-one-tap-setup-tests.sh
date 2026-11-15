@@ -37,7 +37,7 @@ checks={
  "explicit user consent preserved":'.setPositiveButton("동의하고 자동 감지 시작"' in settings,
  "unique OBD candidate auto selection":'if(likely.size()==1){confirmAuto(likely.get(0));return;}' in settings,
  "observed milestone local only":'last_GPS_STARTED' in log and 'getAddress()' not in log and 'getLatitude()' not in log,
- "missing ride actionable diagnosis":'ObdLocalDiagnosticLog.readableTroubleshooting(activity)' in settings,
+ "missing ride actionable diagnosis":'ObdLocalDiagnosticLog.readableTroubleshooting(activity,bikeId)' in settings,
  "ODO not silently edited":'target.put("odo"' not in service,
 }
 for title,ok in checks.items():
