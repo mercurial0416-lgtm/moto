@@ -43,6 +43,7 @@ final class DeveloperObdScreen {
  private final TextView[] fields=new TextView[ObdReadOnlyProtocol.SENSOR_PIDS.length];
  private TextView status;
  private Dialog owner;
+ private boolean resumeSetupAfterDeviceSettings=false;
  private volatile boolean stopped=true;
  private volatile BluetoothSocket socket;
  private Thread worker;
@@ -170,8 +171,13 @@ final class DeveloperObdScreen {
    new AlertDialog.Builder(activity).setTitle("휴대폰 위치를 켜 줘")
     .setMessage("자동 기록을 시작하려면 GPS를 켜야 해. 설정에서 위치를 켜고 이 화면으로 돌아와 다시 시작을 눌러 줘.")
     .setNegativeButton("취소",null).setPositiveButton("위치 설정",(d,w)->{
-     try{activity.startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));}
-     catch(Exception e){setStatus("휴대폰 설정에서 위치를 직접 켜 줘.");}
+     try{
+      resumeSetupAfterDeviceSettings=true;
+      activity.startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+     }catch(Exception e){
+      resumeSetupAfterDeviceSettings=false;
+      setStatus("휴대폰 설정에서 위치를 직접 켜 줘.");
+     }
     }).show();
    return;
   }
@@ -465,6 +471,41 @@ final class DeveloperObdScreen {
   try{activity.startActivity(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS));}
   catch(Exception unavailable){setStatus("갤럭시 설정 → 연결 → Bluetooth에서 동글을 페어링해 주세요.");}
  }
+ private void openBluetoothSettingsForSetup(){
+  resumeSetupAfterDeviceSettings=true;
+  try{activity.startActivity(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS));}
+  catch(Exception unavailable){
+   resumeSetupAfterDeviceSettings=false;
+   setStatus("Bluetooth 설정을 열지 못했어. 갤럭시 연결 설정에서 직접 페어링해 줘.");
+  }
+ }
+ /** Continue only a user-started setup after returning from system settings. */
+ void onActivityResumed(){
+  if(!resumeSetupAfterDeviceSettings)return;
+  resumeSetupAfterDeviceSettings=false;
+  if(activity.root==null)return;
+  activity.root.post(()->{
+   if(activity.isFinishing()||activity.isDestroyed()||owner==null||!owner.isShowing()||
+      activity.developerObd!=this||activity.dialog!=owner)return;
+   LocationManager gps=activity.getSystemService(LocationManager.class);
+   if(gps==null||!gps.isProviderEnabled(LocationManager.GPS_PROVIDER)){
+    setStatus("GPS가 아직 꺼져 있어. 켠 뒤 자동 기록 켜기를 다시 눌러 줘.");return;
+   }
+   BluetoothManager manager=activity.getSystemService(BluetoothManager.class);
+   BluetoothAdapter adapter=manager==null?null:manager.getAdapter();
+   if(adapter==null||!adapter.isEnabled()){
+    setStatus("Bluetooth가 아직 꺼져 있어. 켠 뒤 자동 기록 켜기를 다시 눌러 줘.");return;
+   }
+   if(!permissionGranted()){quickStart();return;}
+   try{
+    if(adapter.getBondedDevices()==null||adapter.getBondedDevices().isEmpty()){
+     setStatus("OBD 동글 페어링이 아직 안 됐어. 페어링 후 자동 기록 켜기를 다시 눌러 줘.");
+     return;
+    }
+   }catch(SecurityException e){setStatus("Bluetooth 연결 권한을 다시 확인해 줘.");return;}
+   quickStart(); // Still requires explicit per-bike device confirmation and consent.
+  });
+ }
  private void loadPaired(boolean automatic,boolean odo){
   if(owner==null||!owner.isShowing())return;
   if(!permissionGranted()){
@@ -474,7 +515,14 @@ final class DeveloperObdScreen {
   BluetoothManager manager=(BluetoothManager)activity.getSystemService(Context.BLUETOOTH_SERVICE);
   BluetoothAdapter adapter=manager==null?null:manager.getAdapter();
   if(adapter==null){setStatus("이 휴대폰은 Bluetooth를 지원하지 않아요.");return;}
-  if(!adapter.isEnabled()){setStatus("휴대폰 설정에서 Bluetooth를 켜고 어댑터를 페어링해 주세요.");return;}
+  if(!adapter.isEnabled()){
+   setStatus("휴대폰 Bluetooth를 먼저 켜 줘.");
+   if(automatic)new AlertDialog.Builder(activity).setTitle("Bluetooth가 꺼져 있어")
+    .setMessage("Bluetooth를 켜고 OBD 동글을 페어링하면 앱에서 이어서 설정할 수 있어.")
+    .setNegativeButton("취소",null)
+    .setPositiveButton("Bluetooth 켜기",(d,w)->openBluetoothSettingsForSetup()).show();
+   return;
+  }
   try{
    Set<BluetoothDevice> bonded=adapter.getBondedDevices();
    if(bonded==null||bonded.isEmpty()){
@@ -482,7 +530,10 @@ final class DeveloperObdScreen {
     new AlertDialog.Builder(activity).setTitle("OBD2 동글 먼저 페어링")
      .setMessage("바이크 시동을 켠 뒤 갤럭시 설정 → 연결 → Bluetooth에서 Vgate iCar Pro BT3.0을 페어링해 주세요. 이후 앱으로 돌아와 다시 선택하면 됩니다.")
      .setNegativeButton("나중에",null)
-     .setPositiveButton("Bluetooth 설정", (d,w)->openBluetoothSettings()).show();
+     .setPositiveButton("Bluetooth 설정", (d,w)->{
+      if(automatic)openBluetoothSettingsForSetup();
+      else openBluetoothSettings();
+     }).show();
     return;
    }
    List<BluetoothDevice> devices=new ArrayList<>(bonded);
