@@ -237,6 +237,8 @@ public final class RideService extends Service implements LocationListener {
   if(checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)
    throw new SecurityException("위치 권한이 해제되어 GPS를 시작할 수 없습니다.");
   if(manager==null)throw new IllegalStateException("GPS 서비스가 준비되지 않았습니다.");
+  if(!manager.isProviderEnabled(LocationManager.GPS_PROVIDER))
+   throw new IllegalStateException("GPS가 꺼져 자동 기록을 시작하지 않았습니다.");
   if(gpsIoThread==null||!gpsIoThread.isAlive())throw new IllegalStateException("GPS 기록 스레드를 시작할 수 없습니다.");
   manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,5000,0,this,gpsIoThread.getLooper());
  }
@@ -419,6 +421,18 @@ public final class RideService extends Service implements LocationListener {
   ObdRideAutoGate.Event event=autoGate.accept(speedKmh,now);
   obdStationaryRemainingMs=autoGate.stationaryRemainingMs(now);
   if(event==ObdRideAutoGate.Event.START){
+   ObdAutoStartPreflight.Decision decision=ObdAutoStartPreflight.decide(
+    autoArmed,running,autoFinishPending||finishPending,
+    manager!=null&&manager.isProviderEnabled(LocationManager.GPS_PROVIDER));
+   if(decision==ObdAutoStartPreflight.Decision.WAIT_GPS){
+    autoGate.reset();
+    pauseObdForGpsOff();
+    return; // No empty GPS file, no false "started" event.
+   }
+   if(decision!=ObdAutoStartPreflight.Decision.ALLOW){
+    autoGate.reset();
+    return;
+   }
    // The externally requested GPS start is interlocked; auto-start must use
    // the same reservation or a concurrent form save/restore could begin.
    if(!RestoreRideGate.beginRideStart()){
@@ -431,9 +445,21 @@ public final class RideService extends Service implements LocationListener {
    try{
     // Re-check after obtaining the process-wide write/start reservation.
     if(!autoArmed||running||autoFinishPending)return;
+    if(manager==null||!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)){
+     autoGate.reset();
+     pauseObdForGpsOff();
+     return;
+    }
     openRideTrack();requestGpsUpdatesChecked();
     status="OBD2 출발 감지 · GPS 기록 중";ObdLocalDiagnosticLog.record(this,"GPS_STARTED");
-   }catch(Exception e){stopWith("GPS 자동 기록 시작 실패: "+e.getMessage(),false);return;}
+   }catch(Exception e){
+    // A failed write/permission registration must not leave persistent consent
+    // enabled and silently re-arm the broken GPS session on the next app opening.
+    ObdHandsFreeSession.disable(this);
+    String why=e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();
+    stopWith("GPS 자동 기록 시작 실패 · 감지 중지: "+why+" · 설정 확인 후 다시 활성화",false);
+    return;
+   }
    finally{RestoreRideGate.endRideStart();}
   }else if(event==ObdRideAutoGate.Event.FINISH){finishAutoTrack();}
   // Speed samples arrive faster than the user needs notification updates. Avoid
