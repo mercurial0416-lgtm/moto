@@ -158,8 +158,11 @@ final class ObdLocalDiagnosticLog {
  static String readableTroubleshooting(Context c,String selectedBikeId){
   SharedPreferences p=c.getSharedPreferences(PREFS,0);
   String observedBike=p.getString("last_auto_bike","");
-  if(selectedBikeId==null||!selectedBikeId.equals(observedBike))
-   return "이 바이크의 최근 OBD 자동 주행 진단 기록이 없어. 다른 바이크의 과거 연결 이력은 여기서 표시하지 않아.\n\nGPS와 Bluetooth를 켜고 이 바이크로 자동 기록을 시작한 뒤 다시 확인해 줘.";
+  boolean hasBikeHistory=RideBikeBinding.valid(selectedBikeId)&&selectedBikeId.equals(observedBike);
+  boolean selectedOwnsSession=RideBikeBinding.valid(selectedBikeId)&&
+    selectedBikeId.equals(ObdHandsFreeSession.bikeId(c));
+  boolean enabledForBike=selectedOwnsSession&&ObdHandsFreeSession.enabled(c);
+  boolean monitoringForBike=selectedOwnsSession&&RideService.autoArmed;
   android.bluetooth.BluetoothManager bm=c.getSystemService(android.bluetooth.BluetoothManager.class);
   android.bluetooth.BluetoothAdapter bt=bm==null?null:bm.getAdapter();
   boolean bluetoothOn=false;
@@ -170,26 +173,31 @@ final class ObdLocalDiagnosticLog {
   android.app.NotificationManager notification=c.getSystemService(android.app.NotificationManager.class);
   boolean notifyAllowed=notification!=null&&notification.areNotificationsEnabled()&&
     (android.os.Build.VERSION.SDK_INT<33||c.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED);
-  long lastArmed=p.getLong("last_AUTO_ON",0);
-  long lastSensor=p.getLong("last_SENSOR_OK",0),lastRide=p.getLong("last_GPS_STARTED",0);
+  long lastArmed=hasBikeHistory?p.getLong("last_AUTO_ON",0):0;
+  long lastSensor=hasBikeHistory?p.getLong("last_SENSOR_OK",0):0;
+  long lastRide=hasBikeHistory?p.getLong("last_GPS_STARTED",0):0;
   boolean sensorSinceArm=lastSensor>0&&(lastArmed<=0||lastSensor>=lastArmed);
   boolean startedSinceArm=lastRide>0&&(lastArmed<=0||lastRide>=lastArmed);
-  String explanation=ObdTroubleshootingPolicy.advice(ObdHandsFreeSession.enabled(c),RideService.autoArmed,
+  String explanation=ObdTroubleshootingPolicy.advice(enabledForBike,monitoringForBike,
     gpsEnabled,bluetoothOn,fine,notifyAllowed,sensorSinceArm,startedSinceArm);
-  StringBuilder b=new StringBuilder("자동 진단\n").append(explanation);
+  StringBuilder b=new StringBuilder("자동 진단\n");
+  if(!hasBikeHistory)b.append("이 바이크의 최근 OBD 자동 연결 기록이 없어. 다른 바이크의 과거 연결 이력은 표시하지 않아.\n");
+  if(RideService.autoArmed&&!monitoringForBike)
+   b.append("다른 바이크의 자동 감지가 작동 중이야.\n");
+  b.append(explanation);
   b.append("\n\nGPS: ").append(gpsEnabled?"켜짐":"꺼짐")
    .append(" · 위치 권한: ").append(fine?"허용":"필요")
    .append("\nBluetooth: ").append(bluetoothOn?"켜짐":"꺼짐")
    .append(" · 알림: ").append(notifyAllowed?"허용":"필요")
-   .append("\n자동 모드: ").append(ObdHandsFreeSession.enabled(c)?"설정 저장":"꺼짐")
-   .append(" · 현재 감지: ").append(RideService.autoArmed?"작동 중":"중단/미실행");
+   .append("\n이 바이크 자동 모드: ").append(enabledForBike?"설정 저장":"꺼짐")
+   .append(" · 현재 감지: ").append(monitoringForBike?"작동 중":"중단/미실행");
   for(String code:new String[]{"AUTO_ON","BT_OK","SENSOR_OK","GPS_STARTED","GPS_SAVED","AUTO_OFF"}){
-   long ts=p.getLong("last_"+code,0);
+   long ts=hasBikeHistory?p.getLong("last_"+code,0):0;
    if(ts>0&&ts<=System.currentTimeMillis())
     b.append("\n").append(ObdDiagnosticEventPolicy.text(code)).append(": ")
      .append(new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.KOREA).format(new Date(ts)));
   }
-  if(RideService.autoArmed)b.append("\n\n현재 OBD: ").append(RideService.obdLink)
+  if(monitoringForBike)b.append("\n\n현재 OBD: ").append(RideService.obdLink)
    .append("\n최근 오류: ").append(RideService.obdLastError);
   b.append("\n\n※ 과거 성공 기록은 오늘 주행 성공을 뜻하지 않아. 실차 수신·주행은 별도 확인해야 해.");
   return b.toString();
