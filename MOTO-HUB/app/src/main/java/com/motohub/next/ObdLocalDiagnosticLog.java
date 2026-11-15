@@ -64,6 +64,12 @@ final class ObdLocalDiagnosticLog {
    .putLong("probe_last_received",lastReceivedAt>0&&lastReceivedAt<=System.currentTimeMillis()?lastReceivedAt:0)
    .apply();
  }
+ /** Attribute diagnostic event history to the selected motorcycle without storing
+  * Bluetooth identifiers or any GPS coordinates. */
+ static void beginBikeSession(Context c,String bikeId){
+  if(!RideBikeBinding.valid(bikeId))return;
+  c.getSharedPreferences(PREFS,0).edit().putString("last_auto_bike",bikeId).apply();
+ }
  static void record(Context c,String code){
   if(!ObdDiagnosticEventPolicy.valid(code))return;
   SharedPreferences p=c.getSharedPreferences(PREFS,0);
@@ -147,7 +153,13 @@ final class ObdLocalDiagnosticLog {
  }
  /** Local diagnosis avoids storing MAC, exact GPS positions, or raw ECU payloads. */
  static String readableTroubleshooting(Context c){
+  return readableTroubleshooting(c,ObdHandsFreeSession.bikeId(c));
+ }
+ static String readableTroubleshooting(Context c,String selectedBikeId){
   SharedPreferences p=c.getSharedPreferences(PREFS,0);
+  String observedBike=p.getString("last_auto_bike","");
+  if(selectedBikeId==null||!selectedBikeId.equals(observedBike))
+   return "이 바이크의 최근 OBD 자동 주행 진단 기록이 없어. 다른 바이크의 과거 연결 이력은 여기서 표시하지 않아.\n\nGPS와 Bluetooth를 켜고 이 바이크로 자동 기록을 시작한 뒤 다시 확인해 줘.";
   android.bluetooth.BluetoothManager bm=c.getSystemService(android.bluetooth.BluetoothManager.class);
   android.bluetooth.BluetoothAdapter bt=bm==null?null:bm.getAdapter();
   boolean bluetoothOn=false;
