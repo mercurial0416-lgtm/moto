@@ -9,6 +9,9 @@ javac -encoding UTF-8 -d "$out" \
  app/src/main/java/com/motohub/next/ObdTroubleshootingPolicy.java \
  app/src/main/java/com/motohub/next/ObdBikeReadinessPolicy.java \
  app/src/main/java/com/motohub/next/ObdAutoStartPreflight.java \
+ app/src/main/java/com/motohub/next/RideBikeBinding.java \
+ app/src/main/java/com/motohub/next/ObdBikeDiagnosticScope.java \
+ tests/ObdBikeDiagnosticScopeTest.java \
  tests/ObdAutoStartPreflightTest.java \
  tests/ObdBikeReadinessPolicyTest.java \
  tests/ObdPowerModePolicyTest.java \
@@ -17,6 +20,7 @@ java -cp "$out" com.motohub.next.ObdPowerModePolicyTest
 java -cp "$out" com.motohub.next.ObdTroubleshootingPolicyTest
 java -cp "$out" com.motohub.next.ObdBikeReadinessPolicyTest
 java -cp "$out" com.motohub.next.ObdAutoStartPreflightTest
+java -cp "$out" com.motohub.next.ObdBikeDiagnosticScopeTest
 python3 - <<'PY'
 from pathlib import Path
 root=Path("app/src/main/java/com/motohub/next")
@@ -66,8 +70,12 @@ checks={
    'ObdHandsFreeSession.disable(this)' in service,
  "first-time bike diagnosis still reveals phone permission states":'if(!hasBikeHistory)b.append(' in log and
   'b.append("\\n\\nGPS: ")' in log,
- "unrelated bike speed and event log omitted":'long ts=hasBikeHistory?p.getLong("last_"+code,0):0;' in log and
+ "unrelated bike speed and event log omitted":'ObdBikeDiagnosticScope.key(selectedBikeId,"last_"+code)' in log and
    'if(monitoringForBike)b.append(' in log,
+ "independent event histories":'ObdBikeDiagnosticScope.key(bikeId,"events")' in log and
+   'ObdBikeDiagnosticScope.shouldRecord(RideService.autoArmed,code)' in log,
+ "legacy logs migrated when bike changes":'ObdBikeDiagnosticScope.key(previous,"events")' in log and
+   'last_auto_bike' in log,
 }
 for title,ok in checks.items():
  assert ok,title
