@@ -119,7 +119,7 @@ final class DeveloperObdScreen {
    .setTitle("자동 라이딩 문제 진단")
    .setMessage(otherBikeRunning?
     "현재 다른 바이크의 OBD 자동 감지가 작동 중이야. 해당 바이크의 설정에서 진단해야 해.":
-    ObdLocalDiagnosticLog.readableTroubleshooting(activity))
+    ObdLocalDiagnosticLog.readableTroubleshooting(activity,bikeId))
    .setPositiveButton("확인",null).show());
   boolean saving=activity.getSharedPreferences("developer_experiments",0)
     .getBoolean(BikeObdPreferences.powerSaveKey(bikeId),false);
