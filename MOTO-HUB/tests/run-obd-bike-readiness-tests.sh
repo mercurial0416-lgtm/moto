@@ -16,6 +16,6 @@ assert 'ObdBikeReadinessPolicy.ownsActiveMonitor(' in settings
 assert 'RideService.obdLastSampleElapsed' in settings
 assert 'anotherBikeActive' in ride
 assert '다른 바이크' in ride
-assert 'ObdLocalDiagnosticLog.readableTroubleshooting(activity)' in settings
+assert 'ObdLocalDiagnosticLog.readableTroubleshooting(activity,bikeId)' in settings
 print('PASS selected-bike telemetry privacy and safety source checks')
 PY
