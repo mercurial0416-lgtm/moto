@@ -55,11 +55,22 @@ final class RideUi {
  }
  void render(){
   final boolean saving=RideService.saving();
+  // The current garage selection may differ from the bike that owns an OBD ride.
+  final boolean anotherBikeActive=RideService.autoArmed&&a.bike()!=null&&
+   !a.bike().optString("id").equals(ObdHandsFreeSession.bikeId(a));
   final boolean focus=RideService.running&&a.getSharedPreferences("ride_display",0).getBoolean("focus",false);
   LinearLayout hero=a.col();hero.setPadding(a.dp(20),a.dp(22),a.dp(20),a.dp(20));hero.setBackground(a.shape(a.panel,a.line,20));
-  TextView eyebrow=a.text(saving?"GPS 저장 중":RideService.running?"GPS 기록 중":RideService.autoArmed?"자동 출발 감지 중":"GPS 준비 완료",13,RideService.running?(a.dark?0xFFFFA79C:0xFFAA3833):a.accent,true);hero.addView(eyebrow);
-  TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?"라이딩 진행 중":RideService.autoArmed?"자동 출발 대기":"라이딩 시작하기",26,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
-  TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":RideService.running?RideService.count+"개 위치 기록 · 화면을 꺼도 GPS 기록 유지":RideService.autoArmed?"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요":"위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
+  TextView eyebrow=a.text(saving?"GPS 저장 중":
+    RideService.running?(anotherBikeActive?"다른 바이크 GPS 기록 중":"GPS 기록 중"):
+    RideService.autoArmed?(anotherBikeActive?"다른 바이크 OBD 감지 중":"자동 출발 감지 중"):
+    "GPS 준비 완료",13,RideService.running?(a.dark?0xFFFFA79C:0xFFAA3833):a.accent,true);hero.addView(eyebrow);
+  TextView title=a.text(saving?"주행 기록 저장 중":RideService.running?"라이딩 진행 중":
+   RideService.autoArmed?(anotherBikeActive?"다른 바이크 감지 중":"자동 출발 대기"):
+   "라이딩 시작하기",26,a.fg,true);title.setTypeface(MotoDesign.display());LinearLayout.LayoutParams t=new LinearLayout.LayoutParams(-1,-2);t.topMargin=a.dp(11);hero.addView(title,t);
+  TextView sub=a.text(saving?"경로를 확인하고 기기에 저장하고 있어요.":
+   RideService.running?(anotherBikeActive?"선택한 바이크가 아닌 기존 바이크의 GPS 기록 중 · 기록 유지":RideService.count+"개 위치 기록 · 화면을 꺼도 GPS 기록 유지"):
+   RideService.autoArmed?(anotherBikeActive?"자동 감지를 전환하려면 기존 바이크의 기록을 먼저 종료해 줘":"OBD2 속도가 감지되면 GPS 기록이 자동 시작돼요"):
+   "위치 정보는 휴대폰에만 저장됩니다.",13,a.muted,false);sub.setPadding(0,a.dp(9),0,a.dp(12));hero.addView(sub);
   // No redundant pre-ride checklist. Explicit permission/consent handling stays
   // inside requestStart/start; foreground GPS never starts silently.
   if(RideService.running){

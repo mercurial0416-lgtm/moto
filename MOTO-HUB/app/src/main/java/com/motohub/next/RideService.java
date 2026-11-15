@@ -323,6 +323,7 @@ public final class RideService extends Service implements LocationListener {
    if(!ObdHandsFreeSession.enable(this,pendingBikeId,address))
     throw new IOException("자동 감지 설정을 보관하지 못했습니다.");
    autoArmed=true;status="OBD2 연결 대기 · 자동 라이딩 감지";
+   ObdLocalDiagnosticLog.beginBikeSession(this,pendingBikeId);
    ObdLocalDiagnosticLog.record(this,"AUTO_ON");
    obdSpeedKmh=-1;obdRpm=Double.NaN;obdCoolantC=Double.NaN;obdVoltage=Double.NaN;obdFuelPercent=Double.NaN;obdFuelAt=0;
    obdReconnects=0;obdSpeedSamples=0;obdAverageLatencyMs=-1;obdQueryFailures=0;obdConnectionAttempts=0;obdConnectionSuccesses=0;obdLink="OBD2 연결 중";obdLastSampleElapsed=0;

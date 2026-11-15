@@ -43,6 +43,7 @@ final class DeveloperObdScreen {
  private final TextView[] fields=new TextView[ObdReadOnlyProtocol.SENSOR_PIDS.length];
  private TextView status;
  private Dialog owner;
+ private boolean resumeSetupAfterDeviceSettings=false;
  private volatile boolean stopped=true;
  private volatile BluetoothSocket socket;
  private Thread worker;
@@ -74,11 +75,12 @@ final class DeveloperObdScreen {
   LinearLayout p=activity.page("자동 라이딩 · 간편 설정");
   activity.label(p,bike.optString("name","내 바이크"),22,activity.fg,true);
   boolean enabled=ObdHandsFreeSession.enabled(activity)&&bikeId.equals(ObdHandsFreeSession.bikeId(activity));
-  boolean monitoring=RideService.autoArmed&&enabled;
-  activity.label(p,monitoring?
-    (RideService.running?"GPS 주행 기록 중":"자동 기록 감지 중 · 시동/출발 대기"):
-    enabled?"설정은 저장됨 · 지금 감지 중이지 않음":
-    "자동 기록 꺼짐 · 한 번 켜면 이후 출발을 감지",15,activity.fg,true);
+  boolean monitoring=ObdBikeReadinessPolicy.ownsActiveMonitor(RideService.autoArmed,enabled);
+  boolean otherBikeRunning=ObdBikeReadinessPolicy.anotherBikeActive(RideService.autoArmed,enabled);
+  boolean speedFresh=monitoring&&ObdTelemetryFreshness.speedFresh(
+    RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime());
+  activity.label(p,ObdBikeReadinessPolicy.status(enabled,RideService.autoArmed,
+    RideService.running,speedFresh),15,activity.fg,true);
   activity.label(p,"시동·출발이 OBD에서 확인되면 GPS 기록을 시작하고, 정차가 확인되면 저장해. 실차 연결 결과에 따라 동작이 달라질 수 있어.",13,activity.muted,false);
   status=activity.text("준비: Bluetooth 동글을 바이크에 꽂고 휴대폰과 페어링해 줘.",14,activity.muted,true);p.addView(status);
   TextView connection=activity.text("현재 연결: 확인 중",13,activity.muted,false);
@@ -86,10 +88,16 @@ final class DeveloperObdScreen {
   Runnable liveStatus=new Runnable(){@Override public void run(){
    if(owner==null||!owner.isShowing()||activity.dialog!=owner||
       !connection.isAttachedToWindow()||activity.isFinishing()||activity.isDestroyed())return;
-   String current=RideService.autoArmed?
-    "현재 연결: "+RideService.obdLink+(RideService.running?" · GPS 기록 중":" · 출발 대기")+
+   boolean owns=ObdBikeReadinessPolicy.ownsActiveMonitor(RideService.autoArmed,
+     ObdHandsFreeSession.enabled(activity)&&bikeId.equals(ObdHandsFreeSession.bikeId(activity)));
+   boolean fresh=owns&&ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,
+     android.os.SystemClock.elapsedRealtime());
+   String current=owns?
+    "현재 연결: "+RideService.obdLink+(fresh?" · ECU 속도 수신 확인":" · ECU 속도 대기")+
+     (RideService.running?" · GPS 기록 중":"")+
      "\n최근 오류: "+RideService.obdLastError:
-    "현재 연결: 자동 감지 미실행";
+     RideService.autoArmed?"현재 연결: 다른 바이크에서 OBD 감지 중":
+     "현재 연결: 자동 감지 미실행";
    connection.setText(current);
    connection.postDelayed(this,3000L);
   }};
@@ -97,16 +105,21 @@ final class DeveloperObdScreen {
   if(!RideService.autoArmed&&!RideService.running){
    activity.action(p,enabled?"자동 감지 다시 시작":"자동 기록 켜기 · 1회 설정",true,this::quickStart);
   }
-  if(enabled||RideService.autoArmed){
+  if(!otherBikeRunning&&(enabled||monitoring)){
    activity.action(p,"자동 기록 끄기",false,()->{
     activity.startService(new Intent(activity,RideService.class).setAction(RideService.AUTO_DISARM));
     setStatus("자동 기록 중지 요청 · 진행 중인 GPS 파일은 보존해.");
    });
   }
+  if(otherBikeRunning)activity.label(p,
+    "이 바이크에서 다른 바이크의 연결을 끌 수 없어. 현재 라이딩을 종료한 뒤 이 바이크로 전환해 줘.",
+    13,activity.muted,false);
   activity.action(p,"연결이 안 될 때 · Bluetooth 페어링",false,this::openBluetoothSettings);
   activity.action(p,"왜 기록이 안 됐지? · 자동 진단",true,()->new AlertDialog.Builder(activity)
    .setTitle("자동 라이딩 문제 진단")
-   .setMessage(ObdLocalDiagnosticLog.readableTroubleshooting(activity))
+   .setMessage(otherBikeRunning?
+    "현재 다른 바이크의 OBD 자동 감지가 작동 중이야. 해당 바이크의 설정에서 진단해야 해.":
+    ObdLocalDiagnosticLog.readableTroubleshooting(activity,bikeId))
    .setPositiveButton("확인",null).show());
   boolean saving=activity.getSharedPreferences("developer_experiments",0)
     .getBoolean(BikeObdPreferences.powerSaveKey(bikeId),false);
@@ -158,8 +171,13 @@ final class DeveloperObdScreen {
    new AlertDialog.Builder(activity).setTitle("휴대폰 위치를 켜 줘")
     .setMessage("자동 기록을 시작하려면 GPS를 켜야 해. 설정에서 위치를 켜고 이 화면으로 돌아와 다시 시작을 눌러 줘.")
     .setNegativeButton("취소",null).setPositiveButton("위치 설정",(d,w)->{
-     try{activity.startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));}
-     catch(Exception e){setStatus("휴대폰 설정에서 위치를 직접 켜 줘.");}
+     try{
+      resumeSetupAfterDeviceSettings=true;
+      activity.startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+     }catch(Exception e){
+      resumeSetupAfterDeviceSettings=false;
+      setStatus("휴대폰 설정에서 위치를 직접 켜 줘.");
+     }
     }).show();
    return;
   }
@@ -453,6 +471,41 @@ final class DeveloperObdScreen {
   try{activity.startActivity(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS));}
   catch(Exception unavailable){setStatus("갤럭시 설정 → 연결 → Bluetooth에서 동글을 페어링해 주세요.");}
  }
+ private void openBluetoothSettingsForSetup(){
+  resumeSetupAfterDeviceSettings=true;
+  try{activity.startActivity(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS));}
+  catch(Exception unavailable){
+   resumeSetupAfterDeviceSettings=false;
+   setStatus("Bluetooth 설정을 열지 못했어. 갤럭시 연결 설정에서 직접 페어링해 줘.");
+  }
+ }
+ /** Continue only a user-started setup after returning from system settings. */
+ void onActivityResumed(){
+  if(!resumeSetupAfterDeviceSettings)return;
+  resumeSetupAfterDeviceSettings=false;
+  if(activity.root==null)return;
+  activity.root.post(()->{
+   if(activity.isFinishing()||activity.isDestroyed()||owner==null||!owner.isShowing()||
+      activity.developerObd!=this||activity.dialog!=owner)return;
+   LocationManager gps=activity.getSystemService(LocationManager.class);
+   if(gps==null||!gps.isProviderEnabled(LocationManager.GPS_PROVIDER)){
+    setStatus("GPS가 아직 꺼져 있어. 켠 뒤 자동 기록 켜기를 다시 눌러 줘.");return;
+   }
+   BluetoothManager manager=activity.getSystemService(BluetoothManager.class);
+   BluetoothAdapter adapter=manager==null?null:manager.getAdapter();
+   if(adapter==null||!adapter.isEnabled()){
+    setStatus("Bluetooth가 아직 꺼져 있어. 켠 뒤 자동 기록 켜기를 다시 눌러 줘.");return;
+   }
+   if(!permissionGranted()){quickStart();return;}
+   try{
+    if(adapter.getBondedDevices()==null||adapter.getBondedDevices().isEmpty()){
+     setStatus("OBD 동글 페어링이 아직 안 됐어. 페어링 후 자동 기록 켜기를 다시 눌러 줘.");
+     return;
+    }
+   }catch(SecurityException e){setStatus("Bluetooth 연결 권한을 다시 확인해 줘.");return;}
+   quickStart(); // Still requires explicit per-bike device confirmation and consent.
+  });
+ }
  private void loadPaired(boolean automatic,boolean odo){
   if(owner==null||!owner.isShowing())return;
   if(!permissionGranted()){
@@ -462,7 +515,14 @@ final class DeveloperObdScreen {
   BluetoothManager manager=(BluetoothManager)activity.getSystemService(Context.BLUETOOTH_SERVICE);
   BluetoothAdapter adapter=manager==null?null:manager.getAdapter();
   if(adapter==null){setStatus("이 휴대폰은 Bluetooth를 지원하지 않아요.");return;}
-  if(!adapter.isEnabled()){setStatus("휴대폰 설정에서 Bluetooth를 켜고 어댑터를 페어링해 주세요.");return;}
+  if(!adapter.isEnabled()){
+   setStatus("휴대폰 Bluetooth를 먼저 켜 줘.");
+   if(automatic)new AlertDialog.Builder(activity).setTitle("Bluetooth가 꺼져 있어")
+    .setMessage("Bluetooth를 켜고 OBD 동글을 페어링하면 앱에서 이어서 설정할 수 있어.")
+    .setNegativeButton("취소",null)
+    .setPositiveButton("Bluetooth 켜기",(d,w)->openBluetoothSettingsForSetup()).show();
+   return;
+  }
   try{
    Set<BluetoothDevice> bonded=adapter.getBondedDevices();
    if(bonded==null||bonded.isEmpty()){
@@ -470,7 +530,10 @@ final class DeveloperObdScreen {
     new AlertDialog.Builder(activity).setTitle("OBD2 동글 먼저 페어링")
      .setMessage("바이크 시동을 켠 뒤 갤럭시 설정 → 연결 → Bluetooth에서 Vgate iCar Pro BT3.0을 페어링해 주세요. 이후 앱으로 돌아와 다시 선택하면 됩니다.")
      .setNegativeButton("나중에",null)
-     .setPositiveButton("Bluetooth 설정", (d,w)->openBluetoothSettings()).show();
+     .setPositiveButton("Bluetooth 설정", (d,w)->{
+      if(automatic)openBluetoothSettingsForSetup();
+      else openBluetoothSettings();
+     }).show();
     return;
    }
    List<BluetoothDevice> devices=new ArrayList<>(bonded);
@@ -588,6 +651,14 @@ final class DeveloperObdScreen {
    setStatus("바이크가 바뀌었습니다. OBD 설정을 다시 열어 주세요.");return;
   }
   if(RideService.running||RideService.autoArmed){setStatus("먼저 기존 라이딩 또는 자동 감지를 중지해 주세요.");return;}
+  try{GpsStorageSpacePolicy.require(activity.getFilesDir());}
+  catch(java.io.IOException lowStorage){
+   setStatus("GPS 저장 여유 공간이 부족해. 저장공간을 확보한 뒤 자동 기록을 켜 줘.");
+   new AlertDialog.Builder(activity).setTitle("GPS 기록 공간 부족")
+    .setMessage(lowStorage.getMessage()+"\n\n자동 기록을 켰더라도 실제 출발 시 저장이 실패할 수 있어서 시작 전에 확인했어.")
+    .setPositiveButton("확인",null).show();
+   return;
+  }
   if(activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
    setStatus("라이딩 탭에서 정확한 위치 권한을 허용한 뒤 다시 시도해 주세요.");return;
   }
