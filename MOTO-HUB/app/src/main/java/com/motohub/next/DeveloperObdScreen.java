@@ -74,11 +74,12 @@ final class DeveloperObdScreen {
   LinearLayout p=activity.page("자동 라이딩 · 간편 설정");
   activity.label(p,bike.optString("name","내 바이크"),22,activity.fg,true);
   boolean enabled=ObdHandsFreeSession.enabled(activity)&&bikeId.equals(ObdHandsFreeSession.bikeId(activity));
-  boolean monitoring=RideService.autoArmed&&enabled;
-  activity.label(p,monitoring?
-    (RideService.running?"GPS 주행 기록 중":"자동 기록 감지 중 · 시동/출발 대기"):
-    enabled?"설정은 저장됨 · 지금 감지 중이지 않음":
-    "자동 기록 꺼짐 · 한 번 켜면 이후 출발을 감지",15,activity.fg,true);
+  boolean monitoring=ObdBikeReadinessPolicy.ownsActiveMonitor(RideService.autoArmed,enabled);
+  boolean otherBikeRunning=ObdBikeReadinessPolicy.anotherBikeActive(RideService.autoArmed,enabled);
+  boolean speedFresh=monitoring&&ObdTelemetryFreshness.speedFresh(
+    RideService.obdLastSampleElapsed,android.os.SystemClock.elapsedRealtime());
+  activity.label(p,ObdBikeReadinessPolicy.status(enabled,RideService.autoArmed,
+    RideService.running,speedFresh),15,activity.fg,true);
   activity.label(p,"시동·출발이 OBD에서 확인되면 GPS 기록을 시작하고, 정차가 확인되면 저장해. 실차 연결 결과에 따라 동작이 달라질 수 있어.",13,activity.muted,false);
   status=activity.text("준비: Bluetooth 동글을 바이크에 꽂고 휴대폰과 페어링해 줘.",14,activity.muted,true);p.addView(status);
   TextView connection=activity.text("현재 연결: 확인 중",13,activity.muted,false);
@@ -86,10 +87,16 @@ final class DeveloperObdScreen {
   Runnable liveStatus=new Runnable(){@Override public void run(){
    if(owner==null||!owner.isShowing()||activity.dialog!=owner||
       !connection.isAttachedToWindow()||activity.isFinishing()||activity.isDestroyed())return;
-   String current=RideService.autoArmed?
-    "현재 연결: "+RideService.obdLink+(RideService.running?" · GPS 기록 중":" · 출발 대기")+
+   boolean owns=ObdBikeReadinessPolicy.ownsActiveMonitor(RideService.autoArmed,
+     ObdHandsFreeSession.enabled(activity)&&bikeId.equals(ObdHandsFreeSession.bikeId(activity)));
+   boolean fresh=owns&&ObdTelemetryFreshness.speedFresh(RideService.obdLastSampleElapsed,
+     android.os.SystemClock.elapsedRealtime());
+   String current=owns?
+    "현재 연결: "+RideService.obdLink+(fresh?" · ECU 속도 수신 확인":" · ECU 속도 대기")+
+     (RideService.running?" · GPS 기록 중":"")+
      "\n최근 오류: "+RideService.obdLastError:
-    "현재 연결: 자동 감지 미실행";
+     RideService.autoArmed?"현재 연결: 다른 바이크에서 OBD 감지 중":
+     "현재 연결: 자동 감지 미실행";
    connection.setText(current);
    connection.postDelayed(this,3000L);
   }};
@@ -97,16 +104,21 @@ final class DeveloperObdScreen {
   if(!RideService.autoArmed&&!RideService.running){
    activity.action(p,enabled?"자동 감지 다시 시작":"자동 기록 켜기 · 1회 설정",true,this::quickStart);
   }
-  if(enabled||RideService.autoArmed){
+  if(!otherBikeRunning&&(enabled||monitoring)){
    activity.action(p,"자동 기록 끄기",false,()->{
     activity.startService(new Intent(activity,RideService.class).setAction(RideService.AUTO_DISARM));
     setStatus("자동 기록 중지 요청 · 진행 중인 GPS 파일은 보존해.");
    });
   }
+  if(otherBikeRunning)activity.label(p,
+    "이 바이크에서 다른 바이크의 연결을 끌 수 없어. 현재 라이딩을 종료한 뒤 이 바이크로 전환해 줘.",
+    13,activity.muted,false);
   activity.action(p,"연결이 안 될 때 · Bluetooth 페어링",false,this::openBluetoothSettings);
   activity.action(p,"왜 기록이 안 됐지? · 자동 진단",true,()->new AlertDialog.Builder(activity)
    .setTitle("자동 라이딩 문제 진단")
-   .setMessage(ObdLocalDiagnosticLog.readableTroubleshooting(activity))
+   .setMessage(otherBikeRunning?
+    "현재 다른 바이크의 OBD 자동 감지가 작동 중이야. 해당 바이크의 설정에서 진단해야 해.":
+    ObdLocalDiagnosticLog.readableTroubleshooting(activity))
    .setPositiveButton("확인",null).show());
   boolean saving=activity.getSharedPreferences("developer_experiments",0)
     .getBoolean(BikeObdPreferences.powerSaveKey(bikeId),false);
