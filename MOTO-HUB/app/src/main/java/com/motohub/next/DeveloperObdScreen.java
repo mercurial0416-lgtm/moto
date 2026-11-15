@@ -651,6 +651,14 @@ final class DeveloperObdScreen {
    setStatus("바이크가 바뀌었습니다. OBD 설정을 다시 열어 주세요.");return;
   }
   if(RideService.running||RideService.autoArmed){setStatus("먼저 기존 라이딩 또는 자동 감지를 중지해 주세요.");return;}
+  try{GpsStorageSpacePolicy.require(activity.getFilesDir());}
+  catch(java.io.IOException lowStorage){
+   setStatus("GPS 저장 여유 공간이 부족해. 저장공간을 확보한 뒤 자동 기록을 켜 줘.");
+   new AlertDialog.Builder(activity).setTitle("GPS 기록 공간 부족")
+    .setMessage(lowStorage.getMessage()+"\n\n자동 기록을 켰더라도 실제 출발 시 저장이 실패할 수 있어서 시작 전에 확인했어.")
+    .setPositiveButton("확인",null).show();
+   return;
+  }
   if(activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
    setStatus("라이딩 탭에서 정확한 위치 권한을 허용한 뒤 다시 시도해 주세요.");return;
   }
