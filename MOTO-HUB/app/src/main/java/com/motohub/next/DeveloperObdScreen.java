@@ -13,6 +13,7 @@ import android.os.Build;
 import android.content.Intent;
 import android.location.LocationManager;
 import android.widget.LinearLayout;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.text.InputType;
 import org.json.JSONObject;
@@ -114,6 +115,13 @@ final class DeveloperObdScreen {
   if(otherBikeRunning)activity.label(p,
     "이 바이크에서 다른 바이크의 연결을 끌 수 없어. 현재 라이딩을 종료한 뒤 이 바이크로 전환해 줘.",
     13,activity.muted,false);
+  boolean odoOn=OdometerAutoSyncInbox.enabled(activity,bikeId);
+  activity.label(p,odoOn?"ODO 자동 연동: 켜짐 · "+
+    OdometerAutoSyncInbox.display(activity,bikeId):
+    "ODO 자동 연동: 꺼짐 · ECU 01A6 지원 시 누적거리 확인 가능",13,activity.muted,false);
+  if(!otherBikeRunning)activity.action(p,odoOn?
+   "ODO 자동 연동 끄기":"ODO 자동 연동 켜기 · 계기판 최초 1회 확인",
+   false,this::toggleOdoAutomatic);
   activity.action(p,"연결이 안 될 때 · Bluetooth 페어링",false,this::openBluetoothSettings);
   activity.action(p,"왜 기록이 안 됐지? · 자동 진단",true,()->new AlertDialog.Builder(activity)
    .setTitle("자동 라이딩 문제 진단")
@@ -148,6 +156,49 @@ final class DeveloperObdScreen {
   activity.label(p,"휴대폰 재부팅·앱 강제 중지 후 자동 실행은 안드로이드 제한으로 보장되지 않아. 이때 앱을 한 번 열면 복구를 시도해.",12,activity.muted,false);
   activity.show();owner=activity.dialog;
   owner.setOnDismissListener(d->{stop();if(activity.developerObd==this)activity.developerObd=null;});
+ }
+ /** One-time baseline confirmation. Do not overwrite the dashboard based on GPS
+  * or an unconfirmed ECU PID; the already-running speed monitor is not interrupted. */
+ private void toggleOdoAutomatic(){
+  JSONObject bike=activity.bike();
+  if(bike==null||!bikeId.equals(bike.optString("id"))||
+     GarageBikeStatus.sold(bike.optString("soldDate"))||activity.readOnly||
+     RestoreRideGate.isRestoring()||RestoreRideGate.isFormWriting()){
+   setStatus("바이크 또는 저장 상태를 확인한 뒤 다시 시도해 줘.");return;
+  }
+  if(RideService.autoArmed&&!bikeId.equals(ObdHandsFreeSession.bikeId(activity))){
+   setStatus("현재 다른 바이크의 OBD 감지가 작동 중이야.");return;
+  }
+  if(OdometerAutoSyncInbox.enabled(activity,bikeId)){
+   new AlertDialog.Builder(activity).setTitle("ODO 자동 연동 끄기")
+    .setMessage("앞으로 ECU 누적거리 값을 가져오지 않아. 기존 차고 km와 GPS 라이딩 기록은 그대로 보존해.")
+    .setNegativeButton("취소",null).setPositiveButton("끄기",(d,w)->{
+     OdometerAutoSyncInbox.disable(activity);
+     setStatus("ODO 자동 연동 꺼짐 · 기존 km 유지");
+    }).show();
+   return;
+  }
+  double baseline=bike.optDouble("odo",Double.NaN);
+  if(!OdoAutoSyncPolicy.sane(baseline)){
+   setStatus("차고의 누적 km가 없어. 실제 계기판 거리를 먼저 입력해 줘.");
+   return;
+  }
+  new AlertDialog.Builder(activity).setTitle("ODO 자동 연동 · 최초 한 번만 확인")
+   .setMessage(bike.optString("name")+"\n차고에 저장된 누적거리: "+activity.num(baseline)+
+    " km\n\n지금 바이크의 실제 계기판 총 주행거리와 같아?\n\n같다면 ECU가 표준 PID 01A6을 지원하고 두 번 읽은 값이 일치할 때만 자동 연동해. GPS 추정거리는 실제 ODO에 더하지 않아. 달리는 중에는 차고 DB 갱신을 미루고 앱을 다시 열면 자동 반영해.")
+   .setNegativeButton("취소",null)
+   .setPositiveButton("계기판과 일치 · 자동 연동 켜기",(d,w)->{
+    JSONObject current=activity.bike();
+    if(current==null||!bikeId.equals(current.optString("id"))||
+       Double.compare(current.optDouble("odo",Double.NaN),baseline)!=0||
+       activity.readOnly){setStatus("바이크 또는 누적 km가 변경됐어. 다시 확인해 줘.");return;}
+    if(!OdometerAutoSyncInbox.enable(activity,bikeId,baseline)){
+     setStatus("ODO 자동 연동 설정을 저장하지 못했어.");return;
+    }
+    setStatus(RideService.autoArmed?
+      "ODO 자동 연동 켜짐 · 연결 중이면 다음 OBD 재연결부터 확인":
+      "ODO 자동 연동 켜짐 · 다음 OBD 연결에서 자동 조회");
+   }).show();
  }
  /** Sequential OS permission flow. No developer tab, separate sensor test, or ODO setup. */
  void quickStart(){
@@ -669,12 +720,40 @@ final class DeveloperObdScreen {
   if(location==null||!location.isProviderEnabled(LocationManager.GPS_PROVIDER)){
    setStatus("먼저 휴대폰 GPS를 켜 주세요.");return;
   }
+  double odoBaseline=currentBike.optDouble("odo",Double.NaN);
+  boolean askOdo=!OdometerAutoSyncInbox.enabled(activity,bikeId)&&OdoAutoSyncPolicy.sane(odoBaseline);
+  final CheckBox odoChoice=new CheckBox(activity);
+  if(askOdo){
+   odoChoice.setText("ODO도 자동 · 실제 계기판 "+activity.num(odoBaseline)+" km와 일치함");
+   odoChoice.setTextSize(14);
+   odoChoice.setTextColor(activity.fg);
+   odoChoice.setChecked(false); // Require an intentional first-time ECU baseline acknowledgment.
+  }
+  LinearLayout message=activity.col();
+  message.setPadding(activity.dp(22),activity.dp(6),activity.dp(22),activity.dp(8));
+  TextView summary=activity.text("연결 장치: "+(device.getName()==null?"이름 없음":device.getName())+
+   "\n\n한 번 켜면 OBD 연결을 감시하다 실제 출발(5km/h 이상 정상 속도 2회)에 GPS 기록을 시작하고, 정차 확인 후 저장해. 상시 알림·배터리 사용이 있고, 재부팅·앱 강제 종료 후에는 자동 복구가 제한될 수 있어. 친구 위치 공유와 ECU 쓰기 작업은 하지 않아.",13,activity.fg,false);
+  message.addView(summary);
+  if(askOdo){
+   activity.gap(message,14);
+   message.addView(odoChoice);
+   activity.label(message,"선택 시 ECU 01A6을 두 번 검증해 자동 반영해. 미지원이면 계기판은 그대로 두고 GPS 추정거리만 별도로 관리해. 계기판 숫자가 다르면 선택하지 마.",12,activity.muted,false);
+  }else if(OdometerAutoSyncInbox.enabled(activity,bikeId)){
+   activity.label(message,"ODO 자동 연동도 켜져 있어. ECU 지원 시 검증값을 자동 수집해.",12,activity.muted,false);
+  }else activity.label(message,"ODO를 자동 연동하려면 차고에서 실제 계기판 누적 km를 먼저 기록해 줘.",12,activity.muted,false);
   new AlertDialog.Builder(activity).setTitle("OBD2 자동 라이딩 기록을 켤까요?")
-   .setMessage("연결 장치: "+(device.getName()==null?"이름 없음":device.getName())+"\n\n최초 한 번 동의하면 이 바이크의 OBD 연결을 지속적으로 감시합니다. 속도 5km/h 이상을 2회 연속 정상 수신하면 GPS 경로를 시작하고, 정차를 확인하면 저장한 다음 재대기합니다. 연결이 끊어져도 30초~5분 간격으로 반복 재접속하며, 라이딩 중에는 GPS를 유지합니다. 상시 알림과 배터리 사용이 발생합니다. 앱 강제 종료/폰 재부팅 후에는 안드로이드 제한으로 즉시 복구되지 않을 수 있으며, 앱을 다시 열면 복구를 시도합니다. 친구에게 위치를 자동 공유하지 않고 ECU를 수정하지 않습니다. 실차 호환성은 미검증입니다.")
+   .setView(message)
    .setNegativeButton("취소",null).setPositiveButton("동의하고 자동 감지 시작",(d,w)->{
     JSONObject stillSelected=activity.bike();
     if(stillSelected==null||!bikeId.equals(stillSelected.optString("id"))){
      setStatus("바이크 선택이 변경됐습니다. 감지 시작을 취소했어요.");return;
+    }
+    if(askOdo&&odoChoice.isChecked()){
+     if(activity.readOnly||Double.compare(stillSelected.optDouble("odo",Double.NaN),odoBaseline)!=0||
+        !OdometerAutoSyncInbox.enable(activity,bikeId,odoBaseline)){
+      setStatus("ODO 기준 확인 또는 설정 저장 실패 · 자동 출발도 보류했어. 다시 확인해 줘.");
+      return;
+     }
     }
     // Hands-free mode explicitly retains only this bike's chosen paired adapter.
     activity.getSharedPreferences("developer_experiments",0).edit().putString(adapterKey(),device.getAddress()).apply();
