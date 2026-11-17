@@ -262,7 +262,7 @@ final class DeveloperObdScreen {
   });
   activity.gap(p,15);
   activity.label(p,"이 바이크 · OBD 자동 라이딩 기록",17,activity.accent,true);
-  activity.label(p,"최초 1회 자동 모드를 켜면 화면이 꺼져도 OBD 연결을 반복 확인합니다. ECU 속도 7km/h 이상을 연속 3회 읽으면 GPS를 자동 시작하고 정차 시간(기본 10분) 이후 자동 저장합니다. 연결이 끊겨도 GPS 기록을 유지하며, 정확한 GPS가 장시간 정차를 확인하면 자동 저장합니다. 휴대폰 재부팅 후에는 알림에서 앱을 다시 열어야 할 수 있습니다.",13,activity.muted,false);
+  activity.label(p,"최초 1회 자동 모드를 켜면 화면이 꺼져도 OBD 연결을 반복 확인합니다. ECU 속도 5km/h 이상을 2회 연속 정상 수신하면 GPS를 자동 시작하고 정차 시간(기본 10분) 이후 자동 저장합니다. 연결이 끊겨도 GPS 기록을 유지하며, 정확한 GPS가 장시간 정차를 확인하면 자동 저장합니다. 휴대폰 재부팅 후에는 알림에서 앱을 다시 열어야 할 수 있습니다.",13,activity.muted,false);
   activity.action(p,"정차 종료 시간 설정 (3·5·10분)",false,()->{
    if(RideService.autoArmed||RideService.running){setStatus("기록 중에는 정차 시간을 변경할 수 없습니다.");return;}
    long value=activity.getSharedPreferences("developer_experiments",0).getLong(stopAfterKey(),ObdRideAutoGate.USER_DEFAULT_STOP_AFTER_MS);
