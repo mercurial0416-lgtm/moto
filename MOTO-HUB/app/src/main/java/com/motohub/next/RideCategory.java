@@ -8,8 +8,8 @@ import java.nio.file.StandardCopyOption;
 
 /** Local, user-controlled labels. A heuristic must never infer home/work destinations. */
 final class RideCategory {
- static final String AUTO="자동 분류",DAILY="일상",COMMUTE="출퇴근",WINDING="와인딩",LONG="장거리",TOUR="투어";
- static final String[] OPTIONS={AUTO,DAILY,COMMUTE,WINDING,LONG,TOUR};
+ static final String AUTO="자동 분류",OBD_AUTO="OBD 자동 기록",DAILY="일상",COMMUTE="출퇴근",WINDING="와인딩",LONG="장거리",TOUR="투어";
+ static final String[] OPTIONS={AUTO,OBD_AUTO,DAILY,COMMUTE,WINDING,LONG,TOUR};
  private RideCategory(){}
  static boolean valid(String category){
   if(category==null)return false;
