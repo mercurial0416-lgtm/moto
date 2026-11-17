@@ -37,6 +37,15 @@ final class RideCompletionInbox {
   for(JSONObject row:entries(c))if(!row.optBoolean("seen"))return row;
   return null;
  }
+ /** Latest saved OBD trip, independent of the history screen's search/date filters. */
+ static synchronized JSONObject latestAutomatic(Context c){
+  for(JSONObject row:entries(c))if(row.optBoolean("automatic"))return row;
+  return null;
+ }
+ static synchronized String latestAutomaticId(Context c){
+  JSONObject row=latestAutomatic(c);
+  return row==null?"":row.optString("id","");
+ }
  static synchronized void remove(Context c,String id){
   if(id==null||id.isEmpty())return;
   JSONArray old=read(c),next=new JSONArray();
@@ -78,6 +87,7 @@ final class RideCompletionInbox {
    // GPS is a separate, explicitly approximate ledger; never rewrite dashboard ODO.
    RideMileageEstimate.record(context,track,boundBike,result.distanceKm);
    row.put("id",id).put("summary",recap).put("seen",false)
+    .put("automatic",RideCategory.OBD_AUTO.equals(RideCategory.read(track)))
     .put("bikeId",boundBike)
     .put("time",System.currentTimeMillis());
    next.put(row);
