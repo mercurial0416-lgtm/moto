@@ -25,8 +25,9 @@ final class ObdCeHardeningTest {
   boolean refused=false;try{ObdReadOnlyProtocol.query("04FF");}catch(IllegalArgumentException e){refused=true;}
   yes(refused,"no write commands");
   ObdRideAutoGate gate=new ObdRideAutoGate();
-  gate.accept(8,1000);gate.accept(8,2000);
-  yes(gate.accept(8,3000)==ObdRideAutoGate.Event.START,"start");
+  gate.accept(8,1000);
+  yes(gate.accept(8,2000)==ObdRideAutoGate.Event.START,"start");
+  yes(gate.accept(8,3000)==ObdRideAutoGate.Event.NONE,"already recording");
   gate.accept(0,4000);gate.connectionLost();
   yes(gate.recording(),"connection loss preserves ongoing ride");
   yes(!gate.stoppedBeforeDisconnect(1000000),"stale idle is not proof of finish");
