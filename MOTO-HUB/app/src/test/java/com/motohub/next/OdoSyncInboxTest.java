@@ -28,6 +28,9 @@ public final class OdoSyncInboxTest {
   assertEquals(503.1,OdometerAutoSyncInbox.pending(c,bike),0.01);
   OdometerAutoSyncInbox.acknowledged(c,bike,503.1);
   assertTrue(Double.isNaN(OdometerAutoSyncInbox.pending(c,bike)));
+  assertTrue(OdometerAutoSyncInbox.display(c,bike).contains("503.1 km"));
+  assertTrue(OdometerAutoSyncInbox.rebaseline(c,bike,504,503.1));
+  assertFalse(OdometerAutoSyncInbox.display(c,bike).contains("503.1 km"));
   OdometerAutoSyncInbox.disable(c);
   assertFalse(OdometerAutoSyncInbox.enabled(c,bike));
  }
