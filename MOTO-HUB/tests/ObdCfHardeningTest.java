@@ -21,8 +21,9 @@ final class ObdCfHardeningTest {
   }
   ok(gate.accept(0,304000)==ObdRideAutoGate.Event.FINISH,"5-min rest completes");
   gate.setStopAfterMs(600_000L);ok(gate.stopAfterMs()==600_000L,"10-min rest");
-  gate.accept(10,400000);gate.accept(10,401000);
-  ok(gate.accept(10,402000)==ObdRideAutoGate.Event.START,"restart at speed");
+  gate.accept(10,400000);
+  ok(gate.accept(10,401000)==ObdRideAutoGate.Event.START,"restart at speed");
+  ok(gate.accept(10,402000)==ObdRideAutoGate.Event.NONE,"subsequent speed is a continuing ride");
   gate.accept(0,403000);gate.connectionLost();
   ok(gate.recording(),"Bluetooth outage must preserve ride state");
   ok(!gate.stoppedBeforeDisconnect(700000),"stale stop not proof of finished trip");
