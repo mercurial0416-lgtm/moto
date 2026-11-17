@@ -29,7 +29,8 @@ tests={
  "experimental opt in":'getSharedPreferences("developer_experiments",0).getBoolean("enabled",false)' in (p/'HubScreens.java').read_text(),
  "ODO permission callback":'DeveloperObdScreen.ODO_CONNECT_PERMISSION_REQUEST' in main and 'developerObd.loadPairedOdo()' in main,
  "no boot reconnection":'App.onCreate()' not in screen and 'onBoot' not in screen,
- "ride auto start 7 km/h":'START_KMH=7' in (p/"ObdRideAutoGate.java").read_text(),
+ "ride auto start two distinct >=5 km/h speed values":all(piece in (p/"ObdRideAutoGate.java").read_text() for piece in
+  ('START_KMH=5','REQUIRED_MOVING_SAMPLES=2','MIN_START_SAMPLE_GAP_MS=700L')),
  "no ECU writes":'모든 차량' not in screen and 'setPid(' not in screen,
 }
 for description,passed in tests.items():
