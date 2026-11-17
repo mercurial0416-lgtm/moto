@@ -11,8 +11,8 @@ final class ObdCfHardeningTest {
   throwsIllegal(()->gate.setStopAfterMs(240_000L));
   gate.setStopAfterMs(300_000L);ok(gate.stopAfterMs()==300_000L,"5-min pause selected");
   ok(gate.accept(9,1000)==ObdRideAutoGate.Event.NONE,"first movement");
-  ok(gate.accept(9,2000)==ObdRideAutoGate.Event.NONE,"second movement");
-  ok(gate.accept(9,3000)==ObdRideAutoGate.Event.START,"third movement starts");
+  ok(gate.accept(9,2000)==ObdRideAutoGate.Event.START,"second movement starts");
+  ok(gate.accept(9,3000)==ObdRideAutoGate.Event.NONE,"third sample continues recording");
   boolean protectedChange=false;try{gate.setStopAfterMs(600_000L);}catch(IllegalStateException e){protectedChange=true;}
   ok(protectedChange,"cannot change pause while recording");
   gate.accept(0,4000);
