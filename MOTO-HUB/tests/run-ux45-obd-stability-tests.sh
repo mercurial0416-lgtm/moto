@@ -45,6 +45,19 @@ checks={
  "privacy policy excludes identifiers":'GPS 37.' not in policy,
  "do not auto-edit ODO":'target.put("odo"' not in service,
  "GPS ride still user opted":'.setPositiveButton("동의하고 자동 감지 시작"' in dev and 'setAction(RideService.AUTO_ARM)' in dev,
+ "early validated auto start":'START_KMH=5' in read("ObdRideAutoGate.java") and
+   'REQUIRED_MOVING_SAMPLES=2' in read("ObdRideAutoGate.java") and
+   'MIN_START_SAMPLE_GAP_MS=700L' in read("ObdRideAutoGate.java"),
+ "OBD automatic source marked before inbox":'RideCategory.write(savedTrack,RideCategory.OBD_AUTO);' in service and
+   'publishAutomaticRide(savedTrack);' in service,
+ "automatic source appears as saved category":'OBD_AUTO="OBD 자동 기록"' in read("RideCategory.java") and
+   'RideCategory.OBD_AUTO' in read("RideCategoryFilter.java"),
+ "saved trip distinguished in local inbox":'put("automatic",RideCategory.OBD_AUTO.equals(RideCategory.read(track)))' in read("RideCompletionInbox.java"),
+ "riding tab refreshes after auto save":'watchAutomaticRideCompletion(historyPanel,a.content)' in home and
+   'loadHistoryAsync(panel,requestedContent)' in home,
+ "recent completed OBD trip always accessible":'showLatestAutomaticRide(historyPanel)' in home and
+   '최근 자동 기록 상세 보기' in home,
+ "no automatic dashboard ODO modification":'target.put("odo"' not in service,
 }
 for label,valid in checks.items():assert valid,label
 print(f"PASS UX45 OBD safety/source guards: {len(checks)}")
