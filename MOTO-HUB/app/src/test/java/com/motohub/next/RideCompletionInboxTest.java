@@ -27,6 +27,7 @@ public final class RideCompletionInboxTest {
     Files.write(track.toPath(),(TrackFile.point(37.0,127.0,5.0,1761600000000L)+
      TrackFile.point(37.0001,127.0001,5.0,1761600003000L)).getBytes(StandardCharsets.UTF_8));
     TrackCompletion.mark(track,2);
+    if(i==11)RideCategory.write(track,RideCategory.OBD_AUTO);
     created.add(track);
     RideCompletionInbox.record(context,track);
     RideCompletionInbox.record(context,track);
@@ -35,6 +36,9 @@ public final class RideCompletionInboxTest {
    JSONObject latest=RideCompletionInbox.unread(context);
    assertNotNull(latest);
    assertTrue(latest.optString("summary").contains("GPS"));
+   assertTrue(latest.optBoolean("automatic"));
+   assertEquals(created.get(11).getName(),RideCompletionInbox.latestAutomaticId(context));
+   assertNotNull(RideCompletionInbox.latestAutomatic(context));
    String id=latest.optString("id");
    assertTrue(RideCompletionInbox.seen(context,id));
    assertTrue(RideCompletionInbox.entries(context).get(0).optBoolean("seen"));
@@ -42,6 +46,7 @@ public final class RideCompletionInboxTest {
   }finally{
    for(File file:created){
     new File(file.getPath()+".done").delete();
+    new File(file.getPath()+".category").delete();
     file.delete();
    }
    context.getSharedPreferences("ride_completion_inbox",0).edit().clear().commit();
