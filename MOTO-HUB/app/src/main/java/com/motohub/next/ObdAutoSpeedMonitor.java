@@ -110,9 +110,10 @@ final class ObdAutoSpeedMonitor {
      throw new IOException("차량 속도 응답 6회 연속 무효 · 안전하게 재연결합니다.");
    }
    else {unsupported=0;listener.speed(speed);}
-   // Optional and explicitly opted-in ODO: two independent read-only samples.
-   // Failure must never disrupt safety-critical speed-triggered GPS tracking.
-   if(!stopped&&samples>0&&samples%60==0&&odoSupported&&listener.allowOdometer()){
+   // Optional and explicitly opted-in ODO: two independent read-only samples
+   // after five speed polls (not after minutes of slow idling) and periodically
+   // thereafter. Failure never interrupts speed-triggered GPS tracking.
+   if(!stopped&&ObdOdoPollPolicy.due(samples,speed>=0,odoSupported,listener.allowOdometer())){
     try{
      double a=ObdOdometer.parseKm(query(in,out,ObdReadOnlyProtocol.query("01A6"),2500));
      double b=ObdOdometer.parseKm(query(in,out,ObdReadOnlyProtocol.query("01A6"),2500));
