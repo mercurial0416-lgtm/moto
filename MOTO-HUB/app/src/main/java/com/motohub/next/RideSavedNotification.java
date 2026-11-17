@@ -7,7 +7,8 @@ import android.os.Build;
 /** Verified GPS-only completion alert, containing no location or bike identifiers. */
 final class RideSavedNotification {
  private RideSavedNotification(){}
- static void post(Context context){
+ static void post(Context context){post(context,false);}
+ static void post(Context context,boolean automatic){
   try{
    NotificationManager manager=context.getSystemService(NotificationManager.class);
    if(manager==null||!manager.areNotificationsEnabled())return;
