@@ -86,6 +86,8 @@ final class DeveloperObdScreen {
   status=activity.text("준비: Bluetooth 동글을 바이크에 꽂고 휴대폰과 페어링해 줘.",14,activity.muted,true);p.addView(status);
   TextView connection=activity.text("현재 연결: 확인 중",13,activity.muted,false);
   p.addView(connection);
+  TextView odoStatus=activity.text("ODO 상태 확인 중…",13,activity.muted,false);
+  p.addView(odoStatus);
   Runnable liveStatus=new Runnable(){@Override public void run(){
    if(owner==null||!owner.isShowing()||activity.dialog!=owner||
       !connection.isAttachedToWindow()||activity.isFinishing()||activity.isDestroyed())return;
@@ -100,6 +102,7 @@ final class DeveloperObdScreen {
      RideService.autoArmed?"현재 연결: 다른 바이크에서 OBD 감지 중":
      "현재 연결: 자동 감지 미실행";
    connection.setText(current);
+   odoStatus.setText("ODO 자동 연동: "+OdometerAutoSyncInbox.display(activity,bikeId));
    connection.postDelayed(this,3000L);
   }};
   connection.postDelayed(liveStatus,500L);
@@ -116,9 +119,6 @@ final class DeveloperObdScreen {
     "이 바이크에서 다른 바이크의 연결을 끌 수 없어. 현재 라이딩을 종료한 뒤 이 바이크로 전환해 줘.",
     13,activity.muted,false);
   boolean odoOn=OdometerAutoSyncInbox.enabled(activity,bikeId);
-  activity.label(p,odoOn?"ODO 자동 연동: 켜짐 · "+
-    OdometerAutoSyncInbox.display(activity,bikeId):
-    "ODO 자동 연동: 꺼짐 · ECU 01A6 지원 시 누적거리 확인 가능",13,activity.muted,false);
   if(!otherBikeRunning)activity.action(p,odoOn?
    "ODO 자동 연동 끄기":"ODO 자동 연동 켜기 · 계기판 최초 1회 확인",
    false,this::toggleOdoAutomatic);
