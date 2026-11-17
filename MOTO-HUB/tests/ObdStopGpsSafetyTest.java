@@ -4,7 +4,8 @@ final class ObdStopGpsSafetyTest {
  static void ok(boolean v){if(!v)throw new AssertionError("GPS stop safety");checks++;}
  public static void main(String[] args){
   ObdRideAutoGate g=new ObdRideAutoGate();
-  g.accept(8,1_000);g.accept(8,2_000);ok(g.accept(8,3_000)==ObdRideAutoGate.Event.START);
+  g.accept(8,1_000);ok(g.accept(8,2_000)==ObdRideAutoGate.Event.START);
+  ok(g.accept(8,3_000)==ObdRideAutoGate.Event.NONE);
   g.accept(0,4_000);
   ok(g.stationaryRemainingMs(4_000)==180_000);
   g.gpsMovement(15,5_000); // real GPS movement cancels zero ECU speed

@@ -3,8 +3,9 @@ package com.motohub.next;
 /** Pure state machine for optional OBD speed-triggered GPS rides. No GPS or ECU writes. */
 final class ObdRideAutoGate {
  enum Event { NONE, START, FINISH }
- static final int START_KMH=7, KEEP_MOVING_KMH=4, FINISH_KMH=2;
- static final int REQUIRED_MOVING_SAMPLES=3;
+ static final int START_KMH=5, KEEP_MOVING_KMH=4, FINISH_KMH=2;
+ static final int REQUIRED_MOVING_SAMPLES=2;
+ static final long MIN_START_SAMPLE_GAP_MS=700L;
  static final long STOP_AFTER_MS=180_000L;
  /** Safer user-facing default groups traffic and longer short stops; user can select 3/5/10 min. */
  static final long USER_DEFAULT_STOP_AFTER_MS=600_000L;
@@ -24,12 +25,19 @@ final class ObdRideAutoGate {
 
  Event accept(int speedKmh,long elapsedMs){
   if(elapsedMs<0||lastSample>elapsedMs)return Event.NONE;
+  long previousSample=lastSample;
   if(lastSample>=0&&elapsedMs-lastSample>(recording?15_000:5_500)){movingSamples=0;stationarySince=-1;}
   lastSample=elapsedMs;
   if(speedKmh<0||speedKmh>200){movingSamples=0;stationarySince=-1;return Event.NONE;}
   if(!recording){
-   if(speedKmh>=START_KMH){if(++movingSamples>=REQUIRED_MOVING_SAMPLES){recording=true;movingSamples=0;stationarySince=-1;return Event.START;}}
-   else movingSamples=0;
+   if(speedKmh>=START_KMH){
+    // Ignore duplicate/overly rapid ECU replies; 2 independent moving samples
+    // let the GPS track begin earlier than the old 7 km/h x3 threshold.
+    if(previousSample>=0&&elapsedMs-previousSample<MIN_START_SAMPLE_GAP_MS)return Event.NONE;
+    if(++movingSamples>=REQUIRED_MOVING_SAMPLES){
+     recording=true;movingSamples=0;stationarySince=-1;return Event.START;
+    }
+   }else movingSamples=0;
    return Event.NONE;
   }
   if(speedKmh>=KEEP_MOVING_KMH){stationarySince=-1;return Event.NONE;}

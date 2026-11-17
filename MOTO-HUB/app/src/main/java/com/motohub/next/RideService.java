@@ -508,6 +508,14 @@ public final class RideService extends Service implements LocationListener {
    stopWith("사용자가 라이딩 기록을 종료했습니다.",true);
   }
  }
+ /** Only a successfully completed automatic GPS file is labeled and sent to
+  * the local riding history. The saved file is valid even if tagging fails. */
+ private void publishAutomaticRide(File savedTrack){
+  if(savedTrack==null||!RideMileageIntegrity.validCompleted(savedTrack))return;
+  try{RideCategory.write(savedTrack,RideCategory.OBD_AUTO);}
+  catch(IOException ignored){ /* Never sacrifice a verified GPS track to metadata. */ }
+  RideCompletionInbox.record(getApplicationContext(),savedTrack);
+ }
  /** Auto rides use the same ordered GPS worker for full-file verification.
   *  Keep OBD autoGate on the main thread but do not allow a new start mid-finalize.
   */
@@ -521,14 +529,22 @@ public final class RideService extends Service implements LocationListener {
   HandlerThread worker=gpsIoThread;
   if(worker==null||!worker.isAlive()||!new Handler(worker.getLooper()).post(()->{
    boolean verified=closeTrack(true);
-   if(verified)RideCompletionInbox.record(getApplicationContext(),savedTrack);
+   if(verified)publishAutomaticRide(savedTrack);
    // Reconcile previous sections in the derived GPS ledger, never the vehicle ODO.
    if(verified&&completedSegments>0)new Thread(()->{
     try{RideMileageEstimate.rebuild(getApplicationContext());}catch(IOException ignored){}
    },"moto-rollover-distance-reconcile").start();
    handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,verified);});
   })){
-   completeAutoTrack(savedTrack,closeTrack(true));
+   boolean verified=closeTrack(true);
+   if(verified){
+    // The GPS worker may be unavailable during shutdown. Perform derived
+    // labeling/inbox analysis off the main thread, then finalize on main.
+    new Thread(()->{
+     publishAutomaticRide(savedTrack);
+     handler.post(()->{if(autoFinishPending)completeAutoTrack(savedTrack,true);});
+    },"moto-auto-finalize-fallback").start();
+   }else completeAutoTrack(savedTrack,false);
   }
  }
  private void completeAutoTrack(File savedTrack,boolean verified){

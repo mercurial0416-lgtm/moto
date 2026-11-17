@@ -7,7 +7,8 @@ import android.os.Build;
 /** Verified GPS-only completion alert, containing no location or bike identifiers. */
 final class RideSavedNotification {
  private RideSavedNotification(){}
- static void post(Context context){
+ static void post(Context context){post(context,false);}
+ static void post(Context context,boolean automatic){
   try{
    NotificationManager manager=context.getSystemService(NotificationManager.class);
    if(manager==null||!manager.areNotificationsEnabled())return;
@@ -18,8 +19,8 @@ final class RideSavedNotification {
    PendingIntent destination=PendingIntent.getActivity(context,406,open,
     PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
    manager.notify(406,new Notification.Builder(context,"moto_ride_saved")
-    .setSmallIcon(R.drawable.ic_notification).setContentTitle("라이딩 GPS 저장 완료")
-    .setContentText("GPS 원본을 검증해 저장했습니다. 눌러서 주행 내역 보기")
+    .setSmallIcon(R.drawable.ic_notification).setContentTitle(automatic?"OBD 자동 라이딩 저장 완료":"라이딩 GPS 저장 완료")
+    .setContentText("GPS 원본 검증 완료 · 눌러서 라이딩 기록 보기")
     .setContentIntent(destination).setAutoCancel(true)
     .setVisibility(Notification.VISIBILITY_PRIVATE).build());
   }catch(RuntimeException ignored){/* Notification failure never modifies verified GPS. */}

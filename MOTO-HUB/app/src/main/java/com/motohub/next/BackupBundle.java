@@ -215,7 +215,7 @@ public final class BackupBundle {
     }
     File category=new File(file.getPath()+".category");
     if(category.isFile()||Files.isSymbolicLink(category.toPath())){
-     if(!java.util.Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(new String(readSidecar(category,64),StandardCharsets.UTF_8)))
+     if(!java.util.Arrays.asList("자동 분류","OBD 자동 기록","일상","출퇴근","와인딩","장거리","투어").contains(new String(readSidecar(category,64),StandardCharsets.UTF_8)))
       throw new IOException("라이딩 분류가 손상됐습니다: "+file.getName());
      total=writeFile(zip,category,"rides/"+category.getName(),total);count++;
     }

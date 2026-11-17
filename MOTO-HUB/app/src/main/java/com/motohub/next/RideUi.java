@@ -265,8 +265,45 @@ final class RideUi {
   historyPanel.addView(a.text("라이딩 기록 확인 중…",13,a.muted,false));
   a.content.addView(historyPanel);
   loadHistoryAsync(historyPanel,a.content);
+  watchAutomaticRideCompletion(historyPanel,a.content);
   a.gap(a.content,12);
   a.label(a.content,"GPS 기록은 이 기기에 저장됩니다. 주행 중 화면 조작은 피하세요.",12,a.muted,false);
+ }
+ /** A saved automatic ride should appear while the Riding tab stays open,
+  * not only after the user manually switches tabs. Read only a tiny local inbox. */
+ void watchAutomaticRideCompletion(LinearLayout panel,LinearLayout requestedContent){
+  final String[] lastId={RideCompletionInbox.latestAutomaticId(a)};
+  Runnable refresh=new Runnable(){@Override public void run(){
+   if(a.isFinishing()||a.isDestroyed()||!panel.isAttachedToWindow()||
+     !"라이딩".equals(a.tab)||a.content!=requestedContent)return;
+   String current=RideCompletionInbox.latestAutomaticId(a);
+   if(!current.equals(lastId[0])){
+    lastId[0]=current;
+    loadHistoryAsync(panel,requestedContent);
+   }
+   panel.postDelayed(this,3500L);
+  }};
+  panel.postDelayed(refresh,3500L);
+ }
+ /** Independent of history filters: a just-completed OBD ride is always findable. */
+ void showLatestAutomaticRide(LinearLayout panel){
+  org.json.JSONObject latest=RideCompletionInbox.latestAutomatic(a);
+  if(latest==null)return;
+  String name=latest.optString("id","");
+  if(!name.matches("[0-9]{10,15}-[a-f0-9-]{36}\\.track"))return;
+  File track=new File(new File(a.getFilesDir(),"rides"),name);
+  if(!RideMileageIntegrity.validCompleted(track))return;
+  LinearLayout card=a.col();
+  card.setPadding(a.dp(15),a.dp(14),a.dp(15),a.dp(14));
+  card.setBackground(a.shape(a.panel,a.line,17));
+  card.addView(a.text("OBD 자동 라이딩 · 저장 완료",16,a.fg,true));
+  card.addView(a.text(a.rideBikeCaption(latest)+" · "+
+   RideHistoryLabel.title(track,java.time.ZoneId.systemDefault()),12,a.muted,false));
+  a.gap(card,8);
+  Button details=a.button("최근 자동 기록 상세 보기",true,()->a.openRideInsights(track));
+  details.setMinHeight(a.dp(46));card.addView(details);
+  panel.addView(card);
+  a.gap(panel,12);
  }
  /** Snapshot all filesystem metadata off the Android UI thread. Stale screen loads are discarded. */
  void loadHistoryAsync(LinearLayout historyPanel,LinearLayout requestedContent){
@@ -384,6 +421,7 @@ final class RideUi {
  }
  /** Only Android view creation runs on the UI thread; the file scan has already completed. */
  void populateHistory(LinearLayout historyPanel,HistoryData data){
+  showLatestAutomaticRide(historyPanel);
   if(data.latestUnapplied!=null&&data.unappliedCount>0){
    LinearLayout review=a.col();review.setPadding(a.dp(14),a.dp(12),a.dp(14),a.dp(12));
    review.setBackground(a.shape(a.panel,a.line,17));

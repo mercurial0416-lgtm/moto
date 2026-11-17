@@ -25,8 +25,9 @@ public final class ObdDiagnosticSummaryTest {
   check(!sensors.summary(now).contains("FFFF"),"no unexpected PID");
   ObdRideAutoGate ride=new ObdRideAutoGate();
   check(ride.stationaryRemainingMs(0)==-1,"not recording");
-  ride.accept(8,1000);ride.accept(8,2000);
-  check(ride.accept(8,3000)==ObdRideAutoGate.Event.START,"start");
+  ride.accept(8,1000);
+  check(ride.accept(8,2000)==ObdRideAutoGate.Event.START,"start");
+  check(ride.accept(8,3000)==ObdRideAutoGate.Event.NONE,"recording already active");
   check(ride.stationaryRemainingMs(3000)==-1,"moving");
   ride.accept(0,4000);
   check(ride.stationaryRemainingMs(4000)==180000L,"full rest interval");

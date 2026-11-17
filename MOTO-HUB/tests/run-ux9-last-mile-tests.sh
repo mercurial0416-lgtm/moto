@@ -23,7 +23,10 @@ assert 'if(autoFinishPending){' in service and 'finishPending=true;Sharing.stop(
 assert 'if(finishPending){' in service and 'stopWith(verified?' in service
 assert 'finishPending=true;\n  Sharing.stop();' in service
 assert 'new Handler(worker.getLooper()).post(()->{' in service
-assert service.count('boolean verified=closeTrack(true);')==2, 'Both user and OBD completion verify on the worker'
+assert service.count('boolean verified=closeTrack(true);')==3, 'User, auto and defensive fallback all verify before publishing'
+assert service.count('new Handler(worker.getLooper()).post(()->{')>=2, 'Normal user and auto GPS closing remain ordered on GPS worker'
+assert 'if(verified)publishAutomaticRide(savedTrack);' in service, 'Only verified auto GPS trips enter history'
+assert 'moto-auto-finalize-fallback' in service, 'Fallback completion remains off main thread'
 assert 'private synchronized boolean closeTrack(boolean completed)' in service
 assert 'if(!finishPending)return;finishPending=false;' in service and 'stopWith(verified?' in service
 assert 'autoFinishPending=false;running=false;' in service

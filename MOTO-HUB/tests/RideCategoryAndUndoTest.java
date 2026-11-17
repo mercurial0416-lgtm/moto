@@ -29,6 +29,9 @@ final class RideCategoryAndUndoTest {
   try{
    File a=make(home,1_700_000_000_000L), b=make(home,1_700_000_030_000L);
    ok(RideCategory.AUTO.equals(RideCategory.read(a)),"automatic category by default");
+   ok(RideCategory.valid(RideCategory.OBD_AUTO),"auto OBD category is an explicit valid label");
+   RideCategory.write(b,RideCategory.OBD_AUTO);
+   ok(RideCategory.OBD_AUTO.equals(RideCategory.read(b)),"OBD automatic ride source persisted");
    ok(RideCategory.LONG.equals(RideCategory.suggested(180,7200000,90)),"long trip heuristic");
    ok(RideCategory.DAILY.equals(RideCategory.suggested(7,1800000,14)),"short ride not falsely commute");
    ok(RideCategory.suggested(35,3600000,35).contains("추정"),"winding only suggested");
@@ -61,6 +64,7 @@ final class RideCategoryAndUndoTest {
    ok(RideTrackMerge.archived(combined),"archive status roundtrip");
    ok(RideCategory.TOUR.equals(RideCategory.read(combined)),"combined category roundtrip");
    ok(RideCategory.COMMUTE.equals(RideCategory.read(copyA)),"source category roundtrip");
+   ok(RideCategory.OBD_AUTO.equals(RideCategory.read(copyB)),"OBD auto category survives the backup roundtrip");
    RideCategory.write(copyA,RideCategory.AUTO);
    ok(RideCategory.AUTO.equals(RideCategory.read(copyA)),"category reset");
    System.out.println("CS ride categorization/undo/backup tests passed: "+checks);

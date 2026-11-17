@@ -11,8 +11,8 @@ final class ObdCfHardeningTest {
   throwsIllegal(()->gate.setStopAfterMs(240_000L));
   gate.setStopAfterMs(300_000L);ok(gate.stopAfterMs()==300_000L,"5-min pause selected");
   ok(gate.accept(9,1000)==ObdRideAutoGate.Event.NONE,"first movement");
-  ok(gate.accept(9,2000)==ObdRideAutoGate.Event.NONE,"second movement");
-  ok(gate.accept(9,3000)==ObdRideAutoGate.Event.START,"third movement starts");
+  ok(gate.accept(9,2000)==ObdRideAutoGate.Event.START,"second movement starts");
+  ok(gate.accept(9,3000)==ObdRideAutoGate.Event.NONE,"third sample continues recording");
   boolean protectedChange=false;try{gate.setStopAfterMs(600_000L);}catch(IllegalStateException e){protectedChange=true;}
   ok(protectedChange,"cannot change pause while recording");
   gate.accept(0,4000);
@@ -21,8 +21,9 @@ final class ObdCfHardeningTest {
   }
   ok(gate.accept(0,304000)==ObdRideAutoGate.Event.FINISH,"5-min rest completes");
   gate.setStopAfterMs(600_000L);ok(gate.stopAfterMs()==600_000L,"10-min rest");
-  gate.accept(10,400000);gate.accept(10,401000);
-  ok(gate.accept(10,402000)==ObdRideAutoGate.Event.START,"restart at speed");
+  gate.accept(10,400000);
+  ok(gate.accept(10,401000)==ObdRideAutoGate.Event.START,"restart at speed");
+  ok(gate.accept(10,402000)==ObdRideAutoGate.Event.NONE,"subsequent speed is a continuing ride");
   gate.accept(0,403000);gate.connectionLost();
   ok(gate.recording(),"Bluetooth outage must preserve ride state");
   ok(!gate.stoppedBeforeDisconnect(700000),"stale stop not proof of finished trip");
