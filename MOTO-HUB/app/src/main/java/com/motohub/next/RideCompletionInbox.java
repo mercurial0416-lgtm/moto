@@ -92,7 +92,8 @@ final class RideCompletionInbox {
     .put("time",System.currentTimeMillis());
    next.put(row);
    for(int i=0;i<current.length()&&next.length()<LIMIT;i++)next.put(current.getJSONObject(i));
-   if(p.edit().putString(KEY,next.toString()).commit())RideSavedNotification.post(context);
+   if(p.edit().putString(KEY,next.toString()).commit())
+    RideSavedNotification.post(context,row.optBoolean("automatic"));
   }catch(Exception ignored){/* Leave original completed GPS and .done untouched. */}
  }
 }
