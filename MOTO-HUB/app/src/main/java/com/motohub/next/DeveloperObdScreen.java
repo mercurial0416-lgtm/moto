@@ -14,6 +14,7 @@ import android.content.Intent;
 import android.location.LocationManager;
 import android.widget.LinearLayout;
 import android.widget.CheckBox;
+import android.widget.ScrollView;
 import android.widget.EditText;
 import android.text.InputType;
 import org.json.JSONObject;
@@ -741,8 +742,11 @@ final class DeveloperObdScreen {
   }else if(OdometerAutoSyncInbox.enabled(activity,bikeId)){
    activity.label(message,"ODO 자동 연동도 켜져 있어. ECU 지원 시 검증값을 자동 수집해.",12,activity.muted,false);
   }else activity.label(message,"ODO를 자동 연동하려면 차고에서 실제 계기판 누적 km를 먼저 기록해 줘.",12,activity.muted,false);
+  ScrollView contentScroll=new ScrollView(activity);
+  contentScroll.setFillViewport(false);
+  contentScroll.addView(message);
   new AlertDialog.Builder(activity).setTitle("OBD2 자동 라이딩 기록을 켤까요?")
-   .setView(message)
+   .setView(contentScroll)
    .setNegativeButton("취소",null).setPositiveButton("동의하고 자동 감지 시작",(d,w)->{
     JSONObject stillSelected=activity.bike();
     if(stillSelected==null||!bikeId.equals(stillSelected.optString("id"))){
