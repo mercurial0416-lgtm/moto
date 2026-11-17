@@ -185,7 +185,7 @@ final class DeveloperObdScreen {
    return;
   }
   new AlertDialog.Builder(activity).setTitle("ODO 자동 연동 · 최초 한 번만 확인")
-   .setMessage(bike.optString("name")+"\n차고에 저장된 누적거리: "+activity.num(baseline)+
+   .setMessage(bike.optString("name")+"\n차고에 저장된 누적거리: "+String.format(java.util.Locale.KOREA,"%,.1f",baseline)+
     " km\n\n지금 바이크의 실제 계기판 총 주행거리와 같아?\n\n같다면 ECU가 표준 PID 01A6을 지원하고 두 번 읽은 값이 일치할 때만 자동 연동해. GPS 추정거리는 실제 ODO에 더하지 않아. 달리는 중에는 차고 DB 갱신을 미루고 앱을 다시 열면 자동 반영해.")
    .setNegativeButton("취소",null)
    .setPositiveButton("계기판과 일치 · 자동 연동 켜기",(d,w)->{
@@ -725,7 +725,7 @@ final class DeveloperObdScreen {
   boolean askOdo=!OdometerAutoSyncInbox.enabled(activity,bikeId)&&OdoAutoSyncPolicy.sane(odoBaseline);
   final CheckBox odoChoice=new CheckBox(activity);
   if(askOdo){
-   odoChoice.setText("ODO도 자동 · 실제 계기판 "+activity.num(odoBaseline)+" km와 일치함");
+   odoChoice.setText("ODO도 자동 · 실제 계기판 "+String.format(java.util.Locale.KOREA,"%,.1f",odoBaseline)+" km와 일치함");
    odoChoice.setTextSize(14);
    odoChoice.setTextColor(activity.fg);
    odoChoice.setChecked(false); // Require an intentional first-time ECU baseline acknowledgment.
