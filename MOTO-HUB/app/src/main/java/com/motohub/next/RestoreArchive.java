@@ -225,7 +225,7 @@ public final class RestoreArchive {
    }
    for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".category")){
     File label=new File(stage,name);
-    if(!java.util.Arrays.asList("자동 분류","일상","출퇴근","와인딩","장거리","투어").contains(new String(Files.readAllBytes(label.toPath()),StandardCharsets.UTF_8)))throw new IOException("지원하지 않는 라이딩 분류입니다.");
+    if(!java.util.Arrays.asList("자동 분류","OBD 자동 기록","일상","출퇴근","와인딩","장거리","투어").contains(new String(Files.readAllBytes(label.toPath()),StandardCharsets.UTF_8)))throw new IOException("지원하지 않는 라이딩 분류입니다.");
    }
    for(String name:seen)if(name.startsWith("rides/")&&name.endsWith(".unmerged")&&!seen.contains(name.substring(0,name.length()-9)+".done"))
     throw new IOException("완료되지 않은 통합 기록입니다.");
