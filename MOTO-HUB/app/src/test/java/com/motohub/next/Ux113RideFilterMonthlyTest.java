@@ -16,7 +16,9 @@ public final class Ux113RideFilterMonthlyTest {
   assertFalse(RideCategoryFilter.matches(RideCategory.WINDING,RideCategory.TOUR));
   assertTrue(RideHistorySearch.matches("2026-11-03 · 출퇴근","완료","출퇴근"));
   assertTrue(RideCategoryFilter.matches(RideCategory.COMMUTE,RideCategory.COMMUTE));
-  assertEquals(7,RideCategoryFilter.OPTIONS.length);
+  assertTrue(RideCategoryFilter.matches(RideCategory.OBD_AUTO,RideCategory.OBD_AUTO));
+  assertFalse(RideCategoryFilter.matches(RideCategory.OBD_AUTO,RideCategory.DAILY));
+  assertEquals(8,RideCategoryFilter.OPTIONS.length);
  }
  @Test public void sixCalendarMonthsCoverTheFirstDayAndRejectPriorMonth(){
   ZoneId zone=ZoneId.of("Asia/Seoul");
