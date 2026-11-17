@@ -23,7 +23,8 @@ final class OdometerAutoSyncInbox {
     ||!OdoAutoSyncPolicy.sane(garageKm)||confirmedDashboardKm<garageKm
     ||confirmedDashboardKm-garageKm>=2000)return false;
   return p(c).edit().putString("baseline",Double.toString(confirmedDashboardKm))
-   .remove("last").remove("lastAt").remove("pending").remove("lastNote").commit();
+   .remove("last").remove("lastAt").remove("pending").remove("lastNote")
+   .remove("lastChecked").remove("lastCheckedAt").commit();
  }
  /** Restored JSON/ZIP may contain older garage km. Invalidate pre-restore
   * ECU baseline and queued values only AFTER successful data commit. */
@@ -63,7 +64,10 @@ final class OdometerAutoSyncInbox {
  static synchronized void acknowledged(Context c,String bikeId,double applied){
   if(!enabled(c,bikeId))return;
   double current=pending(c,bikeId);
-  if(OdoAutoSyncPolicy.sane(current)&&current<=applied+0.05)p(c).edit().remove("pending").commit();
+  if(OdoAutoSyncPolicy.sane(current)&&current<=applied+0.05)
+   p(c).edit().remove("pending")
+    .putString("lastChecked",Double.toString(current))
+    .putLong("lastCheckedAt",System.currentTimeMillis()).commit();
  }
  static synchronized String display(Context c,String bikeId){
   if(!enabled(c,bikeId))return "OBD 누적거리 동기화 꺼짐";
@@ -71,6 +75,13 @@ final class OdometerAutoSyncInbox {
   if(OdoAutoSyncPolicy.sane(pending))
    return "OBD 검증값 "+String.format(java.util.Locale.KOREA,"%.1f km",pending)+" · 차고 반영 대기";
   String note=p(c).getString("lastNote","");
-  return note.isEmpty()?"OBD 계기판 확인값 대기":note;
+  if(!note.isEmpty())return note;
+  try{
+   double last=Double.parseDouble(p(c).getString("lastChecked","NaN"));
+   if(OdoAutoSyncPolicy.sane(last))
+    return "마지막 확인된 ECU 누적거리 "+String.format(java.util.Locale.KOREA,"%,.1f km",last)+
+      " · 실제 차고 km는 기록 화면에서 확인";
+  }catch(Exception ignored){}
+  return "ECU 누적거리 01A6 검증 대기";
  }
 }
