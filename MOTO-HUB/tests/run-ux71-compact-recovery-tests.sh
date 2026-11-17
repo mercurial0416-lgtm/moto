@@ -20,7 +20,8 @@ assert '"매물"' not in (p/"MotoDesign.java").read_text()
 assert 'items("listings")' in hub, "legacy data must be kept accessible in backup"
 assert 'HomeShortcutOrder.parse' in home and 'changeHomeShortcutOrder()' in home
 assert 'Collections.swap' in order
-assert 'RideSavedNotification.post(context)' in inbox and 'manager.notify(406' in notify
+assert 'RideSavedNotification.post(context,row.optBoolean("automatic"))' in inbox and 'manager.notify(406' in notify
+assert '"OBD 자동 라이딩 저장 완료"' in notify, "OBD automatic GPS ride completion is clearly labeled"
 assert 'BackupGpsProof.recordVerifiedZip(this,checkedBackup.trackSha256,checkedBackup.sidecarSha256,snapshot,"FULL".equals(part))' in main
 assert 'BackupIntegrity.verify(check);' in main
 assert 'RideStorageManager.show(a)' in hub
