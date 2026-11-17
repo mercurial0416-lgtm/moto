@@ -670,7 +670,7 @@ final class DeveloperObdScreen {
    setStatus("먼저 휴대폰 GPS를 켜 주세요.");return;
   }
   new AlertDialog.Builder(activity).setTitle("OBD2 자동 라이딩 기록을 켤까요?")
-   .setMessage("연결 장치: "+(device.getName()==null?"이름 없음":device.getName())+"\n\n최초 한 번 동의하면 이 바이크의 OBD 연결을 지속적으로 감시합니다. 속도 7km/h 이상 연속 3회 감지 시 GPS 경로를 시작하고, 정차를 확인하면 저장한 다음 재대기합니다. 연결이 끊어져도 30초~5분 간격으로 반복 재접속하며, 라이딩 중에는 GPS를 유지합니다. 상시 알림과 배터리 사용이 발생합니다. 앱 강제 종료/폰 재부팅 후에는 안드로이드 제한으로 즉시 복구되지 않을 수 있으며, 앱을 다시 열면 복구를 시도합니다. 친구에게 위치를 자동 공유하지 않고 ECU를 수정하지 않습니다. 실차 호환성은 미검증입니다.")
+   .setMessage("연결 장치: "+(device.getName()==null?"이름 없음":device.getName())+"\n\n최초 한 번 동의하면 이 바이크의 OBD 연결을 지속적으로 감시합니다. 속도 5km/h 이상을 2회 연속 정상 수신하면 GPS 경로를 시작하고, 정차를 확인하면 저장한 다음 재대기합니다. 연결이 끊어져도 30초~5분 간격으로 반복 재접속하며, 라이딩 중에는 GPS를 유지합니다. 상시 알림과 배터리 사용이 발생합니다. 앱 강제 종료/폰 재부팅 후에는 안드로이드 제한으로 즉시 복구되지 않을 수 있으며, 앱을 다시 열면 복구를 시도합니다. 친구에게 위치를 자동 공유하지 않고 ECU를 수정하지 않습니다. 실차 호환성은 미검증입니다.")
    .setNegativeButton("취소",null).setPositiveButton("동의하고 자동 감지 시작",(d,w)->{
     JSONObject stillSelected=activity.bike();
     if(stillSelected==null||!bikeId.equals(stillSelected.optString("id"))){
