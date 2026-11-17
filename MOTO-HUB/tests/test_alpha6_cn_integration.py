@@ -11,7 +11,7 @@ checks={
  'invalid OBD2 speed is transient': 'throw new IOException("차량 속도 응답 6회 연속 무효' in monitor,
  'explicit unsupported PID is terminal': 'if(ObdSpeedResponsePolicy.unsupported' in monitor,
  'bounded reconnection preserved': 'ObdConnectionPolicy.shouldRetry' in monitor,
- 'ODO automatic polling only with verified ECU capability and explicit opt-in': 'listener.allowOdometer()' in monitor and 'ObdOdoPollPolicy.due(samples,speed>=0,odoSupported,listener.allowOdometer())' in monitor and 'ObdOdoPollPolicy.java' in str((root/'app/src/main/java/com/motohub/next/ObdOdoPollPolicy.java')) and 'OdoAutoSyncPolicy.consistent(a,b)' in monitor and 'ObdReadOnlyProtocol.query("01A6")' in monitor,
+ 'ODO automatic polling only with verified ECU capability and explicit opt-in': 'listener.allowOdometer()' in monitor and 'ObdOdoPollPolicy.due(samples,speed>=0,odoSupported,listener.allowOdometer())' in monitor and '!speedValid||!supportConfirmed||!consented' in source('ObdOdoPollPolicy.java') and 'OdoAutoSyncPolicy.consistent(a,b)' in monitor and 'ObdReadOnlyProtocol.query("01A6")' in monitor,
  'no ECU writes': 'ObdReadOnlyProtocol.query("010D")' in monitor and 'ATSH' not in monitor and 'CLEAR' not in monitor,
  'durable recovery marker': 'markerOut.getFD().sync()' in recovery and 'if(marker.isFile())marker.delete();' in recovery and 'Files.move(originalCopy,track.toPath()' in recovery,
  'opt-in privacy': 'Sharing.stop(); // Automatic local rides' in service,
