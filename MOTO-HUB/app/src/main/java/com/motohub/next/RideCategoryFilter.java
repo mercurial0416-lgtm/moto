@@ -6,7 +6,7 @@ package com.motohub.next;
  */
 final class RideCategoryFilter {
  static final String ALL="전체 종류";
- static final String[] OPTIONS={ALL,RideCategory.AUTO,RideCategory.DAILY,RideCategory.COMMUTE,
+ static final String[] OPTIONS={ALL,RideCategory.AUTO,RideCategory.OBD_AUTO,RideCategory.DAILY,RideCategory.COMMUTE,
   RideCategory.WINDING,RideCategory.LONG,RideCategory.TOUR};
  private RideCategoryFilter(){}
  static String normalize(String value){
